@@ -325,6 +325,18 @@
     <div class="settings-modal" style="max-width:460px">
       <div class="fm-head"><span>👋 Chào mừng tới Jarvis</span></div>
       <div class="settings-body">
+        <style>
+        .wz-prov{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+        .wz-card{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid rgba(255,255,255,.14);border-radius:10px;cursor:pointer;transition:.15s}
+        .wz-card:hover{border-color:rgba(255,138,60,.5)} .wz-card.sel{border-color:#ff8a3c;background:rgba(255,138,60,.12)}
+        .wz-card input{margin-top:3px;accent-color:#ff8a3c} .wz-card b{font-size:13px;color:#e7eefc}
+        .wz-rec{font-size:10px;background:#ff8a3c;color:#1a1a1a;border-radius:6px;padding:1px 6px;margin-left:6px;font-weight:700}
+        .wz-pdesc{font-size:11.5px;color:#9fb0cf;margin-top:3px;line-height:1.45}
+        .wz-tokhelp{border:1px solid rgba(255,138,60,.3);background:rgba(255,138,60,.06);border-radius:10px;padding:10px 12px;margin-top:8px;font-size:12px;color:#cdd8ee;line-height:1.55}
+        .wz-tokhelp ol{margin:6px 0 4px 18px;padding:0} .wz-tokhelp li{margin:3px 0}
+        .wz-tokhelp code,#wzProvHint code{background:rgba(0,0,0,.35);padding:1px 5px;border-radius:4px;font-size:11px}
+        #wzProvHint{margin-top:8px;font-size:11.5px;color:#8aa}
+        </style>
         <div class="set-note">Vài bước nhanh để bắt đầu. Mọi thứ đổi lại được sau trong ⚙ Cài đặt.</div>
         <div class="set-sec">
           <h4>1. Workspace</h4>
@@ -338,16 +350,43 @@
           <div id="wzTokenWrap" style="display:none">
             <label>Mã thiết lập <span class="dim">(bảo mật)</span></label>
             <input id="wzToken" placeholder="dán MÃ THIẾT LẬP từ log server">
-            <div class="set-note">Jarvis đang chạy public → cần MÃ THIẾT LẬP in trong log/terminal server (Hostinger: <b>App terminal</b>, hoặc <code>docker compose logs jarvis</code>) để xác nhận bạn là chủ.</div>
+            <div class="wz-tokhelp">
+              <b>❓ Mã thiết lập là gì?</b> Jarvis đang chạy trên server công khai. Để chắc <b>chính bạn</b> (không phải người lạ vô tình mở link) là người tạo tài khoản admin, bạn dán một mã chỉ in ra <b>log server</b> — nơi duy nhất chủ máy xem được.
+              <br><b>Cách lấy mã (Hostinger):</b>
+              <ol>
+                <li>Mở app của bạn → bấm <b>App terminal</b> (hoặc vào mục <b>Logs</b>).</li>
+                <li>Chạy lệnh: <code>docker compose logs jarvis | grep "SETUP TOKEN"</code></li>
+                <li>Copy đoạn sau chữ <code>SETUP TOKEN:</code> rồi dán vào ô trên.</li>
+              </ol>
+              💡 <b>Khỏi cần mã:</b> nếu lúc deploy bạn đặt sẵn env <code>JARVIS_ADMIN_PASSWORD</code> (+ <code>JARVIS_ADMIN_USER</code>), mở app ra là <b>đăng nhập luôn</b>, không hỏi mã.
+            </div>
           </div>
         </div>
         <div class="set-sec">
-          <h4>3. Model xử lý</h4>
-          <label>Engine</label>
-          <select id="wzEngine">
-            <option value="cli">Claude Code CLI — đầy đủ MCP / skill / loop</option>
-            <option value="openrouter">OpenRouter — chat thuần (cần API key, đặt sau)</option>
-          </select>
+          <h4>3. Nhà cung cấp AI (bộ não)</h4>
+          <div class="set-note">Chọn 1 nhà cung cấp chính. Đổi lại được trong ⚙ <b>Models</b>.</div>
+          <div class="wz-prov" id="wzProv">
+            <label class="wz-card" data-prov="anthropic-cli">
+              <input type="radio" name="wzprov" value="anthropic-cli" checked>
+              <div><b>🧠 Claude Code <span class="wz-rec">khuyên dùng</span></b>
+                <div class="wz-pdesc">Đăng nhập subscription Claude → đủ MCP, skill, đọc/ghi file, vòng lặp tự cải thiện. Mạnh & đầy đủ nhất.</div></div>
+            </label>
+            <label class="wz-card" data-prov="openai-oauth">
+              <input type="radio" name="wzprov" value="openai-oauth">
+              <div><b>💬 ChatGPT (gói subscription)</b>
+                <div class="wz-pdesc">Đăng nhập ChatGPT Plus/Pro (qua Codex) → vẫn dùng được MCP của Jarvis. Hợp nếu bạn đã có gói ChatGPT.</div></div>
+            </label>
+            <label class="wz-card" data-prov="openrouter">
+              <input type="radio" name="wzprov" value="openrouter">
+              <div><b>🌐 OpenRouter</b>
+                <div class="wz-pdesc">Nhiều model giá rẻ (chat thuần, không MCP). Chỉ cần API key — không cần đăng nhập.</div></div>
+            </label>
+          </div>
+          <div id="wzOrKey" style="display:none">
+            <label>OpenRouter API key <span class="dim">(có thể dán sau ở Models)</span></label>
+            <input id="wzOrKeyInput" placeholder="sk-or-v1-…  (tùy chọn)">
+          </div>
+          <div id="wzProvHint"></div>
         </div>
         <div class="set-actions"><button class="s-btn" id="wzFinish">Bắt đầu dùng Jarvis →</button></div>
         <div class="auth-err" id="wzErr"></div>
@@ -438,7 +477,7 @@
   <script src="https://unpkg.com/three@0.159.0/build/three.min.js"></script>
   <script src="https://unpkg.com/3d-force-graph@1.73.4/dist/3d-force-graph.min.js"></script>
   <script src="/static/graph3d.js?v=13"></script>
-  <script src="/static/app.js?v=44"></script>
+  <script src="/static/app.js?v=45"></script>
   <script src="/static/sessions-ui.js?v=1"></script>
   <script src="/static/studio.js?v=10"></script>
   <!-- Console layer: console.js đăng ký store TRƯỚC khi Alpine khởi động (defer) -->

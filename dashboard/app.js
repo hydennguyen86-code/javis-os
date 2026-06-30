@@ -1455,7 +1455,6 @@ async function initSetup() {
     // Đã setup, đã có tài khoản, hoặc bị chặn auth (đang ở màn đăng nhập) → không hiện wizard
     if (s.setup_done || (s.auth && s.auth.has_password) || s.auth_required) return false;
     document.getElementById("wzWsName").value = s.workspace_name || "";
-    document.getElementById("wzEngine").value = (s.model && s.model.engine) || "cli";
     document.getElementById("setupWizard").classList.add("open");
     return true;
   } catch (e) { return false; }
@@ -1466,7 +1465,7 @@ if (document.getElementById("wzFinish")) {
     const ws = document.getElementById("wzWsName").value.trim();
     const user = document.getElementById("wzUser").value.trim();
     const pass = document.getElementById("wzPass").value;
-    const engine = document.getElementById("wzEngine").value;
+    const prov = (document.querySelector('input[name="wzprov"]:checked') || {}).value || "anthropic-cli";
     const btn = document.getElementById("wzFinish"); btn.disabled = true; btn.textContent = "Đang lưu…";
     if (_wizardMandatory && !pass) { err.textContent = "Bắt buộc đặt mật khẩu khi chạy trên server công khai."; btn.disabled = false; btn.textContent = "Bắt đầu dùng Jarvis →"; return; }
     try {
@@ -1476,11 +1475,36 @@ if (document.getElementById("wzFinish")) {
         if (!d.ok) { err.textContent = d.error || "Đặt mật khẩu lỗi"; btn.disabled = false; btn.textContent = "Bắt đầu dùng Jarvis →"; return; }
       }
       await fetch("/settings", { method: "POST", body: _fd({ section: "general", data: JSON.stringify({ workspace_name: ws, setup_done: true }) }) });
-      await fetch("/settings", { method: "POST", body: _fd({ section: "model", data: JSON.stringify({ engine }) }) });
+      const _PM = { "anthropic-cli": "sonnet", "openai-oauth": "gpt-5.5", "openrouter": "openai/gpt-4o-mini" };
+      const _mp = { main: { provider: prov, model: _PM[prov] || "sonnet" } };
+      const _ork = (document.getElementById("wzOrKeyInput") || {}).value;
+      if (prov === "openrouter" && _ork && _ork.trim()) _mp.openrouter_key = _ork.trim();
+      await fetch("/settings", { method: "POST", body: _fd({ section: "model", data: JSON.stringify(_mp) }) });
       location.reload();
     } catch (e) { err.textContent = "Lỗi mạng"; btn.disabled = false; btn.textContent = "Bắt đầu dùng Jarvis →"; }
   });
 }
+
+// Wizard — chọn nhà cung cấp (card radio) + hiện ô key OpenRouter + gợi ý cách kết nối
+(function () {
+  const cards = document.querySelectorAll("#wzProv .wz-card");
+  if (!cards.length) return;
+  const orKey = document.getElementById("wzOrKey");
+  const hint = document.getElementById("wzProvHint");
+  const HINTS = {
+    "anthropic-cli": "Sau khi vào: đăng nhập Claude 1 lần — chạy <code>claude auth login --claudeai</code> trong terminal (Hostinger: App terminal).",
+    "openai-oauth": "Sau khi vào: mục <b>Models</b> → đăng nhập ChatGPT (hoặc <code>codex login</code> trong terminal).",
+    "openrouter": "Lấy key tại <a href='https://openrouter.ai/keys' target='_blank' style='color:#bcd2ff'>openrouter.ai/keys</a> rồi dán ở trên (hoặc sau ở Models).",
+  };
+  function pick(prov) {
+    cards.forEach(c => c.classList.toggle("sel", c.dataset.prov === prov));
+    const r = document.querySelector('input[name="wzprov"][value="' + prov + '"]'); if (r) r.checked = true;
+    if (orKey) orKey.style.display = prov === "openrouter" ? "" : "none";
+    if (hint) hint.innerHTML = HINTS[prov] || "";
+  }
+  cards.forEach(c => c.addEventListener("click", () => pick(c.dataset.prov)));
+  pick("anthropic-cli");
+})();
 
 // ============================================
 // Boot
