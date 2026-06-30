@@ -2836,7 +2836,9 @@ async def telegram_status():
     t = cfgmod.read_settings().get("telegram", {})
     running = bool(_TG_BOT and _TG_BOT._task and not _TG_BOT._task.done())
     return {"enabled": bool(t.get("enabled")), "token_set": bool(t.get("token")),
-            "chat_id": t.get("chat_id", ""), "running": running}
+            "chat_id": t.get("chat_id", ""), "running": running,
+            "status": (_TG_BOT.status if _TG_BOT else "off"),
+            "last_error": (_TG_BOT.last_error if _TG_BOT else "")}
 
 
 @app.post("/telegram/restart")

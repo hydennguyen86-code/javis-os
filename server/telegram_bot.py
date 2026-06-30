@@ -37,6 +37,8 @@ class TelegramBot:
         self._current = None                # task lượt trả lời đang chạy
         self._stop = False
         self.offset = 0
+        self.status = "off"      # off | starting | polling | conflict | error | stopped
+        self.last_error = ""
 
     def _url(self, method):
         return TG_API.format(token=self.token, method=method)
@@ -83,18 +85,24 @@ class TelegramBot:
             except Exception as e:
                 print(f"[telegram setMyCommands] {e}", file=sys.stderr)
             print(f"[telegram] bot started (chat_id={self.chat_id or 'mọi người'})", file=sys.stderr)
+            self.status = "polling"
             while not self._stop:
                 try:
                     r = await client.get(self._url("getUpdates"), params={"offset": self.offset, "timeout": 25})
                     data = r.json()
                     if not data.get("ok"):
                         if data.get("error_code") == 409:
+                            self.status = "conflict"
+                            self.last_error = "Token đang được poll ở nơi khác — chỉ bật bot ở 1 nơi."
                             print("[telegram] 409 CONFLICT — cùng token đang poll ở nơi khác. Chỉ chạy 1 nơi.", file=sys.stderr)
                             await asyncio.sleep(20)
                         else:
+                            self.status = "error"
+                            self.last_error = data.get("description") or "getUpdates lỗi"
                             print(f"[telegram] getUpdates lỗi: {data.get('description')}", file=sys.stderr)
                             await asyncio.sleep(10)
                         continue
+                    self.status = "polling"; self.last_error = ""
                     for upd in data.get("result", []):
                         self.offset = upd["update_id"] + 1
                         cq = upd.get("callback_query")
@@ -176,11 +184,13 @@ class TelegramBot:
 
     def start(self):
         self._stop = False
+        self.status = "starting"
         if not self._task or self._task.done():
             self._task = asyncio.create_task(self._loop())
 
     def stop(self):
         self._stop = True
+        self.status = "stopped"
         if self._current and not self._current.done():
             self._current.cancel()
         if self._task:

@@ -953,13 +953,27 @@
       </div>
       ${placeholder("channels", "Sắp tới: thêm kênh Zalo, web widget… mỗi kênh là 1 card ở đây.")}`;
     const st = document.getElementById("tgStatus");
+    async function refreshTgStatus() {
+      let d; try { d = await (await fetch("/telegram/status")).json(); } catch (e) { return; }
+      let line;
+      if (!d.enabled) line = "⚪ Bot CHƯA bật — tích 'Bật bot Telegram' rồi Lưu (test gửi được KHÔNG có nghĩa bot đang nhận tin).";
+      else if (!d.token_set) line = "⚪ Chưa có bot token.";
+      else if (d.status === "polling") line = "🟢 Bot đang nhận tin — nhắn cho bot là Jarvis trả lời.";
+      else if (d.status === "conflict") line = "🔴 TRÙNG TOKEN (409): token đang bị poll ở nơi khác (vd Jarvis local của bạn vẫn bật bot). Tắt bot ở nơi kia — 1 token chỉ chạy 1 nơi.";
+      else if (d.status === "error") line = "⚠ Lỗi bot: " + (d.last_error || "");
+      else if (d.status === "starting") line = "⏳ Đang khởi động bot…";
+      else line = "⚪ Bot đã tắt.";
+      st.textContent = line;
+    }
+    refreshTgStatus();
     document.getElementById("tgSave").onclick = async () => {
       const data = { enabled: document.getElementById("tgEnabled").checked, chat_id: document.getElementById("tgChat").value.trim() };
       const tok = document.getElementById("tgToken").value.trim();
       if (tok) data.token = tok;
       st.textContent = "Đang lưu...";
       const r = await saveSetting("telegram", data);
-      st.textContent = r.ok ? "✅ Đã lưu & khởi động lại bot." : "⚠ Lỗi lưu.";
+      st.textContent = r.ok ? "✅ Đã lưu, đang khởi động bot…" : "⚠ Lỗi lưu.";
+      if (r.ok) setTimeout(refreshTgStatus, 1800);
     };
     document.getElementById("tgTest").onclick = async () => {
       st.textContent = "Đang gửi test...";
