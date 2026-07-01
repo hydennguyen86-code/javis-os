@@ -1,7 +1,7 @@
 // ============================================
 // JAVIS OS - Console layer (sidebar + router)
 // Bọc ngoài cockpit: rail điều hướng + trang quản lý. KHÔNG sửa app.js.
-// Graph 3D tự pause khi rời cockpit (qua window.__jarvisGraph). Alpine cho UI.
+// Graph 3D tự pause khi rời cockpit (qua window.__javisGraph). Alpine cho UI.
 // Thêm trang mới = thêm 1 mục vào RAIL_ITEMS + 1 case trong renderPage().
 // ============================================
 (function () {
@@ -82,11 +82,11 @@
   // Pause SỚM (chạy ngay khi parse, không chờ Alpine tải): màn hẹp → graph app.js vừa dựng
   // dừng luôn, khỏi ngốn pin/GPU trong lúc Alpine đang tải. _animate có guard _paused nên
   // dù load() chạy xong gọi lại cũng không bật lại.
-  if (isNarrow() && window.__jarvisGraph) { try { window.__jarvisGraph.pause(); } catch (e) {} }
+  if (isNarrow() && window.__javisGraph) { try { window.__javisGraph.pause(); } catch (e) {} }
 
   // ---- Điều khiển graph: chỉ chạy khi đang ở cockpit + không lite + không mở Studio ----
   function recomputeGraph() {
-    const g = window.__jarvisGraph;
+    const g = window.__javisGraph;
     if (!g) return;
     const studioOpen = !!document.getElementById("studio")?.classList.contains("open");
     const active = window.Alpine ? Alpine.store("nav").active : "home";
@@ -319,7 +319,7 @@
       catch (e) { listEl.innerHTML = `<div class="empty" style="padding:20px;color:#d98">Lỗi kết nối: ${esc(e.message)}</div>`; return; }
       if (!resp.ok || d.error) {
         const msg = d.error || (resp.status === 404
-          ? "Máy chủ Javis chưa có chức năng Tệp tin - hãy KHỞI ĐỘNG LẠI server (stop-jarvis.bat → start-jarvis.vbs) rồi tải lại trang."
+          ? "Máy chủ Javis chưa có chức năng Tệp tin - hãy KHỞI ĐỘNG LẠI server (stop-javis.bat → start-javis.vbs) rồi tải lại trang."
           : resp.status === 401 ? "Phiên đăng nhập hết hạn - tải lại trang & đăng nhập."
           : "Lỗi máy chủ (" + resp.status + ").");
         listEl.innerHTML = `<div class="empty" style="padding:20px;color:#d98">⚠ ${esc(msg)}</div>`; return;
@@ -652,7 +652,7 @@
     const mig = document.getElementById("ovMigrate");
     if (mig) mig.onclick = async () => {
       const brain = (window.currentBrainPath ? currentBrainPath() : "brain");
-      if (!confirm("Chuẩn hóa cấu trúc brain đang chọn?\n(Di chuyển Jarvis/agents→agents, Jarvis/workflows→workflows, Memory→memory. Có git backup.)")) return;
+      if (!confirm("Chuẩn hóa cấu trúc brain đang chọn?\n(Di chuyển Javis/agents→agents, Javis/workflows→workflows, Memory→memory. Có git backup.)")) return;
       mig.disabled = true; mig.textContent = "Đang chuẩn hóa...";
       const fd = new FormData(); fd.append("brain", brain);
       let r = {};
@@ -1299,7 +1299,7 @@
     const host = el.querySelector(".cs-host");
     const qs = document.getElementById("quickSet");
     if (qs && host) host.appendChild(qs);         // nhúng bộ điều khiển cũ vào trang (giữ handler)
-    if (window.__jarvisRefreshExtras) { try { window.__jarvisRefreshExtras(); } catch (e) {} }  // nạp lại avatar/tên miền
+    if (window.__javisRefreshExtras) { try { window.__javisRefreshExtras(); } catch (e) {} }  // nạp lại avatar/tên miền
 
     const provSel = document.getElementById("vpProvider");
     const showFields = () => {

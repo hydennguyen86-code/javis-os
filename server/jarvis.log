@@ -1,0 +1,551 @@
+D:\Project\Javis-OS\server\main.py:2115: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("startup")
+INFO:     Started server process [13044]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:7777 (Press CTRL+C to quit)
+INFO:     127.0.0.1:62164 - "GET /health HTTP/1.1" 200 OK
+[telegram] bot started (chat_id=673780529)
+INFO:     ('127.0.0.1', 49983) - "WebSocket /ws/graph?path=D%3A%5CMy%20Bullet%20Journal" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 50060) - "WebSocket /ws" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:50063 - "GET /auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63961 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63961 - "POST /brain/migrate HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63961 - "POST /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63961 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51791 - "GET / HTTP/1.1" 200 OK
+INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:51791 - "GET /static/style.css?v=23 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51791 - "GET /static/console.css?v=11 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51791 - "GET /static/voice.js?v=9 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51791 - "GET /static/graph3d.js?v=13 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51791 - "GET /static/app.js?v=44 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51791 - "GET /static/sessions-ui.js?v=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51791 - "GET /static/studio.js?v=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51791 - "GET /static/console.js?v=25 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51791 - "GET /config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65251 - "GET /auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52476 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51791 - "GET /graph?path=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51583 - "GET /memory/stats?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65251 - "GET /agents?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55867 - "GET /skills?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59852 - "GET /workflows?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52476 - "GET /automations?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     ('127.0.0.1', 62290) - "WebSocket /ws" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:51583 - "GET /loop/config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65251 - "GET /loop/log?brain=D%3A%5CMy%20Bullet%20Journal&limit=8 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55867 - "GET /vault/check?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52476 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51791 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51791 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     ('127.0.0.1', 50713) - "WebSocket /ws/graph?path=D%3A%5CMy%20Bullet%20Journal" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:59852 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58978 - "GET /workflows?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58978 - "GET /agents?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58978 - "GET /skills?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58978 - "GET /workflows?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58978 - "GET /automations?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58978 - "GET /agents?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58978 - "GET /agents?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62918 - "GET /skills?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62274 - "GET /workflows?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60862 - "GET /automations?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60862 - "GET /skills?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60862 - "GET /agents?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62274 - "GET /skills?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62918 - "GET /workflows?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58978 - "GET /automations?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58978 - "GET /files/list?brain=D%3A%5CMy%20Bullet%20Journal&path= HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58978 - "GET /skills?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58978 - "GET /agents?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62918 - "GET /skills?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62274 - "GET /workflows?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60862 - "GET /automations?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60862 - "GET /agents?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60862 - "GET /agents?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62274 - "GET /skills?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62918 - "GET /workflows?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58978 - "GET /automations?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58978 - "GET /skills?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58978 - "GET /agents?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62918 - "GET /skills?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62274 - "GET /workflows?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60862 - "GET /automations?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60862 - "GET /loop/config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60862 - "GET /loop/config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62274 - "GET /loop/log?brain=D%3A%5CMy%20Bullet%20Journal&limit=8 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54733 - "GET /mcp/list HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54733 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54733 - "GET /mcp/ambient HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54733 - "POST /mcp/delete HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54733 - "GET /mcp/list HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54733 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54733 - "GET /mcp/ambient HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52095 - "GET /workflows?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52095 - "GET /agents?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52095 - "GET /skills?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52095 - "GET /workflows?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52095 - "GET /automations?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52095 - "GET /agents?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51420 - "GET /sessions?brain=D%3A%5CMy%20Bullet%20Journal&limit=60 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54937 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54937 - "GET /skills?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54937 - "GET /agents?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59563 - "GET /skills?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54937 - "GET /workflows?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59563 - "GET /automations?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59563 - "GET /workflows?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59563 - "GET /agents?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54937 - "GET /skills?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50991 - "GET /workflows?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53276 - "GET /automations?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53276 - "GET /skills?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53276 - "GET /agents?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50991 - "GET /skills?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54937 - "GET /workflows?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59563 - "GET /automations?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59563 - "GET /files/list?brain=D%3A%5CMy%20Bullet%20Journal&path= HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59563 - "GET /loop/config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59563 - "GET /loop/config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59563 - "GET /loop/log?brain=D%3A%5CMy%20Bullet%20Journal&limit=8 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64372 - "GET /automations?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64372 - "GET /agents?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64372 - "GET /skills?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64372 - "GET /workflows?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64372 - "GET /automations?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64372 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64372 - "GET /claude/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64372 - "GET /automations?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64372 - "GET /agents?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60200 - "GET /skills?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53318 - "GET /workflows?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52349 - "GET /automations?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59268 - "GET /files/list?brain=D%3A%5CMy%20Bullet%20Journal&path= HTTP/1.1" 200 OK
+INFO:     connection closed
+INFO:     127.0.0.1:51977 - "GET /graph?source=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51977 - "GET /memory/stats?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51977 - "GET /agents?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51977 - "GET /skills?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51977 - "GET /workflows?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51977 - "GET /automations?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51977 - "GET /loop/log?brain=brain&limit=8 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51977 - "GET /vault/check?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51977 - "GET /files/list?brain=brain&path= HTTP/1.1" 200 OK
+INFO:     ('127.0.0.1', 56934) - "WebSocket /ws/graph?source=brain" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:53937 - "GET / HTTP/1.1" 200 OK
+INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:53937 - "GET /static/style.css?v=23 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50546 - "GET /static/console.css?v=11 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53937 - "GET /static/voice.js?v=9 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50546 - "GET /static/graph3d.js?v=13 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53937 - "GET /static/app.js?v=45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50546 - "GET /static/sessions-ui.js?v=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53937 - "GET /static/studio.js?v=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50546 - "GET /static/console.js?v=25 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50546 - "GET /config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53937 - "GET /auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52330 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50546 - "GET /graph?source=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52675 - "GET /memory/stats?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53229 - "GET /agents?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50394 - "GET /skills?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53937 - "GET /workflows?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52330 - "GET /automations?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50546 - "GET /loop/config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52675 - "GET /loop/log?brain=brain&limit=8 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53229 - "GET /vault/check?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52330 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52330 - "GET /settings HTTP/1.1" 200 OK
+INFO:     ('127.0.0.1', 50062) - "WebSocket /ws" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 57652) - "WebSocket /ws/graph?source=brain" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:52330 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:54200 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54200 - "GET /static/style.css?v=23 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54200 - "GET /static/console.css?v=11 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54200 - "GET /static/voice.js?v=9 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54200 - "GET /static/graph3d.js?v=13 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54200 - "GET /static/app.js?v=45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54200 - "GET /static/sessions-ui.js?v=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54200 - "GET /static/studio.js?v=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54200 - "GET /static/console.js?v=25 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54200 - "GET /config HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:65509 - "GET /settings HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:54200 - "GET /auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54200 - "GET /graph?source=brain HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:65509 - "GET /memory/stats?brain=brain HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:63460 - "GET /agents?brain=brain HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:58685 - "GET /skills?brain=brain HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:52259 - "GET /workflows?brain=brain HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:64201 - "GET /automations?brain=brain HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:54200 - "GET /loop/config HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:65509 - "GET /loop/log?brain=brain&limit=8 HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:63460 - "GET /vault/check?brain=brain HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:58685 - "GET /metrics HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:58685 - "GET /settings HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:58685 - "GET /agents?brain=brain HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:63460 - "GET /skills?brain=brain HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:65509 - "GET /workflows?brain=brain HTTP/1.1" 401 Unauthorized
+INFO:     ('127.0.0.1', 55989) - "WebSocket /ws" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('127.0.0.1', 54627) - "WebSocket /ws/graph?source=brain" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('127.0.0.1', 64225) - "WebSocket /ws" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('127.0.0.1', 52466) - "WebSocket /ws/graph?source=brain" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('127.0.0.1', 50651) - "WebSocket /ws" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('127.0.0.1', 59932) - "WebSocket /ws/graph?source=brain" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('127.0.0.1', 51821) - "WebSocket /ws" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('127.0.0.1', 64274) - "WebSocket /ws/graph?source=brain" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('127.0.0.1', 50838) - "WebSocket /ws" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('127.0.0.1', 53684) - "WebSocket /ws/graph?source=brain" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     127.0.0.1:50394 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62585 - "GET / HTTP/1.1" 200 OK
+INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:62585 - "GET /static/style.css?v=24 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49828 - "GET /static/console.css?v=12 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62585 - "GET /static/logo.png?v=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49828 - "GET /static/voice.js?v=9 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49828 - "GET /static/graph3d.js?v=13 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62585 - "GET /static/app.js?v=45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64012 - "GET /static/sessions-ui.js?v=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51912 - "GET /static/studio.js?v=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49828 - "GET /static/console.js?v=25 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49828 - "GET /config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51912 - "GET /auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62585 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62585 - "GET /graph?source=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51912 - "GET /memory/stats?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49828 - "GET /agents?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64012 - "GET /skills?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55280 - "GET /workflows?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59612 - "GET /automations?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62585 - "GET /loop/config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51912 - "GET /loop/log?brain=brain&limit=8 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49828 - "GET /vault/check?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51912 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51912 - "GET /settings HTTP/1.1" 200 OK
+INFO:     ('127.0.0.1', 64813) - "WebSocket /ws" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 61394) - "WebSocket /ws/graph?source=brain" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:51912 - "GET /static/favicon.png?v=1 HTTP/1.1" 200 OK
+INFO:     connection closed
+INFO:     127.0.0.1:51912 - "GET /graph?path=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62585 - "GET /memory/stats?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59612 - "GET /vault/check?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55280 - "GET /agents?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64012 - "GET /skills?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51912 - "GET /workflows?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62585 - "GET /automations?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59612 - "GET /loop/log?brain=D%3A%5CMy%20Bullet%20Journal&limit=8 HTTP/1.1" 200 OK
+INFO:     ('127.0.0.1', 53160) - "WebSocket /ws/graph?path=D%3A%5CMy%20Bullet%20Journal" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:59612 - "GET /sessions?brain=D%3A%5CMy%20Bullet%20Journal&limit=60 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49324 - "GET /sessions?brain=D%3A%5CMy%20Bullet%20Journal&limit=60 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57256 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57256 - "GET /workflows?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57256 - "GET /agents?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57256 - "GET /skills?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57256 - "GET /workflows?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57256 - "GET /automations?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57256 - "GET /agents?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57256 - "GET /agents?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57954 - "GET /skills?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65337 - "GET /workflows?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54499 - "GET /automations?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54499 - "GET /workflows?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54499 - "GET /agents?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65337 - "GET /skills?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57954 - "GET /workflows?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57256 - "GET /automations?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50965 - "GET /agents?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50965 - "GET /agents?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50965 - "GET /skills?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50965 - "GET /workflows?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50965 - "GET /automations?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50965 - "GET /skills?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50965 - "GET /agents?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56082 - "GET /skills?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49557 - "GET /workflows?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62252 - "GET /automations?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62252 - "GET /files/list?brain=D%3A%5CMy%20Bullet%20Journal&path= HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62252 - "GET /loop/config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62252 - "GET /loop/config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49557 - "GET /loop/log?brain=D%3A%5CMy%20Bullet%20Journal&limit=8 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49828 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56785 - "GET /files/list?brain=D%3A%5CMy%20Bullet%20Journal&path= HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58511 - "GET /files/list?brain=D%3A%5CMy%20Bullet%20Journal&path= HTTP/1.1" 200 OK
+INFO:     connection closed
+INFO:     127.0.0.1:58511 - "GET /files/list?brain=D%3A%5CQuyBrain&path= HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58511 - "GET /graph?path=D%3A%5CQuyBrain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58511 - "GET /memory/stats?brain=D%3A%5CQuyBrain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58511 - "GET /agents?brain=D%3A%5CQuyBrain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58511 - "GET /skills?brain=D%3A%5CQuyBrain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58511 - "GET /workflows?brain=D%3A%5CQuyBrain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58511 - "GET /automations?brain=D%3A%5CQuyBrain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58511 - "GET /loop/log?brain=D%3A%5CQuyBrain&limit=8 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58511 - "GET /vault/check?brain=D%3A%5CQuyBrain HTTP/1.1" 200 OK
+INFO:     ('127.0.0.1', 56973) - "WebSocket /ws/graph?path=D%3A%5CQuyBrain" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:58511 - "GET /graph?path=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59342 - "GET /memory/stats?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61518 - "GET /agents?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49979 - "GET /skills?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51699 - "GET /workflows?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55362 - "GET /automations?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58511 - "GET /loop/log?brain=D%3A%5CMy%20Bullet%20Journal&limit=8 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59342 - "GET /vault/check?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61518 - "GET /files/list?brain=D%3A%5CMy%20Bullet%20Journal&path= HTTP/1.1" 200 OK
+INFO:     ('127.0.0.1', 52232) - "WebSocket /ws/graph?path=D%3A%5CMy%20Bullet%20Journal" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:57682 - "GET / HTTP/1.1" 200 OK
+INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:57682 - "GET /static/style.css?v=24 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51029 - "GET /static/console.css?v=12 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57682 - "GET /static/logo.png?v=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51029 - "GET /static/voice.js?v=9 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51029 - "GET /static/graph3d.js?v=13 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57682 - "GET /static/app.js?v=45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57694 - "GET /static/sessions-ui.js?v=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53950 - "GET /static/studio.js?v=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51029 - "GET /static/console.js?v=25 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51029 - "GET /config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53950 - "GET /auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57682 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51029 - "GET /graph?path=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53950 - "GET /memory/stats?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57694 - "GET /agents?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57682 - "GET /skills?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     ('127.0.0.1', 55536) - "WebSocket /ws" [accepted]
+INFO:     127.0.0.1:53652 - "GET /workflows?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     connection open
+INFO:     127.0.0.1:51029 - "GET /loop/config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58456 - "GET /automations?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53950 - "GET /loop/log?brain=D%3A%5CMy%20Bullet%20Journal&limit=8 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57694 - "GET /vault/check?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53652 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51029 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58456 - "GET /static/favicon.png?v=1 HTTP/1.1" 200 OK
+INFO:     ('127.0.0.1', 62303) - "WebSocket /ws/graph?path=D%3A%5CMy%20Bullet%20Journal" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:49403 - "GET /sessions?brain=D%3A%5CMy%20Bullet%20Journal&limit=60 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56110 - "GET /sessions?brain=D%3A%5CMy%20Bullet%20Journal&limit=60 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57682 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49322 - "POST /upload HTTP/1.1" 200 OK
+INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:56804 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56804 - "GET /static/brains-ui.js?v=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56804 - "GET /config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59453 - "GET /auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56804 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56804 - "GET /graph?path=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59453 - "GET /memory/stats?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     ('127.0.0.1', 64381) - "WebSocket /ws" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:56804 - "GET /loop/config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54561 - "GET /agents?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64506 - "GET /skills?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59453 - "GET /loop/log?brain=D%3A%5CMy%20Bullet%20Journal&limit=8 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55399 - "GET /workflows?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63883 - "GET /automations?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56804 - "GET /vault/check?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64506 - "GET /brains HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:59453 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56804 - "GET /settings HTTP/1.1" 200 OK
+INFO:     ('127.0.0.1', 60366) - "WebSocket /ws/graph?path=D%3A%5CMy%20Bullet%20Journal" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:56804 - "GET / HTTP/1.1" 200 OK
+INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:56804 - "GET /static/style.css?v=24 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59453 - "GET /static/console.css?v=12 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63883 - "GET /static/voice.js?v=9 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64506 - "GET /static/logo.png?v=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63883 - "GET /static/brains-ui.js?v=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59453 - "GET /static/app.js?v=45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64506 - "GET /static/graph3d.js?v=13 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55399 - "GET /static/studio.js?v=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56804 - "GET /static/sessions-ui.js?v=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64506 - "GET /static/console.js?v=25 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64506 - "GET /config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59453 - "GET /auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56804 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64506 - "GET /graph?path=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63883 - "GET /memory/stats?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55399 - "GET /agents?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59453 - "GET /skills?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56804 - "GET /workflows?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53493 - "GET /automations?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63883 - "GET /loop/config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55399 - "GET /loop/log?brain=D%3A%5CMy%20Bullet%20Journal&limit=8 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64506 - "GET /vault/check?brain=D%3A%5CMy%20Bullet%20Journal HTTP/1.1" 200 OK
+INFO:     ('127.0.0.1', 56252) - "WebSocket /ws" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:56804 - "GET /brains HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:53493 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63883 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55399 - "GET /static/favicon.png?v=1 HTTP/1.1" 200 OK
+INFO:     ('127.0.0.1', 56228) - "WebSocket /ws/graph?path=D%3A%5CMy%20Bullet%20Journal" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:55399 - "GET /graph?source=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63883 - "GET /memory/stats?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53493 - "GET /agents?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56804 - "GET /skills?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64506 - "GET /workflows?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55399 - "GET /automations?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63883 - "GET /loop/log?brain=brain&limit=8 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53493 - "GET /vault/check?brain=brain HTTP/1.1" 200 OK
+INFO:     ('127.0.0.1', 55179) - "WebSocket /ws/graph?source=brain" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:53160 - "POST /vault/init HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53160 - "GET /vault/check?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53160 - "GET / HTTP/1.1" 200 OK
+INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:53160 - "GET /static/style.css?v=24 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53160 - "GET /static/console.css?v=12 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53160 - "GET /static/logo.png?v=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53160 - "GET /static/voice.js?v=9 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53160 - "GET /static/graph3d.js?v=13 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53160 - "GET /static/app.js?v=45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53160 - "GET /static/brains-ui.js?v=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53160 - "GET /static/sessions-ui.js?v=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53160 - "GET /static/studio.js?v=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53160 - "GET /static/console.js?v=25 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53160 - "GET /config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59282 - "GET /auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58975 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51041 - "GET /graph?source=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53160 - "GET /memory/stats?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59893 - "GET /agents?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64952 - "GET /skills?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59282 - "GET /workflows?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58975 - "GET /automations?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51041 - "GET /loop/config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53160 - "GET /loop/log?brain=brain&limit=8 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59893 - "GET /vault/check?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59282 - "GET /brains HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:58975 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51041 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51041 - "GET /static/favicon.png?v=1 HTTP/1.1" 200 OK
+INFO:     ('127.0.0.1', 61551) - "WebSocket /ws" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 61545) - "WebSocket /ws/graph?source=brain" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:63698 - "GET /browse?path= HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63698 - "GET /browse?path=D%3A%5C HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59680 - "GET /browse?path=D%3A%5C HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64952 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63698 - "GET /browse?path=D%3A%5CBrowser HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64442 - "POST /brains/new HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:59905 - "POST /brains/new HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:59905 - "GET / HTTP/1.1" 200 OK
+INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:59905 - "GET /static/style.css?v=24 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59905 - "GET /static/console.css?v=12 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59905 - "GET /static/logo.png?v=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59905 - "GET /static/voice.js?v=9 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59905 - "GET /static/graph3d.js?v=13 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64863 - "GET /static/app.js?v=45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59905 - "GET /static/brains-ui.js?v=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64863 - "GET /static/sessions-ui.js?v=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59905 - "GET /static/studio.js?v=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64863 - "GET /static/console.js?v=25 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64863 - "GET /config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59905 - "GET /auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55286 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64863 - "GET /graph?source=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58881 - "GET /memory/stats?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59905 - "GET /agents?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55286 - "GET /automations?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63339 - "GET /skills?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65266 - "GET /workflows?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64863 - "GET /loop/config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58881 - "GET /loop/log?brain=brain&limit=8 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59905 - "GET /vault/check?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55286 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63339 - "GET /brains HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:65266 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64863 - "GET /settings HTTP/1.1" 200 OK
+INFO:     ('127.0.0.1', 65045) - "WebSocket /ws" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:64863 - "GET /static/favicon.png?v=1 HTTP/1.1" 200 OK
+INFO:     ('127.0.0.1', 64037) - "WebSocket /ws/graph?source=brain" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:51828 - "GET / HTTP/1.1" 200 OK
+INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:51828 - "GET /static/style.css?v=24 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61958 - "GET /static/console.css?v=12 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51828 - "GET /static/logo.png?v=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61958 - "GET /static/voice.js?v=9 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61958 - "GET /static/graph3d.js?v=13 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51828 - "GET /static/app.js?v=45 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55787 - "GET /static/sessions-ui.js?v=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64801 - "GET /static/brains-ui.js?v=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61958 - "GET /static/studio.js?v=10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55787 - "GET /static/console.js?v=25 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55787 - "GET /config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61958 - "GET /auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51828 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55787 - "GET /graph?source=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64801 - "GET /memory/stats?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52263 - "GET /agents?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62969 - "GET /skills?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61958 - "GET /workflows?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51828 - "GET /automations?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55787 - "GET /loop/config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64801 - "GET /loop/log?brain=brain&limit=8 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52263 - "GET /vault/check?brain=brain HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61958 - "GET /brains HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51828 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55787 - "GET /settings HTTP/1.1" 200 OK
+INFO:     ('127.0.0.1', 65095) - "WebSocket /ws" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:55787 - "GET /static/favicon.png?v=1 HTTP/1.1" 200 OK
+INFO:     ('127.0.0.1', 62521) - "WebSocket /ws/graph?source=brain" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:55787 - "POST /brains/new HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:62969 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53699 - "GET /brains HTTP/1.1" 404 Not Found
+INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:53699 - "GET /favicon.ico HTTP/1.1" 404 Not Found

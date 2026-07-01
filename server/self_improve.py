@@ -147,13 +147,13 @@ class LoopFeature:
             elif goal == "product":
                 base = (
                     "MỤC TIÊU: TỰ CẢI THIỆN JAVIS hữu dụng hơn với người dùng.\n"
-                    "Đọc log hội thoại gần đây (Memory/conversations) + các agent/workflow trong Jarvis/ + ghi chú phản hồi. "
+                    "Đọc log hội thoại gần đây (Memory/conversations) + các agent/workflow trong Javis/ + ghi chú phản hồi. "
                     "Nhận diện: người dùng hay vướng gì, yêu cầu lặp lại gì, thiếu agent/workflow/skill nào, chỗ nào gây khó. "
                     "⛔ AN TOÀN: CHỈ thao tác FILE trong vault, KHÔNG gọi MCP/tiền/đơn, KHÔNG sửa code server.\n"
                 )
                 if mode == "auto":
                     prompt = base + (
-                        "Thực hiện 1 cải tiến cụ thể: tạo/cải thiện 1 agent hoặc workflow trong Jarvis/ (đúng format frontmatter), "
+                        "Thực hiện 1 cải tiến cụ thể: tạo/cải thiện 1 agent hoặc workflow trong Javis/ (đúng format frontmatter), "
                         "hoặc ghi 1 note đề xuất cải tiến UX/tính năng vào '05 - Projects'. Báo cáo NGẮN: cải tiến gì, file nào, vì sao."
                     )
                 else:

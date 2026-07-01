@@ -131,7 +131,7 @@ Cột trái (SỐ LIỆU KINH DOANH) hiện các thẻ số liệu. Có 3 nguồ
 
 1. **Tự tải khi mở trang.** Javis quét các nguồn dữ liệu (POS, kênh, quảng cáo...) đã kết nối và điền số. Nếu chưa đấu nguồn kinh doanh nào, panel hiện thay bằng số Agents / Skills / Workflows của vault.
 2. **Bấm nút ⟳** cạnh chữ SỐ LIỆU KINH DOANH để lấy lại số mới nhất.
-3. **Trong lúc trò chuyện.** Khi bạn hỏi về tình hình kinh doanh, Javis có thể gắn kèm một khối số liệu ẩn trong câu trả lời (đánh dấu `JARVIS_METRICS`). Javis tự gỡ khối này ra khỏi phần chữ đọc và đẩy con số lên các thẻ ở panel trái. Bạn chỉ thấy thẻ số liệu đổi, không thấy đoạn kỹ thuật đó.
+3. **Trong lúc trò chuyện.** Khi bạn hỏi về tình hình kinh doanh, Javis có thể gắn kèm một khối số liệu ẩn trong câu trả lời (đánh dấu `JAVIS_METRICS`). Javis tự gỡ khối này ra khỏi phần chữ đọc và đẩy con số lên các thẻ ở panel trái. Bạn chỉ thấy thẻ số liệu đổi, không thấy đoạn kỹ thuật đó.
 
 Số liệu của phiên gần nhất được nhớ lại: mở trang lần sau vẫn thấy ngay, kèm ghi chú "phiên trước", rồi Javis làm mới ngầm. Chi tiết về nguồn số liệu xem [MCP & số liệu kinh doanh](09-mcp-va-so-lieu.md).
 

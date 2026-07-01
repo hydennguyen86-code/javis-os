@@ -63,7 +63,7 @@ Hostinger tự pull image + cấp URL `https://<app>.<vps>.hstgr.cloud` + nút *
 **3 việc làm 1 lần:**
 1. **Để image GHCR ở chế độ Public:** GitHub → repo → **Packages** → `javis-os` → *Package settings* → Visibility = **Public**.
 2. **Tạo tài khoản admin** (chọn 1):
-   - *Khuyến nghị:* thêm env `JARVIS_ADMIN_USER` + `JARVIS_ADMIN_PASSWORD` trong compose Hostinger → mở app **đăng nhập luôn**.
+   - *Khuyến nghị:* thêm env `JAVIS_ADMIN_USER` + `JAVIS_ADMIN_PASSWORD` trong compose Hostinger → mở app **đăng nhập luôn**.
    - *Hoặc:* mở app sẽ hỏi **MÃ THIẾT LẬP** - trong **App terminal** (vào bên trong container) chạy: `cat /data/state/.setup_token`.
 3. **Đăng nhập Claude (bộ não):** App terminal → `claude auth login --claudeai` → mở link, dán code.
 
@@ -71,18 +71,18 @@ Hostinger tự pull image + cấp URL `https://<app>.<vps>.hstgr.cloud` + nút *
 
 ```bash
 # Cần Docker (chưa có?  curl -fsSL https://get.docker.com | sh)
-mkdir jarvis && cd jarvis
+mkdir javis && cd javis
 curl -fsSLO https://raw.githubusercontent.com/blogminhquy/javis-os/main/docker-compose.yml
 
-docker compose run --rm jarvis claude auth login --claudeai   # đăng nhập Claude 1 lần
+docker compose run --rm javis claude auth login --claudeai   # đăng nhập Claude 1 lần
 docker compose up -d                                          # pull image + chạy
 ```
-Mở `http://<ip-vps>:7777` → màn tạo tài khoản admin (xem MÃ THIẾT LẬP trong `docker compose logs jarvis`).
+Mở `http://<ip-vps>:7777` → màn tạo tài khoản admin (xem MÃ THIẾT LẬP trong `docker compose logs javis`).
 
 ### Cách 3 - Cài trực tiếp lên Linux/macOS (không Docker)
 
 ```bash
-git clone https://github.com/blogminhquy/javis-os.git jarvis && cd jarvis
+git clone https://github.com/blogminhquy/javis-os.git javis && cd javis
 chmod +x install.sh && ./install.sh
 ```
 Script tự cài Python + Node + Claude CLI, tạo venv, đăng ký dịch vụ systemd tự chạy khi boot, in ra địa chỉ. Báo Claude chưa đăng nhập thì chạy 1 lần: `claude auth login --claudeai`.
@@ -93,8 +93,8 @@ Script tự cài Python + Node + Claude CLI, tạo venv, đăng ký dịch vụ 
 1. Cài Python 3.12 (tick "Add to PATH") + Node.js LTS
 2. npm install -g @anthropic-ai/claude-code  &&  claude auth login --claudeai
 3. Double-click  setup.bat   (chạy hiện cửa sổ)
-   hoặc           start-jarvis.vbs   (chạy ngầm, log ở server\jarvis.log)
-4. Mở http://localhost:7777   ·   Dừng: stop-jarvis.bat
+   hoặc           start-javis.vbs   (chạy ngầm, log ở server\javis.log)
+4. Mở http://localhost:7777   ·   Dừng: stop-javis.bat
 ```
 
 📄 Chi tiết hơn (named tunnel URL cố định, build từ source…) xem **[DEPLOY.md](DEPLOY.md)**.
@@ -151,11 +151,11 @@ Mọi dòng để trống vẫn chạy được. Sao chép `.env.example` → `.
 
 | Biến | Ý nghĩa | Mặc định |
 |---|---|---|
-| `JARVIS_HOST` | Địa chỉ nghe. `127.0.0.1`=chỉ máy này; `0.0.0.0`=public | `127.0.0.1` |
-| `JARVIS_PORT` | Cổng | `7777` |
-| `JARVIS_REQUIRE_LOGIN` | `1`/`0` ép bật/tắt bắt buộc đăng nhập (mặc định: bật khi bind public) | *(auto)* |
-| `JARVIS_ADMIN_USER` / `JARVIS_ADMIN_PASSWORD` | Tạo sẵn admin lúc deploy (khỏi cần MÃ THIẾT LẬP) | - |
-| `JARVIS_STATE_DIR` | Nơi ghi state (settings, sessions, loop) | `server/` (Docker: `/data/state`) |
+| `JAVIS_HOST` | Địa chỉ nghe. `127.0.0.1`=chỉ máy này; `0.0.0.0`=public | `127.0.0.1` |
+| `JAVIS_PORT` | Cổng | `7777` |
+| `JAVIS_REQUIRE_LOGIN` | `1`/`0` ép bật/tắt bắt buộc đăng nhập (mặc định: bật khi bind public) | *(auto)* |
+| `JAVIS_ADMIN_USER` / `JAVIS_ADMIN_PASSWORD` | Tạo sẵn admin lúc deploy (khỏi cần MÃ THIẾT LẬP) | - |
+| `JAVIS_STATE_DIR` | Nơi ghi state (settings, sessions, loop) | `server/` (Docker: `/data/state`) |
 | `OBSIDIAN_VAULT_PATH` | Vault Second Brain chính | `vault/` (Docker: `/data/vault`) |
 | `BRAIN_PATH` | Thư mục brain | `brain/` (Docker: `/data/brain`) |
 | `CLAUDE_CWD` | Thư mục làm việc của Claude CLI | repo root |
@@ -179,7 +179,7 @@ Mọi dòng để trống vẫn chạy được. Sao chép `.env.example` → `.
 git add -A && git commit -m "..." && git push     # → CI tự build image mới lên GHCR
 
 # Trên VPS: kéo bản mới
-cd jarvis && ./update.sh          # tự pull image + restart (dữ liệu trong volume KHÔNG mất)
+cd javis && ./update.sh          # tự pull image + restart (dữ liệu trong volume KHÔNG mất)
 ```
 
 ## 🌐 Truy cập từ xa (VPS không phải Hostinger)
@@ -210,10 +210,10 @@ Telegram ─────────────────┤→  FastAPI (ser
 
 | Hiện tượng | Cách xử lý |
 |---|---|
-| Sửa code mà không thấy đổi | Đã đổi `.py`? **Khởi động lại server** (Windows: `stop-jarvis.bat` → `start-jarvis.vbs`). Đổi giao diện? **Ctrl+Shift+R**. |
-| Port 7777 bị giữ, bản mới không lên | Kill tiến trình cũ TRƯỚC (`stop-jarvis.bat`, hoặc `taskkill /F /PID <pid>`), rồi start lại. |
+| Sửa code mà không thấy đổi | Đã đổi `.py`? **Khởi động lại server** (Windows: `stop-javis.bat` → `start-javis.vbs`). Đổi giao diện? **Ctrl+Shift+R**. |
+| Port 7777 bị giữ, bản mới không lên | Kill tiến trình cũ TRƯỚC (`stop-javis.bat`, hoặc `taskkill /F /PID <pid>`), rồi start lại. |
 | Hostinger không pull được image | Để package GHCR = **Public**; đợi GitHub Action build xong (tab Actions). |
-| Mở app báo cần MÃ THIẾT LẬP | App terminal (trong container): `cat /data/state/.setup_token`. Trên host: `docker compose logs jarvis \| grep "SETUP TOKEN"`. Hoặc đặt env `JARVIS_ADMIN_PASSWORD` để khỏi cần mã. |
+| Mở app báo cần MÃ THIẾT LẬP | App terminal (trong container): `cat /data/state/.setup_token`. Trên host: `docker compose logs javis \| grep "SETUP TOKEN"`. Hoặc đặt env `JAVIS_ADMIN_PASSWORD` để khỏi cần mã. |
 | Claude báo chưa đăng nhập | Chạy 1 lần `claude auth login --claudeai` (Docker: trong App terminal). |
 | Trang Tệp tin treo "Đang tải" | Khởi động lại server để nạp endpoint mới, rồi Ctrl+Shift+R. |
 

@@ -9,8 +9,8 @@ let cancelledTurn = false;
 let spokeStream = false;   // đã đọc đoạn trung gian nào trong lượt này chưa
 
 // Lưu & khôi phục phiên gần nhất (hội thoại + số liệu + session Claude)
-const SESSION_KEY = "jarvis.session.v1";
-let convo = [];            // [{role:"user"|"jarvis", text, atts}]
+const SESSION_KEY = "javis.session.v1";
+let convo = [];            // [{role:"user"|"javis", text, atts}]
 let savedSessionId = null; // session_id của Claude để resume sau khi F5
 let savedMetrics = null;   // {cards, status}
 const stopBtn = document.getElementById("stopBtn");
@@ -64,7 +64,7 @@ function setOrbState(state, label) {
   orbState.textContent = label;
   const thinking = state === "thinking";
   _thinkingActive = thinking;
-  if (jarvisGraph) jarvisGraph.setThinking(thinking);
+  if (javisGraph) javisGraph.setThinking(thinking);
 }
 
 // ============================================
@@ -156,7 +156,7 @@ function handleMessage(data) {
     spokeStream = false;
     savedSessionId = data.session_id || savedSessionId;
     if (data.engine) setEngineBadge(data.engine, data.model);   // sự thật engine+model của lượt này
-    if (finalText.trim()) recordTurn("jarvis", finalText);   // KHÔNG lưu lượt rỗng (tránh khôi phục bong bóng trống)
+    if (finalText.trim()) recordTurn("javis", finalText);   // KHÔNG lưu lượt rỗng (tránh khôi phục bong bóng trống)
     maybeAutoLearn();
   } else if (data.type === "error") {
     hideToolBar(); appendJavisMessage("⚠ " + data.content); setProcessing(false);
@@ -251,7 +251,7 @@ async function openStoredSession(id) {
     chatArea.innerHTML = "";
     (sess.messages || []).forEach(m => {
       if (m.role === "user") { appendUserMessage(m.content || "", []); convo.push({ role: "user", text: m.content || "", atts: [] }); }
-      else if (m.role === "assistant") { appendJavisMessage(m.content || ""); convo.push({ role: "jarvis", text: m.content || "", atts: [] }); }
+      else if (m.role === "assistant") { appendJavisMessage(m.content || ""); convo.push({ role: "javis", text: m.content || "", atts: [] }); }
     });
     savedSessionId = id;          // lượt gửi tiếp theo → server resume đúng phiên này
     persistSession();
@@ -284,13 +284,13 @@ function appendUserMessage(text, attachments) {
 }
 function appendJavisMessage(text) {
   const div = document.createElement("div");
-  div.className = "msg msg-jarvis";
+  div.className = "msg msg-javis";
   div.innerHTML = `<div class="bubble">${markdownToHtml(text)}</div>`;
   chatArea.appendChild(div); scrollBottom();
 }
 function createStreamingBubble() {
   const div = document.createElement("div");
-  div.className = "msg msg-jarvis";
+  div.className = "msg msg-javis";
   div.innerHTML = `<div class="bubble"></div>`;
   chatArea.appendChild(div); scrollBottom();
   return div;
@@ -374,7 +374,7 @@ const graph3dContainer = document.getElementById("graph3dContainer");
 const graphTooltip = document.getElementById("graphTooltip");
 const graphStats = document.getElementById("graphStats");
 const graphSource = document.getElementById("graphSource");
-let jarvisGraph = null;
+let javisGraph = null;
 
 graph3dContainer.addEventListener("mousemove", (e) => {
   graphTooltip.style.left = (e.clientX + 14) + "px";
@@ -387,7 +387,7 @@ async function initGraph() {
     graphStats.textContent = "⚠ Lỗi tải thư viện 3D (kiểm tra mạng)";
     return;
   }
-  jarvisGraph = new JavisGraph3D(graph3dContainer, graphTooltip);
+  javisGraph = new JavisGraph3D(graph3dContainer, graphTooltip);
   await reloadGraph();
 }
 
@@ -397,14 +397,14 @@ window.onGraphNodeClick = (node) => {
   sendMessage(`Đọc note "${node.label}" (${node.path}) trong second brain, tóm tắt ngắn nội dung chính và đề xuất việc tiếp theo nếu có.`);
 };
 async function reloadGraph() {
-  if (!jarvisGraph) return;
+  if (!javisGraph) return;
   graphStats.textContent = "Đang tải...";
   const val = graphSource.value;
   const query = val.startsWith("path:")
     ? `path=${encodeURIComponent(val.slice(5))}`
     : `source=${val}`;
   try {
-    const data = await jarvisGraph.load(query);
+    const data = await javisGraph.load(query);
     const stats = data.stats || {};
     const hidden = stats.hidden ? ` · ẩn ${stats.hidden}` : "";
     graphStats.textContent = `${stats.total_notes} note · ${stats.total_links} kết nối${hidden}`;
@@ -412,7 +412,7 @@ async function reloadGraph() {
   } catch (e) { graphStats.textContent = "Lỗi: " + e.message; }
 }
 graphSource.addEventListener("change", () => {
-  localStorage.setItem("jarvis.graphSource", graphSource.value);
+  localStorage.setItem("javis.graphSource", graphSource.value);
   reloadGraph();
   connectGraphWatch();   // theo dõi realtime trên nguồn mới
   loadMemStats();   // bộ nhớ theo vault → đổi vault thì đổi số ký ức
@@ -442,10 +442,10 @@ function connectGraphWatch() {
   graphWs = new WebSocket(`${WS_ORIGIN}/ws/graph?${q}`);
   graphWs.onmessage = (e) => {
     let m; try { m = JSON.parse(e.data); } catch (_) { return; }
-    if (m.type !== "graph_add" || !jarvisGraph) return;
-    const r = jarvisGraph.addOrUpdate(m.node, m.linkTargets, m.isNew);
+    if (m.type !== "graph_add" || !javisGraph) return;
+    const r = javisGraph.addOrUpdate(m.node, m.linkTargets, m.isNew);
     if (r && r.created) {
-      const s = jarvisGraph.nodeStats();
+      const s = javisGraph.nodeStats();
       graphStats.textContent = `${s.nodes} note · ${s.links} kết nối`;
       // Nháy nhẹ nhãn để báo có note mới sinh ra
       graphStats.classList.add("pulse");
@@ -532,7 +532,7 @@ function renderConceptLabels(categories, total) {
 
 // Brain folder tùy chọn - lưu localStorage, hiện trong dropdown
 function loadCustomBrains() {
-  const brains = JSON.parse(localStorage.getItem("jarvis.brains") || "[]");
+  const brains = JSON.parse(localStorage.getItem("javis.brains") || "[]");
   // Xóa option cũ
   [...graphSource.querySelectorAll("option[data-custom]")].forEach(o => o.remove());
   brains.forEach(b => {
@@ -544,17 +544,17 @@ function loadCustomBrains() {
   });
 }
 function addCustomBrain(path) {
-  const brains = JSON.parse(localStorage.getItem("jarvis.brains") || "[]");
+  const brains = JSON.parse(localStorage.getItem("javis.brains") || "[]");
   if (brains.some(b => b.path === path)) return;
   const name = path.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || path;
   brains.push({ name, path });
-  localStorage.setItem("jarvis.brains", JSON.stringify(brains));
+  localStorage.setItem("javis.brains", JSON.stringify(brains));
   loadCustomBrains();
 }
 loadCustomBrains();
 // Khôi phục folder đã chọn lần trước (mặc định: brain)
 (function restoreGraphSource() {
-  const saved = localStorage.getItem("jarvis.graphSource");
+  const saved = localStorage.getItem("javis.graphSource");
   if (saved && [...graphSource.options].some(o => o.value === saved)) {
     graphSource.value = saved;
   } else {
@@ -610,15 +610,15 @@ document.getElementById("fmUse").addEventListener("click", () => {
   if (!fmCurrent) return;
   addCustomBrain(fmCurrent);
   graphSource.value = "path:" + fmCurrent;
-  localStorage.setItem("jarvis.graphSource", graphSource.value);
+  localStorage.setItem("javis.graphSource", graphSource.value);
   folderModal.classList.remove("open");
   reloadGraph();
 });
-window.addEventListener("resize", () => { if (jarvisGraph) jarvisGraph.resize(); });
+window.addEventListener("resize", () => { if (javisGraph) javisGraph.resize(); });
 
 let _stopBtnTick = 0;
 function pumpAudioLevel() {
-  if (jarvisGraph) jarvisGraph.setLevel(voice.getLevel());
+  if (javisGraph) javisGraph.setLevel(voice.getLevel());
   // Cập nhật hiển thị nút stop ~6 lần/giây (theo dõi cả lúc Javis đang đọc)
   if ((_stopBtnTick++ % 10) === 0) {
     updateStopBtn();
@@ -818,7 +818,7 @@ function renderMetrics(cards, statusText) {
 document.getElementById("refreshMetrics").addEventListener("click", loadMetrics);
 
 // Trích block metrics Javis nhúng trong response → cập nhật panel trái
-const METRICS_BLOCK_RE = /<!--\s*JARVIS_METRICS:\s*([\s\S]*?)\s*-->/;
+const METRICS_BLOCK_RE = /<!--\s*JAVIS_METRICS:\s*([\s\S]*?)\s*-->/;
 function extractMetrics(text) {
   if (typeof text !== "string") return { clean: "", cards: null };
   const m = text.match(METRICS_BLOCK_RE);
@@ -848,12 +848,12 @@ let turnsSinceReflect = 0;
 const AUTO_LEARN_EVERY = 6;   // tự học sau mỗi 6 lượt hội thoại
 
 // Khôi phục cài đặt tự học
-let autoLearn = localStorage.getItem("jarvis.autoLearn") !== "off";
+let autoLearn = localStorage.getItem("javis.autoLearn") !== "off";
 if (autoLearnToggle) {
   autoLearnToggle.checked = autoLearn;
   autoLearnToggle.addEventListener("change", () => {
     autoLearn = autoLearnToggle.checked;
-    localStorage.setItem("jarvis.autoLearn", autoLearn ? "on" : "off");
+    localStorage.setItem("javis.autoLearn", autoLearn ? "on" : "off");
   });
 }
 
@@ -1112,21 +1112,21 @@ const voicePickerBtn = document.getElementById("voicePickerBtn");
 const voicePopover = document.getElementById("voicePopover");
 const rateSlider = document.getElementById("rateSlider");
 const rateLabel = document.getElementById("rateLabel");
-const savedVoice = localStorage.getItem("jarvis.voice") || "vi-VN-HoaiMyNeural";
-const savedRate = parseFloat(localStorage.getItem("jarvis.rate") || "1.10");
+const savedVoice = localStorage.getItem("javis.voice") || "vi-VN-HoaiMyNeural";
+const savedRate = parseFloat(localStorage.getItem("javis.rate") || "1.10");
 document.querySelector(`input[name="voice"][value="${savedVoice}"]`)?.click();
 rateSlider.value = savedRate; rateLabel.textContent = savedRate.toFixed(2) + "×";
 voice.setVoice(savedVoice); voice.setRate(rateToPct(savedRate));
 function rateToPct(r) { const p = ((r - 1) * 100).toFixed(0); return (p >= 0 ? "+" : "") + p + "%"; }
 voicePickerBtn.addEventListener("click", (e) => { e.stopPropagation(); voicePopover.classList.toggle("open"); });
 document.addEventListener("click", (e) => { if (!voicePopover.contains(e.target) && e.target !== voicePickerBtn) voicePopover.classList.remove("open"); });
-document.querySelectorAll('input[name="voice"]').forEach(r => r.addEventListener("change", () => { voice.setVoice(r.value); localStorage.setItem("jarvis.voice", r.value); }));
-const savedRecLang = localStorage.getItem("jarvis.recLang") || "vi-VN";
+document.querySelectorAll('input[name="voice"]').forEach(r => r.addEventListener("change", () => { voice.setVoice(r.value); localStorage.setItem("javis.voice", r.value); }));
+const savedRecLang = localStorage.getItem("javis.recLang") || "vi-VN";
 const recLangInput = document.querySelector(`input[name="recognitionLang"][value="${savedRecLang}"]`);
 if (recLangInput) recLangInput.checked = true;
 voice.setRecognitionLang(savedRecLang);
-document.querySelectorAll('input[name="recognitionLang"]').forEach(r => r.addEventListener("change", () => { voice.setRecognitionLang(r.value); localStorage.setItem("jarvis.recLang", r.value); }));
-rateSlider.addEventListener("input", () => { const r = parseFloat(rateSlider.value); rateLabel.textContent = r.toFixed(2) + "×"; voice.setRate(rateToPct(r)); localStorage.setItem("jarvis.rate", r.toString()); });
+document.querySelectorAll('input[name="recognitionLang"]').forEach(r => r.addEventListener("change", () => { voice.setRecognitionLang(r.value); localStorage.setItem("javis.recLang", r.value); }));
+rateSlider.addEventListener("input", () => { const r = parseFloat(rateSlider.value); rateLabel.textContent = r.toFixed(2) + "×"; voice.setRate(rateToPct(r)); localStorage.setItem("javis.rate", r.toString()); });
 document.getElementById("testVoiceBtn").addEventListener("click", () => {
   const v = document.querySelector('input[name="voice"]:checked').value;
   voice.speak(v.includes("HoaiMy") ? "Xin chào, em là HoaiMy, trợ lý của anh." : "Xin chào, tôi là NamMinh, trợ lý của bạn.");

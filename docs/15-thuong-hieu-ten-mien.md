@@ -1,6 +1,6 @@
 # Thương hiệu & tên miền riêng
 
-Trang này hướng dẫn hai việc: đổi logo/avatar của Javis thành ảnh của bạn, và trỏ một tên miền riêng (ví dụ `jarvis.tencuaban.com`) vào Javis để chạy qua HTTPS. Tất cả thao tác đều nằm trong khối **CÀI ĐẶT NHANH**, không cần biết kỹ thuật.
+Trang này hướng dẫn hai việc: đổi logo/avatar của Javis thành ảnh của bạn, và trỏ một tên miền riêng (ví dụ `javis.tencuaban.com`) vào Javis để chạy qua HTTPS. Tất cả thao tác đều nằm trong khối **CÀI ĐẶT NHANH**, không cần biết kỹ thuật.
 
 ## Tính năng này là gì
 
@@ -48,9 +48,9 @@ Phần này giả định bạn đã deploy Javis bằng Docker trên VPS, đã 
 ### Bước A: nhập và lưu tên miền
 
 1. Mở khối **⚙ CÀI ĐẶT NHANH**, tìm ô **TÊN MIỀN RIÊNG (HTTPS)**.
-2. Nhập tên miền (hoặc tên miền con) bạn muốn dùng vào ô, ví dụ `jarvis.tencuaban.com`. Không cần gõ `https://`; nếu có gõ, Javis tự bỏ.
+2. Nhập tên miền (hoặc tên miền con) bạn muốn dùng vào ô, ví dụ `javis.tencuaban.com`. Không cần gõ `https://`; nếu có gõ, Javis tự bỏ.
 3. Bấm nút **Lưu**. Javis hiện **Đang lưu…**, rồi tự chạy kiểm tra và hiện hướng dẫn trỏ DNS.
-4. Nếu tên miền sai định dạng, Javis báo: **Tên miền không hợp lệ (vd: jarvis.tencuaban.com)**. Sửa lại rồi lưu tiếp.
+4. Nếu tên miền sai định dạng, Javis báo: **Tên miền không hợp lệ (vd: javis.tencuaban.com)**. Sửa lại rồi lưu tiếp.
 
 Muốn **xóa** tên miền: xóa trống ô nhập rồi bấm **Lưu**. Javis báo **Đã xoá tên miền.** và ẩn phần hướng dẫn.
 
@@ -63,7 +63,7 @@ Sau khi lưu (hoặc khi bấm **Kiểm tra kết nối**), Javis hiện hướn
    | Trường | Giá trị |
    |---|---|
    | Loại (Type) | A |
-   | Tên (Name/Host) | tên miền bạn vừa nhập, ví dụ `jarvis.tencuaban.com` |
+   | Tên (Name/Host) | tên miền bạn vừa nhập, ví dụ `javis.tencuaban.com` |
    | Trỏ tới (Value/Points to) | địa chỉ IP máy chủ VPS của bạn (Javis điền sẵn IP này trong hướng dẫn) |
 
 2. **Bước 2 trong hướng dẫn:** đợi DNS lan (vài phút đến vài giờ), rồi mở `https://<tên miền của bạn>`. Chứng chỉ HTTPS được tự cấp ở lần mở đầu tiên.

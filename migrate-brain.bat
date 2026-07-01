@@ -8,7 +8,7 @@ echo   Chuan hoa cau truc project brain
 echo   brain  ->  Brain Default  (phang: agents/ workflows/ memory/ skills/)
 echo  ==========================================
 echo.
-echo  [!] Hay chac chan da TAT server (stop-jarvis.bat) truoc khi chay.
+echo  [!] Hay chac chan da TAT server (stop-javis.bat) truoc khi chay.
 echo.
 pause
 

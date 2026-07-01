@@ -4,10 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Javis OS</title>
-  <link rel="icon" type="image/png" href="/static/favicon.png?v=2">
-  <link rel="apple-touch-icon" href="/static/logo.png?v=2">
-  <link rel="stylesheet" href="/static/style.css?v=28">
-  <link rel="stylesheet" href="/static/console.css?v=13">
+  <link rel="icon" type="image/png" href="/static/favicon.png?v=3">
+  <link rel="apple-touch-icon" href="/static/logo.png?v=3">
+  <link rel="stylesheet" href="/static/style.css?v=29">
+  <link rel="stylesheet" href="/static/console.css?v=14">
 </head>
 <body>
   <div class="hud">
@@ -248,7 +248,7 @@
               <div class="popover-label">TÊN MIỀN & SSL</div>
               <div class="opt-sub" style="margin:4px 0 8px">Trỏ tên miền riêng để chạy HTTPS. VPS thường (DigitalOcean/Vultr): bật SSL ngay đây. Hostinger: đặt tên miền qua docker-compose.hostinger.yml (xem DEPLOY.md).</div>
               <div class="dom-field">
-                <input id="setDomain" placeholder="vd: jarvis.tencuaban.com" autocomplete="off" spellcheck="false">
+                <input id="setDomain" placeholder="vd: javis.tencuaban.com" autocomplete="off" spellcheck="false">
                 <button class="s-btn" id="saveDomain">Lưu</button>
               </div>
               <div class="dom-status" id="domStatusRow" style="display:none">
@@ -406,12 +406,12 @@
               <b>❓ Mã thiết lập là gì?</b> Javis đang chạy trên server công khai. Để chắc <b>chính bạn</b> (không phải người lạ vô tình mở link) là người tạo tài khoản admin, bạn dán một mã chỉ in ra <b>log server</b> - nơi duy nhất chủ máy xem được.
               <br><b>Cách lấy mã (Hostinger → App terminal):</b>
               <ol>
-                <li>Mở app → bấm <b>App terminal</b> (bạn sẽ vào BÊN TRONG container <code>jarvis</code>).</li>
+                <li>Mở app → bấm <b>App terminal</b> (bạn sẽ vào BÊN TRONG container <code>javis</code>).</li>
                 <li>Chạy: <code>cat /data/state/.setup_token</code></li>
                 <li>Copy chuỗi hiện ra → dán vào ô trên.</li>
               </ol>
-              <span class="dim">Nếu SSH vào HOST (không phải App terminal): <code>docker compose logs jarvis | grep "SETUP TOKEN"</code></span><br>
-              💡 <b>Khỏi cần mã:</b> nếu lúc deploy bạn đặt sẵn env <code>JARVIS_ADMIN_PASSWORD</code> (+ <code>JARVIS_ADMIN_USER</code>), mở app ra là <b>đăng nhập luôn</b>, không hỏi mã.
+              <span class="dim">Nếu SSH vào HOST (không phải App terminal): <code>docker compose logs javis | grep "SETUP TOKEN"</code></span><br>
+              💡 <b>Khỏi cần mã:</b> nếu lúc deploy bạn đặt sẵn env <code>JAVIS_ADMIN_PASSWORD</code> (+ <code>JAVIS_ADMIN_USER</code>), mở app ra là <b>đăng nhập luôn</b>, không hỏi mã.
             </div>
           </div>
         </div>
@@ -459,7 +459,7 @@
         <div class="auth-help"><span id="authForgot">Quên mật khẩu?</span></div>
         <div class="auth-reset" id="authResetInfo" style="display:none">
           Mở file <code>server/settings.json</code>, xóa khối <code>"auth"</code> (hoặc đặt rỗng), rồi
-          chạy <code>stop-jarvis.bat</code> → <code>start-jarvis.vbs</code>. Mở lại sẽ về bộ cài đặt để tạo tài khoản mới.
+          chạy <code>stop-javis.bat</code> → <code>start-javis.vbs</code>. Mở lại sẽ về bộ cài đặt để tạo tài khoản mới.
         </div>
       </div>
     </div>
@@ -530,19 +530,19 @@
   <!-- Holder ẩn giữ #quickSet khi KHÔNG ở trang Cài đặt (node vẫn trong DOM → handler còn sống) -->
   <div id="quickSetHolder" hidden></div>
 
-  <script src="/static/voice.js?v=11"></script>
+  <script src="/static/voice.js?v=12"></script>
   <script src="https://unpkg.com/three@0.159.0/build/three.min.js"></script>
   <script src="https://unpkg.com/3d-force-graph@1.73.4/dist/3d-force-graph.min.js"></script>
-  <script src="/static/graph3d.js?v=14"></script>
-  <script src="/static/app.js?v=47"></script>
-  <script src="/static/branding.js?v=5"></script>
-  <script src="/static/quick-settings.js?v=2"></script>
-  <script src="/static/chat-zoom.js?v=2"></script>
-  <script src="/static/brains-ui.js?v=3"></script>
-  <script src="/static/sessions-ui.js?v=2"></script>
-  <script src="/static/studio.js?v=12"></script>
+  <script src="/static/graph3d.js?v=15"></script>
+  <script src="/static/app.js?v=48"></script>
+  <script src="/static/branding.js?v=6"></script>
+  <script src="/static/quick-settings.js?v=3"></script>
+  <script src="/static/chat-zoom.js?v=3"></script>
+  <script src="/static/brains-ui.js?v=4"></script>
+  <script src="/static/sessions-ui.js?v=3"></script>
+  <script src="/static/studio.js?v=13"></script>
   <!-- Console layer: console.js đăng ký store TRƯỚC khi Alpine khởi động (defer) -->
-  <script src="/static/console.js?v=34"></script>
+  <script src="/static/console.js?v=35"></script>
   <script defer src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>
 </body>
 </html>

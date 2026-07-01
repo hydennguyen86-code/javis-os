@@ -83,13 +83,13 @@ Không thể xoá **Brain Default**. Cũng không xoá được folder ngoài (n
 
 ### Chuẩn hoá cấu trúc một brain
 
-Nếu một brain có cấu trúc cũ (ví dụ ghi chú nằm trong `Jarvis/agents`, `Memory` viết hoa), anh có thể gom về dạng phẳng đồng nhất:
+Nếu một brain có cấu trúc cũ (ví dụ ghi chú nằm trong `Javis/agents`, `Memory` viết hoa), anh có thể gom về dạng phẳng đồng nhất:
 
 1. Vào **Tổng quan** ở nav trái.
 2. Tìm mục **Cấu trúc brain**.
 3. Bấm **Chuẩn hóa brain đang chọn**, rồi xác nhận.
 
-Thao tác này an toàn: chỉ di chuyển khi thư mục đích chưa tồn tại, không ghi đè. Nó gộp `Jarvis/agents` về `agents/`, `Jarvis/workflows` về `workflows/`, `Memory` về `memory/`.
+Thao tác này an toàn: chỉ di chuyển khi thư mục đích chưa tồn tại, không ghi đè. Nó gộp `Javis/agents` về `agents/`, `Javis/workflows` về `workflows/`, `Memory` về `memory/`.
 
 ## Bộ nhớ dài hạn: làm Javis "nhớ anh"
 

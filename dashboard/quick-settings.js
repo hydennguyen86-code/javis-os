@@ -4,8 +4,8 @@
   "use strict";
   function $(id) { return document.getElementById(id); }
   function getVoice() { try { return (typeof voice !== "undefined") ? voice : null; } catch (e) { return null; } }
-  function isOff() { return localStorage.getItem("jarvis.ttsEnabled") === "0"; }
-  function persist(on) { try { localStorage.setItem("jarvis.ttsEnabled", on ? "1" : "0"); } catch (e) {} }
+  function isOff() { return localStorage.getItem("javis.ttsEnabled") === "0"; }
+  function persist(on) { try { localStorage.setItem("javis.ttsEnabled", on ? "1" : "0"); } catch (e) {} }
 
   function applyState(on) {
     persist(on);

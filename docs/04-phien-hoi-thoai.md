@@ -24,10 +24,10 @@ Toàn bộ lịch sử nằm trong một tệp duy nhất tên `conversations.db
 |---|---|---|
 | Tên tệp | `conversations.db` | Định dạng SQLite |
 | Thư mục | Thư mục `server/` của Javis | Cùng chỗ với `settings.json` |
-| Biến môi trường đổi vị trí tệp | `JARVIS_SESSIONS_DB` | Trỏ tới đường dẫn tệp `.db` khác |
-| Biến môi trường đổi thư mục gốc | `JARVIS_STATE_DIR` | Đổi cả thư mục chứa trạng thái |
+| Biến môi trường đổi vị trí tệp | `JAVIS_SESSIONS_DB` | Trỏ tới đường dẫn tệp `.db` khác |
+| Biến môi trường đổi thư mục gốc | `JAVIS_STATE_DIR` | Đổi cả thư mục chứa trạng thái |
 
-Nếu bạn muốn dời tệp lịch sử sang chỗ khác (ví dụ ổ dữ liệu riêng), đặt biến `JARVIS_SESSIONS_DB` trong tệp cấu hình. Chi tiết cách chỉnh biến môi trường xem [Cấu hình .env](16-cau-hinh-env.md).
+Nếu bạn muốn dời tệp lịch sử sang chỗ khác (ví dụ ổ dữ liệu riêng), đặt biến `JAVIS_SESSIONS_DB` trong tệp cấu hình. Chi tiết cách chỉnh biến môi trường xem [Cấu hình .env](16-cau-hinh-env.md).
 
 Mỗi cuộc trò chuyện lưu kèm: tên (title), bộ não, engine đang dùng, model, số tin nhắn, thời gian tạo và thời gian cập nhật gần nhất. Từng lượt hỏi và đáp lưu riêng để có thể tìm kiếm và mở lại chính xác.
 

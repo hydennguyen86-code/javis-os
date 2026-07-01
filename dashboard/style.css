@@ -370,15 +370,15 @@ body {
   padding: 8px 12px; border-radius: 12px 12px 3px 12px; max-width: 90%;
   line-height: 1.45; font-size: 15px;
 }
-.msg-jarvis .bubble {
+.msg-javis .bubble {
   background: var(--bg3); border: 1px solid var(--border);
   padding: 10px 12px; border-radius: 3px 12px 12px 12px;
   line-height: 1.6; font-size: 15px;
 }
-.msg-jarvis .bubble strong { color: var(--accent); }
-.msg-jarvis .bubble ul { padding-left: 16px; margin: 5px 0; }
-.msg-jarvis .bubble code { font-family: var(--font); font-size: 13px; background: var(--bg); padding: 1px 4px; border-radius: 3px; color: #a78bfa; }
-.msg-jarvis .bubble h3 { font-size: 15px; color: var(--text); margin: 8px 0 4px; }
+.msg-javis .bubble strong { color: var(--accent); }
+.msg-javis .bubble ul { padding-left: 16px; margin: 5px 0; }
+.msg-javis .bubble code { font-family: var(--font); font-size: 13px; background: var(--bg); padding: 1px 4px; border-radius: 3px; color: #a78bfa; }
+.msg-javis .bubble h3 { font-size: 15px; color: var(--text); margin: 8px 0 4px; }
 
 .tool-bar {
   padding: 7px 10px; background: rgba(124,58,237,0.08);

@@ -52,12 +52,12 @@ if need_node; then
     arch=$(uname -m); case "$arch" in x86_64) na=x64;; aarch64|arm64) na=arm64;; *) err "unsupported arch $arch"; exit 1;; esac
     tb=$(curl -fsSL https://nodejs.org/dist/latest-v22.x/ | grep -oE "node-v22\.[0-9]+\.[0-9]+-linux-${na}\.tar\.xz" | head -1)
     tmp=$(mktemp -d); curl -fsSL "https://nodejs.org/dist/latest-v22.x/${tb}" -o "$tmp/n.tar.xz"
-    mkdir -p "$HOME/.jarvis"; rm -rf "$HOME/.jarvis/node"
-    tar xf "$tmp/n.tar.xz" -C "$tmp"; mv "$tmp"/node-v22* "$HOME/.jarvis/node"; rm -rf "$tmp"
+    mkdir -p "$HOME/.javis"; rm -rf "$HOME/.javis/node"
+    tar xf "$tmp/n.tar.xz" -C "$tmp"; mv "$tmp"/node-v22* "$HOME/.javis/node"; rm -rf "$tmp"
     mkdir -p "$HOME/.local/bin"
-    ln -sf "$HOME/.jarvis/node/bin/node" "$HOME/.local/bin/node"
-    ln -sf "$HOME/.jarvis/node/bin/npm"  "$HOME/.local/bin/npm"
-    ln -sf "$HOME/.jarvis/node/bin/npx"  "$HOME/.local/bin/npx"
+    ln -sf "$HOME/.javis/node/bin/node" "$HOME/.local/bin/node"
+    ln -sf "$HOME/.javis/node/bin/npm"  "$HOME/.local/bin/npm"
+    ln -sf "$HOME/.javis/node/bin/npx"  "$HOME/.local/bin/npx"
     export PATH="$HOME/.local/bin:$PATH"
   fi
 fi
@@ -90,7 +90,7 @@ if [ -t 0 ]; then
     if grep -q '^OBSIDIAN_VAULT_PATH=' .env; then sed -i.bak "s|^OBSIDIAN_VAULT_PATH=.*|OBSIDIAN_VAULT_PATH=$VP|" .env && rm -f .env.bak; else echo "OBSIDIAN_VAULT_PATH=$VP" >> .env; fi
   fi
 fi
-grep -q '^JARVIS_HOST=' .env || echo "JARVIS_HOST=127.0.0.1" >> .env
+grep -q '^JAVIS_HOST=' .env || echo "JAVIS_HOST=127.0.0.1" >> .env
 
 # --- 8. one-time Claude auth reminder ---
 if ! claude auth status >/dev/null 2>&1; then
@@ -102,7 +102,7 @@ fi
 PY="$APP_DIR/.venv/bin/python"
 if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
   log "Installing systemd service..."
-  $SUDO tee /etc/systemd/system/jarvis.service >/dev/null <<UNIT
+  $SUDO tee /etc/systemd/system/javis.service >/dev/null <<UNIT
 [Unit]
 Description=Javis OS
 After=network-online.target
@@ -113,9 +113,9 @@ StartLimitIntervalSec=0
 Type=simple
 User=$(whoami)
 WorkingDirectory=$APP_DIR/server
-Environment="JARVIS_HOST=127.0.0.1"
-Environment="JARVIS_PORT=7777"
-Environment="JARVIS_STATE_DIR=$APP_DIR/server"
+Environment="JAVIS_HOST=127.0.0.1"
+Environment="JAVIS_PORT=7777"
+Environment="JAVIS_STATE_DIR=$APP_DIR/server"
 Environment="PATH=$APP_DIR/.venv/bin:/usr/local/bin:/usr/bin:/bin"
 ExecStart=$PY -m uvicorn main:app --host 127.0.0.1 --port 7777
 Restart=always
@@ -128,12 +128,12 @@ StandardError=journal
 WantedBy=multi-user.target
 UNIT
   $SUDO systemctl daemon-reload
-  $SUDO systemctl enable --now jarvis.service
-  ok "Service installed. Logs: journalctl -u jarvis -f"
+  $SUDO systemctl enable --now javis.service
+  ok "Service installed. Logs: journalctl -u javis -f"
 else
   warn "systemd not available - starting under nohup..."
-  ( cd "$APP_DIR/server" && JARVIS_STATE_DIR="$APP_DIR/server" nohup "$PY" -m uvicorn main:app --host 127.0.0.1 --port 7777 > "$APP_DIR/server/jarvis.log" 2>&1 & )
-  ok "Started. Logs: $APP_DIR/server/jarvis.log"
+  ( cd "$APP_DIR/server" && JAVIS_STATE_DIR="$APP_DIR/server" nohup "$PY" -m uvicorn main:app --host 127.0.0.1 --port 7777 > "$APP_DIR/server/javis.log" 2>&1 & )
+  ok "Started. Logs: $APP_DIR/server/javis.log"
 fi
 
 echo ""

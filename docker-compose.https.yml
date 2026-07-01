@@ -15,18 +15,18 @@
 # Cần Docker Compose v2.23.1+ (hỗ trợ configs.content). Kiểm tra: docker compose version
 # ============================================================================
 configs:
-  jarvis_caddyfile:
+  javis_caddyfile:
     content: |
       {
         on_demand_tls {
-          ask http://jarvis:7777/tls-check
+          ask http://javis:7777/tls-check
         }
       }
       https:// {
         tls {
           on_demand
         }
-        reverse_proxy jarvis:7777
+        reverse_proxy javis:7777
       }
       http:// {
         redir https://{host}{uri}
@@ -36,15 +36,15 @@ services:
   # Backend giữ nguyên; cookie Secure tự bật khi Host khớp tên miền (server tự xử, không cần env).
   caddy:
     image: caddy:2-alpine
-    container_name: jarvis-caddy
+    container_name: javis-caddy
     restart: unless-stopped
     depends_on:
-      - jarvis
+      - javis
     ports:
       - "80:80"
       - "443:443"
     configs:
-      - source: jarvis_caddyfile
+      - source: javis_caddyfile
         target: /etc/caddy/Caddyfile
     volumes:
       - caddy-data:/data       # chứng chỉ đã cấp - giữ qua restart, không xin lại

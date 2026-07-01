@@ -130,7 +130,7 @@ def _apply_anthropic_cache(payload: dict, cache_ttl: str = "5m") -> None:
 
 # Một số model OpenRouter (qwen, deepseek-r1, minimax...) nhét reasoning INLINE vào
 # content dưới dạng <think>...</think> thay vì field "reasoning" riêng → nếu yield
-# thẳng thì tag lậu lên chat, bẩn conversation log và phá parse JARVIS_METRICS.
+# thẳng thì tag lậu lên chat, bẩn conversation log và phá parse JAVIS_METRICS.
 # Scrubber stateful gỡ block khỏi text hiển thị, giữ đuôi tag chẻ đôi giữa 2 delta
 # lại tới delta sau mới quyết định. Port rút gọn từ Hermes agent/think_scrubber.py.
 _THINK_OPEN = ("<think>", "<thinking>")

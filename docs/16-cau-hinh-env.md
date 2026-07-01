@@ -32,7 +32,7 @@ Cách sao chép nhanh bằng lệnh (chạy trong thư mục dự án):
 - Windows PowerShell: `Copy-Item .env.example .env`
 - Git Bash / Linux / macOS: `cp .env.example .env`
 
-Lưu ý về dấu `#`: dòng bắt đầu bằng `#` là dòng chú thích, Javis bỏ qua. Muốn bật một biến đang bị chú thích, xoá dấu `#` ở đầu dòng đó. Ví dụ đổi từ `# JARVIS_PORT=7777` thành `JARVIS_PORT=8080`.
+Lưu ý về dấu `#`: dòng bắt đầu bằng `#` là dòng chú thích, Javis bỏ qua. Muốn bật một biến đang bị chú thích, xoá dấu `#` ở đầu dòng đó. Ví dụ đổi từ `# JAVIS_PORT=7777` thành `JAVIS_PORT=8080`.
 
 ## Danh sách đầy đủ các biến
 
@@ -49,23 +49,23 @@ Dưới đây là mọi biến Javis thực sự đọc, gom theo chức năng. 
 
 | Biến | Ý nghĩa | Mặc định | Khi nào đổi |
 |---|---|---|---|
-| `JARVIS_HOST` | Địa chỉ server nghe. `127.0.0.1` = chỉ máy này truy cập được. `0.0.0.0` = nghe mọi nơi (public, ai có địa chỉ đều vào được) | `127.0.0.1` | Chỉ đổi sang `0.0.0.0` khi chạy trên VPS/server và muốn truy cập từ máy khác. Khi đó phải bật đăng nhập (xem nhóm 3). |
-| `JARVIS_PORT` | Cổng nghe của dashboard | `7777` | Cổng `7777` bị chiếm hoặc muốn cổng khác. Đổi xong nhớ mở đúng cổng đó trên trình duyệt. |
+| `JAVIS_HOST` | Địa chỉ server nghe. `127.0.0.1` = chỉ máy này truy cập được. `0.0.0.0` = nghe mọi nơi (public, ai có địa chỉ đều vào được) | `127.0.0.1` | Chỉ đổi sang `0.0.0.0` khi chạy trên VPS/server và muốn truy cập từ máy khác. Khi đó phải bật đăng nhập (xem nhóm 3). |
+| `JAVIS_PORT` | Cổng nghe của dashboard | `7777` | Cổng `7777` bị chiếm hoặc muốn cổng khác. Đổi xong nhớ mở đúng cổng đó trên trình duyệt. |
 
-Chi tiết quan trọng về `JARVIS_HOST`: Javis dùng cơ chế "an toàn mặc định". Nếu bạn để địa chỉ nghe KHÔNG phải loopback (tức khác `127.0.0.1`, `localhost`, `::1`), server tự coi là đang chạy public và **tự bật bắt buộc đăng nhập** để không ai vào được nếu chưa có tài khoản. Lý do: Claude chạy với đầy quyền trên máy, để hở là nguy hiểm.
+Chi tiết quan trọng về `JAVIS_HOST`: Javis dùng cơ chế "an toàn mặc định". Nếu bạn để địa chỉ nghe KHÔNG phải loopback (tức khác `127.0.0.1`, `localhost`, `::1`), server tự coi là đang chạy public và **tự bật bắt buộc đăng nhập** để không ai vào được nếu chưa có tài khoản. Lý do: Claude chạy với đầy quyền trên máy, để hở là nguy hiểm.
 
 ### Nhóm 3: Đăng nhập và bảo mật
 
 | Biến | Ý nghĩa | Mặc định | Khi nào đổi |
 |---|---|---|---|
-| `JARVIS_REQUIRE_LOGIN` | Ép bật/tắt bắt buộc đăng nhập. `1`/`true`/`yes`/`on` = bật. `0`/`false`/`no`/`off` = tắt | Tự động (bật khi bind public) | Chạy localhost rồi expose ra ngoài qua tunnel (Cloudflare, ngrok...): đặt `JARVIS_REQUIRE_LOGIN=1` để chặn người lạ. |
-| `JARVIS_ADMIN_USER` | Tên đăng nhập admin tạo sẵn lúc deploy | `admin` | Đặt cùng `JARVIS_ADMIN_PASSWORD` để tạo sẵn tài khoản, khỏi cần lấy MÃ THIẾT LẬP từ log. |
-| `JARVIS_ADMIN_PASSWORD` | Mật khẩu admin tạo sẵn lúc deploy | (trống) | Deploy public: đặt mật khẩu mạnh ở đây. Có biến này và chưa có admin, Javis tạo tài khoản admin ngay lúc khởi động và đóng luôn màn hình tạo tài khoản (an toàn nhất cho public). |
-| `JARVIS_SECURE_COOKIE` | Bật cookie chỉ gửi qua HTTPS. `1`/`true`/`yes`/`on` = bật | Tắt | Chỉ bật khi CHẮC CHẮN chạy HTTPS đầu-cuối (domain riêng có SSL). Bật nhầm khi proxy đang chạy HTTP sẽ kẹt vòng đăng nhập (nhập đúng mật khẩu vẫn bị đá về trang login). |
+| `JAVIS_REQUIRE_LOGIN` | Ép bật/tắt bắt buộc đăng nhập. `1`/`true`/`yes`/`on` = bật. `0`/`false`/`no`/`off` = tắt | Tự động (bật khi bind public) | Chạy localhost rồi expose ra ngoài qua tunnel (Cloudflare, ngrok...): đặt `JAVIS_REQUIRE_LOGIN=1` để chặn người lạ. |
+| `JAVIS_ADMIN_USER` | Tên đăng nhập admin tạo sẵn lúc deploy | `admin` | Đặt cùng `JAVIS_ADMIN_PASSWORD` để tạo sẵn tài khoản, khỏi cần lấy MÃ THIẾT LẬP từ log. |
+| `JAVIS_ADMIN_PASSWORD` | Mật khẩu admin tạo sẵn lúc deploy | (trống) | Deploy public: đặt mật khẩu mạnh ở đây. Có biến này và chưa có admin, Javis tạo tài khoản admin ngay lúc khởi động và đóng luôn màn hình tạo tài khoản (an toàn nhất cho public). |
+| `JAVIS_SECURE_COOKIE` | Bật cookie chỉ gửi qua HTTPS. `1`/`true`/`yes`/`on` = bật | Tắt | Chỉ bật khi CHẮC CHẮN chạy HTTPS đầu-cuối (domain riêng có SSL). Bật nhầm khi proxy đang chạy HTTP sẽ kẹt vòng đăng nhập (nhập đúng mật khẩu vẫn bị đá về trang login). |
 
-Về MÃ THIẾT LẬP: khi chạy public mà chưa có tài khoản admin, lần đầu mở app sẽ yêu cầu nhập một mã thiết lập. Mã này chỉ in ra log server lúc khởi động, nên chỉ người xem được log/terminal mới tạo được tài khoản, kẻ chỉ có URL không làm gì được. Nếu bạn đặt sẵn `JARVIS_ADMIN_USER` + `JARVIS_ADMIN_PASSWORD` thì khỏi cần mã này, cứ đăng nhập bằng tài khoản đã đặt. Xem thêm ở [Bảo mật & tài khoản](14-bao-mat-tai-khoan.md).
+Về MÃ THIẾT LẬP: khi chạy public mà chưa có tài khoản admin, lần đầu mở app sẽ yêu cầu nhập một mã thiết lập. Mã này chỉ in ra log server lúc khởi động, nên chỉ người xem được log/terminal mới tạo được tài khoản, kẻ chỉ có URL không làm gì được. Nếu bạn đặt sẵn `JAVIS_ADMIN_USER` + `JAVIS_ADMIN_PASSWORD` thì khỏi cần mã này, cứ đăng nhập bằng tài khoản đã đặt. Xem thêm ở [Bảo mật & tài khoản](14-bao-mat-tai-khoan.md).
 
-Về tên miền riêng và HTTPS: **không** đặt tên miền trong `.env`. Bạn bật Caddy (qua `docker-compose.https.yml`) rồi nhập tên miền trong app ở phần ⚙ Cài đặt, mục Tên miền riêng. Khi truy cập đúng tên miền qua HTTPS, server tự bật cookie Secure nên bạn cũng không cần đặt `JARVIS_SECURE_COOKIE` thủ công. Chi tiết ở [Thương hiệu & tên miền](15-thuong-hieu-ten-mien.md).
+Về tên miền riêng và HTTPS: **không** đặt tên miền trong `.env`. Bạn bật Caddy (qua `docker-compose.https.yml`) rồi nhập tên miền trong app ở phần ⚙ Cài đặt, mục Tên miền riêng. Khi truy cập đúng tên miền qua HTTPS, server tự bật cookie Secure nên bạn cũng không cần đặt `JAVIS_SECURE_COOKIE` thủ công. Chi tiết ở [Thương hiệu & tên miền](15-thuong-hieu-ten-mien.md).
 
 ### Nhóm 4: Đường dẫn dữ liệu (Second Brain và state)
 
@@ -76,7 +76,7 @@ Về tên miền riêng và HTTPS: **không** đặt tên miền trong `.env`. B
 | `BRAIN_PATH` | Thư mục brain (bản cũ, chỉ dùng để migrate dữ liệu cũ) | `brain/` trong dự án (Docker: `/data/brain`) | Hầu như không cần đụng. Đây là đường dẫn brain đơn kiểu cũ, giữ lại để chuyển dữ liệu. |
 | `BRAINS_DIR` | Thư mục cha chứa mọi brain, mỗi thư mục con là một Second Brain | `brains/` trong dự án | Muốn để nhiều brain ở nơi khác (ví dụ ổ dữ liệu riêng, mount git-backup). Docker thường mount `/brains`. |
 | `SOURCES_PATH` | Nơi lưu file đính kèm từ chat (làm source cho Second Brain) | `brain/01 - Sources/` trong dự án | Muốn tách thư mục nguồn ra chỗ khác. |
-| `JARVIS_STATE_DIR` | Nơi Javis ghi state riêng: `settings.json`, phiên đăng nhập, cấu hình loop | `server/` (Docker: `/data/state`) | Docker/VPS phải trỏ vào volume ghi được (vì cây mã nguồn trong container là chỉ đọc). Máy cá nhân để trống là được. |
+| `JAVIS_STATE_DIR` | Nơi Javis ghi state riêng: `settings.json`, phiên đăng nhập, cấu hình loop | `server/` (Docker: `/data/state`) | Docker/VPS phải trỏ vào volume ghi được (vì cây mã nguồn trong container là chỉ đọc). Máy cá nhân để trống là được. |
 
 Ghi chú về Second Brain: hai biến `OBSIDIAN_VAULT_PATH` và `BRAINS_DIR` là phần cấp dữ liệu cho đồ thị tri thức và bộ nhớ. Để trống là chạy được ngay với dữ liệu mẫu trong repo. Đọc thêm cách vận hành bộ nhớ ở [Second Brain: bộ nhớ, Wiki, INGEST](13-second-brain-bo-nho-wiki.md) và [Đồ thị tri thức 3D](03-do-thi-tri-thuc-3d.md).
 
@@ -93,10 +93,10 @@ Lưu ý: hai biến TTS này áp cho giọng Edge TTS miễn phí mặc định.
 
 | Biến | Ý nghĩa | Mặc định | Khi nào đổi |
 |---|---|---|---|
-| `WATCHTOWER_TOKEN` | Token cho nút "Cập nhật ngay" (trang Tổng quan) gọi Watchtower khi chạy Docker | `jarvis-update` | Muốn chặt hơn: đổi thành chuỗi ngẫu nhiên, đặt cùng giá trị cho cả app lẫn service watchtower. |
+| `WATCHTOWER_TOKEN` | Token cho nút "Cập nhật ngay" (trang Tổng quan) gọi Watchtower khi chạy Docker | `javis-update` | Muốn chặt hơn: đổi thành chuỗi ngẫu nhiên, đặt cùng giá trị cho cả app lẫn service watchtower. |
 | `METRICS_TTL` | Thời gian cache số liệu kinh doanh, tính bằng giây | `180` | Muốn số liệu MCP làm mới nhanh hơn hoặc chậm hơn. Xem [MCP & số liệu](09-mcp-va-so-lieu.md). |
-| `JARVIS_CLAUDE_IDLE_TIMEOUT` | Thời gian chờ tối đa khi Claude CLI không phản hồi, tính bằng giây | `180` | Tác vụ nền chạy lâu hay bị ngắt sớm thì tăng lên. |
-| `JARVIS_SESSIONS_DB` | Đường dẫn file cơ sở dữ liệu lưu phiên hội thoại (`conversations.db`) | Nằm trong `JARVIS_STATE_DIR` | Muốn để file lịch sử phiên ở nơi khác. Xem [Phiên hội thoại](04-phien-hoi-thoai.md). |
+| `JAVIS_CLAUDE_IDLE_TIMEOUT` | Thời gian chờ tối đa khi Claude CLI không phản hồi, tính bằng giây | `180` | Tác vụ nền chạy lâu hay bị ngắt sớm thì tăng lên. |
+| `JAVIS_SESSIONS_DB` | Đường dẫn file cơ sở dữ liệu lưu phiên hội thoại (`conversations.db`) | Nằm trong `JAVIS_STATE_DIR` | Muốn để file lịch sử phiên ở nơi khác. Xem [Phiên hội thoại](04-phien-hoi-thoai.md). |
 
 Các biến nhóm 6 hiếm khi cần đụng. `WATCHTOWER_TOKEN` chỉ liên quan khi bạn chạy bản Docker và muốn dùng nút cập nhật một chạm.
 
@@ -117,32 +117,32 @@ TTS_RATE=+0%
 Deploy public trên VPS, tạo sẵn admin và mở cho truy cập từ ngoài:
 
 ```
-JARVIS_HOST=0.0.0.0
-JARVIS_ADMIN_USER=admin
-JARVIS_ADMIN_PASSWORD=doi-mat-khau-that-manh-o-day
+JAVIS_HOST=0.0.0.0
+JAVIS_ADMIN_USER=admin
+JAVIS_ADMIN_PASSWORD=doi-mat-khau-that-manh-o-day
 OBSIDIAN_VAULT_PATH=/data/vault
-JARVIS_STATE_DIR=/data/state
+JAVIS_STATE_DIR=/data/state
 ```
 
-Ở ví dụ thứ hai, vì `JARVIS_HOST=0.0.0.0` (public) nên Javis tự bật bắt buộc đăng nhập, và vì đã có `JARVIS_ADMIN_PASSWORD` nên bạn đăng nhập luôn bằng tài khoản đó, khỏi cần MÃ THIẾT LẬP.
+Ở ví dụ thứ hai, vì `JAVIS_HOST=0.0.0.0` (public) nên Javis tự bật bắt buộc đăng nhập, và vì đã có `JAVIS_ADMIN_PASSWORD` nên bạn đăng nhập luôn bằng tài khoản đó, khỏi cần MÃ THIẾT LẬP.
 
 ## Mẹo
 
 1. Luôn giữ lại `.env.example` làm bản gốc tham chiếu. Chỉ sửa `.env`.
 2. Đổi biến trong `.env` xong phải khởi động lại Javis mới ăn. Khác với bảng Cài đặt trong app (đổi là ăn ngay).
 3. Không chắc một biến làm gì thì cứ để nguyên dấu `#` (chú thích) cho an toàn. Mặc định đã chạy tốt.
-4. Với các biến bật/tắt (`JARVIS_REQUIRE_LOGIN`, `JARVIS_SECURE_COOKIE`), giá trị bật chấp nhận `1`, `true`, `yes`, `on`. Giá trị tắt chấp nhận `0`, `false`, `no`, `off`.
+4. Với các biến bật/tắt (`JAVIS_REQUIRE_LOGIN`, `JAVIS_SECURE_COOKIE`), giá trị bật chấp nhận `1`, `true`, `yes`, `on`. Giá trị tắt chấp nhận `0`, `false`, `no`, `off`.
 5. File `.env` chứa mật khẩu và cấu hình nhạy cảm. Không đưa lên nơi công khai. Trên máy chung, đặt quyền đọc hạn chế.
 
 ## Sự cố thường gặp
 
 **Sửa .env rồi mà không thấy đổi gì.** Bạn chưa khởi động lại Javis. `.env` chỉ đọc lúc khởi động. Tắt server rồi mở lại.
 
-**Đổi cổng xong không vào được app.** Bạn đang mở trình duyệt ở cổng cũ. Ví dụ đổi `JARVIS_PORT=8080` thì phải mở `http://localhost:8080`, không phải `7777` nữa.
+**Đổi cổng xong không vào được app.** Bạn đang mở trình duyệt ở cổng cũ. Ví dụ đổi `JAVIS_PORT=8080` thì phải mở `http://localhost:8080`, không phải `7777` nữa.
 
-**Đăng nhập đúng mật khẩu nhưng cứ bị đá về trang login.** Nhiều khả năng bạn đã bật `JARVIS_SECURE_COOKIE=1` nhưng thực tế đang truy cập qua HTTP (không phải HTTPS). Cookie Secure chỉ gửi qua HTTPS nên trình duyệt không giữ được phiên. Xoá dòng đó hoặc đặt về tắt, khởi động lại.
+**Đăng nhập đúng mật khẩu nhưng cứ bị đá về trang login.** Nhiều khả năng bạn đã bật `JAVIS_SECURE_COOKIE=1` nhưng thực tế đang truy cập qua HTTP (không phải HTTPS). Cookie Secure chỉ gửi qua HTTPS nên trình duyệt không giữ được phiên. Xoá dòng đó hoặc đặt về tắt, khởi động lại.
 
-**Mở app báo cần MÃ THIẾT LẬP mà không biết lấy ở đâu.** Mã in trong log server lúc khởi động. Với Docker, xem log container tìm dòng "SETUP TOKEN", hoặc đọc file `.setup_token` trong thư mục state. Cách gọn hơn: đặt sẵn `JARVIS_ADMIN_PASSWORD` trong `.env` để bỏ qua bước nhập mã.
+**Mở app báo cần MÃ THIẾT LẬP mà không biết lấy ở đâu.** Mã in trong log server lúc khởi động. Với Docker, xem log container tìm dòng "SETUP TOKEN", hoặc đọc file `.setup_token` trong thư mục state. Cách gọn hơn: đặt sẵn `JAVIS_ADMIN_PASSWORD` trong `.env` để bỏ qua bước nhập mã.
 
 **Đặt tên workspace trong .env mà app hiển thị tên khác.** App ưu tiên tên đã lưu trong Cài đặt hơn biến `WORKSPACE_NAME`. Sửa tên trong bảng Cài đặt của app, hoặc xoá tên đã lưu để app dùng lại giá trị từ `.env`.
 

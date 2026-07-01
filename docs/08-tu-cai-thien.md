@@ -109,7 +109,7 @@ Ngay dưới các nút là ô trạng thái, cho biết:
 
 Phần **Nhật ký gần đây** liệt kê các entry log mới nhất. Mỗi lần chạy, Javis ghi một mục gồm: loại nhiệm vụ, chế độ, lý do chạy (thủ công hay theo lịch), phần tóm tắt việc đã làm, và dòng kiểm chứng nếu có.
 
-Nhật ký cũng được lưu thành file trong vault, tại thư mục `Jarvis/loop-log/` với mỗi ngày một file (dạng `YYYY-MM-DD.md`). Bạn có thể mở lại đầy đủ qua trang [Quản lý tệp tin](05-quan-ly-tep-tin.md) nếu muốn xem lịch sử xa hơn.
+Nhật ký cũng được lưu thành file trong vault, tại thư mục `Javis/loop-log/` với mỗi ngày một file (dạng `YYYY-MM-DD.md`). Bạn có thể mở lại đầy đủ qua trang [Quản lý tệp tin](05-quan-ly-tep-tin.md) nếu muốn xem lịch sử xa hơn.
 
 ## Bước tự kiểm chứng (chỉ ở chế độ Tự làm)
 

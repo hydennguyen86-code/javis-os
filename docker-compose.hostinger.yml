@@ -23,16 +23,16 @@
 #   - Image GHCR phải để PUBLIC (GitHub > Packages > javis-os > Package settings > Public).
 # ============================================================================
 services:
-  jarvis:
+  javis:
     image: ghcr.io/blogminhquy/javis-os:latest
-    container_name: jarvis
+    container_name: javis
     restart: unless-stopped
     pull_policy: always
     environment:
-      JARVIS_HOST: 0.0.0.0
-      JARVIS_PORT: "7777"
-      JARVIS_REQUIRE_LOGIN: "1"     # ÉP đăng nhập/đăng ký khi mở app (public)
-      JARVIS_STATE_DIR: /data/state
+      JAVIS_HOST: 0.0.0.0
+      JAVIS_PORT: "7777"
+      JAVIS_REQUIRE_LOGIN: "1"     # ÉP đăng nhập/đăng ký khi mở app (public)
+      JAVIS_STATE_DIR: /data/state
       BRAIN_PATH: /data/brain
       BRAINS_DIR: /brains
       OBSIDIAN_VAULT_PATH: /data/vault
@@ -49,19 +49,19 @@ services:
       - traefik.http.routers.${COMPOSE_PROJECT_NAME:-javis}.tls.certresolver=letsencrypt
       - traefik.http.services.${COMPOSE_PROJECT_NAME:-javis}.loadbalancer.server.port=7777
     volumes:
-      - jarvis-data:/data
-      - jarvis-brains:/brains
-      - claude-auth:/home/jarvis/.claude
-      - codex-auth:/home/jarvis/.codex
+      - javis-data:/data
+      - javis-brains:/brains
+      - claude-auth:/home/javis/.claude
+      - codex-auth:/home/javis/.codex
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request,os,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:'+os.getenv('JARVIS_PORT','7777')+'/health',timeout=4).status==200 else 1)"]
+      test: ["CMD", "python", "-c", "import urllib.request,os,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:'+os.getenv('JAVIS_PORT','7777')+'/health',timeout=4).status==200 else 1)"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 25s
 
 volumes:
-  jarvis-data:
-  jarvis-brains:
+  javis-data:
+  javis-brains:
   claude-auth:
   codex-auth:

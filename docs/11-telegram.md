@@ -25,7 +25,7 @@ Xem thêm engine và model ở [Models & engine](10-models-va-engine.md), công 
 ### Lấy Bot token (từ BotFather)
 
 1. Trong Telegram, tìm tài khoản tên **@BotFather** (có tick xanh) và mở chat.
-2. Gõ `/newbot` rồi làm theo hướng dẫn: đặt tên hiển thị cho bot, rồi đặt username kết thúc bằng `bot` (vd `jarvis_cua_toi_bot`).
+2. Gõ `/newbot` rồi làm theo hướng dẫn: đặt tên hiển thị cho bot, rồi đặt username kết thúc bằng `bot` (vd `javis_cua_toi_bot`).
 3. BotFather trả về một chuỗi token dạng `123456789:ABCdef...`. Đây chính là **Bot token**. Giữ kín, ai có token này là điều khiển được bot.
 
 ### Lấy Chat ID của bạn

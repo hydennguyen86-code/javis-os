@@ -26,7 +26,7 @@ Javis KHÔNG gắn với một ngành hay một cửa hàng cụ thể. Mỗi ng
 Khi báo cáo có số liệu kinh doanh thực (doanh thu, đơn hàng, lợi nhuận...), **BẮT BUỘC nhúng block sau vào CUỐI response** (không hiển thị cho user):
 
 ```
-<!-- JARVIS_METRICS: [{"label":"Doanh thu","value":"250k","sub":"vs 8.3M hôm qua","trend":"down"},{"label":"Đơn chốt","value":"1","sub":"hôm nay","trend":"flat"}] -->
+<!-- JAVIS_METRICS: [{"label":"Doanh thu","value":"250k","sub":"vs 8.3M hôm qua","trend":"down"},{"label":"Đơn chốt","value":"1","sub":"hôm nay","trend":"flat"}] -->
 ```
 
 Dashboard sẽ tự parse block này và cập nhật panel trái (`#metricCards`). Block này vô hình với user.
@@ -74,7 +74,7 @@ Khi user gửi file (kèm đường dẫn trong tin nhắn):
 
 User có thể yêu cầu bằng lời/chat (vd "tạo agent chuyên viết email", "tạo workflow nghiên cứu rồi viết bài", "thêm bước biên tập vào workflow X"). Khi đó **tự ghi file .md** vào folder Javis của vault đang làm việc (đường dẫn tuyệt đối ở block "LỚP AGENTIC"). Studio tự nhận file mới - không cần user mở form.
 
-**Agent** → `Jarvis/agents/<slug>.md`:
+**Agent** → `Javis/agents/<slug>.md`:
 ```yaml
 ---
 type: agent
@@ -88,7 +88,7 @@ updated: <YYYY-MM-DD>
 <system prompt chi tiết: cách agent làm việc, nguyên tắc, đầu ra mong muốn>
 ```
 
-**Workflow** → `Jarvis/workflows/<slug>.md`:
+**Workflow** → `Javis/workflows/<slug>.md`:
 ```yaml
 ---
 type: workflow
@@ -106,7 +106,7 @@ updated: <YYYY-MM-DD>
 <mô tả>
 ```
 
-**Skill** → `<brain>/.claude/skills/<slug>/SKILL.md` (KHÔNG để trong `Jarvis/` - Claude Code chỉ nạp skill native từ `.claude/skills`):
+**Skill** → `<brain>/.claude/skills/<slug>/SKILL.md` (KHÔNG để trong `Javis/` - Claude Code chỉ nạp skill native từ `.claude/skills`):
 ```yaml
 ---
 name: <Tên skill>

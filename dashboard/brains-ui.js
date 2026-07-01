@@ -45,11 +45,11 @@
       const want = "path:" + selectPath;
       if ([...sel.options].some((o) => o.value === want)) {
         sel.value = want;
-        localStorage.setItem("jarvis.graphSource", want);
+        localStorage.setItem("javis.graphSource", want);
         sel.dispatchEvent(new Event("change"));
       }
     } else if (restoreSaved) {
-      const saved = localStorage.getItem("jarvis.graphSource");
+      const saved = localStorage.getItem("javis.graphSource");
       if (saved && saved !== sel.value && [...sel.options].some((o) => o.value === saved)) {
         sel.value = saved;
         sel.dispatchEvent(new Event("change"));
@@ -94,7 +94,7 @@
     if (!r || !r.ok) { alert((r && r.error) || "Không xoá được brain."); return; }
     // Về brain mặc định rồi nạp lại danh sách
     sel.value = "brain";
-    localStorage.setItem("jarvis.graphSource", "brain");
+    localStorage.setItem("javis.graphSource", "brain");
     await loadBrains(null, false);
     sel.dispatchEvent(new Event("change"));
     alert('Đã xoá brain "' + name + '".');

@@ -21,7 +21,7 @@ server/loop_config.json
 server/conversations.db
 server/conversations.db-wal
 server/conversations.db-shm
-server/jarvis.log
+server/javis.log
 *.log
 *.mp3
 .DS_Store

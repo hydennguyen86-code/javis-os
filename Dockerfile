@@ -53,33 +53,33 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Non-root runtime user. Code stays root-owned + read-only; state on volumes.
-RUN useradd -u 10001 -m -d /home/jarvis jarvis \
-    && mkdir -p /data/state /data/vault /brains /home/jarvis/.claude /home/jarvis/.codex \
-    && chown -R jarvis:jarvis /data /brains /home/jarvis
+RUN useradd -u 10001 -m -d /home/javis javis \
+    && mkdir -p /data/state /data/vault /brains /home/javis/.claude /home/javis/.codex \
+    && chown -R javis:javis /data /brains /home/javis
 
 # Writable state under /data; ALL second brains under /brains (mount riêng → git-backup được).
-ENV JARVIS_HOST=0.0.0.0 \
-    JARVIS_PORT=7777 \
-    JARVIS_STATE_DIR=/data/state \
+ENV JAVIS_HOST=0.0.0.0 \
+    JAVIS_PORT=7777 \
+    JAVIS_STATE_DIR=/data/state \
     BRAIN_PATH=/data/brain \
     BRAINS_DIR=/brains \
     OBSIDIAN_VAULT_PATH=/data/vault \
     CLAUDE_CWD=/app \
-    HOME=/home/jarvis \
+    HOME=/home/javis \
     PATH=/usr/local/bin:$PATH
 
-USER jarvis
+USER javis
 
 # Persist state (/data) + brains (/brains) + Claude auth + Codex auth (login ChatGPT).
-VOLUME ["/data", "/brains", "/home/jarvis/.claude", "/home/jarvis/.codex"]
+VOLUME ["/data", "/brains", "/home/javis/.claude", "/home/javis/.codex"]
 
 EXPOSE 7777
 
 # Healthcheck hits the public /health endpoint with stdlib only (no curl).
 HEALTHCHECK --interval=30s --timeout=5s --start-period=25s --retries=3 \
-    CMD python -c "import urllib.request,os,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:'+os.getenv('JARVIS_PORT','7777')+'/health',timeout=4).status==200 else 1)" || exit 1
+    CMD python -c "import urllib.request,os,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:'+os.getenv('JAVIS_PORT','7777')+'/health',timeout=4).status==200 else 1)" || exit 1
 
 # tini reaps node subprocesses. uvicorn launched with --app-dir server because
 # main.py uses the "main:app" import string and `from claude_cli import ...`.
 ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["sh", "-c", "python -m uvicorn main:app --app-dir server --host ${JARVIS_HOST} --port ${JARVIS_PORT}"]
+CMD ["sh", "-c", "python -m uvicorn main:app --app-dir server --host ${JAVIS_HOST} --port ${JAVIS_PORT}"]

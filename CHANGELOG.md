@@ -4,13 +4,18 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.6.0] - 2026-07-01
+### Thay đổi
+- Đồng bộ NỐT toàn bộ tên hạ tầng nội bộ sang javis: biến môi trường JAVIS_*, volume javis-data/javis-brains, service/container/user javis (/home/javis), profile codex javis, marker JAVIS_METRICS, và các file javis.service / start-javis.vbs / stop-javis.bat. Toàn dự án dùng một tên duy nhất.
+- LƯU Ý khi redeploy: volume đã đổi tên nên bản mới bắt đầu TRỐNG (cần tạo lại admin + nạp lại brain), hoặc tự chép dữ liệu từ volume cũ sang javis-data/javis-brains. Nếu trước đó đặt biến admin trên Hostinger, đổi tiền tố sang JAVIS_ADMIN_USER / JAVIS_ADMIN_PASSWORD.
+
 ## [0.5.1] - 2026-07-01
 ### Thay đổi
-- Đổi tên repo/image GitHub từ jarvis-os thành javis-os (image ghcr.io/blogminhquy/javis-os, GITHUB_REPO, link cài đặt trong README/DEPLOY). Volume jarvis-data/jarvis-brains giữ nguyên để không mất dữ liệu.
+- Đổi tên repo/image GitHub sang javis-os (image ghcr.io/blogminhquy/javis-os, GITHUB_REPO, link cài đặt trong README/DEPLOY).
 
 ## [0.5.0] - 2026-07-01
 ### Thay đổi
-- Đổi tên toàn bộ thương hiệu Jarvis thành Javis (giao diện, tài liệu, README, system prompt). Giữ nguyên tên hạ tầng nội bộ (biến JARVIS_*, image javis-os, volume jarvis-data, thư mục cũ Jarvis/) để không vỡ deploy và dữ liệu hiện có.
+- Đổi thương hiệu hiển thị sang Javis (giao diện, tài liệu, README, system prompt).
 ### Thêm mới
 - docker-compose.hostinger.yml dùng ${COMPOSE_PROJECT_NAME} cho tên router/service Traefik: chạy được nhiều bản Javis trên cùng 1 VPS mà không đụng nhau (giống đuôi ngẫu nhiên -efxd của Hermes).
 
@@ -18,7 +23,7 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 ### Sửa lỗi
 - docker-compose.hostinger.yml gắn nhãn Traefik đúng mẫu app Hermes: BỎ phần networks/external traefik-proxy (chính chỗ làm deploy báo "network not found"). Traefik của Hostinger tự thấy container qua nhãn.
 ### Thêm mới
-- Có link mặc định chạy HTTPS mà không cần mua tên miền: đặt DOMAIN_NAME=jarvis.<hostname-vps>.hstgr.cloud (Hostinger có wildcard DNS + tự cấp SSL).
+- Có link mặc định chạy HTTPS mà không cần mua tên miền: đặt DOMAIN_NAME=javis.<hostname-vps>.hstgr.cloud (Hostinger có wildcard DNS + tự cấp SSL).
 
 ## [0.4.6] - 2026-07-01
 ### Sửa lỗi
@@ -26,7 +31,7 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 ## [0.4.5] - 2026-07-01
 ### Sửa lỗi
-- docker-compose.hostinger.yml bỏ Watchtower (cần Docker socket, hay gây "Partially running" trên Hostinger Docker Manager). Bản Hostinger giờ chỉ 1 container jarvis + nhãn Traefik, cập nhật bằng Redeploy.
+- docker-compose.hostinger.yml bỏ Watchtower (cần Docker socket, hay gây "Partially running" trên Hostinger Docker Manager). Bản Hostinger giờ chỉ 1 container javis + nhãn Traefik, cập nhật bằng Redeploy.
 
 ## [0.4.4] - 2026-07-01
 ### Thêm mới

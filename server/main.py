@@ -52,7 +52,7 @@ async def _auth_guard(request: Request, call_next):
     if cfgmod.gate_active():
         path = request.url.path
         public = path in _AUTH_PUBLIC_EXACT or any(path.startswith(p) for p in _AUTH_PUBLIC_PREFIX)
-        if not public and not cfgmod.valid_session(request.cookies.get("jarvis_session", "")):
+        if not public and not cfgmod.valid_session(request.cookies.get("javis_session", "")):
             return JSONResponse({"error": "unauthorized", "auth_required": True,
                                  "setup_required": not cfgmod.auth_enabled()}, status_code=401)
     return await call_next(request)
@@ -223,7 +223,7 @@ def _clip_for_log(text: str, max_chars: int = _LOG_MSG_MAX_CHARS) -> str:
               f"{_LOG_TAIL_CHARS} cuối / tổng {len(text)} …]\n\n")
     return head + marker + tail
 
-def log_conversation(brain: str, user_msg: str, jarvis_msg: str):
+def log_conversation(brain: str, user_msg: str, javis_msg: str):
     """Ghi log hội thoại vào Memory của vault đang chọn (nguyên liệu để học)."""
     try:
         from datetime import datetime, timezone, timedelta
@@ -231,7 +231,7 @@ def log_conversation(brain: str, user_msg: str, jarvis_msg: str):
         conv = _brain_memory_dir(brain) / "conversations"
         f = conv / f"{now.strftime('%Y-%m-%d')}.md"
         u = _clip_for_log(_redact_secrets(user_msg))
-        j = _clip_for_log(_redact_secrets(jarvis_msg))
+        j = _clip_for_log(_redact_secrets(javis_msg))
         entry = f"\n## {now.strftime('%H:%M')}\n**Bạn:** {u}\n\n**Javis:** {j}\n"
         with open(f, "a", encoding="utf-8") as fh:
             fh.write(entry)
@@ -283,8 +283,8 @@ def _session_cookie(resp, token, request=None):
     # KHÔNG tự suy Secure từ X-Forwarded-Proto: nhiều proxy (vd Hostinger port-path http://host/PORT/)
     # phục vụ HTTP → cookie Secure sẽ KHÔNG được trình duyệt gửi lại → KẸT vòng đăng nhập (đăng nhập/
     # tạo tài khoản xong vẫn bị hỏi lại từ đầu). Mặc định TẮT Secure để chạy được cả HTTP lẫn HTTPS.
-    # Chỉ bật khi bạn CHẮC CHẮN HTTPS đầu-cuối: đặt env JARVIS_SECURE_COOKIE=1.
-    secure = os.getenv("JARVIS_SECURE_COOKIE", "").strip().lower() in ("1", "true", "yes", "on")
+    # Chỉ bật khi bạn CHẮC CHẮN HTTPS đầu-cuối: đặt env JAVIS_SECURE_COOKIE=1.
+    secure = os.getenv("JAVIS_SECURE_COOKIE", "").strip().lower() in ("1", "true", "yes", "on")
     # HTTPS thật qua TÊN MIỀN RIÊNG (Caddy On-Demand TLS): Host khớp custom domain → chắc chắn đi
     # qua Caddy = HTTPS đầu-cuối → bật Secure. An toàn: KHÔNG suy từ X-Forwarded-Proto, và không
     # ảnh hưởng bản localhost/Hostinger (Host khác custom domain → giữ nguyên như cũ).
@@ -296,7 +296,7 @@ def _session_cookie(resp, token, request=None):
                 secure = True
         except Exception:
             pass
-    resp.set_cookie("jarvis_session", token, httponly=True, samesite="lax",
+    resp.set_cookie("javis_session", token, httponly=True, samesite="lax",
                     secure=secure, max_age=30 * 86400, path="/")
     return resp
 
@@ -306,7 +306,7 @@ async def auth_status(request: Request):
     cfg = cfgmod.read_settings()
     enabled = cfgmod.auth_enabled(cfg)
     require = cfgmod.require_login()
-    has_session = cfgmod.valid_session(request.cookies.get("jarvis_session", ""))
+    has_session = cfgmod.valid_session(request.cookies.get("javis_session", ""))
     # authed: có session thật; HOẶC bản local không bắt buộc login + chưa đặt mật khẩu (giữ UX cũ).
     authed = has_session or (not enabled and not require)
     return {"needs_setup": not enabled, "auth_required": enabled or require,
@@ -370,9 +370,9 @@ async def auth_login(request: Request, username: str = Form(...), password: str 
 
 @app.post("/auth/logout")
 async def auth_logout(request: Request):
-    cfgmod.drop_session(request.cookies.get("jarvis_session", ""))
+    cfgmod.drop_session(request.cookies.get("javis_session", ""))
     resp = JSONResponse({"ok": True})
-    resp.delete_cookie("jarvis_session", path="/")
+    resp.delete_cookie("javis_session", path="/")
     return resp
 
 
@@ -550,9 +550,9 @@ def _toml_str(s):
 
 
 def _write_codex_profile():
-    """Ghi ~/.codex/jarvis.config.toml từ MCP http của Javis → `codex exec -p jarvis` thấy được MCP đó
-    (ChatGPT subscription dùng MCP của Javis như POSCake). Trả 'jarvis' nếu có server, None nếu rỗng."""
-    path = Path.home() / ".codex" / "jarvis.config.toml"
+    """Ghi ~/.codex/javis.config.toml từ MCP http của Javis → `codex exec -p javis` thấy được MCP đó
+    (ChatGPT subscription dùng MCP của Javis như POSCake). Trả 'javis' nếu có server, None nếu rỗng."""
+    path = Path.home() / ".codex" / "javis.config.toml"
     lines, seen = [], set()
     for s in mcp_store.servers_for_client():
         name = re.sub(r"[^A-Za-z0-9_]", "_", (s.get("name") or "").strip())
@@ -573,7 +573,7 @@ def _write_codex_profile():
         if seen:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text("\n".join(lines), encoding="utf-8")
-            return "jarvis"
+            return "javis"
         if path.exists():
             path.unlink()
     except Exception as e:
@@ -1131,7 +1131,7 @@ def _node_payload(fpath, roots):
 @app.websocket("/ws/graph")
 async def ws_graph(ws: WebSocket):
     """Đẩy realtime mỗi khi brain sinh ra / cập nhật note .md (poll mtime nhẹ)."""
-    if cfgmod.gate_active() and not cfgmod.valid_session(ws.cookies.get("jarvis_session", "")):
+    if cfgmod.gate_active() and not cfgmod.valid_session(ws.cookies.get("javis_session", "")):
         await ws.close(code=1008)
         return
     await ws.accept()
@@ -1202,7 +1202,7 @@ def _brain_root(brain: str) -> str:
 
 def _brain_sub(root, new_name: str, old_rel: str) -> Path:
     """Subfolder trong brain theo cấu trúc CHUẨN MỚI (phẳng <root>/<new_name>).
-    Fallback cấu trúc CŨ (<root>/<old_rel>, vd Jarvis/agents, Memory) nếu mới chưa có →
+    Fallback cấu trúc CŨ (<root>/<old_rel>, vd Javis/agents, Memory) nếu mới chưa có →
     không vỡ vault chưa migrate. Chưa có cả hai → tạo mới."""
     root = Path(root)
     new = root / new_name
@@ -1326,8 +1326,8 @@ STANDARD_STRUCTURE = [
     # Nội dung người dùng đưa vào - nguồn lưu trữ (source of truth)
     {"key": "sources", "label": "sources", "kind": "dir", "detect": r"^(\d+\s*[-_.]\s*)?sources$", "create": "sources", "essential": True},
     # Lớp vận hành Javis (alt = vị trí cũ chưa migrate → không báo thiếu nhầm)
-    {"key": "agents", "label": "agents", "kind": "dir", "detect": r"^agents$", "alt": "Jarvis/agents", "create": "agents", "essential": True},
-    {"key": "workflows", "label": "workflows", "kind": "dir", "detect": r"^workflows$", "alt": "Jarvis/workflows", "create": "workflows", "essential": True},
+    {"key": "agents", "label": "agents", "kind": "dir", "detect": r"^agents$", "alt": "Javis/agents", "create": "agents", "essential": True},
+    {"key": "workflows", "label": "workflows", "kind": "dir", "detect": r"^workflows$", "alt": "Javis/workflows", "create": "workflows", "essential": True},
     {"key": "memory", "label": "memory", "kind": "dir", "detect": r"^memory$", "alt": "Memory", "create": "memory", "essential": True},
     # Skill KHÔNG phải folder top-level: sống ở .claude/skills/<skill>/SKILL.md (Claude Code native),
     # chia nhóm bằng field `group` trong frontmatter. Nên không liệt kê ở đây.
@@ -1364,7 +1364,7 @@ def _check_structure(root: Path):
                       "where": where, "essential": it["essential"]})
     return items
 
-JARVIS_README = (
+JAVIS_README = (
     "# Javis\n\nLớp điều phối của Javis OS trong vault này.\n\n"
     "- `agents/` - các Agent (vai trò + skills + bộ nhớ riêng)\n"
     "- `workflows/` - quy trình nhiều agent (status active/off)\n"
@@ -1376,13 +1376,13 @@ SCHEMA_SEED = (
     "- `06 - Sources/` - ghi chú thô (source of truth)\n"
     "- `07 - Wiki/` - tri thức đã chưng cất, có `[[wikilink]]`\n"
     "- `Memory/` - bộ nhớ dài hạn của Javis (facts + conversations)\n"
-    "- `Jarvis/` - agents + workflows\n\n"
+    "- `Javis/` - agents + workflows\n\n"
     "Nguyên lý: Sources → (ingest) → Wiki. Tri thức tích luỹ, không tái phát hiện.\n"
 )
 
 def _ensure_brain_scaffold(root):
     """Tạo cấu trúc chuẩn cho MỘT brain (idempotent): sources/agents/workflows/memory/wiki/
-    attachments + Jarvis/README + memory seed. Dùng cho brain mặc định lẫn brain mới tạo."""
+    attachments + Javis/README + memory seed. Dùng cho brain mặc định lẫn brain mới tạo."""
     root = Path(root)
     root.mkdir(parents=True, exist_ok=True)
     present = {i["key"] for i in _check_structure(root) if i["present"]}
@@ -1399,7 +1399,7 @@ def _ensure_brain_scaffold(root):
     jr = root / "Javis" / "README.md"
     if not jr.exists():
         jr.parent.mkdir(parents=True, exist_ok=True)
-        jr.write_text(JARVIS_README, encoding="utf-8")
+        jr.write_text(JAVIS_README, encoding="utf-8")
     try:
         _brain_memory_dir(str(root))   # memory/ + MEMORY.md seed
     except Exception:
@@ -1474,12 +1474,12 @@ async def vault_init(brain: str = Form("brain")):
                 created.append(it["label"])
         except Exception as e:
             print(f"[vault init error] {it['key']}: {e}", file=__import__('sys').stderr)
-    # Seed Jarvis/README + Memory
+    # Seed Javis/README + Memory
     try:
         jr = root / "Javis" / "README.md"
         if not jr.exists():
             jr.parent.mkdir(parents=True, exist_ok=True)
-            jr.write_text(JARVIS_README, encoding="utf-8")
+            jr.write_text(JAVIS_README, encoding="utf-8")
         _brain_memory_dir(brain)  # đảm bảo Memory seed
     except Exception:
         pass
@@ -1493,7 +1493,7 @@ async def brain_migrate(brain: str = Form("brain")):
     import shutil
     root = Path(_brain_root(brain))
     moved, skipped = [], []
-    for old_rel, new_rel in [("Jarvis/agents", "agents"), ("Jarvis/workflows", "workflows"), ("Memory", "memory")]:
+    for old_rel, new_rel in [("Javis/agents", "agents"), ("Javis/workflows", "workflows"), ("Memory", "memory")]:
         src, dst = root / old_rel, root / new_rel
         if dst.exists():
             skipped.append(f"{new_rel} (đã tồn tại - bỏ qua)")
@@ -1620,9 +1620,9 @@ def _today():
     return date.today().strftime("%Y-%m-%d")
 
 def _agents_dir(brain):
-    return _brain_sub(_brain_root(brain), "agents", "Jarvis/agents")
+    return _brain_sub(_brain_root(brain), "agents", "Javis/agents")
 def _workflows_dir(brain):
-    return _brain_sub(_brain_root(brain), "workflows", "Jarvis/workflows")
+    return _brain_sub(_brain_root(brain), "workflows", "Javis/workflows")
 
 def _agent_memory(brain, slug):
     f = _brain_memory_dir(brain) / "agents" / slug / "MEMORY.md"
@@ -2174,7 +2174,7 @@ async def lint(brain: str = Query("brain")):
 # ============================================================
 # Automations registry (Hướng 1) - lịch tự động: cron / trigger / routine
 # Backend KHÔNG query được CronList/RemoteTrigger của Claude Code → ta lưu file registry
-# trong vault (Jarvis/automations.json) + chèn sẵn "Vòng lặp tự cải thiện" (loop nội bộ).
+# trong vault (Javis/automations.json) + chèn sẵn "Vòng lặp tự cải thiện" (loop nội bộ).
 # ============================================================
 def _automations_path(brain):
     return Path(_brain_root(brain)) / "Javis" / "automations.json"
@@ -2326,7 +2326,7 @@ async def _start_scheduler():
     _ensure_default_brain()   # brain mặc định có sẵn cấu trúc chuẩn (ghi được trên mount /brains)
     try:
         if cfgmod.provision_admin_from_env():
-            print("[auth] Đã tạo tài khoản admin từ JARVIS_ADMIN_PASSWORD (env).", file=_sys.stderr)
+            print("[auth] Đã tạo tài khoản admin từ JAVIS_ADMIN_PASSWORD (env).", file=_sys.stderr)
         if cfgmod.setup_token_required():
             _tok = cfgmod.get_or_create_setup_token()
             print("\n" + "=" * 66 +
@@ -2334,7 +2334,7 @@ async def _start_scheduler():
                   "\n  Mở app → màn tạo tài khoản sẽ hỏi MÃ THIẾT LẬP dưới đây:"
                   f"\n      SETUP TOKEN:  {_tok}"
                   "\n  (Chỉ người xem được log/terminal này tạo được admin. Hoặc đặt"
-                  "\n   JARVIS_ADMIN_PASSWORD env để tạo sẵn admin, khỏi cần mã.)\n" +
+                  "\n   JAVIS_ADMIN_PASSWORD env để tạo sẵn admin, khỏi cần mã.)\n" +
                   "=" * 66 + "\n", file=_sys.stderr)
     except Exception as e:
         print(f"[auth bootstrap] {e}", file=_sys.stderr)
@@ -2450,7 +2450,7 @@ def _ver_newer(latest, cur) -> bool:
 
 def _deploy_mode() -> str:
     """docker | windows | native - quyết định cách cập nhật."""
-    if os.path.exists("/.dockerenv") or os.getenv("JARVIS_STATE_DIR", "").startswith("/data"):
+    if os.path.exists("/.dockerenv") or os.getenv("JAVIS_STATE_DIR", "").startswith("/data"):
         return "docker"
     if os.name == "nt":
         return "windows"
@@ -2532,7 +2532,7 @@ async def do_update():
                 f.write("@echo off\r\n")
                 f.write(f'cd /d "{root}"\r\n')
                 f.write(f'git pull --ff-only > "{logf}" 2>&1\r\n')
-                f.write('wscript.exe "start-jarvis.vbs"\r\n')
+                f.write('wscript.exe "start-javis.vbs"\r\n')
             subprocess.Popen(["cmd", "/c", bat], cwd=root,
                              creationflags=0x00000008 | 0x00000200)  # DETACHED_PROCESS|NEW_PROCESS_GROUP
         else:
@@ -2734,7 +2734,7 @@ async def tls_check(domain: str = ""):
 async def domain_set(domain: str = Form("")):
     d = _norm_domain(domain)
     if d and not _DOMAIN_RE.match(d):
-        return JSONResponse({"ok": False, "error": "Tên miền không hợp lệ (vd: jarvis.tencuaban.com)"}, status_code=400)
+        return JSONResponse({"ok": False, "error": "Tên miền không hợp lệ (vd: javis.tencuaban.com)"}, status_code=400)
     cfg = cfgmod.read_settings()
     cfg.setdefault("domain", {})
     cfg["domain"]["custom"] = d
@@ -2929,7 +2929,7 @@ async def tts_voices():
 # ============================================
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
-    if cfgmod.gate_active() and not cfgmod.valid_session(ws.cookies.get("jarvis_session", "")):
+    if cfgmod.gate_active() and not cfgmod.valid_session(ws.cookies.get("javis_session", "")):
         await ws.close(code=1008)
         return
     await ws.accept()
@@ -3393,7 +3393,7 @@ async def telegram_test():
 if __name__ == "__main__":
     import uvicorn
     # 127.0.0.1: chỉ máy này truy cập được (an toàn - tránh người khác trong mạng LAN
-    # chạy Claude full quyền trên máy + vault của bạn). Đổi qua JARVIS_HOST nếu cần.
-    host = os.getenv("JARVIS_HOST", "127.0.0.1")
-    port = int(os.getenv("JARVIS_PORT", "7777"))
+    # chạy Claude full quyền trên máy + vault của bạn). Đổi qua JAVIS_HOST nếu cần.
+    host = os.getenv("JAVIS_HOST", "127.0.0.1")
+    port = int(os.getenv("JAVIS_PORT", "7777"))
     uvicorn.run("main:app", host=host, port=port, reload=False)

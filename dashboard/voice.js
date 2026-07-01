@@ -15,7 +15,7 @@ class JavisVoice {
     this.synth = window.speechSynthesis;
     this.isListening = false;
     // Nhớ lựa chọn bật/tắt đọc qua reload (khách hàng nhiều khi không muốn có voice).
-    this.ttsEnabled = (localStorage.getItem("jarvis.ttsEnabled") !== "0");
+    this.ttsEnabled = (localStorage.getItem("javis.ttsEnabled") !== "0");
     this.vietnameseVoice = null;
 
     // Edge TTS backend (server)
@@ -342,7 +342,7 @@ class JavisVoice {
 
   toggleTTS() {
     this.ttsEnabled = !this.ttsEnabled;
-    try { localStorage.setItem("jarvis.ttsEnabled", this.ttsEnabled ? "1" : "0"); } catch (e) {}
+    try { localStorage.setItem("javis.ttsEnabled", this.ttsEnabled ? "1" : "0"); } catch (e) {}
     if (!this.ttsEnabled) this.stopSpeaking();
     return this.ttsEnabled;
   }

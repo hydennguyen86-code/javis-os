@@ -120,7 +120,7 @@ Chi tiết về đồ thị xem [Đồ thị tri thức 3D](03-do-thi-tri-thuc-3
 
 Thẻ **Chuẩn hóa thư mục** gom các thư mục `agents/ workflows/ memory/ skills/` của brain đang chọn về dạng phẳng đồng nhất. Bấm **Chuẩn hóa brain đang chọn** để chạy.
 
-Thao tác này an toàn: chỉ di chuyển khi thư mục đích chưa có, không ghi đè, chạy lại nhiều lần cũng vô hại (ví dụ chuyển `Jarvis/agents` sang `agents`, `Memory` sang `memory`; có git backup). Sau khi chạy, Javis báo đã di chuyển gì hoặc "Không có gì cần di chuyển (đã chuẩn)".
+Thao tác này an toàn: chỉ di chuyển khi thư mục đích chưa có, không ghi đè, chạy lại nhiều lần cũng vô hại (ví dụ chuyển `Javis/agents` sang `agents`, `Memory` sang `memory`; có git backup). Sau khi chạy, Javis báo đã di chuyển gì hoặc "Không có gì cần di chuyển (đã chuẩn)".
 
 Về Second Brain (bộ nhớ, Wiki, cấu trúc vault), xem [Second Brain: bộ nhớ, Wiki, INGEST](13-second-brain-bo-nho-wiki.md).
 
@@ -134,12 +134,12 @@ Cách lấy mã:
 
 | Tình huống | Lệnh chạy |
 |---|---|
-| Hostinger, vào App terminal (bên trong container `jarvis`) | `cat /data/state/.setup_token` |
-| SSH vào host chạy Docker | `docker compose logs jarvis` rồi tìm dòng `SETUP TOKEN` |
+| Hostinger, vào App terminal (bên trong container `javis`) | `cat /data/state/.setup_token` |
+| SSH vào host chạy Docker | `docker compose logs javis` rồi tìm dòng `SETUP TOKEN` |
 
 Sau khi có mã, dán vào ô **Mã thiết lập** trong wizard rồi bấm **Bắt đầu dùng Javis →**. Mã được dùng một lần, sau khi tạo tài khoản thành công Javis xóa mã đi.
 
-**Cách khỏi cần mã:** khi deploy, đặt sẵn hai biến môi trường `JARVIS_ADMIN_USER` và `JARVIS_ADMIN_PASSWORD`. Javis tự tạo tài khoản admin lúc khởi động, mở app ra là màn đăng nhập luôn, không hỏi MÃ THIẾT LẬP. Chi tiết biến môi trường xem [Cấu hình .env](16-cau-hinh-env.md).
+**Cách khỏi cần mã:** khi deploy, đặt sẵn hai biến môi trường `JAVIS_ADMIN_USER` và `JAVIS_ADMIN_PASSWORD`. Javis tự tạo tài khoản admin lúc khởi động, mở app ra là màn đăng nhập luôn, không hỏi MÃ THIẾT LẬP. Chi tiết biến môi trường xem [Cấu hình .env](16-cau-hinh-env.md).
 
 ## Mẹo
 
@@ -150,7 +150,7 @@ Sau khi có mã, dán vào ô **Mã thiết lập** trong wizard rồi bấm **B
 
 ## Sự cố thường gặp
 
-- **Mở app báo cần MÃ THIẾT LẬP nhưng không biết lấy đâu:** vào App terminal (Hostinger) chạy `cat /data/state/.setup_token`, hoặc trên host chạy `docker compose logs jarvis` tìm dòng `SETUP TOKEN`. Hoặc đặt sẵn env `JARVIS_ADMIN_PASSWORD` để khỏi cần mã.
+- **Mở app báo cần MÃ THIẾT LẬP nhưng không biết lấy đâu:** vào App terminal (Hostinger) chạy `cat /data/state/.setup_token`, hoặc trên host chạy `docker compose logs javis` tìm dòng `SETUP TOKEN`. Hoặc đặt sẵn env `JAVIS_ADMIN_PASSWORD` để khỏi cần mã.
 - **Báo "Sai hoặc thiếu MÃ THIẾT LẬP":** mã dán vào sai hoặc thiếu. Lấy lại mã đúng từ log server rồi dán lại, chú ý không dính khoảng trắng thừa.
 - **Báo "Mật khẩu tối thiểu 8 ký tự":** đặt mật khẩu dài từ 8 ký tự trở lên.
 - **Báo "Đã có tài khoản - hãy đăng nhập":** admin đã được tạo trước đó (ví dụ qua env). Dùng màn đăng nhập với tài khoản/mật khẩu đã đặt.

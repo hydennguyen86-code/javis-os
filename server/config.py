@@ -9,10 +9,10 @@ import hashlib
 import secrets
 from pathlib import Path
 
-# Mọi state Javis tự ghi (settings, auth sessions, loop config) nằm ở JARVIS_STATE_DIR.
+# Mọi state Javis tự ghi (settings, auth sessions, loop config) nằm ở JAVIS_STATE_DIR.
 # Mặc định = server/ (không đổi trên máy cũ). Docker/VPS đặt = /data/state (volume ghi được,
 # vì code tree /app là read-only trong container).
-STATE_DIR = Path(os.getenv("JARVIS_STATE_DIR", str(Path(__file__).parent)))
+STATE_DIR = Path(os.getenv("JAVIS_STATE_DIR", str(Path(__file__).parent)))
 try:
     STATE_DIR.mkdir(parents=True, exist_ok=True)
 except Exception:
@@ -116,17 +116,17 @@ def auth_enabled(cfg=None):
 
 def require_login():
     """Có BẮT BUỘC đăng nhập để dùng Javis không (kể cả khi CHƯA đặt mật khẩu → ép setup).
-    - JARVIS_REQUIRE_LOGIN=1/0 ép bật/tắt tường minh.
-    - Mặc định: BẬT khi server nghe public (JARVIS_HOST=0.0.0.0, vd Docker/Hostinger/VPS) -
+    - JAVIS_REQUIRE_LOGIN=1/0 ép bật/tắt tường minh.
+    - Mặc định: BẬT khi server nghe public (JAVIS_HOST=0.0.0.0, vd Docker/Hostinger/VPS) -
       vì Claude chạy full quyền, không được để hở ai cũng vào được."""
-    v = os.getenv("JARVIS_REQUIRE_LOGIN", "").strip().lower()
+    v = os.getenv("JAVIS_REQUIRE_LOGIN", "").strip().lower()
     if v in ("1", "true", "yes", "on"):
         return True
     if v in ("0", "false", "no", "off"):
         return False
     # FAIL-CLOSED: bind KHÔNG phải loopback (0.0.0.0, ::, IP LAN…) → coi là public → bắt buộc login.
-    # Chỉ tắt khi nghe thuần localhost. (Localhost + tunnel: đặt JARVIS_REQUIRE_LOGIN=1.)
-    host = os.getenv("JARVIS_HOST", "127.0.0.1").strip().lower()
+    # Chỉ tắt khi nghe thuần localhost. (Localhost + tunnel: đặt JAVIS_REQUIRE_LOGIN=1.)
+    host = os.getenv("JAVIS_HOST", "127.0.0.1").strip().lower()
     return host not in ("127.0.0.1", "localhost", "::1")
 
 
@@ -245,14 +245,14 @@ def clear_setup_token():
 
 
 def provision_admin_from_env():
-    """Có JARVIS_ADMIN_PASSWORD (+ tùy chọn JARVIS_ADMIN_USER) và CHƯA có admin → tạo admin lúc boot
+    """Có JAVIS_ADMIN_PASSWORD (+ tùy chọn JAVIS_ADMIN_USER) và CHƯA có admin → tạo admin lúc boot
     → đóng /auth/setup cho mọi người (cách an toàn nhất cho deploy public). Trả True nếu vừa tạo."""
     if auth_enabled():
         return False
-    pw = os.getenv("JARVIS_ADMIN_PASSWORD", "")
+    pw = os.getenv("JAVIS_ADMIN_PASSWORD", "")
     if not pw:
         return False
-    user = (os.getenv("JARVIS_ADMIN_USER", "admin").strip() or "admin")
+    user = (os.getenv("JAVIS_ADMIN_USER", "admin").strip() or "admin")
     h, salt = hash_password(pw)
     cfg = read_settings()
     cfg["auth"] = {"username": user, "password_hash": h, "salt": salt}

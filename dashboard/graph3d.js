@@ -65,8 +65,8 @@ class JavisGraph3D {
     this._births = new Map();   // sprite -> frames còn lại của hiệu ứng "nảy sinh"
     this._paused = false;
     // Expose để Console (console.js) gọi pause()/wake() khi chuyển trang - không cần sửa app.js.
-    window.__jarvisGraph = this;
-    window.dispatchEvent(new Event("jarvis-graph-created"));
+    window.__javisGraph = this;
+    window.dispatchEvent(new Event("javis-graph-created"));
   }
 
   async load(query = "source=all") {
@@ -411,4 +411,4 @@ class JavisGraph3D {
 }
 
 window.JavisGraph3D = JavisGraph3D;
-window.dispatchEvent(new Event("jarvis-graph3d-ready"));
+window.dispatchEvent(new Event("javis-graph3d-ready"));

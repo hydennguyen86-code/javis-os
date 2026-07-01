@@ -364,11 +364,11 @@ class ClaudeCLI:
             """Chạy subprocess trong thread, đẩy từng dòng vào queue.
             WATCHDOG idle-timeout: claude không in gì trong IDLE giây (treo / kẹt auth / flail trên
             path không tồn tại) → giết cả cây tiến trình (claude + node con). Chống tích tụ tiến
-            trình treo làm đói tài nguyên → treo server. Chỉnh bằng JARVIS_CLAUDE_IDLE_TIMEOUT."""
+            trình treo làm đói tài nguyên → treo server. Chỉnh bằng JAVIS_CLAUDE_IDLE_TIMEOUT."""
             proc = None
             tinfo = {"timed_out": False}
             last = {"t": time.time()}            # cập nhật mỗi dòng stdout → "còn sống"
-            IDLE = float(os.getenv("JARVIS_CLAUDE_IDLE_TIMEOUT", "180"))
+            IDLE = float(os.getenv("JAVIS_CLAUDE_IDLE_TIMEOUT", "180"))
             try:
                 # CREATE_NO_WINDOW để không pop cửa sổ cmd trên Windows
                 creationflags = 0
@@ -397,7 +397,7 @@ class ClaudeCLI:
                             _kill_tree(p)
                             asyncio.run_coroutine_threadsafe(queue.put({"__error__":
                                 f"Claude không phản hồi {int(IDLE)}s - đã dừng để tránh treo server. "
-                                f"(tăng JARVIS_CLAUDE_IDLE_TIMEOUT nếu tác vụ thật sự dài)"}), loop)
+                                f"(tăng JAVIS_CLAUDE_IDLE_TIMEOUT nếu tác vụ thật sự dài)"}), loop)
                             return
                         time.sleep(5)
                 threading.Thread(target=_watchdog, args=(proc,), daemon=True).start()
@@ -543,7 +543,7 @@ class CodexCLI:
         self.model = model              # gpt-5.5 / gpt-5.4 ...
         self.instructions = instructions
         self.extra_config = []          # list '-c key=value' (override config, vd thêm mcp_servers)
-        self.profile = None             # tên profile codex (-p) - Javis ghi jarvis.config.toml để thêm MCP
+        self.profile = None             # tên profile codex (-p) - Javis ghi javis.config.toml để thêm MCP
 
     def is_available(self) -> bool:
         return self.cli_path is not None
@@ -570,7 +570,7 @@ class CodexCLI:
             proc = None
             tinfo = {"timed_out": False}
             last = {"t": time.time()}
-            IDLE = float(os.getenv("JARVIS_CLAUDE_IDLE_TIMEOUT", "180"))
+            IDLE = float(os.getenv("JAVIS_CLAUDE_IDLE_TIMEOUT", "180"))
             try:
                 creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
                 proc = subprocess.Popen(

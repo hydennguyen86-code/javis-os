@@ -109,7 +109,7 @@ Vòng tự cải thiện chỉ **thao tác file trong vault** (đọc, ghi, sử
 
 ## Dữ liệu lưu ở đâu và lưu ý riêng tư
 
-Danh sách lịch bạn ghi tay và các mục đồng bộ đám mây được lưu trong file `Jarvis/automations.json` bên trong brain đang chọn. Bạn có thể mở file này qua trang [Quản lý tệp tin](05-quan-ly-tep-tin.md) để xem hoặc sao lưu.
+Danh sách lịch bạn ghi tay và các mục đồng bộ đám mây được lưu trong file `Javis/automations.json` bên trong brain đang chọn. Bạn có thể mở file này qua trang [Quản lý tệp tin](05-quan-ly-tep-tin.md) để xem hoặc sao lưu.
 
 Lưu ý quan trọng về riêng tư: các mục đồng bộ từ đám mây có thể mang theo thông tin định danh của routine, ví dụ mã ID hoặc dữ liệu định tuyến. Nếu bạn tự dán mã trigger, chat ID hay bất kỳ định danh cá nhân nào vào ô **Ghi chú / ID**, các thông tin đó sẽ nằm trong `automations.json`. Vì đây là **dữ liệu cá nhân**, hãy cẩn thận khi chia sẻ file này hoặc chia sẻ toàn bộ brain cho người khác. Nếu định gửi brain đi, nên xem lại và xoá các mục chứa ID nhạy cảm trước.
 
