@@ -858,6 +858,7 @@ if (autoLearnToggle) {
 }
 
 async function loadMemStats() {
+  if (!memCount) return;   // panel học cũ đã gỡ khỏi index.html (thay bằng trang Tự học)
   try {
     const d = await (await fetch(`/memory/stats?brain=${encodeURIComponent(currentBrainPath())}`)).json();
     memCount.textContent = d.facts ?? 0;
@@ -902,30 +903,34 @@ async function doReflect(auto) {
   if (reflecting) return;
   reflecting = true;
   turnsSinceReflect = 0;
-  if (!auto) { learnBtn.disabled = true; learnBtn.textContent = "🧠 Đang học..."; }
-  memResult.textContent = auto ? "🧠 Đang tự học nền..." : "Javis đang đọc lại hội thoại và rút ra ký ức...";
+  if (!auto && learnBtn) { learnBtn.disabled = true; learnBtn.textContent = "🧠 Đang học..."; }
+  if (memResult) memResult.textContent = auto ? "🧠 Đang tự học nền..." : "Javis đang đọc lại hội thoại và rút ra ký ức...";
   try {
     const fd = new FormData();
     fd.append("brain", currentBrainPath());
     const d = await (await fetch("/reflect", { method: "POST", body: fd })).json();
     if (d.ok) {
-      memResult.textContent = (auto ? "🧠 Tự học: " : "") + (d.summary || "Đã học xong.");
-      if (d.facts != null) memCount.textContent = d.facts;
+      if (memResult) memResult.textContent = (auto ? "🧠 Tự học: " : "") + (d.summary || "Đã học xong.");
+      if (d.facts != null && memCount) memCount.textContent = d.facts;
     } else {
-      memResult.textContent = "⚠ " + (d.error || "Học thất bại");
+      if (memResult) memResult.textContent = "⚠ " + (d.error || "Học thất bại");
     }
   } catch (e) {
-    memResult.textContent = "⚠ Lỗi mạng";
+    if (memResult) memResult.textContent = "⚠ Lỗi mạng";
   } finally {
     reflecting = false;
-    if (!auto) { learnBtn.textContent = "🧠 Học từ hội thoại"; learnBtn.disabled = false; }
+    if (!auto && learnBtn) { learnBtn.textContent = "🧠 Học từ hội thoại"; learnBtn.disabled = false; }
   }
 }
 
-learnBtn.addEventListener("click", () => doReflect(false));
+// Panel học cũ đã gỡ khỏi index.html → learnBtn có thể null (trang Tự học + engine learn.py thay thế)
+if (learnBtn) learnBtn.addEventListener("click", () => doReflect(false));
 
-// Tự học định kỳ trong phiên dài - gọi sau mỗi N lượt
+// Tự học định kỳ trong phiên dài - gọi sau mỗi N lượt.
+// Chỉ chạy khi panel cũ còn tồn tại; không có panel = đã chuyển sang engine tự học
+// server-side (learn.py enqueue theo lượt) → không spawn /reflect ngầm nữa.
 function maybeAutoLearn() {
+  if (!learnBtn) return;
   turnsSinceReflect++;
   if (autoLearn && !reflecting && turnsSinceReflect >= AUTO_LEARN_EVERY) {
     doReflect(true);
