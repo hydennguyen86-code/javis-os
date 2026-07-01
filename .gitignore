@@ -11,7 +11,7 @@ __pycache__/
 .staging/
 *.mp3
 test_output*.mp3
-server/javis.log
+server/*.log
 server/loop_config.json
 server/settings.json
 server/.sessions.json
