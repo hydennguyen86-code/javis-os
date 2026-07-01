@@ -1,20 +1,26 @@
 # ============================================================================
-# Jarvis OS - HOSTINGER VPS (Docker Manager). Bản này DEPLOY LÀ CHẠY, không kén hạ tầng.
+# Jarvis OS - HOSTINGER VPS (Docker Manager). Có LINK MẶC ĐỊNH + HTTPS như app Catalog (Hermes/n8n).
 #
-# Mặc định: 1 container jarvis, vào bằng nút "Open" của Docker Manager (cổng 7777).
-# KHÔNG có Watchtower (tránh "Partially running"). KHÔNG phụ thuộc mạng/hạ tầng ngoài
-# (tránh lỗi "network ... not found" làm không deploy được).
+# Hostinger có sẵn: (1) wildcard DNS *.<hostname-vps>.hstgr.cloud trỏ về VPS, (2) reverse proxy Traefik
+# tự cấp SSL. Bạn KHÔNG cần mua tên miền: đặt DOMAIN_NAME = <tên>.<hostname-vps>.hstgr.cloud là có link
+# riêng chạy HTTPS ngay. Nhãn Traefik dưới đây COPY theo đúng mẫu app Hermes chạy tốt trên Hostinger
+# (điểm mấu chốt: KHÔNG khai báo network - Traefik tự thấy container qua nhãn).
 #
 # CÁCH DÙNG:
-#   1) Docker Manager > Compose > URL > dán:
+#   1) Xem hostname VPS ở hPanel > VPS (vd: srv1782015.hstgr.cloud).
+#   2) Docker Manager > Compose > URL > dán:
 #      https://raw.githubusercontent.com/blogminhquy/jarvis-os/main/docker-compose.hostinger.yml
-#   2) Deploy > bấm "Open" để vào > tạo tài khoản admin.
-#   (Image GHCR phải để PUBLIC: GitHub > Packages > jarvis-os > Package settings > Public.)
+#   3) Ô Environment đặt (BẮT BUỘC):
+#         DOMAIN_NAME=jarvis.<hostname-vps>.hstgr.cloud
+#      Ví dụ:  DOMAIN_NAME=jarvis.srv1782015.hstgr.cloud
+#      (Muốn dùng tên miền RIÊNG của bạn thì điền tên miền đó + trỏ DNS A về IP VPS trước.)
+#   4) Deploy > đợi 1-3 phút cho Traefik cấp chứng chỉ > mở  https://<DOMAIN_NAME>.
 #
-#   CẬP NHẬT bản mới: vào project > Redeploy/Recreate (image :latest + pull_policy: always tự kéo bản mới).
-#   Dữ liệu nằm trong volume nên không mất.
-#
-# >>> MUỐN TÊN MIỀN RIÊNG + HTTPS (bỏ :7777): xem 2 CÁCH ở CUỐI file. <<<
+# GHI CHÚ:
+#   - Không đặt DOMAIN_NAME cũng deploy được, nhưng chỉ vào tạm bằng nút Open / :7777 (chưa có domain).
+#   - Vẫn publish 7777 để có đường vào dự phòng khi cert chưa cấp xong.
+#   - VPS KHÔNG phải Hostinger: bỏ file này, dùng docker-compose.yml + docker-compose.https.yml (Caddy).
+#   - Image GHCR phải để PUBLIC (GitHub > Packages > jarvis-os > Package settings > Public).
 # ============================================================================
 services:
   jarvis:
@@ -32,7 +38,14 @@ services:
       OBSIDIAN_VAULT_PATH: /data/vault
       CLAUDE_CWD: /app
     ports:
-      - "7777:7777"                 # vào bằng http://<ip-vps>:7777 hoặc nút Open của Hostinger
+      - "7777:7777"                 # đường vào dự phòng (nút Open / http://<ip>:7777)
+    labels:
+      # Copy đúng mẫu Hermes: KHÔNG có traefik.docker.network, KHÔNG có networks external.
+      - traefik.enable=true
+      - traefik.http.routers.jarvis.rule=Host(`${DOMAIN_NAME:-jarvis.localhost}`)
+      - traefik.http.routers.jarvis.entrypoints=websecure
+      - traefik.http.routers.jarvis.tls.certresolver=letsencrypt
+      - traefik.http.services.jarvis.loadbalancer.server.port=7777
     volumes:
       - jarvis-data:/data
       - jarvis-brains:/brains
@@ -50,34 +63,3 @@ volumes:
   jarvis-brains:
   claude-auth:
   codex-auth:
-
-# ============================================================================
-# TÊN MIỀN RIÊNG + HTTPS trên Hostinger (KHÔNG bắt buộc - chọn 1 trong 2):
-#
-# CÁCH 1 (DỄ, khuyên dùng): để Hostinger gán tên miền cho project.
-#   1) Trỏ DNS: bản ghi  A  <tên miền của bạn>  ->  <IP VPS>.
-#   2) Trong hPanel > VPS > Docker Manager, mở project jarvis-os, tìm phần gán/đổi tên miền
-#      (Domain / Access) rồi nhập tên miền của bạn. Hostinger tự lo Traefik + SSL, KHÔNG cần sửa file này.
-#      (Hướng dẫn: hostinger.com > tìm "change the domain of a Docker project".)
-#
-# CÁCH 2 (THỦ CÔNG, chỉ khi VPS đã có Traefik mạng tên "traefik-proxy" - vd đang chạy app Catalog
-#         như n8n/Hermes): sửa service jarvis ở trên như sau
-#   - XOÁ khối "ports: - 7777:7777"  và THAY bằng:
-#       expose:
-#         - "7777"
-#       labels:
-#         - traefik.enable=true
-#         - traefik.docker.network=traefik-proxy
-#         - traefik.http.routers.jarvis.rule=Host(`javis.minhquy.vn`)   # đổi thành tên miền của bạn
-#         - traefik.http.routers.jarvis.entrypoints=websecure
-#         - traefik.http.routers.jarvis.tls.certresolver=letsencrypt
-#         - traefik.http.services.jarvis.loadbalancer.server.port=7777
-#       networks:
-#         - traefik-proxy
-#   - THÊM ở cuối file:
-#       networks:
-#         traefik-proxy:
-#           external: true
-#   Lưu ý: tên mạng "traefik-proxy", entrypoint "websecure", certresolver "letsencrypt" phải KHỚP
-#   Traefik trên VPS của bạn; sai tên -> deploy lỗi hoặc không cấp được chứng chỉ. Trỏ DNS trước.
-# ============================================================================

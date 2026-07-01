@@ -18,8 +18,9 @@ https://raw.githubusercontent.com/blogminhquy/jarvis-os/main/docker-compose.yml
 Hostinger pull image + chạy. Mở app bằng `http://<ip-vps>:7777` (IP xem ở hPanel → VPS) → ra
 màn **tạo tài khoản admin**.
 
-> 🌐 **Muốn tên miền riêng + HTTPS (bỏ `:7777`, để mic/voice chạy)?** Dùng bản có nhãn Traefik
-> `docker-compose.hostinger.yml` thay cho link trên - xem mục [Tên miền + HTTPS trên Hostinger](#-tên-miền--https-trên-hostinger-bỏ-7777). Compose gốc này chỉ vào được bằng IP:7777.
+> 🌐 **Muốn LINK RIÊNG có HTTPS (bỏ `:7777`, để mic/voice chạy) mà KHÔNG cần mua tên miền?** Dùng
+> `docker-compose.hostinger.yml` + đặt `DOMAIN_NAME=jarvis.<hostname-vps>.hstgr.cloud` - xem mục
+> **"Link mặc định + HTTPS trên Hostinger"** ở phần HTTPS bên dưới. Compose gốc này chỉ vào được bằng IP:7777.
 
 **3 việc làm 1 lần:**
 1. **Để image GHCR ở chế độ Public:** GitHub → repo `jarvis-os` → **Packages** → `jarvis-os`
@@ -75,24 +76,23 @@ Mọi ghi chú / vault / settings nằm trong Docker volume (`jarvis-data`, `cla
 > → mở URL `https://...trycloudflare.com` → mic + voice chạy. (URL đổi mỗi restart; muốn cố định →
 > *named tunnel* + `TUNNEL_TOKEN`, xem mục Cloudflare Tunnel bên dưới.)
 
-#### 🌐 Tên miền + HTTPS trên Hostinger
+#### 🌐 Link mặc định + HTTPS trên Hostinger (KHÔNG cần mua tên miền)
 
-**Trước hết, deploy cho chạy được** bằng file Hostinger (1 container, luôn deploy được, vào bằng nút Open / `:7777`):
-```
-https://raw.githubusercontent.com/blogminhquy/jarvis-os/main/docker-compose.hostinger.yml
-```
+Hostinger có sẵn **wildcard DNS** `*.<hostname-vps>.hstgr.cloud` trỏ về VPS + **Traefik** tự cấp SSL. Nên bạn
+lấy được link riêng chạy HTTPS như app Catalog (Hermes/n8n) mà không cần tên miền. Cách làm (copy đúng mẫu Hermes):
 
-Sau đó gắn tên miền + HTTPS bằng **1 trong 2 cách** (ghi rõ trong phần chú thích cuối file compose đó):
+1. Xem **hostname VPS** ở hPanel → VPS (vd `srv1782015.hstgr.cloud`).
+2. Deploy bằng file Hostinger - Docker Manager → Compose → URL:
+   ```
+   https://raw.githubusercontent.com/blogminhquy/jarvis-os/main/docker-compose.hostinger.yml
+   ```
+3. Ô **Environment** đặt: `DOMAIN_NAME=jarvis.<hostname-vps>.hstgr.cloud`
+   (vd `DOMAIN_NAME=jarvis.srv1782015.hstgr.cloud`). Muốn tên miền RIÊNG thì điền tên miền đó + trỏ DNS A về IP VPS.
+4. **Deploy** → đợi 1-3 phút Traefik cấp chứng chỉ → mở `https://<DOMAIN_NAME>`.
 
-- **Cách 1 (dễ, khuyên dùng):** trỏ DNS `A <tên miền> → <IP VPS>`, rồi trong **Docker Manager** mở project
-  `jarvis-os` và dùng chức năng **gán/đổi tên miền** (Domain / Access). Hostinger tự cấu hình Traefik + SSL
-  cho bạn, KHÔNG cần sửa file. (Hostinger: tìm bài "change the domain of a Docker project".)
-- **Cách 2 (thủ công):** chỉ khi VPS đã có Traefik mạng `traefik-proxy` (vd đang chạy app Catalog như n8n).
-  Thêm nhãn Traefik + join mạng `traefik-proxy` cho service jarvis (khối mẫu có sẵn trong chú thích cuối
-  `docker-compose.hostinger.yml`). Tên mạng/entrypoint/certresolver phải khớp Traefik của bạn.
-
-> ⚠️ **Đừng** ép mạng `external: traefik-proxy` khi chưa chắc nó tồn tại - Docker Compose sẽ báo
-> "network ... not found" và **không deploy được**. Vì vậy bản mặc định để `:7777`, domain là bước tùy chọn.
+> **Điểm mấu chốt** (rút từ compose thật của Hermes): nhãn Traefik gắn thẳng vào service, **KHÔNG khai báo
+> `networks:` / `external: traefik-proxy`** (chính chỗ này trước đây làm deploy báo "network not found").
+> Traefik của Hostinger tự thấy container qua nhãn. Không đặt `DOMAIN_NAME` vẫn deploy được (vào tạm bằng `:7777`).
 > **Caddy (`docker-compose.https.yml`) KHÔNG dùng trên Hostinger** vì cổng 80/443 đã bị Traefik của họ chiếm.
 > Không rành? Dùng **Cloudflare Tunnel** (mục dưới) - cho URL HTTPS mà không đụng gì tới proxy của Hostinger.
 

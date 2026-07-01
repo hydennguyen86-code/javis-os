@@ -4,6 +4,12 @@ Lịch sử phiên bản Jarvis OS. Bản mới nhất ở trên cùng. Xem ngay
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.4.7] - 2026-07-01
+### Sửa lỗi
+- docker-compose.hostinger.yml gắn nhãn Traefik đúng mẫu app Hermes: BỎ phần networks/external traefik-proxy (chính chỗ làm deploy báo "network not found"). Traefik của Hostinger tự thấy container qua nhãn.
+### Thêm mới
+- Có link mặc định chạy HTTPS mà không cần mua tên miền: đặt DOMAIN_NAME=jarvis.<hostname-vps>.hstgr.cloud (Hostinger có wildcard DNS + tự cấp SSL).
+
 ## [0.4.6] - 2026-07-01
 ### Sửa lỗi
 - docker-compose.hostinger.yml không deploy được trên Hostinger: bỏ yêu cầu mạng ngoài `traefik-proxy` (gây lỗi "network not found"). Bản mới chỉ 1 container, publish cổng 7777, deploy là chạy; gắn tên miền + HTTPS là bước tùy chọn (Hostinger UI hoặc nhãn Traefik thủ công, hướng dẫn trong file).
