@@ -145,6 +145,14 @@ Dừng bằng `stop-jarvis.bat`. Mở http://localhost:7777
 
 ## 🔄 Cập nhật khi có code mới
 
+> **Nhanh nhất — bấm ngay trong app:** mở **Tổng quan** (rail trái) → mục **Phiên bản** hiện
+> phiên bản đang chạy + tự kiểm tra bản mới trên GitHub. Có bản mới → bấm **⬆ Cập nhật ngay**,
+> app tự kéo bản mới + khởi động lại (~20-40s), khỏi vào terminal.
+> - **Docker/VPS:** cần service **watchtower** (đã có sẵn trong `docker-compose.yml`). Chỉ Watchtower
+>   được cấp quyền Docker (socket); app Jarvis KHÔNG → an toàn. Không muốn thì xoá service đó,
+>   nút sẽ chỉ *báo có bản mới* + hướng dẫn.
+> - **Native/Windows:** nút chạy `update.sh` (git pull + restart) giúp bạn.
+
 Repo & image GHCR đều **Public** → `git clone`/`pull` và `docker pull` không cần đăng nhập.
 
 Mỗi khi bạn push code mới, trên VPS chỉ cần:

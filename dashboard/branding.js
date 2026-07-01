@@ -141,6 +141,9 @@
     loadExtras();
   }
 
+  // Cho trang Cài đặt (console.js) gọi nạp lại giá trị avatar/tên miền khi mở trang.
+  window.__jarvisRefreshExtras = loadExtras;
+
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", bind);
   } else {

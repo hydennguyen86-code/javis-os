@@ -9,7 +9,7 @@
 
   // ---- Khai báo các mục trên rail (mở rộng = thêm dòng ở đây) ----
   // type 'view' = render trong cview ; có launch() = nút mở overlay/modal sẵn có.
-  const APP_VERSION = "0.3.0";   // bump mỗi lần cập nhật
+  const APP_VERSION = "0.4.0";   // bump mỗi lần cập nhật
 
   // Icon SVG line-style đồng bộ (thay cho lẫn lộn emoji + ký tự)
   const _svg = (p) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
@@ -27,11 +27,13 @@
     account:     _svg('<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6.5 8-6.5s8 2.5 8 6.5"/>'),
     files:       _svg('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>'),
     selfimprove: _svg('<path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/>'),
+    settings:    _svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>'),
   };
 
   const RAIL_ITEMS = [
     { id: "home",        icon: ICON.home,        label: "Jarvis" },
     { id: "overview",    icon: ICON.overview,    label: "Tổng quan" },
+    { id: "settings",    icon: ICON.settings,    label: "Cài đặt" },
     { id: "workflows",   icon: ICON.workflows,   label: "Workflows" },
     { id: "agents",      icon: ICON.agents,      label: "Agents" },
     { id: "skills",      icon: ICON.skills,      label: "Skills" },
@@ -48,6 +50,7 @@
   const VIEW_META = {
     home:        { icon: "⬡", label: "Jarvis OS", sub: "" },
     overview:    { icon: "◎", label: "Tổng quan", sub: "Trạng thái hệ thống" },
+    settings:    { icon: "⚙", label: "Cài đặt", sub: "Giọng nói · giao diện · avatar · tên miền" },
     workflows:   { icon: "⚡", label: "Workflows", sub: "Chuỗi agent tự động" },
     agents:      { icon: "🤖", label: "Agents", sub: "Trợ lý chuyên biệt" },
     skills:      { icon: "🧩", label: "Skills", sub: "Kỹ năng khả dụng" },
@@ -65,6 +68,7 @@
   const STUDIO_PAGES = ["workflows", "agents", "skills", "automations"];
 
   let _settings = null;
+  let _renderGen = 0;         // token chống race: mỗi lần đổi trang tăng 1; render async cũ tự bỏ
   let graphEnabled = true;
   const isNarrow = () => window.matchMedia("(max-width: 860px)").matches;
   const liteMode = () => !graphEnabled || isNarrow();
@@ -97,6 +101,8 @@
       store.active = id;
       // Nút điều khiển cockpit (⚙🔊↻) chỉ hiện ở trang Jarvis, không hiện navbar trang quản lý
       document.body.classList.toggle("in-console", id !== "home");
+      // Rời trang Cài đặt → cất #quickSet về holder TRƯỚC khi cviewBody bị ghi đè (giữ node + handler).
+      if (id !== "settings") parkQuickSet();
       if (id !== "home") renderPage(id);
       recomputeGraph();
     };
@@ -110,8 +116,10 @@
   async function renderPage(id) {
     const el = body();
     if (!el) return;
+    _renderGen++;   // đổi trang → vô hiệu mọi render async đang dở
     if (STUDIO_PAGES.includes(id)) return renderStudioPage(el, id);
     if (id === "overview") return renderOverview(el);
+    if (id === "settings") return renderSettings(el);
     if (id === "models")   return renderModels(el);
     if (id === "mcp")      return renderMcp(el);
     if (id === "channels") return renderChannels(el);
@@ -439,6 +447,18 @@
     const gOn = dash.graph_enabled !== false;
     el.innerHTML = `
       <div class="cview-section">
+        <h3>Phiên bản</h3>
+        <div class="gcard" style="max-width:560px">
+          <div class="gcard-top"><span class="gcard-name">Jarvis OS</span><span class="gcard-tag" id="ovVerTag">…</span></div>
+          <div class="gcard-meta" id="ovVerMeta">Đang kiểm tra bản mới…</div>
+          <div class="js-actions">
+            <button class="gcard-btn ghost" id="ovVerCheck">Kiểm tra lại</button>
+            <button class="gcard-btn" id="ovVerUpdate" style="display:none">⬆ Cập nhật ngay</button>
+          </div>
+          <div class="gcard-meta" id="ovVerStatus"></div>
+        </div>
+      </div>
+      <div class="cview-section">
         <h3>Hệ thống</h3>
         <div class="cgrid">
           <div class="gcard"><div class="gcard-top"><span class="gcard-name">Engine</span></div><div class="gcard-meta">${esc(eng)}</div></div>
@@ -468,6 +488,69 @@
           </div>
         </div>
       </div>`;
+    // ---- Phiên bản + cập nhật trong UI ----
+    const MODE_LBL = { docker: "Docker / VPS", native: "Linux (systemd)", windows: "Windows" };
+    async function ovLoadVersion() {
+      const tag = document.getElementById("ovVerTag");
+      const meta = document.getElementById("ovVerMeta");
+      const upd = document.getElementById("ovVerUpdate");
+      if (!tag) return;
+      meta.textContent = "Đang kiểm tra bản mới…";
+      let j = {};
+      try { j = await (await fetch("/version", { cache: "no-store" })).json(); }
+      catch (e) { meta.textContent = "⚠ Không kiểm tra được (mạng)."; return; }
+      tag.textContent = "v" + (j.current || "?");
+      const ml = MODE_LBL[j.mode] || j.mode || "";
+      if (j.update_available) {
+        meta.innerHTML = "🆕 Có bản mới <b>v" + esc(j.latest) + "</b> (đang chạy v" + esc(j.current) + ") · " + esc(ml);
+        upd.style.display = "";
+      } else if (j.latest) {
+        meta.innerHTML = "✅ Đang dùng bản mới nhất (v" + esc(j.current) + ") · " + esc(ml);
+        upd.style.display = "none";
+      } else {
+        meta.innerHTML = "v" + esc(j.current) + " · " + esc(ml) + (j.error ? " · chưa so được với GitHub" : "");
+        upd.style.display = "none";
+      }
+    }
+    const verCheck = document.getElementById("ovVerCheck");
+    if (verCheck) verCheck.onclick = ovLoadVersion;
+    const verUpd = document.getElementById("ovVerUpdate");
+    if (verUpd) verUpd.onclick = async () => {
+      if (!confirm("Cập nhật Jarvis lên bản mới nhất?\nApp sẽ tự khởi động lại (~20-40 giây), trang sẽ tự tải lại.")) return;
+      const st = document.getElementById("ovVerStatus");
+      verUpd.disabled = true;
+      st.textContent = "⏳ Đang chuẩn bị cập nhật…";
+      let resp;
+      try { resp = await (await fetch("/update", { method: "POST" })).json(); }
+      catch (e) { resp = { ok: true, _dropped: true }; }   // kết nối đứt = server đang restart, bình thường
+      if (resp && resp.ok === false) {
+        verUpd.disabled = false;
+        st.innerHTML = "⚠ " + esc(resp.error || "Không cập nhật được.") + (resp.manual ? " Chạy: <code>" + esc(resp.manual) + "</code>" : "");
+        return;
+      }
+      st.textContent = "⏳ Đang tải bản mới + khởi động lại… (đừng tắt trang)";
+      let tries = 0, backButOld = 0;
+      const poll = setInterval(async () => {
+        tries++;
+        try {
+          const j = await (await fetch("/version", { cache: "no-store" })).json();
+          if (j && j.update_available === false) {          // đã lên bản mới → xong
+            clearInterval(poll);
+            st.textContent = "✅ Đã cập nhật xong. Đang tải lại trang…";
+            setTimeout(() => location.reload(), 1500);
+            return;
+          }
+          backButOld++;                                     // server sống lại nhưng vẫn bản cũ
+          if (backButOld >= 3) {
+            clearInterval(poll);
+            st.innerHTML = "⚠ Server đã lên lại nhưng phiên bản chưa đổi — cập nhật có thể thất bại. Xem <code>update.log</code> / <code>docker compose logs</code>.";
+          }
+        } catch (e) { backButOld = 0; /* server đang restart — tiếp tục chờ */ }
+        if (tries > 45) { clearInterval(poll); st.innerHTML = "Server chưa lên lại sau ~3 phút — thử tải lại trang."; }
+      }, 4000);
+    };
+    ovLoadVersion();
+
     const btn = document.getElementById("ovGraphToggle");
     if (btn) btn.onclick = async () => {
       btn.disabled = true;
@@ -1068,6 +1151,99 @@
     fd.append("data", JSON.stringify(dataObj));
     try { return await (await fetch("/settings", { method: "POST", body: fd })).json(); }
     catch (e) { return { ok: false }; }
+  }
+
+  // ---- Cất #quickSet (avatar/tên miền/giọng nói) về holder ẩn khi rời trang Cài đặt ----
+  // Node giữ nguyên → mọi handler đã gắn ở app.js/branding.js/quick-settings.js vẫn sống.
+  function parkQuickSet() {
+    const qs = document.getElementById("quickSet");
+    const holder = document.getElementById("quickSetHolder");
+    if (qs && holder && qs.parentNode !== holder) holder.appendChild(qs);
+  }
+
+  // ---- Trang Cài đặt: nhúng #quickSet + bộ chọn nhà cung cấp giọng đọc ----
+  async function renderSettings(el) {
+    const gen = _renderGen;               // chốt token: nếu user đổi trang trong lúc await → bỏ render này
+    parkQuickSet();                       // giữ #quickSet an toàn TRƯỚC khi ghi đè cviewBody
+    el.innerHTML = `<div class="cview-placeholder"><div class="ph-ico">⚙</div><div>Đang tải...</div></div>`;
+    const s = await freshSettings();
+    if (gen !== _renderGen) return;       // đã sang trang khác → KHÔNG ghi đè trang mới bằng nội dung cũ
+    const v = s.voice || {};
+    const prov = v.tts_provider || "edge";
+    const oaSet = !!(s.model && s.model.openai_api_key_set);
+    const elSet = !!v.elevenlabs_key_set;
+    const opt = (val, label, cur) => `<option value="${esc(val)}"${val === cur ? " selected" : ""}>${esc(label)}</option>`;
+    const oaVoices = ["alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse"];
+    el.innerHTML = `
+      <div class="cview-section">
+        <h3>Giao diện · Avatar · Giọng nói · Tên miền</h3>
+        <div class="cs-host"></div>
+      </div>
+      <div class="cview-section">
+        <h3>Nhà cung cấp giọng đọc</h3>
+        <div class="gcard" style="max-width:560px">
+          <label class="js-lbl">Chọn nhà cung cấp</label>
+          <select class="js-input" id="vpProvider">
+            ${opt("edge", "Edge TTS — miễn phí (mặc định)", prov)}
+            ${opt("openai", "OpenAI — mượt, đa ngôn ngữ", prov)}
+            ${opt("elevenlabs", "ElevenLabs — tự nhiên nhất", prov)}
+          </select>
+          <div id="vpOpenai" style="display:none">
+            <label class="js-lbl">OpenAI API key ${oaSet ? '<span class="dim">(đã có — để trống nếu không đổi)</span>' : ""}</label>
+            <input class="js-input" id="vpOaKey" type="password" placeholder="sk-...">
+            <label class="js-lbl">Giọng OpenAI</label>
+            <select class="js-input" id="vpOaVoice">${oaVoices.map(x => opt(x, x, v.openai_tts_voice || "alloy")).join("")}</select>
+          </div>
+          <div id="vpEleven" style="display:none">
+            <label class="js-lbl">ElevenLabs API key ${elSet ? '<span class="dim">(đã có — để trống nếu không đổi)</span>' : ""}</label>
+            <input class="js-input" id="vpElKey" type="password" placeholder="dán API key ElevenLabs">
+            <label class="js-lbl">Voice ID <span class="dim">(lấy ở ElevenLabs → Voices)</span></label>
+            <input class="js-input" id="vpElVoice" value="${esc(v.elevenlabs_voice || "")}" placeholder="21m00Tcm4TlvDq8ikWAM (Rachel)">
+          </div>
+          <div class="js-actions">
+            <button class="gcard-btn" id="vpSave">Lưu</button>
+            <button class="gcard-btn ghost" id="vpTest">▶ Nghe thử</button>
+          </div>
+          <div class="gcard-meta" id="vpStatus">Đang dùng: <b>${esc(prov)}</b>. Provider trả phí lỗi sẽ tự về Edge (miễn phí).</div>
+        </div>
+      </div>`;
+    const host = el.querySelector(".cs-host");
+    const qs = document.getElementById("quickSet");
+    if (qs && host) host.appendChild(qs);         // nhúng bộ điều khiển cũ vào trang (giữ handler)
+    if (window.__jarvisRefreshExtras) { try { window.__jarvisRefreshExtras(); } catch (e) {} }  // nạp lại avatar/tên miền
+
+    const provSel = document.getElementById("vpProvider");
+    const showFields = () => {
+      document.getElementById("vpOpenai").style.display = provSel.value === "openai" ? "block" : "none";
+      document.getElementById("vpEleven").style.display = provSel.value === "elevenlabs" ? "block" : "none";
+    };
+    provSel.onchange = showFields; showFields();
+
+    const st = document.getElementById("vpStatus");
+    document.getElementById("vpSave").onclick = async () => {
+      st.textContent = "Đang lưu...";
+      const data = {
+        tts_provider: provSel.value,
+        openai_tts_voice: document.getElementById("vpOaVoice").value,
+        elevenlabs_voice: document.getElementById("vpElVoice").value.trim(),
+      };
+      const elKey = document.getElementById("vpElKey").value.trim();
+      if (elKey) data.elevenlabs_key = elKey;
+      const r = await saveSetting("voice", data);
+      const oaKey = document.getElementById("vpOaKey").value.trim();
+      if (oaKey) await saveSetting("model", { openai_api_key: oaKey });   // key OpenAI dùng chung với chat
+      _settings = null;
+      st.innerHTML = r.ok
+        ? "✅ Đã lưu. Đang dùng: <b>" + esc(provSel.value) + "</b>. Bấm ▶ Nghe thử."
+        : "⚠ Lỗi lưu.";
+    };
+    document.getElementById("vpTest").onclick = () => {
+      st.textContent = "Đang phát thử... (dùng cấu hình ĐÃ lưu)";
+      const a = new Audio("/tts?text=" + encodeURIComponent("Xin chào, đây là giọng đọc mới của Jarvis.") + "&t=" + Date.now());
+      a.onended = () => { st.textContent = "Nghe ổn chứ? Nếu chưa, đổi provider/giọng rồi Lưu lại."; };
+      a.onerror = () => { st.textContent = "⚠ Không phát được — kiểm tra API key / provider (Lưu trước khi thử)."; };
+      a.play().catch(() => { st.textContent = "⚠ Trình duyệt chặn phát — bấm ▶ lần nữa."; });
+    };
   }
 
   // ============================================

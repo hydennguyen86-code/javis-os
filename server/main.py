@@ -745,6 +745,10 @@ async def settings_get():
     tok = cfg["telegram"].get("token", "")
     safe["telegram"]["token"] = ("••••" + tok[-4:]) if tok else ""
     safe["telegram"]["token_set"] = bool(tok)
+    vk = (cfg.get("voice", {}) or {}).get("elevenlabs_key", "")
+    safe.setdefault("voice", {})
+    safe["voice"]["elevenlabs_key"] = ("••••" + vk[-4:]) if vk else ""
+    safe["voice"]["elevenlabs_key_set"] = bool(vk)
     safe["model"]["providers"] = _providers_view(cfg)   # danh sách provider + trạng thái + model
     safe["model"]["main"] = _effective_main(cfg)         # model chính hiệu lực (suy từ legacy nếu cần)
     return safe
@@ -802,6 +806,15 @@ async def settings_set(section: str = Form(...), data: str = Form("{}")):
         cfg.setdefault("dashboard", {})
         if "graph_enabled" in patch:
             cfg["dashboard"]["graph_enabled"] = bool(patch["graph_enabled"])
+    elif section == "voice":
+        v = cfg.setdefault("voice", {})
+        if patch.get("tts_provider") in ("edge", "openai", "elevenlabs"):
+            v["tts_provider"] = patch["tts_provider"]
+        for k in ("openai_tts_voice", "openai_tts_model", "elevenlabs_voice", "elevenlabs_model"):
+            if patch.get(k):
+                v[k] = str(patch[k]).strip()
+        if patch.get("elevenlabs_key"):          # chỉ ghi khi có key mới (tránh xoá bằng ••••)
+            v["elevenlabs_key"] = patch["elevenlabs_key"].strip()
     elif section == "password":
         if patch.get("new_password"):
             if len(patch["new_password"]) < 4:
@@ -2389,6 +2402,138 @@ async def config():
 
 
 # ============================================
+# Phiên bản + cập nhật trong UI
+# ============================================
+GITHUB_REPO = "blogminhquy/jarvis-os"
+_UPDATE_TASKS = set()   # giữ ref mạnh cho asyncio.create_task (tránh GC nuốt mất task)
+
+
+def _read_version() -> str:
+    try:
+        p = PROJECT_ROOT / "VERSION"
+        if p.exists():
+            return (p.read_text(encoding="utf-8").strip() or "0.0.0")
+    except Exception:
+        pass
+    return "0.0.0"
+
+
+def _ver_tuple(s):
+    try:
+        parts = [int(x) for x in re.split(r"[.\-]", (s or "").strip().lstrip("vV"))[:3] if x.isdigit()]
+        while len(parts) < 3:
+            parts.append(0)
+        return tuple(parts[:3])
+    except Exception:
+        return None
+
+
+def _ver_newer(latest, cur) -> bool:
+    """So sánh KIỂU SEMVER (không phải string != ) → tránh báo 'có bản mới' nhầm khi local ahead
+    hoặc lệch định dạng, và để tín hiệu 'cập nhật xong' của poll chính xác."""
+    lt, ct = _ver_tuple(latest), _ver_tuple(cur)
+    if lt is None or ct is None:
+        return False
+    return lt > ct
+
+
+def _deploy_mode() -> str:
+    """docker | windows | native — quyết định cách cập nhật."""
+    if os.path.exists("/.dockerenv") or os.getenv("JARVIS_STATE_DIR", "").startswith("/data"):
+        return "docker"
+    if os.name == "nt":
+        return "windows"
+    return "native"
+
+
+def _is_git_checkout(root: str) -> bool:
+    try:
+        import subprocess
+        r = subprocess.run(["git", "-C", root, "rev-parse", "--is-inside-work-tree"],
+                           capture_output=True, text=True, timeout=10)
+        return r.returncode == 0 and "true" in (r.stdout or "").lower()
+    except Exception:
+        return False
+
+
+@app.get("/version")
+async def version_info():
+    cur = _read_version()
+    latest, err = None, None
+    try:
+        import httpx
+        url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/main/VERSION"
+        async with httpx.AsyncClient(timeout=8) as client:
+            r = await client.get(url)
+            if r.status_code == 200:
+                latest = (r.text or "").strip() or None
+            else:
+                err = f"VERSION chưa có trên nhánh main (HTTP {r.status_code})"
+    except Exception as e:
+        err = f"{type(e).__name__}: {e}"
+    mode = _deploy_mode()
+    avail = _ver_newer(latest, cur)
+    can = mode in ("native", "windows") or bool(os.getenv("WATCHTOWER_TOKEN"))
+    return {"current": cur, "latest": latest, "update_available": avail,
+            "mode": mode, "can_self_update": can, "error": err}
+
+
+@app.post("/update")
+async def do_update():
+    """Cập nhật lên bản mới nhất. Docker → nhờ Watchtower (chỉ nó có quyền Docker, app KHÔNG).
+    Native/Windows → git pull + restart ở tiến trình TÁCH RỜI (sống độc lập nếu process này bị kill)."""
+    import sys as _sys
+    mode = _deploy_mode()
+    if mode == "docker":
+        token = os.getenv("WATCHTOWER_TOKEN", "")
+        if not token:
+            return JSONResponse({"ok": False,
+                "error": "Bản Docker chưa bật Watchtower để tự cập nhật. Thêm service watchtower (xem DEPLOY.md) rồi thử lại.",
+                "manual": "./update.sh"}, status_code=400)
+        import asyncio
+        import httpx
+
+        async def _trigger():
+            try:
+                async with httpx.AsyncClient(timeout=180) as client:
+                    await client.post("http://watchtower:8080/v1/update",
+                                      headers={"Authorization": f"Bearer {token}"})
+            except Exception as e:
+                print(f"[update] watchtower trigger: {e}", file=_sys.stderr)
+        t = asyncio.create_task(_trigger())      # giữ ref → không bị GC
+        _UPDATE_TASKS.add(t)
+        t.add_done_callback(_UPDATE_TASKS.discard)
+        return {"ok": True, "mode": "docker", "message": "Đang kéo image mới + khởi động lại (~20-40s)."}
+
+    # native / windows — chỉ tự cập nhật được nếu là git checkout
+    root = str(PROJECT_ROOT)
+    if not _is_git_checkout(root):
+        return JSONResponse({"ok": False,
+            "error": "Thư mục cài đặt không phải git checkout → không tự cập nhật được. Cài lại bằng 'git clone' hoặc cập nhật thủ công.",
+            "manual": "./update.sh"}, status_code=400)
+    try:
+        import subprocess
+        logf = str(cfgmod.STATE_DIR / "update.log")
+        if mode == "windows":
+            # Updater TÁCH RỜI (DETACHED): git pull ghi log rồi relaunch — không chết theo process này.
+            bat = str(cfgmod.STATE_DIR / "_selfupdate.bat")
+            with open(bat, "w", encoding="utf-8") as f:
+                f.write("@echo off\r\n")
+                f.write(f'cd /d "{root}"\r\n')
+                f.write(f'git pull --ff-only > "{logf}" 2>&1\r\n')
+                f.write('wscript.exe "start-jarvis.vbs"\r\n')
+            subprocess.Popen(["cmd", "/c", bat], cwd=root,
+                             creationflags=0x00000008 | 0x00000200)  # DETACHED_PROCESS|NEW_PROCESS_GROUP
+        else:
+            with open(logf, "w", encoding="utf-8") as lf:
+                subprocess.Popen(["bash", "update.sh", "native"], cwd=root,
+                                 stdout=lf, stderr=lf, start_new_session=True)
+        return {"ok": True, "mode": mode, "message": "Đang cập nhật + khởi động lại (log: update.log)."}
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e), "manual": "./update.sh"}, status_code=500)
+
+
+# ============================================
 # Branding — logo/avatar đổi được qua UI (lưu ở STATE_DIR/branding, giữ qua update).
 # Trong Docker code tree read-only → KHÔNG ghi đè dashboard/logo.png; lưu ở volume state.
 # ============================================
@@ -2546,37 +2691,90 @@ async def domain_status(request: Request):
 # ============================================
 # TTS — Edge TTS (giọng Vietnamese chuẩn, miễn phí)
 # ============================================
+def _rate_to_speed(rate: str) -> float:
+    """'+10%' / '-20%' → tốc độ 1.1 / 0.8 cho OpenAI (kẹp 0.25..4.0)."""
+    try:
+        pct = float((rate or "").strip().replace("%", ""))
+        return max(0.25, min(4.0, 1.0 + pct / 100.0))
+    except Exception:
+        return 1.0
+
+
+async def _tts_edge(text: str, voice: str, rate: str) -> bytes:
+    communicate = edge_tts.Communicate(text, voice, rate=rate)
+    buf = bytearray()
+    async for chunk in communicate.stream():
+        if chunk["type"] == "audio":
+            buf.extend(chunk["data"])
+    return bytes(buf)
+
+
+async def _tts_openai(text: str, rate: str, cfg: dict) -> bytes:
+    import httpx
+    key = (cfg.get("model", {}) or {}).get("openai_api_key", "")
+    if not key:
+        raise RuntimeError("Chưa có OpenAI API key (đặt ở Models / Cài đặt).")
+    v = cfg.get("voice", {}) or {}
+    payload = {
+        "model": v.get("openai_tts_model") or "gpt-4o-mini-tts",
+        "voice": v.get("openai_tts_voice") or "alloy",
+        "input": text, "response_format": "mp3", "speed": _rate_to_speed(rate),
+    }
+    async with httpx.AsyncClient(timeout=60) as client:
+        r = await client.post("https://api.openai.com/v1/audio/speech",
+                              headers={"Authorization": f"Bearer {key}"}, json=payload)
+        r.raise_for_status()
+        return r.content
+
+
+async def _tts_elevenlabs(text: str, cfg: dict) -> bytes:
+    import httpx
+    v = cfg.get("voice", {}) or {}
+    key = v.get("elevenlabs_key", "")
+    if not key:
+        raise RuntimeError("Chưa có ElevenLabs API key.")
+    voice_id = v.get("elevenlabs_voice") or "21m00Tcm4TlvDq8ikWAM"
+    payload = {"text": text, "model_id": v.get("elevenlabs_model") or "eleven_multilingual_v2"}
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+    async with httpx.AsyncClient(timeout=60) as client:
+        r = await client.post(url, headers={"xi-api-key": key, "accept": "audio/mpeg"},
+                              json=payload, params={"output_format": "mp3_44100_128"})
+        r.raise_for_status()
+        return r.content
+
+
 @app.get("/tts")
 async def tts(
     text: str = Query(...),
     voice: str = Query("vi-VN-HoaiMyNeural"),
     rate: str = Query("+5%"),
 ):
-    """Sinh audio TTS bằng Edge TTS."""
+    """Sinh audio TTS theo nhà cung cấp đã chọn (edge/openai/elevenlabs). Provider trả phí lỗi
+    → tự fallback về Edge TTS để giọng không bao giờ tắt hẳn."""
     import sys
     from fastapi import HTTPException, Response
-
+    cfg = cfgmod.read_settings()
+    provider = ((cfg.get("voice", {}) or {}).get("tts_provider") or "edge").lower()
+    audio = b""
     try:
-        communicate = edge_tts.Communicate(text, voice, rate=rate)
-        audio_buffer = bytearray()
-        async for chunk in communicate.stream():
-            if chunk["type"] == "audio":
-                audio_buffer.extend(chunk["data"])
-
-        if not audio_buffer:
-            print(f"[TTS] Empty audio for text={text[:50]!r}", file=sys.stderr)
-            raise HTTPException(502, "Edge TTS không trả audio — server cần restart sau upgrade edge-tts.")
-
-        return Response(
-            content=bytes(audio_buffer),
-            media_type="audio/mpeg",
-            headers={"Cache-Control": "no-cache"}
-        )
-    except HTTPException:
-        raise
+        if provider == "openai":
+            audio = await _tts_openai(text, rate, cfg)
+        elif provider == "elevenlabs":
+            audio = await _tts_elevenlabs(text, cfg)
+        else:
+            audio = await _tts_edge(text, voice, rate)
     except Exception as e:
-        print(f"[TTS ERROR] {type(e).__name__}: {e}", file=sys.stderr)
-        raise HTTPException(502, f"TTS failed: {type(e).__name__}: {e}")
+        print(f"[TTS {provider}] {type(e).__name__}: {e} — thử fallback Edge", file=sys.stderr)
+        if provider != "edge":
+            try:
+                audio = await _tts_edge(text, voice, rate)
+            except Exception as e2:
+                raise HTTPException(502, f"TTS failed: {type(e2).__name__}: {e2}")
+        else:
+            raise HTTPException(502, f"TTS failed: {type(e).__name__}: {e}")
+    if not audio:
+        raise HTTPException(502, "TTS không trả audio.")
+    return Response(content=audio, media_type="audio/mpeg", headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/tts/voices")

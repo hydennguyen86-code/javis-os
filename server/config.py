@@ -31,6 +31,16 @@ _DEFAULT = {
     "branding": {"logo_ext": "", "logo_v": 0},
     # Tên miền riêng cho HTTPS tự động (Caddy On-Demand TLS hỏi /tls-check trước khi xin cert).
     "domain": {"custom": ""},
+    # Nhà cung cấp giọng đọc (TTS). edge = Edge TTS miễn phí (mặc định, dự phòng).
+    # openai = OpenAI TTS (dùng model.openai_api_key). elevenlabs = ElevenLabs (key riêng).
+    "voice": {
+        "tts_provider": "edge",                       # edge | openai | elevenlabs
+        "openai_tts_voice": "alloy",                  # alloy|echo|fable|onyx|nova|shimmer|ash|sage|coral
+        "openai_tts_model": "gpt-4o-mini-tts",        # hoặc tts-1 / tts-1-hd
+        "elevenlabs_key": "",
+        "elevenlabs_voice": "21m00Tcm4TlvDq8ikWAM",   # Rachel (premade, đa ngôn ngữ) — đổi được
+        "elevenlabs_model": "eleven_multilingual_v2",
+    },
     "model": {
         # --- Mô hình MAIN MODEL theo provider (mới) ---
         # Rỗng = suy ra từ legacy engine (config cũ không vỡ); UI set vào đây khi user đổi model.

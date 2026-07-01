@@ -713,11 +713,10 @@ body {
 .skill-pick input { width: auto; accent-color: var(--accent2); }
 .editor-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
 
-/* ===== CÀI ĐẶT NHANH (sidebar phải) — đưa lên ĐẦU cột cho dễ thấy ===== */
-.quick-set { order: -1; border: 1px solid var(--border); border-radius: 10px;
-  margin-bottom: 12px; padding: 4px 10px; background: rgba(255,122,60,0.06); flex: 0 0 auto; }
-.quick-set > summary { margin-bottom: 0; padding: 8px 0; color: var(--text2); font-size: 13px; }
-.quick-set > summary:hover { color: var(--accent); }
+/* ===== #quickSet: ẩn mặc định, CHỈ hiện khi được nhúng vào trang Cài đặt (#cviewBody) ===== */
+.quick-set { display: none; }
+#cviewBody .quick-set { display: block; }
+#cviewBody .quick-set > summary { display: none; }   /* trang Cài đặt đã có tiêu đề riêng */
 .quick-set > summary::-webkit-details-marker { display: none; }
 .quick-set .qs-caret { display: inline-block; transition: transform 0.2s; }
 .quick-set[open] .qs-caret { transform: rotate(90deg); }

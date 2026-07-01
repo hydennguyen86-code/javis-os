@@ -6,7 +6,7 @@
   <title>Jarvis OS</title>
   <link rel="icon" type="image/png" href="/static/favicon.png?v=1">
   <link rel="apple-touch-icon" href="/static/logo.png?v=1">
-  <link rel="stylesheet" href="/static/style.css?v=26">
+  <link rel="stylesheet" href="/static/style.css?v=27">
   <link rel="stylesheet" href="/static/console.css?v=12">
 </head>
 <body>
@@ -520,19 +520,22 @@
     </div>
   </div>
 
+  <!-- Holder ẩn giữ #quickSet khi KHÔNG ở trang Cài đặt (node vẫn trong DOM → handler còn sống) -->
+  <div id="quickSetHolder" hidden></div>
+
   <script src="/static/voice.js?v=10"></script>
   <script src="https://unpkg.com/three@0.159.0/build/three.min.js"></script>
   <script src="https://unpkg.com/3d-force-graph@1.73.4/dist/3d-force-graph.min.js"></script>
   <script src="/static/graph3d.js?v=13"></script>
   <script src="/static/app.js?v=46"></script>
-  <script src="/static/branding.js?v=2"></script>
+  <script src="/static/branding.js?v=3"></script>
   <script src="/static/quick-settings.js?v=1"></script>
   <script src="/static/chat-zoom.js?v=1"></script>
   <script src="/static/brains-ui.js?v=2"></script>
   <script src="/static/sessions-ui.js?v=1"></script>
   <script src="/static/studio.js?v=11"></script>
   <!-- Console layer: console.js đăng ký store TRƯỚC khi Alpine khởi động (defer) -->
-  <script src="/static/console.js?v=28"></script>
+  <script src="/static/console.js?v=31"></script>
   <script defer src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>
 </body>
 </html>
