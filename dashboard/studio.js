@@ -1,5 +1,5 @@
 // ============================================
-// JARVIS OS - Studio: Agents / Skills / Workflows
+// JAVIS OS - Studio: Agents / Skills / Workflows
 // ============================================
 (function () {
   const studio = document.getElementById("studio");
@@ -17,9 +17,9 @@
   const fd = (obj) => { const f = new FormData(); Object.entries(obj).forEach(([k, v]) => f.append(k, v)); return f; };
 
   // Studio đã tách thành các trang sidebar riêng. openStudio = điều hướng rail (giữ tương thích
-  // cho nút header & dải số liệu .bstat ở đáy graph). Console gọi loader qua window.JarvisStudio.
+  // cho nút header & dải số liệu .bstat ở đáy graph). Console gọi loader qua window.JavisStudio.
   window.openStudio = (tab) => { if (window.Alpine) Alpine.store("nav").go(tab || "workflows"); };
-  window.JarvisStudio = {
+  window.JavisStudio = {
     workflows: loadWorkflows, agents: loadAgents, skills: loadSkills, automations: loadAutomations,
   };
   const _studioBtn = document.getElementById("studioOpenBtn");
@@ -271,7 +271,7 @@
   async function loadAutomations() {
     const panel = document.getElementById("panel-automations");
     panel.innerHTML = `<div class="panel-bar"><h3>Lịch tự động <span class="dim" id="autoRunning"></span></h3><div class="pb-actions"><button class="s-btn-ghost" id="syncAuto">↻ Đồng bộ cloud</button><button class="s-btn" id="newAuto">+ Lịch</button></div></div>`
-      + `<div class="auto-hint">Bấm <b>↻ Đồng bộ cloud</b> để Jarvis hỏi Claude (CronList / scheduled tasks) lấy routine THẬT đang chạy trên cloud. Mục ☁ là tự đồng bộ; mục ghi tay vẫn giữ. Vòng lặp tự cải thiện 🔁 bật/tắt ngay tại đây.</div>`
+      + `<div class="auto-hint">Bấm <b>↻ Đồng bộ cloud</b> để Javis hỏi Claude (CronList / scheduled tasks) lấy routine THẬT đang chạy trên cloud. Mục ☁ là tự đồng bộ; mục ghi tay vẫn giữ. Vòng lặp tự cải thiện 🔁 bật/tắt ngay tại đây.</div>`
       + `<div class="cards" id="autoCards">Đang tải...</div>`;
     document.getElementById("newAuto").onclick = () => editAutomation(null);
     document.getElementById("syncAuto").onclick = async (e) => {

@@ -1,5 +1,5 @@
 # ============================================================================
-# Jarvis OS - docker compose (PRODUCTION: pull image dựng sẵn từ GHCR)
+# Javis OS - docker compose (PRODUCTION: pull image dựng sẵn từ GHCR)
 #
 # CÀI TRÊN HOSTINGER: dùng file RIÊNG cho Hostinger (1 container, deploy là chạy, không kén hạ tầng):
 #   https://raw.githubusercontent.com/blogminhquy/jarvis-os/main/docker-compose.hostinger.yml
@@ -63,7 +63,7 @@ services:
     #   command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}
 
   # Cập nhật 1-CLICK từ trong UI (nút "Cập nhật ngay" ở Tổng quan). CHỈ Watchtower có quyền Docker
-  # (socket); app Jarvis KHÔNG được cấp socket → an toàn hơn. Bấm nút → app gọi Watchtower qua HTTP
+  # (socket); app Javis KHÔNG được cấp socket → an toàn hơn. Bấm nút → app gọi Watchtower qua HTTP
   # (kèm token) → Watchtower kéo image GHCR mới + tạo lại container jarvis. Không cần terminal.
   # Không muốn tính năng này? Xoá/comment cả service dưới (bản Docker sẽ chỉ "kiểm tra + báo có bản mới").
   watchtower:

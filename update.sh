@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================================
-# Jarvis OS - cập nhật lên bản mới nhất từ GitHub.
+# Javis OS - cập nhật lên bản mới nhất từ GitHub.
 #   ./update.sh            (tự nhận Docker hay native)
 #   ./update.sh docker     (ép chế độ Docker)
 #   ./update.sh native     (ép chế độ native/systemd)
@@ -36,7 +36,7 @@ else
     $SUDO systemctl restart jarvis
     echo "==> Đã restart. Theo dõi:  journalctl -u jarvis -f"
   else
-    echo "==> Không thấy systemd service 'jarvis'. Hãy khởi động lại tiến trình Jarvis thủ công"
+    echo "==> Không thấy systemd service 'jarvis'. Hãy khởi động lại tiến trình Javis thủ công"
     echo "    (vd: kill tiến trình cũ rồi chạy lại uvicorn / start script)."
   fi
 fi

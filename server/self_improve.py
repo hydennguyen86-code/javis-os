@@ -53,7 +53,7 @@ class LoopFeature:
         self.config_path = Path(deps.state_dir) / "loop_config.json"
         self.DEFAULT = {
             "enabled": False, "brain": "brain", "mode": "suggest",  # suggest = chỉ đề xuất | auto = tự làm
-            # goal: business = chỉ số KD | brain = làm dày Wiki | product = Jarvis hữu dụng hơn | custom
+            # goal: business = chỉ số KD | brain = làm dày Wiki | product = Javis hữu dụng hơn | custom
             "goal": "business", "custom_goal": "",
             "interval_min": 60, "last_run": 0.0, "last_summary": "", "last_status": "",
         }
@@ -79,7 +79,7 @@ class LoopFeature:
 
     def _log_append(self, brain: str, entry: dict) -> None:
         try:
-            d = Path(self.deps.brain_root(brain)) / "Jarvis" / "loop-log"
+            d = Path(self.deps.brain_root(brain)) / "Javis" / "loop-log"
             d.mkdir(parents=True, exist_ok=True)
             now = datetime.now(timezone(timedelta(hours=7)))
             with open(d / f"{now.strftime('%Y-%m-%d')}.md", "a", encoding="utf-8") as fh:
@@ -146,7 +146,7 @@ class LoopFeature:
                     )
             elif goal == "product":
                 base = (
-                    "MỤC TIÊU: TỰ CẢI THIỆN JARVIS hữu dụng hơn với người dùng.\n"
+                    "MỤC TIÊU: TỰ CẢI THIỆN JAVIS hữu dụng hơn với người dùng.\n"
                     "Đọc log hội thoại gần đây (Memory/conversations) + các agent/workflow trong Jarvis/ + ghi chú phản hồi. "
                     "Nhận diện: người dùng hay vướng gì, yêu cầu lặp lại gì, thiếu agent/workflow/skill nào, chỗ nào gây khó. "
                     "⛔ AN TOÀN: CHỈ thao tác FILE trong vault, KHÔNG gọi MCP/tiền/đơn, KHÔNG sửa code server.\n"
@@ -158,7 +158,7 @@ class LoopFeature:
                     )
                 else:
                     prompt = base + (
-                        "CHẾ ĐỘ ĐỀ XUẤT - chỉ đọc, không ghi. Liệt kê 3-5 cải tiến giá trị nhất để Jarvis hữu dụng hơn (mỗi cái 1 dòng + lý do)."
+                        "CHẾ ĐỘ ĐỀ XUẤT - chỉ đọc, không ghi. Liệt kê 3-5 cải tiến giá trị nhất để Javis hữu dụng hơn (mỗi cái 1 dòng + lý do)."
                     )
             elif goal == "custom":
                 objective = (cfg.get("custom_goal") or "").strip() or "Cải thiện vault theo cách hữu ích nhất bạn thấy."
@@ -288,7 +288,7 @@ class LoopFeature:
         @router.get("/loop/log")
         async def loop_log(brain: str = Query("brain"), limit: int = Query(10)):
             """Đọc các entry log gần nhất của loop (2 ngày gần nhất)."""
-            d = Path(self.deps.brain_root(brain)) / "Jarvis" / "loop-log"
+            d = Path(self.deps.brain_root(brain)) / "Javis" / "loop-log"
             entries = []
             if d.is_dir():
                 files = sorted(d.glob("*.md"), reverse=True)[:2]

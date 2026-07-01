@@ -1,10 +1,10 @@
 // ============================================
-// JARVIS OS - Graph Layer (Graphify)
+// JAVIS OS - Graph Layer (Graphify)
 // Force-directed graph trên canvas thuần, không cần thư viện ngoài.
 // Đọc /graph endpoint → vẽ mạng lưới note kết nối qua wikilink.
 // ============================================
 
-class JarvisGraph {
+class JavisGraph {
   constructor(canvas, tooltip) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d");
@@ -260,4 +260,4 @@ class JarvisGraph {
   }
 }
 
-window.JarvisGraph = JarvisGraph;
+window.JavisGraph = JavisGraph;

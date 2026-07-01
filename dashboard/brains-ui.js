@@ -107,5 +107,5 @@
 
   loadBrains(null, true);
 
-  window.JarvisBrains = { reload: () => loadBrains(null, false) };
+  window.JavisBrains = { reload: () => loadBrains(null, false) };
 })();

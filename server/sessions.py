@@ -1,5 +1,5 @@
 """
-Conversation-session persistence cho Jarvis OS.
+Conversation-session persistence cho Javis OS.
 
 Lưu hội thoại web-chat (lượt user/assistant của MỌI engine: cli / codex /
 openrouter / openai / anthropic-api) vào 1 file SQLite để dashboard có thể

@@ -1,9 +1,9 @@
 @echo off
 chcp 65001 >nul
-title Jarvis OS
+title Javis OS
 echo.
 echo  ==========================================
-echo   JARVIS OS
+echo   JAVIS OS
 echo  ==========================================
 echo.
 
@@ -38,7 +38,7 @@ for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":7777" ^| findstr "LISTENING
 
 echo.
 echo  ==========================================
-echo   Jarvis OS dang chay tai: http://localhost:7777
+echo   Javis OS dang chay tai: http://localhost:7777
 echo   (Dung Claude Code CLI - khong can API key)
 echo   Nhan Ctrl+C de dung.
 echo  ==========================================

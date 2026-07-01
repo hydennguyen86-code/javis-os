@@ -53,7 +53,7 @@ document.getElementById("currentDate").textContent = new Date().toLocaleDateStri
 });
 
 fetch("/config").then(r => r.json()).then(cfg => {
-  document.getElementById("workspaceName").textContent = cfg.workspace_name || "Jarvis OS";
+  document.getElementById("workspaceName").textContent = cfg.workspace_name || "Javis OS";
 }).catch(() => {});
 
 // ============================================
@@ -70,7 +70,7 @@ function setOrbState(state, label) {
 // ============================================
 // Voice
 // ============================================
-const voice = new JarvisVoice({
+const voice = new JavisVoice({
   lang: "vi-VN",
   onStart: () => {
     voiceBtn.classList.add("recording");
@@ -144,7 +144,7 @@ function handleMessage(data) {
     const finalText = clean || streamingText || "";
     const shownText = finalText || "_(không có nội dung trả về - thử lại hoặc đổi model)_";
     let bubble;
-    if (!streamingBubble) { appendJarvisMessage(shownText); bubble = chatArea.lastChild; }
+    if (!streamingBubble) { appendJavisMessage(shownText); bubble = chatArea.lastChild; }
     else { streamingBubble.querySelector(".bubble").innerHTML = markdownToHtml(shownText); bubble = streamingBubble; streamingBubble = null; streamingText = ""; }
     setProcessing(false);
     if (voice.ttsEnabled && !spokeStream && finalText) {
@@ -159,10 +159,10 @@ function handleMessage(data) {
     if (finalText.trim()) recordTurn("jarvis", finalText);   // KHÔNG lưu lượt rỗng (tránh khôi phục bong bóng trống)
     maybeAutoLearn();
   } else if (data.type === "error") {
-    hideToolBar(); appendJarvisMessage("⚠ " + data.content); setProcessing(false);
+    hideToolBar(); appendJavisMessage("⚠ " + data.content); setProcessing(false);
     setOrbState("", "SẴN SÀNG");
   } else if (data.type === "system") {
-    appendJarvisMessage(data.content);
+    appendJavisMessage(data.content);
   }
 }
 
@@ -177,7 +177,7 @@ function sendMessage(text) {
   appendUserMessage(msg, atts);
   recordTurn("user", msg, atts.map(a => ({ name: a.name, kind: a.kind })));
 
-  // Soạn message gửi Jarvis (kèm đường dẫn file trong Sources)
+  // Soạn message gửi Javis (kèm đường dẫn file trong Sources)
   let outMsg = msg;
   if (atts.length) {
     const lines = atts.map(a => `- ${a.path}`).join("\n");
@@ -231,7 +231,7 @@ function restoreSession() {
   // Dựng lại bong bóng hội thoại
   convo.forEach(t => {
     if (t.role === "user") appendUserMessage(t.text, t.atts || []);
-    else appendJarvisMessage(t.text);
+    else appendJavisMessage(t.text);
   });
   if (convo.length) scrollBottom();
   // Dựng lại số liệu kinh doanh (đánh dấu là của phiên trước)
@@ -241,7 +241,7 @@ function restoreSession() {
 }
 
 // ============================================
-// Phiên hội thoại lưu DB (panel Lịch sử - sessions-ui.js gọi qua window.JarvisSessions)
+// Phiên hội thoại lưu DB (panel Lịch sử - sessions-ui.js gọi qua window.JavisSessions)
 // ============================================
 async function openStoredSession(id) {
   try {
@@ -251,7 +251,7 @@ async function openStoredSession(id) {
     chatArea.innerHTML = "";
     (sess.messages || []).forEach(m => {
       if (m.role === "user") { appendUserMessage(m.content || "", []); convo.push({ role: "user", text: m.content || "", atts: [] }); }
-      else if (m.role === "assistant") { appendJarvisMessage(m.content || ""); convo.push({ role: "jarvis", text: m.content || "", atts: [] }); }
+      else if (m.role === "assistant") { appendJavisMessage(m.content || ""); convo.push({ role: "jarvis", text: m.content || "", atts: [] }); }
     });
     savedSessionId = id;          // lượt gửi tiếp theo → server resume đúng phiên này
     persistSession();
@@ -265,7 +265,7 @@ function newChat() {
   savedSessionId = null;
   persistSession();
 }
-window.JarvisSessions = { open: openStoredSession, new: newChat, brain: () => currentBrainPath() };
+window.JavisSessions = { open: openStoredSession, new: newChat, brain: () => currentBrainPath() };
 
 function appendUserMessage(text, attachments) {
   const div = document.createElement("div");
@@ -282,7 +282,7 @@ function appendUserMessage(text, attachments) {
   div.innerHTML = `<div class="bubble">${textHtml}${attHtml}</div>`;
   chatArea.appendChild(div); scrollBottom();
 }
-function appendJarvisMessage(text) {
+function appendJavisMessage(text) {
   const div = document.createElement("div");
   div.className = "msg msg-jarvis";
   div.innerHTML = `<div class="bubble">${markdownToHtml(text)}</div>`;
@@ -383,15 +383,15 @@ graph3dContainer.addEventListener("mousemove", (e) => {
 
 async function initGraph() {
   // graph3d.js là classic script load trước app.js → class có sẵn ngay
-  if (!window.JarvisGraph3D || !window.ForceGraph3D) {
+  if (!window.JavisGraph3D || !window.ForceGraph3D) {
     graphStats.textContent = "⚠ Lỗi tải thư viện 3D (kiểm tra mạng)";
     return;
   }
-  jarvisGraph = new JarvisGraph3D(graph3dContainer, graphTooltip);
+  jarvisGraph = new JavisGraph3D(graph3dContainer, graphTooltip);
   await reloadGraph();
 }
 
-// Click node trong graph → Jarvis mở & thao tác note đó trong vault
+// Click node trong graph → Javis mở & thao tác note đó trong vault
 window.onGraphNodeClick = (node) => {
   if (!node) return;
   sendMessage(`Đọc note "${node.label}" (${node.path}) trong second brain, tóm tắt ngắn nội dung chính và đề xuất việc tiếp theo nếu có.`);
@@ -474,7 +474,7 @@ async function checkVault() {
       const miss = d.items.filter(i => !i.present).map(i => i.label).join(", ");
       vbText.textContent = d.ok
         ? `Vault chạy được, nhưng thiếu: ${miss}.`
-        : `Cấu trúc vault chưa chuẩn cho Jarvis - thiếu: ${miss}.`;
+        : `Cấu trúc vault chưa chuẩn cho Javis - thiếu: ${miss}.`;
       vaultBanner.classList.add("show");
     }
   } catch (e) {}
@@ -619,7 +619,7 @@ window.addEventListener("resize", () => { if (jarvisGraph) jarvisGraph.resize();
 let _stopBtnTick = 0;
 function pumpAudioLevel() {
   if (jarvisGraph) jarvisGraph.setLevel(voice.getLevel());
-  // Cập nhật hiển thị nút stop ~6 lần/giây (theo dõi cả lúc Jarvis đang đọc)
+  // Cập nhật hiển thị nút stop ~6 lần/giây (theo dõi cả lúc Javis đang đọc)
   if ((_stopBtnTick++ % 10) === 0) {
     updateStopBtn();
     // Đọc xong cả hàng đợi (gồm các bước trung gian) → trả orb về nghỉ.
@@ -762,7 +762,7 @@ async function loadMetrics(opts = {}) {
         persistSession();
       } else if (!opts.silent || !hasCards) {
         const note = data.note || data.error || "Chưa có MCP dữ liệu nào kết nối.";
-        metricCards.innerHTML = `<div class="metric-empty">${escapeHtml(note)}<br><span class="me-hint">Đấu thêm MCP (POS, kênh, quảng cáo...) để Jarvis báo cáo.</span></div>`;
+        metricCards.innerHTML = `<div class="metric-empty">${escapeHtml(note)}<br><span class="me-hint">Đấu thêm MCP (POS, kênh, quảng cáo...) để Javis báo cáo.</span></div>`;
         status.textContent = "";
       }
       return;
@@ -790,7 +790,7 @@ async function agenticFallbackCards() {
       fetch(`/workflows?brain=${b}`).then(r => r.json()).catch(() => ({})),
     ]);
     return [
-      { label: "Agents", value: String((a.agents || []).length), sub: "trong Jarvis", trend: "flat" },
+      { label: "Agents", value: String((a.agents || []).length), sub: "trong Javis", trend: "flat" },
       { label: "Skills", value: String((s.skills || []).length), sub: "khả dụng", trend: "flat" },
       { label: "Workflows", value: String((w.workflows || []).length), sub: "đã tạo", trend: "flat" },
     ];
@@ -817,7 +817,7 @@ function renderMetrics(cards, statusText) {
 }
 document.getElementById("refreshMetrics").addEventListener("click", loadMetrics);
 
-// Trích block metrics Jarvis nhúng trong response → cập nhật panel trái
+// Trích block metrics Javis nhúng trong response → cập nhật panel trái
 const METRICS_BLOCK_RE = /<!--\s*JARVIS_METRICS:\s*([\s\S]*?)\s*-->/;
 function extractMetrics(text) {
   if (typeof text !== "string") return { clean: "", cards: null };
@@ -903,7 +903,7 @@ async function doReflect(auto) {
   reflecting = true;
   turnsSinceReflect = 0;
   if (!auto) { learnBtn.disabled = true; learnBtn.textContent = "🧠 Đang học..."; }
-  memResult.textContent = auto ? "🧠 Đang tự học nền..." : "Jarvis đang đọc lại hội thoại và rút ra ký ức...";
+  memResult.textContent = auto ? "🧠 Đang tự học nền..." : "Javis đang đọc lại hội thoại và rút ra ký ức...";
   try {
     const fd = new FormData();
     fd.append("brain", currentBrainPath());
@@ -987,7 +987,7 @@ async function uploadFile(file) {
   pendingAttachments.push(att);
   renderChips();
   try {
-    // Chỉ STAGE để Jarvis đọc - KHÔNG tự convert/lưu. Lưu Sources chỉ khi user yêu cầu.
+    // Chỉ STAGE để Javis đọc - KHÔNG tự convert/lưu. Lưu Sources chỉ khi user yêu cầu.
     const fd = new FormData();
     fd.append("file", file, att.name);
     fd.append("brain", currentBrainPath());
@@ -1164,7 +1164,7 @@ function fmtClock(ts) {
 function renderLoopStatus(c) {
   loopStatus.className = "loop-status";
   if (c.running) { loopStatus.classList.add("running"); loopStatus.textContent = "⏳ Đang chạy một vòng..."; return; }
-  if (!c.enabled) { loopStatus.textContent = "Tắt - bật để Jarvis tự chạy nền"; return; }
+  if (!c.enabled) { loopStatus.textContent = "Tắt - bật để Javis tự chạy nền"; return; }
   loopStatus.classList.add("on");
   const goalTxt = c.goal === "brain" ? "bộ não" : "chỉ số KD";
   const last = c.last_run ? `lần cuối ${fmtClock(c.last_run)}` : "chưa chạy";
@@ -1230,8 +1230,8 @@ if (loopEnabled) {
     const old = lintBtn.textContent; lintBtn.disabled = true; lintBtn.textContent = "🩺 Đang quét...";
     try {
       const d = await (await fetch(`/lint?brain=${encodeURIComponent(currentBrainPath())}`)).json();
-      appendJarvisMessage(d.ok ? ("🩺 **LINT Wiki**\n\n" + d.report) : ("⚠ " + (d.error || "lỗi LINT")));
-    } catch (e) { appendJarvisMessage("⚠ LINT lỗi mạng"); }
+      appendJavisMessage(d.ok ? ("🩺 **LINT Wiki**\n\n" + d.report) : ("⚠ " + (d.error || "lỗi LINT")));
+    } catch (e) { appendJavisMessage("⚠ LINT lỗi mạng"); }
     lintBtn.textContent = old; lintBtn.disabled = false;
   });
   // Tự cập nhật trạng thái khi loop đang bật (nhẹ)
@@ -1299,7 +1299,7 @@ async function initAuthGate() {
     if (_wizardMandatory) {
       const pass = document.getElementById("wzPass"); if (pass) pass.required = true;
       const tw = document.getElementById("wzTokenWrap"); if (tw) tw.style.display = "";
-      const note = document.getElementById("wzErr"); if (note) note.textContent = "Đặt tài khoản + mật khẩu (≥8 ký tự) + MÃ THIẾT LẬP để bảo vệ Jarvis trên server công khai.";
+      const note = document.getElementById("wzErr"); if (note) note.textContent = "Đặt tài khoản + mật khẩu (≥8 ký tự) + MÃ THIẾT LẬP để bảo vệ Javis trên server công khai.";
     }
     wz.classList.add("open");
   } else {
@@ -1358,7 +1358,7 @@ if (document.getElementById("settingsBtn")) {
 
   document.getElementById("saveGeneral").addEventListener("click", (e) => {
     _saveSetting("general", { workspace_name: document.getElementById("setWsName").value.trim() }, e.target)
-      .then(() => { document.getElementById("workspaceName").textContent = document.getElementById("setWsName").value.trim() || "Jarvis OS"; });
+      .then(() => { document.getElementById("workspaceName").textContent = document.getElementById("setWsName").value.trim() || "Javis OS"; });
   });
   document.getElementById("saveModel").addEventListener("click", (e) => {
     const sel = document.getElementById("setOrModelSel");
@@ -1480,12 +1480,12 @@ if (document.getElementById("wzFinish")) {
     const pass = document.getElementById("wzPass").value;
     const prov = (document.querySelector('input[name="wzprov"]:checked') || {}).value || "anthropic-cli";
     const btn = document.getElementById("wzFinish"); btn.disabled = true; btn.textContent = "Đang lưu…";
-    if (_wizardMandatory && !pass) { err.textContent = "Bắt buộc đặt mật khẩu khi chạy trên server công khai."; btn.disabled = false; btn.textContent = "Bắt đầu dùng Jarvis →"; return; }
+    if (_wizardMandatory && !pass) { err.textContent = "Bắt buộc đặt mật khẩu khi chạy trên server công khai."; btn.disabled = false; btn.textContent = "Bắt đầu dùng Javis →"; return; }
     try {
       if (pass) {
         const _tok = document.getElementById("wzToken");
         const d = await (await fetch("/auth/setup", { method: "POST", body: _fd({ username: user || "admin", password: pass, setup_token: _tok ? _tok.value.trim() : "" }) })).json();
-        if (!d.ok) { err.textContent = d.error || "Đặt mật khẩu lỗi"; btn.disabled = false; btn.textContent = "Bắt đầu dùng Jarvis →"; return; }
+        if (!d.ok) { err.textContent = d.error || "Đặt mật khẩu lỗi"; btn.disabled = false; btn.textContent = "Bắt đầu dùng Javis →"; return; }
       }
       await fetch("/settings", { method: "POST", body: _fd({ section: "general", data: JSON.stringify({ workspace_name: ws, setup_done: true }) }) });
       const _PM = { "anthropic-cli": "sonnet", "openai-oauth": "gpt-5.5", "openrouter": "openai/gpt-4o-mini" };
@@ -1494,7 +1494,7 @@ if (document.getElementById("wzFinish")) {
       if (prov === "openrouter" && _ork && _ork.trim()) _mp.openrouter_key = _ork.trim();
       await fetch("/settings", { method: "POST", body: _fd({ section: "model", data: JSON.stringify(_mp) }) });
       location.reload();
-    } catch (e) { err.textContent = "Lỗi mạng"; btn.disabled = false; btn.textContent = "Bắt đầu dùng Jarvis →"; }
+    } catch (e) { err.textContent = "Lỗi mạng"; btn.disabled = false; btn.textContent = "Bắt đầu dùng Javis →"; }
   });
 }
 

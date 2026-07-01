@@ -1,5 +1,5 @@
 """
-Cấu hình tập trung của Jarvis OS - đọc/ghi server/settings.json (gitignored, chứa secret).
+Cấu hình tập trung của Javis OS - đọc/ghi server/settings.json (gitignored, chứa secret).
 Gồm: workspace, tài khoản admin (mật khẩu hash), model engine, telegram.
 Auth CHỈ bật khi đã đặt mật khẩu → bản local chưa đặt vẫn chạy như cũ.
 """
@@ -9,7 +9,7 @@ import hashlib
 import secrets
 from pathlib import Path
 
-# Mọi state Jarvis tự ghi (settings, auth sessions, loop config) nằm ở JARVIS_STATE_DIR.
+# Mọi state Javis tự ghi (settings, auth sessions, loop config) nằm ở JARVIS_STATE_DIR.
 # Mặc định = server/ (không đổi trên máy cũ). Docker/VPS đặt = /data/state (volume ghi được,
 # vì code tree /app là read-only trong container).
 STATE_DIR = Path(os.getenv("JARVIS_STATE_DIR", str(Path(__file__).parent)))
@@ -24,7 +24,7 @@ SETTINGS_PATH = STATE_DIR / "settings.json"
 BRANDING_DIR = STATE_DIR / "branding"
 
 _DEFAULT = {
-    "workspace_name": "Jarvis OS",
+    "workspace_name": "Javis OS",
     "setup_done": False,                       # đã qua bộ cài đặt lần đầu chưa
     "auth": {"username": "", "password_hash": "", "salt": ""},
     # Logo/avatar hiển thị (góc trên, thanh bên, màn đăng nhập). logo_ext rỗng = dùng ảnh mặc định.
@@ -77,8 +77,8 @@ _DEFAULT = {
         # Frontend cũng tự ép lite-mode khi màn hình hẹp dù cờ này bật.
         "graph_enabled": True,
     },
-    # MCP do Jarvis quản lý (danh sách server ở mcp_servers.json). strict=True → CHỈ dùng
-    # server của Jarvis (--strict-mcp-config), bỏ qua config MCP sẵn có của máy.
+    # MCP do Javis quản lý (danh sách server ở mcp_servers.json). strict=True → CHỈ dùng
+    # server của Javis (--strict-mcp-config), bỏ qua config MCP sẵn có của máy.
     "mcp": {"strict": False},
 }
 

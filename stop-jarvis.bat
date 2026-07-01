@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
-title Dung Jarvis OS
-echo Dang tim va tat Jarvis OS (port 7777)...
+title Dung Javis OS
+echo Dang tim va tat Javis OS (port 7777)...
 set FOUND=0
 for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":7777" ^| findstr "LISTENING"') do (
   taskkill /F /T /PID %%a >nul 2>&1

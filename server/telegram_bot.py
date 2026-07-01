@@ -1,5 +1,5 @@
 """
-Telegram bot cho Jarvis - long-polling getUpdates, whitelist theo chat_id.
+Telegram bot cho Javis - long-polling getUpdates, whitelist theo chat_id.
 - Trả lời chạy ở BACKGROUND task → vẫn nhận /stop giữa chừng.
 - Lệnh /...: command_fn(cmd, arg) -> {"reply": str} | {"ask": str} | None.
 Decoupled: main.py cấp answer_fn (1 lượt chat) + command_fn (xử lý lệnh).
@@ -120,7 +120,7 @@ class TelegramBot:
                         if not text or not chat:
                             continue
                         if self.chat_id and chat != self.chat_id:
-                            await self._send(client, chat, "Bạn không có quyền dùng bot Jarvis này.")
+                            await self._send(client, chat, "Bạn không có quyền dùng bot Javis này.")
                             continue
                         await self._dispatch(client, chat, text)
                 except Exception as e:
@@ -147,7 +147,7 @@ class TelegramBot:
                     await self._send(client, chat, res["reply"], res.get("reply_markup"))
                     return
                 if res and "ask" in res:
-                    text = res["ask"]   # chuyển thành câu hỏi cho Jarvis
+                    text = res["ask"]   # chuyển thành câu hỏi cho Javis
                 # res None → coi như tin thường (gửi nguyên text)
         # Tin thường → chạy nền (1 lượt 1 lúc)
         if self._current and not self._current.done():

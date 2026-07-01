@@ -1,6 +1,6 @@
 // ============================================================
-// Jarvis - Panel "Lịch sử hội thoại" (sessions). Tự chứa, không đụng layout.
-// Gọi backend /sessions* và window.JarvisSessions (app.js) để mở/tạo phiên.
+// Javis - Panel "Lịch sử hội thoại" (sessions). Tự chứa, không đụng layout.
+// Gọi backend /sessions* và window.JavisSessions (app.js) để mở/tạo phiên.
 // ============================================================
 (function () {
   "use strict";
@@ -45,7 +45,7 @@
   function el(html) { var d = document.createElement("div"); d.innerHTML = html.trim(); return d.firstChild; }
   function esc(s) { return (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
   function fmtTime(ts) { try { return new Date(ts * 1000).toLocaleString(); } catch (e) { return ""; } }
-  function brain() { try { return (window.JarvisSessions && window.JarvisSessions.brain()) || "brain"; } catch (e) { return "brain"; } }
+  function brain() { try { return (window.JavisSessions && window.JavisSessions.brain()) || "brain"; } catch (e) { return "brain"; } }
 
   var overlay, listEl, searchEl, searchTimer;
 
@@ -68,7 +68,7 @@
     overlay.querySelector(".x").onclick = closePanel;
     overlay.onclick = function (e) { if (e.target === overlay) closePanel(); };
     overlay.querySelector("#jv-sess-new").onclick = function () {
-      if (window.JarvisSessions) window.JarvisSessions.new();
+      if (window.JavisSessions) window.JavisSessions.new();
       closePanel();
     };
     searchEl.oninput = function () {
@@ -104,7 +104,7 @@
       item.onclick = function (e) {
         if (e.target.classList.contains("del")) { e.stopPropagation(); delSession(s.id); return; }
         if (e.target.classList.contains("ren")) { e.stopPropagation(); renSession(s); return; }
-        if (window.JarvisSessions) window.JarvisSessions.open(s.id);
+        if (window.JavisSessions) window.JavisSessions.open(s.id);
         closePanel();
       };
       listEl.appendChild(item);
@@ -126,7 +126,7 @@
           '<div class="jv-sess-snip">' + snip + '</div>' +
           '<div class="jv-sess-meta"><span>' + esc(h.role || "") + '</span><span>' + fmtTime(h.ts) + '</span></div>' +
           '</div>');
-        item.onclick = function () { if (window.JarvisSessions) window.JarvisSessions.open(h.session_id); closePanel(); };
+        item.onclick = function () { if (window.JavisSessions) window.JavisSessions.open(h.session_id); closePanel(); };
         listEl.appendChild(item);
       });
     } catch (e) { listEl.innerHTML = '<div id="jv-sess-empty">Lỗi tìm kiếm.</div>'; }

@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # ============================================================================
-# Jarvis OS - container image
+# Javis OS - container image
 # "Brain" = Claude Code CLI (npm global). FastAPI app served by uvicorn.
 # Code tree is immutable; ALL mutable state lives on the /data volume and the
 # Claude auth volume (~/.claude). Pattern adapted from Hermes Agent's Dockerfile

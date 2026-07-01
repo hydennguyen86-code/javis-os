@@ -1,5 +1,5 @@
 # ============================================================================
-# Jarvis OS - HOSTINGER VPS (Docker Manager). Có LINK MẶC ĐỊNH + HTTPS như app Catalog (Hermes/n8n).
+# Javis OS - HOSTINGER VPS (Docker Manager). Có LINK MẶC ĐỊNH + HTTPS như app Catalog (Hermes/n8n).
 #
 # Hostinger có sẵn: (1) wildcard DNS *.<hostname-vps>.hstgr.cloud trỏ về VPS, (2) reverse proxy Traefik
 # tự cấp SSL. Bạn KHÔNG cần mua tên miền: đặt DOMAIN_NAME = <tên>.<hostname-vps>.hstgr.cloud là có link
@@ -11,8 +11,8 @@
 #   2) Docker Manager > Compose > URL > dán:
 #      https://raw.githubusercontent.com/blogminhquy/jarvis-os/main/docker-compose.hostinger.yml
 #   3) Ô Environment đặt (BẮT BUỘC):
-#         DOMAIN_NAME=jarvis.<hostname-vps>.hstgr.cloud
-#      Ví dụ:  DOMAIN_NAME=jarvis.srv1782015.hstgr.cloud
+#         DOMAIN_NAME=javis.<hostname-vps>.hstgr.cloud
+#      Ví dụ:  DOMAIN_NAME=javis.srv1782015.hstgr.cloud
 #      (Muốn dùng tên miền RIÊNG của bạn thì điền tên miền đó + trỏ DNS A về IP VPS trước.)
 #   4) Deploy > đợi 1-3 phút cho Traefik cấp chứng chỉ > mở  https://<DOMAIN_NAME>.
 #
@@ -41,11 +41,13 @@ services:
       - "7777:7777"                 # đường vào dự phòng (nút Open / http://<ip>:7777)
     labels:
       # Copy đúng mẫu Hermes: KHÔNG có traefik.docker.network, KHÔNG có networks external.
+      # Tên router/service = ${COMPOSE_PROJECT_NAME} (tên project) → mỗi lần deploy 1 tên khác nhau,
+      # chạy được NHIỀU bản Javis trên cùng 1 VPS mà không đụng nhau (giống đuôi -efxd của Hermes).
       - traefik.enable=true
-      - traefik.http.routers.jarvis.rule=Host(`${DOMAIN_NAME:-jarvis.localhost}`)
-      - traefik.http.routers.jarvis.entrypoints=websecure
-      - traefik.http.routers.jarvis.tls.certresolver=letsencrypt
-      - traefik.http.services.jarvis.loadbalancer.server.port=7777
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-javis}.rule=Host(`${DOMAIN_NAME:-javis.localhost}`)
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-javis}.entrypoints=websecure
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-javis}.tls.certresolver=letsencrypt
+      - traefik.http.services.${COMPOSE_PROJECT_NAME:-javis}.loadbalancer.server.port=7777
     volumes:
       - jarvis-data:/data
       - jarvis-brains:/brains

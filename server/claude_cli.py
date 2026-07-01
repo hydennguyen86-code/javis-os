@@ -298,7 +298,7 @@ def mcp_open_auth_terminal():
         return {"ok": False, "error": "Claude CLI chưa cài"}
     try:
         if os.name == "nt":
-            subprocess.Popen('start "Jarvis - Xac thuc MCP (go /mcp)" cmd /k claude', shell=True)
+            subprocess.Popen('start "Javis - Xac thuc MCP (go /mcp)" cmd /k claude', shell=True)
         else:
             for term in ("x-terminal-emulator", "gnome-terminal", "konsole", "xterm"):
                 if shutil.which(term):
@@ -321,7 +321,7 @@ class ClaudeCLI:
         self.tag = tag                      # nhóm để ngắt chọn lọc
         self.allowed_tools = allowed_tools  # None = mọi tool; list = CHỈ các tool này (an toàn cho loop)
         self.model = model                  # None = model mặc định của CLI; hoặc sonnet/opus/haiku
-        self.mcp_config: Optional[str] = None   # path file --mcp-config (MCP do Jarvis quản lý)
+        self.mcp_config: Optional[str] = None   # path file --mcp-config (MCP do Javis quản lý)
         self.mcp_strict: bool = False           # True → --strict-mcp-config (bỏ qua MCP sẵn của máy)
         self.disallowed_tools: Optional[list] = None  # pattern --disallowedTools (server chỉ-đọc)
 
@@ -543,7 +543,7 @@ class CodexCLI:
         self.model = model              # gpt-5.5 / gpt-5.4 ...
         self.instructions = instructions
         self.extra_config = []          # list '-c key=value' (override config, vd thêm mcp_servers)
-        self.profile = None             # tên profile codex (-p) - Jarvis ghi jarvis.config.toml để thêm MCP
+        self.profile = None             # tên profile codex (-p) - Javis ghi jarvis.config.toml để thêm MCP
 
     def is_available(self) -> bool:
         return self.cli_path is not None

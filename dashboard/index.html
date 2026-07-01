@@ -3,18 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Jarvis OS</title>
-  <link rel="icon" type="image/png" href="/static/favicon.png?v=1">
-  <link rel="apple-touch-icon" href="/static/logo.png?v=1">
-  <link rel="stylesheet" href="/static/style.css?v=27">
-  <link rel="stylesheet" href="/static/console.css?v=12">
+  <title>Javis OS</title>
+  <link rel="icon" type="image/png" href="/static/favicon.png?v=2">
+  <link rel="apple-touch-icon" href="/static/logo.png?v=2">
+  <link rel="stylesheet" href="/static/style.css?v=28">
+  <link rel="stylesheet" href="/static/console.css?v=13">
 </head>
 <body>
   <div class="hud">
 
     <!-- ===== TOP BAR ===== -->
     <header class="hud-top">
-      <div class="brand"><span class="brand-icon"><img src="/brand-logo" alt="" style="width:22px;height:22px;border-radius:5px;vertical-align:middle;object-fit:cover"></span> <span class="brand-text">JARVIS OS</span></div>
+      <div class="brand"><span class="brand-icon"><img src="/brand-logo" alt="" style="width:22px;height:22px;border-radius:5px;vertical-align:middle;object-fit:cover"></span> <span class="brand-text">JAVIS OS</span></div>
       <!-- Select Brain: dời từ góc graph lên navbar (trái) -->
       <div class="orb-graph-ctl navbar-brain">
         <select id="graphSource" class="graph-select">
@@ -26,7 +26,7 @@
         <span class="graph-stats" id="graphStats">-</span>
       </div>
       <div class="hud-center-title">
-        <span class="ws-name" id="workspaceName">Jarvis OS</span>
+        <span class="ws-name" id="workspaceName">Javis OS</span>
         <span class="ws-date" id="currentDate"></span>
       </div>
       <div class="hud-actions">
@@ -40,7 +40,7 @@
           </svg>
         </button>
         <!-- Voice/tốc độ đã dời xuống sidebar phải (mục CÀI ĐẶT NHANH). -->
-        <button class="hud-icon-btn" id="ttsToggle" title="Bật/tắt giọng Jarvis">
+        <button class="hud-icon-btn" id="ttsToggle" title="Bật/tắt giọng Javis">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M11 5L6 9H2v6h4l5 4V5z"/>
             <path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"/>
@@ -120,7 +120,7 @@
           BỘ NHỚ DÀI HẠN <span class="mem-count" id="memCount">0</span>
         </div>
         <div class="mem-box">
-          <div class="mem-desc">Ký ức lưu ngay trong vault đang chọn - đổi máy chỉ cần trỏ lại vault là Jarvis nhớ như cũ.</div>
+          <div class="mem-desc">Ký ức lưu ngay trong vault đang chọn - đổi máy chỉ cần trỏ lại vault là Javis nhớ như cũ.</div>
           <label class="auto-learn">
             <input type="checkbox" id="autoLearnToggle" checked>
             <span>Tự học sau mỗi 6 lượt</span>
@@ -135,7 +135,7 @@
           VÒNG LẶP TỰ CẢI THIỆN <span class="beta-tag">BETA</span>
         </div>
         <div class="loop-box" style="display:none">
-          <div class="loop-desc">Jarvis tự đánh thức theo lịch, tìm đòn bẩy cải thiện rồi tự kiểm chứng. An toàn: chỉ soạn nháp/ghi file trong vault - KHÔNG tự gọi MCP tạo đơn, đốt tiền, đăng bài.</div>
+          <div class="loop-desc">Javis tự đánh thức theo lịch, tìm đòn bẩy cải thiện rồi tự kiểm chứng. An toàn: chỉ soạn nháp/ghi file trong vault - KHÔNG tự gọi MCP tạo đơn, đốt tiền, đăng bài.</div>
           <label class="loop-row">
             <span>Bật tự chạy nền</span>
             <label class="toggle"><input type="checkbox" id="loopEnabled"><span></span></label>
@@ -145,7 +145,7 @@
             <select id="loopGoal" class="loop-sel">
               <option value="business">Cải thiện chỉ số kinh doanh</option>
               <option value="brain">Làm dày bộ não (Wiki)</option>
-              <option value="product">Cải thiện Jarvis hữu dụng hơn</option>
+              <option value="product">Cải thiện Javis hữu dụng hơn</option>
               <option value="custom">Tự định nghĩa…</option>
             </select>
           </label>
@@ -285,7 +285,7 @@
         </svg>
       </button>
       <input type="file" id="fileInput" multiple style="display:none">
-      <textarea id="chatInput" class="voice-input" placeholder="Nói với Jarvis, gõ ở đây, hoặc kéo/dán file vào..." rows="1"></textarea>
+      <textarea id="chatInput" class="voice-input" placeholder="Nói với Javis, gõ ở đây, hoặc kéo/dán file vào..." rows="1"></textarea>
       <button class="stop-btn" id="stopBtn" title="Ngắt lệnh / dừng đọc (Esc)" style="display:none">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
       </button>
@@ -299,7 +299,7 @@
   <nav class="rail" x-data x-cloak>
     <!-- ĐỈNH cố định -->
     <div class="rail-top">
-      <div class="rail-brand"><img src="/brand-logo" alt="Jarvis" style="width:30px;height:30px;border-radius:8px;display:block;object-fit:cover"></div>
+      <div class="rail-brand"><img src="/brand-logo" alt="Javis" style="width:30px;height:30px;border-radius:8px;display:block;object-fit:cover"></div>
     </div>
     <!-- GIỮA cuộn được - nhồi bao nhiêu tính năng cũng cuộn -->
     <div class="rail-nav">
@@ -346,7 +346,7 @@
   <!-- Vault structure banner -->
   <div class="vault-banner" id="vaultBanner">
     <span class="vb-icon">⚠</span>
-    <span class="vb-text" id="vbText">Cấu trúc vault chưa chuẩn cho Jarvis.</span>
+    <span class="vb-text" id="vbText">Cấu trúc vault chưa chuẩn cho Javis.</span>
     <button class="vb-init" id="vbInit">Khởi tạo cấu trúc</button>
     <button class="vb-close" id="vbClose">✕</button>
   </div>
@@ -375,7 +375,7 @@
   <!-- Bộ cài đặt lần đầu (hiện khi chưa setup_done) -->
   <div class="modal-overlay" id="setupWizard">
     <div class="settings-modal" style="max-width:460px">
-      <div class="fm-head"><img src="/brand-logo" alt="" style="width:24px;height:24px;border-radius:6px;vertical-align:middle;margin-right:6px;object-fit:cover"><span>Chào mừng tới Jarvis</span></div>
+      <div class="fm-head"><img src="/brand-logo" alt="" style="width:24px;height:24px;border-radius:6px;vertical-align:middle;margin-right:6px;object-fit:cover"><span>Chào mừng tới Javis</span></div>
       <div class="settings-body">
         <style>
         .wz-prov{display:flex;flex-direction:column;gap:8px;margin-top:6px}
@@ -392,7 +392,7 @@
         <div class="set-note">Vài bước nhanh để bắt đầu. Mọi thứ đổi lại được sau trong ⚙ Cài đặt.</div>
         <div class="set-sec">
           <h4>1. Workspace</h4>
-          <label>Tên hiển thị</label><input id="wzWsName" placeholder="Jarvis OS">
+          <label>Tên hiển thị</label><input id="wzWsName" placeholder="Javis OS">
         </div>
         <div class="set-sec">
           <h4>2. Tài khoản admin <span class="dim">(khuyến nghị)</span></h4>
@@ -403,7 +403,7 @@
             <label>Mã thiết lập <span class="dim">(bảo mật)</span></label>
             <input id="wzToken" placeholder="dán MÃ THIẾT LẬP từ log server">
             <div class="wz-tokhelp">
-              <b>❓ Mã thiết lập là gì?</b> Jarvis đang chạy trên server công khai. Để chắc <b>chính bạn</b> (không phải người lạ vô tình mở link) là người tạo tài khoản admin, bạn dán một mã chỉ in ra <b>log server</b> - nơi duy nhất chủ máy xem được.
+              <b>❓ Mã thiết lập là gì?</b> Javis đang chạy trên server công khai. Để chắc <b>chính bạn</b> (không phải người lạ vô tình mở link) là người tạo tài khoản admin, bạn dán một mã chỉ in ra <b>log server</b> - nơi duy nhất chủ máy xem được.
               <br><b>Cách lấy mã (Hostinger → App terminal):</b>
               <ol>
                 <li>Mở app → bấm <b>App terminal</b> (bạn sẽ vào BÊN TRONG container <code>jarvis</code>).</li>
@@ -427,7 +427,7 @@
             <label class="wz-card" data-prov="openai-oauth">
               <input type="radio" name="wzprov" value="openai-oauth">
               <div><b>💬 ChatGPT (gói subscription)</b>
-                <div class="wz-pdesc">Đăng nhập ChatGPT Plus/Pro (qua Codex) → vẫn dùng được MCP của Jarvis. Hợp nếu bạn đã có gói ChatGPT.</div></div>
+                <div class="wz-pdesc">Đăng nhập ChatGPT Plus/Pro (qua Codex) → vẫn dùng được MCP của Javis. Hợp nếu bạn đã có gói ChatGPT.</div></div>
             </label>
             <label class="wz-card" data-prov="openrouter">
               <input type="radio" name="wzprov" value="openrouter">
@@ -441,7 +441,7 @@
           </div>
           <div id="wzProvHint"></div>
         </div>
-        <div class="set-actions"><button class="s-btn" id="wzFinish">Bắt đầu dùng Jarvis →</button></div>
+        <div class="set-actions"><button class="s-btn" id="wzFinish">Bắt đầu dùng Javis →</button></div>
         <div class="auth-err" id="wzErr"></div>
       </div>
     </div>
@@ -450,7 +450,7 @@
   <!-- Đăng nhập (chỉ hiện khi admin đã đặt mật khẩu & chưa đăng nhập) -->
   <div class="modal-overlay" id="authOverlay">
     <div class="folder-modal auth-modal">
-      <div class="fm-head"><img src="/brand-logo" alt="" style="width:24px;height:24px;border-radius:6px;vertical-align:middle;margin-right:6px;object-fit:cover"><span id="authTitle">Đăng nhập Jarvis</span></div>
+      <div class="fm-head"><img src="/brand-logo" alt="" style="width:24px;height:24px;border-radius:6px;vertical-align:middle;margin-right:6px;object-fit:cover"><span id="authTitle">Đăng nhập Javis</span></div>
       <div class="auth-body">
         <input id="authUser" placeholder="Tài khoản" autocomplete="username">
         <input id="authPass" type="password" placeholder="Mật khẩu" autocomplete="current-password">
@@ -468,7 +468,7 @@
   <!-- Cài đặt -->
   <div class="modal-overlay" id="settingsOverlay">
     <div class="settings-modal">
-      <div class="fm-head"><span>⚙ Cài đặt Jarvis</span><button class="fm-close" id="settingsClose">✕</button></div>
+      <div class="fm-head"><span>⚙ Cài đặt Javis</span><button class="fm-close" id="settingsClose">✕</button></div>
       <div class="settings-body">
         <div class="set-sec">
           <h4>Chung</h4>
@@ -504,7 +504,7 @@
           <label>Chat ID được phép dùng</label>
           <input id="setTgChat" placeholder="vd 123456789">
           <div class="set-note" id="setTgStatus">-</div>
-          <div class="set-note">Nhắn Telegram ↔ Jarvis. Dùng đúng engine đang chọn (CLI thì có cả MCP để hỏi doanh thu/ads qua điện thoại). Có thể dùng lại token bot Morning Briefing.</div>
+          <div class="set-note">Nhắn Telegram ↔ Javis. Dùng đúng engine đang chọn (CLI thì có cả MCP để hỏi doanh thu/ads qua điện thoại). Có thể dùng lại token bot Morning Briefing.</div>
           <div class="set-actions">
             <button class="s-btn" id="saveTelegram">Lưu & bật</button>
             <button class="s-btn-ghost" id="testTelegram">Gửi test</button>
@@ -520,7 +520,7 @@
             <button class="s-btn-ghost" id="logoutBtn">Đăng xuất</button>
             <button class="s-btn-ghost" id="disableAuthBtn">Tắt đăng nhập</button>
           </div>
-          <div class="set-note">Đặt mật khẩu để chặn người lạ khi đưa Jarvis lên VPS. Lưu ý: trên VPS nên chạy sau HTTPS (reverse proxy).</div>
+          <div class="set-note">Đặt mật khẩu để chặn người lạ khi đưa Javis lên VPS. Lưu ý: trên VPS nên chạy sau HTTPS (reverse proxy).</div>
         </div>
         <div class="set-note" style="opacity:.7">Ảnh đại diện, tên miền, giọng nói &amp; tốc độ giờ nằm ở mục <b>CÀI ĐẶT NHANH</b> (thanh bên phải).</div>
       </div>
@@ -530,19 +530,19 @@
   <!-- Holder ẩn giữ #quickSet khi KHÔNG ở trang Cài đặt (node vẫn trong DOM → handler còn sống) -->
   <div id="quickSetHolder" hidden></div>
 
-  <script src="/static/voice.js?v=10"></script>
+  <script src="/static/voice.js?v=11"></script>
   <script src="https://unpkg.com/three@0.159.0/build/three.min.js"></script>
   <script src="https://unpkg.com/3d-force-graph@1.73.4/dist/3d-force-graph.min.js"></script>
-  <script src="/static/graph3d.js?v=13"></script>
-  <script src="/static/app.js?v=46"></script>
-  <script src="/static/branding.js?v=4"></script>
-  <script src="/static/quick-settings.js?v=1"></script>
-  <script src="/static/chat-zoom.js?v=1"></script>
-  <script src="/static/brains-ui.js?v=2"></script>
-  <script src="/static/sessions-ui.js?v=1"></script>
-  <script src="/static/studio.js?v=11"></script>
+  <script src="/static/graph3d.js?v=14"></script>
+  <script src="/static/app.js?v=47"></script>
+  <script src="/static/branding.js?v=5"></script>
+  <script src="/static/quick-settings.js?v=2"></script>
+  <script src="/static/chat-zoom.js?v=2"></script>
+  <script src="/static/brains-ui.js?v=3"></script>
+  <script src="/static/sessions-ui.js?v=2"></script>
+  <script src="/static/studio.js?v=12"></script>
   <!-- Console layer: console.js đăng ký store TRƯỚC khi Alpine khởi động (defer) -->
-  <script src="/static/console.js?v=33"></script>
+  <script src="/static/console.js?v=34"></script>
   <script defer src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>
 </body>
 </html>

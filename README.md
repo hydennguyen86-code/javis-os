@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🧠 Jarvis OS
+# 🧠 Javis OS
 
 **Trợ lý AI cá nhân + Second Brain - chạy bằng Claude Code, có giọng nói, đồ thị tri thức 3D, và tự thông minh dần lên.**
 
@@ -10,15 +10,15 @@
 
 ---
 
-## Jarvis là gì?
+## Javis là gì?
 
-Jarvis OS **không phải** một chatbot. Nó là một **lớp điều hành AI** chạy trên máy/VPS của bạn, lấy **Claude Code CLI làm "bộ não"** - nghĩa là nó có đầy đủ khả năng đọc/ghi file, gọi công cụ (MCP), chạy lệnh, và dùng skill của Claude Code - rồi gói tất cả vào một **dashboard đẹp, điều khiển bằng giọng nói**, kèm một **Second Brain** (bộ nhớ + wiki) tích luỹ tri thức theo thời gian.
+Javis OS **không phải** một chatbot. Nó là một **lớp điều hành AI** chạy trên máy/VPS của bạn, lấy **Claude Code CLI làm "bộ não"** - nghĩa là nó có đầy đủ khả năng đọc/ghi file, gọi công cụ (MCP), chạy lệnh, và dùng skill của Claude Code - rồi gói tất cả vào một **dashboard đẹp, điều khiển bằng giọng nói**, kèm một **Second Brain** (bộ nhớ + wiki) tích luỹ tri thức theo thời gian.
 
-Bạn đấu các **MCP** của riêng mình vào (bán hàng/POS, quảng cáo, lịch, email, ghi chú…) → Jarvis tự phát hiện và **báo cáo kinh doanh + cuộc sống** bằng số liệu thật, nói chuyện như người.
+Bạn đấu các **MCP** của riêng mình vào (bán hàng/POS, quảng cáo, lịch, email, ghi chú…) → Javis tự phát hiện và **báo cáo kinh doanh + cuộc sống** bằng số liệu thật, nói chuyện như người.
 
-### Vì sao Jarvis khác biệt
+### Vì sao Javis khác biệt
 
-| | Chatbot thường | **Jarvis OS** |
+| | Chatbot thường | **Javis OS** |
 |---|---|---|
 | Bộ não | API gọi rời từng câu | **Claude Code CLI** - đủ tool, MCP, skill, session, chạy lệnh thật |
 | Trí nhớ | Quên sau mỗi phiên | **Second Brain sống** - nhớ bạn, dày lên qua từng hội thoại |
@@ -27,22 +27,22 @@ Bạn đấu các **MCP** của riêng mình vào (bán hàng/POS, quảng cáo,
 | Giao diện | Khung chat | Dashboard 3D + **giọng nói rảnh tay** + Telegram |
 | Triển khai | Khoá vào 1 nhà cung cấp | **Tự host**: Hostinger 1-click / Docker / VPS bất kỳ |
 
-> 💡 **Triết lý:** Jarvis *biên dịch một lần* tri thức từ ghi chú thô → Wiki, rồi *duy trì* nó sống cùng mỗi nguồn mới. Tri thức **tích luỹ**, không tái phát hiện mỗi lần.
+> 💡 **Triết lý:** Javis *biên dịch một lần* tri thức từ ghi chú thô → Wiki, rồi *duy trì* nó sống cùng mỗi nguồn mới. Tri thức **tích luỹ**, không tái phát hiện mỗi lần.
 
 ---
 
 ## ✨ Tính năng nổi bật
 
-- 🎙️ **Trò chuyện bằng giọng nói rảnh tay** - nói, Jarvis nghe và trả lời bằng giọng (Edge TTS tiếng Việt). Giữ phím Cách để bật mic.
+- 🎙️ **Trò chuyện bằng giọng nói rảnh tay** - nói, Javis nghe và trả lời bằng giọng (Edge TTS tiếng Việt). Giữ phím Cách để bật mic.
 - 🌌 **Đồ thị tri thức 3D** - bộ não của bạn hiện ra dưới dạng nebula 3D phản ứng theo âm thanh, các note nối nhau qua `[[wikilink]]`.
 - 💬 **Phiên hội thoại** - lưu / mở lại / **tìm kiếm toàn văn** mọi cuộc trò chuyện cũ (kể cả khi đổi máy).
 - 🗂️ **Quản lý tệp tin** - duyệt, **sửa file `.md`/`.txt` trực tiếp** trong trình duyệt, tải lên/về, ngay trong brain đang chọn.
-- 🧩 **Skills (kiểu Hermes)** - gom nhóm, tìm kiếm, **bật/tắt từng skill**, thêm/sửa/xoá; Jarvis tự xếp skill mới vào đúng nhóm.
+- 🧩 **Skills (kiểu Hermes)** - gom nhóm, tìm kiếm, **bật/tắt từng skill**, thêm/sửa/xoá; Javis tự xếp skill mới vào đúng nhóm.
 - 🤖 **Agents & Workflows** - tạo trợ lý chuyên biệt + chuỗi tự động (Studio), mỗi bước một agent, có kiểm chứng.
-- ♻️ **Tự cải thiện** - Jarvis tự thức theo lịch làm **một nhiệm vụ cụ thể** (vd: mỗi sáng tổng hợp doanh thu + soạn nháp content) rồi tự kiểm chứng.
+- ♻️ **Tự cải thiện** - Javis tự thức theo lịch làm **một nhiệm vụ cụ thể** (vd: mỗi sáng tổng hợp doanh thu + soạn nháp content) rồi tự kiểm chứng.
 - 📊 **Dashboard số liệu** - panel trái tự cập nhật chỉ số kinh doanh thật từ MCP, so sánh kỳ trước, đề xuất hành động.
 - 🔌 **Quản lý MCP đa-shop** - đấu nhiều server cùng link khác key (vd nhiều cửa hàng POS), dùng được cho cả Claude Code lẫn model OpenRouter/OpenAI.
-- 📱 **Telegram bot** - hỏi Jarvis qua điện thoại, có cả MCP khi dùng engine Claude.
+- 📱 **Telegram bot** - hỏi Javis qua điện thoại, có cả MCP khi dùng engine Claude.
 - 🔄 **Đa engine** - Claude Code CLI (đủ MCP), ChatGPT (Codex), OpenRouter, OpenAI API, Anthropic API - đổi trong Settings.
 - 🔐 **An toàn khi lên VPS** - tự bắt buộc đăng nhập khi chạy public, chống chiếm tài khoản, rate-limit.
 
@@ -50,7 +50,7 @@ Bạn đấu các **MCP** của riêng mình vào (bán hàng/POS, quảng cáo,
 
 ## 🚀 Cài đặt
 
-> ⚠️ **Quan trọng về bảo mật:** Jarvis chạy Claude với **toàn quyền** trên máy. Khi chạy public (Docker/VPS/Hostinger), Jarvis **tự bắt buộc đăng nhập** - mở app ra là màn tạo tài khoản / đăng nhập, không ai điều khiển được khi chưa có mật khẩu.
+> ⚠️ **Quan trọng về bảo mật:** Javis chạy Claude với **toàn quyền** trên máy. Khi chạy public (Docker/VPS/Hostinger), Javis **tự bắt buộc đăng nhập** - mở app ra là màn tạo tài khoản / đăng nhập, không ai điều khiển được khi chưa có mật khẩu.
 
 ### Cách 1 - Hostinger Docker Manager (1-click, nhanh nhất) ⚡
 
@@ -103,12 +103,12 @@ Script tự cài Python + Node + Claude CLI, tạo venv, đăng ký dịch vụ 
 
 ## 🎬 Thiết lập lần đầu
 
-Mở Jarvis → bộ cài đặt sẽ dẫn bạn qua:
+Mở Javis → bộ cài đặt sẽ dẫn bạn qua:
 
 1. **Tài khoản admin** - đặt mật khẩu (bắt buộc khi chạy public, để chặn người lạ).
 2. **Đăng nhập Claude** - "bộ não". 1 lần, không cần API key. Token lưu trong `~/.claude` (Docker: volume riêng → không mất khi update).
 3. **Chọn engine + model** - mặc định Claude Code CLI (đủ MCP). Có thể đổi sang OpenRouter / OpenAI / ChatGPT / Anthropic API trong **Models**.
-4. **Đấu MCP** (tuỳ chọn) - vào **MCP**, thêm server (POS, Ads…) bằng URL + key. Jarvis sẽ báo cáo số liệu thật từ đó.
+4. **Đấu MCP** (tuỳ chọn) - vào **MCP**, thêm server (POS, Ads…) bằng URL + key. Javis sẽ báo cáo số liệu thật từ đó.
 
 ---
 
@@ -120,16 +120,16 @@ Dashboard có thanh điều hướng bên trái:
 
 | Mục | Làm gì | Chi tiết |
 |---|---|---|
-| **Jarvis** (3D) | Màn chính: trò chuyện (gõ hoặc nói), đồ thị tri thức 3D, panel số liệu trái. | [Trò chuyện & giọng nói](docs/02-tro-chuyen-va-giong-noi.md) · [Đồ thị 3D](docs/03-do-thi-tri-thuc-3d.md) |
+| **Javis** (3D) | Màn chính: trò chuyện (gõ hoặc nói), đồ thị tri thức 3D, panel số liệu trái. | [Trò chuyện & giọng nói](docs/02-tro-chuyen-va-giong-noi.md) · [Đồ thị 3D](docs/03-do-thi-tri-thuc-3d.md) |
 | **Tổng quan** | Trạng thái hệ thống, engine, model, công tắc đồ thị, chuẩn hoá brain. | [Bắt đầu & thiết lập](docs/01-bat-dau-thiet-lap.md) |
 | **Workflows** | Tạo/chạy chuỗi tự động (agent → agent), có bước kiểm chứng. | [Agents & Workflows](docs/07-agents-va-workflows.md) |
 | **Agents** | Tạo trợ lý chuyên biệt (vai trò + skill + bộ nhớ riêng). | [Agents & Workflows](docs/07-agents-va-workflows.md) |
 | **Skills** | Gom nhóm + tìm kiếm + **bật/tắt** + thêm/sửa/xoá skill. | [Skills](docs/06-skills.md) |
 | **Tệp tin** | Duyệt brain, **sửa `.md`/`.txt` trực tiếp**, tải lên/về, tạo/đổi tên/xoá. | [Quản lý tệp tin](docs/05-quan-ly-tep-tin.md) |
-| **Tự cải thiện** | Bật Jarvis tự chạy nền làm 1 nhiệm vụ cụ thể theo lịch + nhật ký + LINT Wiki. | [Tự cải thiện](docs/08-tu-cai-thien.md) |
+| **Tự cải thiện** | Bật Javis tự chạy nền làm 1 nhiệm vụ cụ thể theo lịch + nhật ký + LINT Wiki. | [Tự cải thiện](docs/08-tu-cai-thien.md) |
 | **Lịch** | Quản lý cron/trigger/routine tự động. | [Lịch & tự động hoá](docs/12-lich-tu-dong-hoa.md) |
 | **Models** | Main model + các provider (Claude/OpenAI/OpenRouter…) + reasoning + model phụ. | [Models & engine](docs/10-models-va-engine.md) |
-| **Kênh** | Bật Telegram bot (hỏi Jarvis qua điện thoại). | [Kênh Telegram](docs/11-telegram.md) |
+| **Kênh** | Bật Telegram bot (hỏi Javis qua điện thoại). | [Kênh Telegram](docs/11-telegram.md) |
 | **MCP** | Đấu/quản lý công cụ ngoài (đa-shop cùng link khác key). | [MCP & số liệu](docs/09-mcp-va-so-lieu.md) |
 | **Logs** | Nhật ký hoạt động. | [Khắc phục sự cố](docs/17-khac-phuc-su-co.md) |
 | **Tài khoản** | Workspace, đăng nhập/đăng xuất, đổi/tắt mật khẩu. | [Bảo mật & tài khoản](docs/14-bao-mat-tai-khoan.md) |
@@ -138,10 +138,10 @@ Dashboard có thanh điều hướng bên trái:
 
 ### Vài luồng hay dùng
 
-- **Hỏi số liệu:** *"Doanh thu hôm nay thế nào? So với hôm qua?"* → Jarvis gọi MCP, trả số thật + đề xuất.
-- **Tiêu hoá tri thức (INGEST):** thả file/ghi chú vào → Jarvis tóm tắt, rút insight, viết vào Wiki, gợi ý task.
+- **Hỏi số liệu:** *"Doanh thu hôm nay thế nào? So với hôm qua?"* → Javis gọi MCP, trả số thật + đề xuất.
+- **Tiêu hoá tri thức (INGEST):** thả file/ghi chú vào → Javis tóm tắt, rút insight, viết vào Wiki, gợi ý task.
 - **Tự cải thiện:** vào **Tự cải thiện** → chọn "Tự định nghĩa" → mô tả nhiệm vụ (vd *"mỗi sáng tổng hợp bán hàng hôm qua, tìm hàng bán chậm, soạn 1 caption đẩy hàng vào Projects"*) → bật chạy nền.
-- **Giọng nói:** bấm mic (hoặc bật rảnh tay) → nói → Jarvis trả lời bằng giọng. Esc để ngắt.
+- **Giọng nói:** bấm mic (hoặc bật rảnh tay) → nói → Javis trả lời bằng giọng. Esc để ngắt.
 
 ---
 

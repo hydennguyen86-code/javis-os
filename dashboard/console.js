@@ -1,5 +1,5 @@
 // ============================================
-// JARVIS OS - Console layer (sidebar + router)
+// JAVIS OS - Console layer (sidebar + router)
 // Bọc ngoài cockpit: rail điều hướng + trang quản lý. KHÔNG sửa app.js.
 // Graph 3D tự pause khi rời cockpit (qua window.__jarvisGraph). Alpine cho UI.
 // Thêm trang mới = thêm 1 mục vào RAIL_ITEMS + 1 case trong renderPage().
@@ -31,7 +31,7 @@
   };
 
   const RAIL_ITEMS = [
-    { id: "home",        icon: ICON.home,        label: "Jarvis" },
+    { id: "home",        icon: ICON.home,        label: "Javis" },
     { id: "overview",    icon: ICON.overview,    label: "Tổng quan" },
     { id: "settings",    icon: ICON.settings,    label: "Cài đặt" },
     { id: "workflows",   icon: ICON.workflows,   label: "Workflows" },
@@ -48,7 +48,7 @@
   ];
 
   const VIEW_META = {
-    home:        { icon: "⬡", label: "Jarvis OS", sub: "" },
+    home:        { icon: "⬡", label: "Javis OS", sub: "" },
     overview:    { icon: "◎", label: "Tổng quan", sub: "Trạng thái hệ thống" },
     settings:    { icon: "⚙", label: "Cài đặt", sub: "Giọng nói · giao diện · avatar · tên miền" },
     workflows:   { icon: "⚡", label: "Workflows", sub: "Chuỗi agent tự động" },
@@ -64,7 +64,7 @@
     account:     { icon: "⚙", label: "Tài khoản", sub: "Đăng nhập & workspace" },
   };
 
-  // 4 trang tách từ Studio cũ - render container rồi gọi loader trong studio.js (window.JarvisStudio).
+  // 4 trang tách từ Studio cũ - render container rồi gọi loader trong studio.js (window.JavisStudio).
   const STUDIO_PAGES = ["workflows", "agents", "skills", "automations"];
 
   let _settings = null;
@@ -99,7 +99,7 @@
     const store = Alpine.store("nav");
     const swap = () => {
       store.active = id;
-      // Nút điều khiển cockpit (⚙🔊↻) chỉ hiện ở trang Jarvis, không hiện navbar trang quản lý
+      // Nút điều khiển cockpit (⚙🔊↻) chỉ hiện ở trang Javis, không hiện navbar trang quản lý
       document.body.classList.toggle("in-console", id !== "home");
       // Rời trang Cài đặt → cất #quickSet về holder TRƯỚC khi cviewBody bị ghi đè (giữ node + handler).
       if (id !== "settings") parkQuickSet();
@@ -133,7 +133,7 @@
   // Trang Studio: tạo panel-<id> trong cview rồi gọi loader cũ (studio.js fill vào đó).
   function renderStudioPage(el, id) {
     el.innerHTML = `<div class="stab-panel" id="panel-${id}"></div>`;
-    const fn = window.JarvisStudio && window.JarvisStudio[id];
+    const fn = window.JavisStudio && window.JavisStudio[id];
     if (fn) { try { fn(); } catch (e) { el.innerHTML = placeholder(id, "Lỗi nạp: " + e.message); } }
     else el.innerHTML = placeholder(id, "studio.js chưa sẵn sàng.");
   }
@@ -319,7 +319,7 @@
       catch (e) { listEl.innerHTML = `<div class="empty" style="padding:20px;color:#d98">Lỗi kết nối: ${esc(e.message)}</div>`; return; }
       if (!resp.ok || d.error) {
         const msg = d.error || (resp.status === 404
-          ? "Máy chủ Jarvis chưa có chức năng Tệp tin - hãy KHỞI ĐỘNG LẠI server (stop-jarvis.bat → start-jarvis.vbs) rồi tải lại trang."
+          ? "Máy chủ Javis chưa có chức năng Tệp tin - hãy KHỞI ĐỘNG LẠI server (stop-jarvis.bat → start-jarvis.vbs) rồi tải lại trang."
           : resp.status === 401 ? "Phiên đăng nhập hết hạn - tải lại trang & đăng nhập."
           : "Lỗi máy chủ (" + resp.status + ").");
         listEl.innerHTML = `<div class="empty" style="padding:20px;color:#d98">⚠ ${esc(msg)}</div>`; return;
@@ -369,7 +369,7 @@
       catch (e) { card.querySelector(".fm-readbox").innerHTML = `<span style="color:#d98">Lỗi: ${esc(e.message)}</span>`; return; }
       const dlUrl = `/files/download?brain=${encodeURIComponent(fbrain())}&path=${encodeURIComponent(rel)}`;
       if (!resp.ok || d.error) {
-        const m = d.error || (resp.status === 404 ? "Server chưa có chức năng Tệp tin - khởi động lại server Jarvis."
+        const m = d.error || (resp.status === 404 ? "Server chưa có chức năng Tệp tin - khởi động lại server Javis."
           : resp.status === 401 ? "Hết phiên đăng nhập - tải lại trang." : "Lỗi (" + resp.status + ")");
         card.querySelector(".fm-readbox").innerHTML = `<span>${esc(m)} - <a href="${dlUrl}" target="_blank" style="color:#bcd2ff">Tải về</a></span>`;
         return;
@@ -430,7 +430,7 @@
     const GOALS = [
       ["business", "Kinh doanh", "Đọc số liệu thật → soạn nháp content/khuyến mãi/lead cần gọi lại (chỉ nháp để duyệt)"],
       ["brain", "Bộ não (Wiki)", "Ingest source mới, trả lời open-question, sửa lỗi Wiki"],
-      ["product", "Cải thiện Jarvis", "Đọc hội thoại → đề xuất/tạo agent, workflow, cải tiến UX"],
+      ["product", "Cải thiện Javis", "Đọc hội thoại → đề xuất/tạo agent, workflow, cải tiến UX"],
       ["custom", "Tự định nghĩa", "Bạn mô tả nhiệm vụ cụ thể bên dưới"],
     ];
     const goalChips = GOALS.map(([v, l]) => `<button class="si-chip ${cfg.goal === v ? "sel" : ""}" data-goal="${v}">${l}</button>`).join("");
@@ -438,7 +438,7 @@
       .map(([v, l]) => `<button class="si-chip ${cfg.mode === v ? "sel" : ""}" data-mode="${v}">${l}</button>`).join("");
     const goalDesc = (GOALS.find(g => g[0] === cfg.goal) || GOALS[0])[2];
     el.innerHTML = `<div class="cview-section">
-      <p style="color:#9fb0cf;font-size:15px;max-width:640px;margin:0 0 16px">Jarvis tự thức theo lịch, làm <b>một nhiệm vụ cụ thể</b> rồi tự kiểm chứng và ghi log. An toàn: chỉ thao tác FILE trong vault - KHÔNG tự gọi MCP tạo đơn, đốt tiền, đăng bài.</p>
+      <p style="color:#9fb0cf;font-size:15px;max-width:640px;margin:0 0 16px">Javis tự thức theo lịch, làm <b>một nhiệm vụ cụ thể</b> rồi tự kiểm chứng và ghi log. An toàn: chỉ thao tác FILE trong vault - KHÔNG tự gọi MCP tạo đơn, đốt tiền, đăng bài.</p>
       <div class="si-grid">
         <div class="si-field"><label>Bật chạy nền</label>
           <button class="si-chip ${cfg.enabled ? "sel" : ""}" id="siEnabled">${cfg.enabled ? "● Đang bật" : "○ Đang tắt"}</button></div>
@@ -538,7 +538,7 @@
       <div class="cview-section">
         <h3>Phiên bản</h3>
         <div class="gcard" style="max-width:560px">
-          <div class="gcard-top"><span class="gcard-name">Jarvis OS</span><span class="gcard-tag" id="ovVerTag">…</span></div>
+          <div class="gcard-top"><span class="gcard-name">Javis OS</span><span class="gcard-tag" id="ovVerTag">…</span></div>
           <div class="gcard-meta" id="ovVerMeta">Đang kiểm tra bản mới…</div>
           <div class="js-actions">
             <button class="gcard-btn ghost" id="ovVerCheck">Kiểm tra lại</button>
@@ -552,7 +552,7 @@
         <div class="cgrid">
           <div class="gcard"><div class="gcard-top"><span class="gcard-name">Engine</span></div><div class="gcard-meta">${esc(eng)}</div></div>
           <div class="gcard"><div class="gcard-top"><span class="gcard-name">Model</span></div><div class="gcard-meta">${esc(curModel)}</div></div>
-          <div class="gcard"><div class="gcard-top"><span class="gcard-name">Workspace</span></div><div class="gcard-meta">${esc(s.workspace_name || "Jarvis OS")}</div></div>
+          <div class="gcard"><div class="gcard-top"><span class="gcard-name">Workspace</span></div><div class="gcard-meta">${esc(s.workspace_name || "Javis OS")}</div></div>
           <div class="gcard"><div class="gcard-top"><span class="gcard-name">Telegram</span></div><div class="gcard-meta">${tg.enabled ? "● Bật" : "○ Tắt"}${tg.chat_id ? " · " + esc(tg.chat_id) : ""}</div></div>
         </div>
       </div>
@@ -605,7 +605,7 @@
     if (verCheck) verCheck.onclick = ovLoadVersion;
     const verUpd = document.getElementById("ovVerUpdate");
     if (verUpd) verUpd.onclick = async () => {
-      if (!confirm("Cập nhật Jarvis lên bản mới nhất?\nApp sẽ tự khởi động lại (~20-40 giây), trang sẽ tự tải lại.")) return;
+      if (!confirm("Cập nhật Javis lên bản mới nhất?\nApp sẽ tự khởi động lại (~20-40 giây), trang sẽ tự tải lại.")) return;
       const st = document.getElementById("ovVerStatus");
       verUpd.disabled = true;
       st.textContent = "⏳ Đang chuẩn bị cập nhật…";
@@ -1038,20 +1038,20 @@
     if (!mainHasMcp) {
       const oauth = main.provider === "openai-oauth";
       if (oauth) {
-        warn = `<div class="gcard" style="border:1px solid #2c7a4b;background:rgba(44,122,75,.10);max-width:740px;margin-bottom:14px"><div class="gcard-meta" style="opacity:1">✓ <b>ChatGPT (gói subscription)</b> chạy qua <b>Codex CLI</b> - Jarvis tự đẩy MCP của bạn (các server bên dưới) sang Codex, nên <b>dùng được MCP của Jarvis</b> luôn. Lần đầu mỗi tin nhắn kết nối MCP nên hơi chậm.</div></div>`;
+        warn = `<div class="gcard" style="border:1px solid #2c7a4b;background:rgba(44,122,75,.10);max-width:740px;margin-bottom:14px"><div class="gcard-meta" style="opacity:1">✓ <b>ChatGPT (gói subscription)</b> chạy qua <b>Codex CLI</b> - Javis tự đẩy MCP của bạn (các server bên dưới) sang Codex, nên <b>dùng được MCP của Javis</b> luôn. Lần đầu mỗi tin nhắn kết nối MCP nên hơi chậm.</div></div>`;
       } else {
         warn = `<div class="gcard" style="border:1px solid #b9821f;background:rgba(185,130,31,.10);max-width:740px;margin-bottom:14px"><div class="gcard-meta" style="opacity:1">⚠ Main Model đang là <b>${esc(mainLabel)}</b> - <b>chưa hỗ trợ MCP</b>. Dùng MCP qua <b>Claude Code</b>, <b>OpenRouter</b> hoặc <b>OpenAI</b>. Đổi ở trang <b>Models</b>.</div></div>`;
       }
     } else if (main.provider !== "anthropic-cli") {
-      warn = `<div class="gcard" style="border:1px solid #2c7a4b;background:rgba(44,122,75,.10);max-width:740px;margin-bottom:14px"><div class="gcard-meta" style="opacity:1">✓ <b>${esc(mainLabel)}</b> dùng được MCP của Jarvis (qua vòng gọi tool). Mỗi tin nhắn kết nối MCP nên hơi chậm hơn.</div></div>`;
+      warn = `<div class="gcard" style="border:1px solid #2c7a4b;background:rgba(44,122,75,.10);max-width:740px;margin-bottom:14px"><div class="gcard-meta" style="opacity:1">✓ <b>${esc(mainLabel)}</b> dùng được MCP của Javis (qua vòng gọi tool). Mỗi tin nhắn kết nối MCP nên hơi chậm hơn.</div></div>`;
     }
     el.innerHTML = `
       ${warn}
       <div class="cview-section">
-        <h3>◆ MCP của Jarvis <span style="opacity:.5">Claude Code · OpenRouter · OpenAI dùng được</span>
+        <h3>◆ MCP của Javis <span style="opacity:.5">Claude Code · OpenRouter · OpenAI dùng được</span>
           <button class="gcard-btn" id="mcpAdd" style="float:right">+ Thêm server</button></h3>
         <div class="gcard-meta" style="max-width:740px">Nhiều shop chung 1 link, khác key → thêm nhiều server cùng URL khác token. Bật/tắt từng cái.
-          <label style="margin-left:8px;cursor:pointer"><input type="checkbox" id="mcpStrict" ${d.strict ? "checked" : ""}> Chỉ dùng MCP của Jarvis (bỏ MCP sẵn của máy)</label></div>
+          <label style="margin-left:8px;cursor:pointer"><input type="checkbox" id="mcpStrict" ${d.strict ? "checked" : ""}> Chỉ dùng MCP của Javis (bỏ MCP sẵn của máy)</label></div>
         <div class="prov-list" style="margin-top:12px">${servers.length ? servers.map(mcpCard).join("") : '<div class="mp-empty">Chưa có server. Bấm "+ Thêm server".</div>'}</div>
       </div>
       <div class="cview-section">
@@ -1157,7 +1157,7 @@
       let line;
       if (!d.enabled) line = "⚪ Bot CHƯA bật - tích 'Bật bot Telegram' rồi Lưu (test gửi được KHÔNG có nghĩa bot đang nhận tin).";
       else if (!d.token_set) line = "⚪ Chưa có bot token.";
-      else if (d.status === "polling") line = "🟢 Bot đang nhận tin - nhắn cho bot là Jarvis trả lời.";
+      else if (d.status === "polling") line = "🟢 Bot đang nhận tin - nhắn cho bot là Javis trả lời.";
       else if (d.status === "conflict") line = "🔴 409: " + (d.last_error || "token bị poll nơi khác hoặc còn webhook") + " - bot tự xoá webhook khi khởi động; nếu vẫn lỗi thì có nơi khác đang poll cùng token.";
       else if (d.status === "error") line = "⚠ Lỗi bot: " + (d.last_error || "");
       else if (d.status === "starting") line = "⏳ Đang khởi động bot…";
@@ -1191,7 +1191,7 @@
         <h3>Workspace</h3>
         <div class="gcard" style="max-width:560px">
           <label class="js-lbl">Tên workspace</label>
-          <input class="js-input" id="acWs" value="${esc(s.workspace_name || "Jarvis OS")}">
+          <input class="js-input" id="acWs" value="${esc(s.workspace_name || "Javis OS")}">
           <button class="gcard-btn" id="acWsSave">Lưu</button>
           <div class="gcard-meta" id="acWsStatus"></div>
         </div>
@@ -1214,7 +1214,7 @@
       wsStatus.textContent = "Đang lưu...";
       const r = await saveSetting("general", { workspace_name: document.getElementById("acWs").value.trim() });
       wsStatus.textContent = r.ok ? "✅ Đã lưu." : "⚠ Lỗi.";
-      const wn = document.getElementById("workspaceName"); if (wn) wn.textContent = document.getElementById("acWs").value.trim() || "Jarvis OS";
+      const wn = document.getElementById("workspaceName"); if (wn) wn.textContent = document.getElementById("acWs").value.trim() || "Javis OS";
     };
     const acStatus = document.getElementById("acStatus");
     document.getElementById("acSave").onclick = async () => {
@@ -1328,7 +1328,7 @@
     };
     document.getElementById("vpTest").onclick = () => {
       st.textContent = "Đang phát thử... (dùng cấu hình ĐÃ lưu)";
-      const a = new Audio("/tts?text=" + encodeURIComponent("Xin chào, đây là giọng đọc mới của Jarvis.") + "&t=" + Date.now());
+      const a = new Audio("/tts?text=" + encodeURIComponent("Xin chào, đây là giọng đọc mới của Javis.") + "&t=" + Date.now());
       a.onended = () => { st.textContent = "Nghe ổn chứ? Nếu chưa, đổi provider/giọng rồi Lưu lại."; };
       a.onerror = () => { st.textContent = "⚠ Không phát được - kiểm tra API key / provider (Lưu trước khi thử)."; };
       a.play().catch(() => { st.textContent = "⚠ Trình duyệt chặn phát - bấm ▶ lần nữa."; });

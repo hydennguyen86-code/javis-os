@@ -1,8 +1,14 @@
 # Nhật ký cập nhật
 
-Lịch sử phiên bản Jarvis OS. Bản mới nhất ở trên cùng. Xem ngay trong app tại mục **Cập nhật** trên thanh bên trái.
+Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay trong app tại mục **Cập nhật** trên thanh bên trái.
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
+
+## [0.5.0] - 2026-07-01
+### Thay đổi
+- Đổi tên toàn bộ thương hiệu Jarvis thành Javis (giao diện, tài liệu, README, system prompt). Giữ nguyên tên hạ tầng nội bộ (biến JARVIS_*, image jarvis-os, volume jarvis-data, thư mục cũ Jarvis/) để không vỡ deploy và dữ liệu hiện có.
+### Thêm mới
+- docker-compose.hostinger.yml dùng ${COMPOSE_PROJECT_NAME} cho tên router/service Traefik: chạy được nhiều bản Javis trên cùng 1 VPS mà không đụng nhau (giống đuôi ngẫu nhiên -efxd của Hermes).
 
 ## [0.4.7] - 2026-07-01
 ### Sửa lỗi
@@ -20,7 +26,7 @@ Lịch sử phiên bản Jarvis OS. Bản mới nhất ở trên cùng. Xem ngay
 
 ## [0.4.4] - 2026-07-01
 ### Thêm mới
-- File docker-compose.hostinger.yml: chạy Jarvis trên Hostinger với tên miền riêng + HTTPS qua Traefik có sẵn của Hostinger, bỏ cổng :7777.
+- File docker-compose.hostinger.yml: chạy Javis trên Hostinger với tên miền riêng + HTTPS qua Traefik có sẵn của Hostinger, bỏ cổng :7777.
 ### Sửa lỗi
 - Tài liệu Hostinger nói đúng thực tế: compose gốc chỉ vào bằng IP:7777; muốn tên miền và SSL phải dùng bản có nhãn Traefik (docker-compose.hostinger.yml).
 
@@ -56,7 +62,7 @@ Lịch sử phiên bản Jarvis OS. Bản mới nhất ở trên cùng. Xem ngay
 
 ## [0.3.0] - 2026-06-29
 ### Thêm mới
-- Chạy ChatGPT qua Codex CLI trên VPS: đăng nhập bằng gói subscription, dùng được cả MCP của Jarvis.
+- Chạy ChatGPT qua Codex CLI trên VPS: đăng nhập bằng gói subscription, dùng được cả MCP của Javis.
 - Đăng nhập Claude bằng OAuth device-code ngay trong giao diện (không cần terminal).
 - Kiến trúc đa Second Brain: quản lý nhiều brain trong thư mục `brains/`, tạo và xoá brain trong app.
 ### Sửa lỗi

@@ -1,5 +1,5 @@
 """
-Quản lý MCP server cho engine Claude Code (Jarvis làm chủ danh sách).
+Quản lý MCP server cho engine Claude Code (Javis làm chủ danh sách).
 - Registry: server/mcp_servers.json (gitignored - chứa key trong headers/env).
 - Sinh file --mcp-config (.mcp_config.json) từ server đang bật → truyền vào `claude --mcp-config`.
 - Nhiều server CÙNG URL khác header/key được (giải quyết multi-shop POSCake).
@@ -142,7 +142,7 @@ def config_path():
 
 
 def servers_for_client():
-    """Server http/sse đang bật + headers THẬT - cho MCP client của Jarvis (model API/OAuth dùng MCP)."""
+    """Server http/sse đang bật + headers THẬT - cho MCP client của Javis (model API/OAuth dùng MCP)."""
     out = []
     for s in _load()["servers"]:
         if not s.get("enabled") or s.get("auth") == "oauth":

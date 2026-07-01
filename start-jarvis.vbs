@@ -1,5 +1,5 @@
 ' ============================================
-'  Jarvis OS - chạy NGẦM (ẩn cửa sổ cmd)
+'  Javis OS - chạy NGẦM (ẩn cửa sổ cmd)
 '  Double-click file này để bật server ở chế độ nền.
 '  Log ghi vào server\jarvis.log. Dừng bằng stop-jarvis.bat.
 ' ============================================

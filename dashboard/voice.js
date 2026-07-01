@@ -1,8 +1,8 @@
 // ============================================
-// JARVIS OS - Voice Layer (Web Speech API)
+// JAVIS OS - Voice Layer (Web Speech API)
 // ============================================
 
-class JarvisVoice {
+class JavisVoice {
   constructor(opts = {}) {
     this.lang = opts.lang || "vi-VN";
     this.onTranscript = opts.onTranscript || (() => {});
@@ -29,7 +29,7 @@ class JarvisVoice {
 
     // Audio analysis - cho hiệu ứng phát sáng theo âm thanh
     this.audioCtx = null;
-    this.outAnalyser = null;   // âm Jarvis đọc (TTS)
+    this.outAnalyser = null;   // âm Javis đọc (TTS)
     this.inAnalyser = null;    // âm mic (khi nghe)
     this.micStream = null;
     this._freqData = new Uint8Array(64);
@@ -372,4 +372,4 @@ class JarvisVoice {
   }
 }
 
-window.JarvisVoice = JarvisVoice;
+window.JavisVoice = JavisVoice;

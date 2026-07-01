@@ -1,5 +1,5 @@
 // ============================================
-// JARVIS OS - 3D Graph (V.A.U.L.T. nebula HUD)
+// JAVIS OS - 3D Graph (V.A.U.L.T. nebula HUD)
 // Node = sprite phát sáng additive (glow) → khối cầu tinh vân như chase.h.ai.
 // Dùng window.THREE global (load trước 3d-force-graph) + ForceGraph3D UMD.
 // ============================================
@@ -51,7 +51,7 @@ function hexA(hex, a) {
   return `rgba(${r},${g},${b},${a})`;
 }
 
-class JarvisGraph3D {
+class JavisGraph3D {
   constructor(container, tooltip) {
     this.container = container;
     this.tooltip = tooltip;
@@ -410,5 +410,5 @@ class JarvisGraph3D {
   isPaused() { return !!this._paused; }
 }
 
-window.JarvisGraph3D = JarvisGraph3D;
+window.JavisGraph3D = JavisGraph3D;
 window.dispatchEvent(new Event("jarvis-graph3d-ready"));

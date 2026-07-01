@@ -1,8 +1,8 @@
 """
-Jarvis OS - Backend
+Javis OS - Backend
 Kiến trúc: Voice (browser) ⇄ FastAPI WebSocket ⇄ Claude Code CLI subprocess
 
-Jarvis KHÔNG gọi Anthropic API trực tiếp. Mọi reasoning + tool calling đi qua
+Javis KHÔNG gọi Anthropic API trực tiếp. Mọi reasoning + tool calling đi qua
 `claude` CLI đã cài trên máy → tự kế thừa MCP, skills, auth.
 """
 import os
@@ -33,7 +33,7 @@ import mcp_client
 from telegram_bot import TelegramBot
 from sessions import get_store   # kho phiên hội thoại (sqlite + fts5): list/resume/search
 
-app = FastAPI(title="Jarvis OS")
+app = FastAPI(title="Javis OS")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 # Đường dẫn KHÔNG cần đăng nhập. CHỈ các auth endpoint công khai (status/login/setup) -
@@ -65,16 +65,16 @@ SYSTEM_PROMPT = CLAUDE_MD_PATH.read_text(encoding="utf-8") if CLAUDE_MD_PATH.exi
 
 # Bộ nhớ dài hạn - lưu TRONG vault đang chọn để đi theo vault
 MEMORY_SEED = (
-    "# Bộ nhớ Jarvis - Index\n\n"
-    "> Chỉ mục bộ nhớ dài hạn của Jarvis. Mỗi dòng = 1 ký ức, trỏ tới file trong `facts/`.\n"
-    "> Nội dung file này được nạp vào đầu mỗi câu hỏi để Jarvis nhớ ngữ cảnh.\n\n"
-    "_(Chưa có ký ức nào. Jarvis sẽ học dần sau mỗi hội thoại.)_\n"
+    "# Bộ nhớ Javis - Index\n\n"
+    "> Chỉ mục bộ nhớ dài hạn của Javis. Mỗi dòng = 1 ký ức, trỏ tới file trong `facts/`.\n"
+    "> Nội dung file này được nạp vào đầu mỗi câu hỏi để Javis nhớ ngữ cảnh.\n\n"
+    "_(Chưa có ký ức nào. Javis sẽ học dần sau mỗi hội thoại.)_\n"
 )
 
 def _atomic_write_text(path, content: str, encoding: str = "utf-8"):
     """Ghi file nguyên tử: viết ra .tmp cùng thư mục → fsync → os.replace.
 
-    Mặc định write_text() ghi trực tiếp; nếu Jarvis crash hoặc mất điện
+    Mặc định write_text() ghi trực tiếp; nếu Javis crash hoặc mất điện
     giữa chừng, file (loop_config.json, automations.json, memory .md...)
     sẽ bị cắt cụt → JSON corrupt / frontmatter hỏng. Pattern port từ
     hermes-agent/utils.py:atomic_replace - bảo đảm reader luôn thấy bản
@@ -122,7 +122,7 @@ def _brain_memory_dir(brain: str) -> Path:
     return mem
 
 def build_system_prompt(brain: str = "brain") -> str:
-    """CLAUDE.md + nạp MEMORY.md của vault đang chọn → Jarvis luôn nhớ ngữ cảnh."""
+    """CLAUDE.md + nạp MEMORY.md của vault đang chọn → Javis luôn nhớ ngữ cảnh."""
     base = CLAUDE_MD_PATH.read_text(encoding="utf-8") if CLAUDE_MD_PATH.exists() else ""
     idx = _brain_memory_dir(brain) / "MEMORY.md"
     mem = ""
@@ -133,7 +133,7 @@ def build_system_prompt(brain: str = "brain") -> str:
         mem = ""
     if mem.strip():
         base += "\n\n# === BỘ NHỚ DÀI HẠN (nạp sẵn) ===\n" + mem
-    # Đường dẫn lớp Agentic của vault đang làm việc (để Jarvis tạo agent/workflow qua chat)
+    # Đường dẫn lớp Agentic của vault đang làm việc (để Javis tạo agent/workflow qua chat)
     root = _brain_root(brain)
     ag, wf = _agents_dir(brain), _workflows_dir(brain)
     base += (
@@ -208,7 +208,7 @@ def _redact_secrets(text: str) -> str:
 # Cap kích thước mỗi message khi ghi conversation log - port head/tail truncation
 # từ hermes-agent/agent/prompt_builder.py::_truncate_content. conversations/*.md là
 # "nguyên liệu để học" (rewire đọc lại) VÀ bị git commit; user paste 1 source dài
-# hoặc Jarvis trả báo cáo dài → log phình, rewire tốn token, repo nặng. Giữ đầu +
+# hoặc Javis trả báo cáo dài → log phình, rewire tốn token, repo nặng. Giữ đầu +
 # đuôi (đủ ngữ cảnh để học), bỏ giữa, ghi rõ đã cắt bao nhiêu ký tự.
 _LOG_MSG_MAX_CHARS = 4000
 _LOG_HEAD_CHARS = 2800
@@ -232,13 +232,13 @@ def log_conversation(brain: str, user_msg: str, jarvis_msg: str):
         f = conv / f"{now.strftime('%Y-%m-%d')}.md"
         u = _clip_for_log(_redact_secrets(user_msg))
         j = _clip_for_log(_redact_secrets(jarvis_msg))
-        entry = f"\n## {now.strftime('%H:%M')}\n**Bạn:** {u}\n\n**Jarvis:** {j}\n"
+        entry = f"\n## {now.strftime('%H:%M')}\n**Bạn:** {u}\n\n**Javis:** {j}\n"
         with open(f, "a", encoding="utf-8") as fh:
             fh.write(entry)
     except Exception as e:
         print(f"[memory log error] {e}", file=__import__('sys').stderr)
 
-# Working directory cho Claude CLI - mặc định là root project Jarvis OS
+# Working directory cho Claude CLI - mặc định là root project Javis OS
 # để Claude đọc được CLAUDE.md và truy cập MCPs cài globally
 CLAUDE_CWD = os.getenv("CLAUDE_CWD", str(Path(__file__).parent.parent))
 
@@ -509,7 +509,7 @@ def _trim_history(messages, max_msgs: int = _MAX_HISTORY_MSGS):
 
 
 async def _api_stream_mcp(prov, key, model, messages, reasoning="off"):
-    """Như _api_stream nhưng cho model API/OAuth DÙNG MCP của Jarvis (vòng tool-calling).
+    """Như _api_stream nhưng cho model API/OAuth DÙNG MCP của Javis (vòng tool-calling).
     Registry rỗng / không discover được tool → fallback chat thuần. anthropic-api chưa có tool loop."""
     # ChatGPT OAuth (backend Codex) KHÔNG nhận function tool → bỏ MCP, chạy chat thuần.
     servers = mcp_store.servers_for_client()
@@ -550,8 +550,8 @@ def _toml_str(s):
 
 
 def _write_codex_profile():
-    """Ghi ~/.codex/jarvis.config.toml từ MCP http của Jarvis → `codex exec -p jarvis` thấy được MCP đó
-    (ChatGPT subscription dùng MCP của Jarvis như POSCake). Trả 'jarvis' nếu có server, None nếu rỗng."""
+    """Ghi ~/.codex/jarvis.config.toml từ MCP http của Javis → `codex exec -p jarvis` thấy được MCP đó
+    (ChatGPT subscription dùng MCP của Javis như POSCake). Trả 'jarvis' nếu có server, None nếu rỗng."""
     path = Path.home() / ".codex" / "jarvis.config.toml"
     lines, seen = [], set()
     for s in mcp_store.servers_for_client():
@@ -582,7 +582,7 @@ def _write_codex_profile():
 
 
 def _apply_mcp(cli):
-    """Gắn MCP do Jarvis quản lý vào 1 ClaudeCLI (registry rỗng → không đổi gì, dùng MCP sẵn của máy)."""
+    """Gắn MCP do Javis quản lý vào 1 ClaudeCLI (registry rỗng → không đổi gì, dùng MCP sẵn của máy)."""
     try:
         cli.mcp_config = mcp_store.config_path()
         cli.mcp_strict = bool(cfgmod.read_settings().get("mcp", {}).get("strict")) and cli.mcp_config is not None
@@ -658,7 +658,7 @@ def claude_logout():
     return claude_auth_logout()
 
 
-# ---- MCP do Jarvis quản lý (engine Claude Code) ----
+# ---- MCP do Javis quản lý (engine Claude Code) ----
 @app.get("/mcp/list")
 async def mcp_list():
     return {"servers": mcp_store.list_servers(),
@@ -764,7 +764,7 @@ async def settings_set(section: str = Form(...), data: str = Form("{}")):
 
     if section == "general":
         if "workspace_name" in patch:
-            cfg["workspace_name"] = patch["workspace_name"] or "Jarvis OS"
+            cfg["workspace_name"] = patch["workspace_name"] or "Javis OS"
         if "setup_done" in patch:
             cfg["setup_done"] = bool(patch["setup_done"])
     elif section == "model":
@@ -935,7 +935,7 @@ async def memory_stats(brain: str = Query("brain")):
 
 @app.post("/reflect")
 async def reflect(brain: str = Form("brain")):
-    """Vòng tự học: Jarvis đọc hội thoại gần đây → rút ký ức bền vững → ghi vào Memory của vault."""
+    """Vòng tự học: Javis đọc hội thoại gần đây → rút ký ức bền vững → ghi vào Memory của vault."""
     cli = ClaudeCLI(system_prompt=SYSTEM_PROMPT, cwd=CLAUDE_CWD)
     if not cli.is_available():
         return {"ok": False, "error": "Claude CLI chưa cài"}
@@ -993,7 +993,7 @@ _METRICS_TTL = float(os.getenv("METRICS_TTL", "180"))   # giây
 @app.get("/metrics")
 async def metrics(fresh: int = Query(0, description="1 = bỏ cache, gọi mới")):
     """
-    Số liệu động - Jarvis tự phát hiện MCP đang kết nối và trả về các card
+    Số liệu động - Javis tự phát hiện MCP đang kết nối và trả về các card
     phù hợp (kinh doanh và/hoặc cuộc sống). Không hardcode ngành nào.
     Có cache TTL: F5 liên tục không gọi lại Claude.
     """
@@ -1005,7 +1005,7 @@ async def metrics(fresh: int = Query(0, description="1 = bỏ cache, gọi mới
 
     cli = ClaudeCLI(system_prompt=SYSTEM_PROMPT, cwd=CLAUDE_CWD, tag="metrics")
     cli.model = _aux_model() or None   # việc nền: dùng model phụ nếu có cấu hình
-    _apply_mcp(cli)   # metrics cần MCP (POS/ads) - dùng server Jarvis quản lý nếu có
+    _apply_mcp(cli)   # metrics cần MCP (POS/ads) - dùng server Javis quản lý nếu có
     if not cli.is_available():
         return {"error": "Claude CLI chưa cài", "cards": []}
 
@@ -1320,18 +1320,18 @@ async def ingest_upload(
                 "folder": os.path.basename(sources)}
     return {"ok": False, "error": "Không tạo được .md", "raw": final[:200]}
 
-# Cấu trúc chuẩn Jarvis - kiểm tra khi mở vault
+# Cấu trúc chuẩn Javis - kiểm tra khi mở vault
 # detect: regex khớp tên folder top-level (linh hoạt "06 - Sources" / "Sources")
 STANDARD_STRUCTURE = [
     # Nội dung người dùng đưa vào - nguồn lưu trữ (source of truth)
     {"key": "sources", "label": "sources", "kind": "dir", "detect": r"^(\d+\s*[-_.]\s*)?sources$", "create": "sources", "essential": True},
-    # Lớp vận hành Jarvis (alt = vị trí cũ chưa migrate → không báo thiếu nhầm)
+    # Lớp vận hành Javis (alt = vị trí cũ chưa migrate → không báo thiếu nhầm)
     {"key": "agents", "label": "agents", "kind": "dir", "detect": r"^agents$", "alt": "Jarvis/agents", "create": "agents", "essential": True},
     {"key": "workflows", "label": "workflows", "kind": "dir", "detect": r"^workflows$", "alt": "Jarvis/workflows", "create": "workflows", "essential": True},
     {"key": "memory", "label": "memory", "kind": "dir", "detect": r"^memory$", "alt": "Memory", "create": "memory", "essential": True},
     # Skill KHÔNG phải folder top-level: sống ở .claude/skills/<skill>/SKILL.md (Claude Code native),
     # chia nhóm bằng field `group` trong frontmatter. Nên không liệt kê ở đây.
-    # Tuỳ chọn - Jarvis chưng cất source → wiki (nuôi graph); đính kèm ảnh/file
+    # Tuỳ chọn - Javis chưng cất source → wiki (nuôi graph); đính kèm ảnh/file
     {"key": "wiki", "label": "wiki", "kind": "dir", "detect": r"^(\d+\s*[-_.]\s*)?wiki$", "create": "wiki", "essential": False},
     {"key": "attachments", "label": "attachments", "kind": "dir", "detect": r"^(\d+\s*[-_.]\s*)?attachments$", "create": "attachments", "essential": False},
 ]
@@ -1365,17 +1365,17 @@ def _check_structure(root: Path):
     return items
 
 JARVIS_README = (
-    "# Jarvis\n\nLớp điều phối của Jarvis OS trong vault này.\n\n"
+    "# Javis\n\nLớp điều phối của Javis OS trong vault này.\n\n"
     "- `agents/` - các Agent (vai trò + skills + bộ nhớ riêng)\n"
     "- `workflows/` - quy trình nhiều agent (status active/off)\n"
     "- Skills dùng chung ở `.claude/skills/`\n"
 )
 SCHEMA_SEED = (
-    "# AGENTS.md - Vault Schema (Jarvis)\n\n"
-    "> Vault này hoạt động với Jarvis OS. Cấu trúc:\n\n"
+    "# AGENTS.md - Vault Schema (Javis)\n\n"
+    "> Vault này hoạt động với Javis OS. Cấu trúc:\n\n"
     "- `06 - Sources/` - ghi chú thô (source of truth)\n"
     "- `07 - Wiki/` - tri thức đã chưng cất, có `[[wikilink]]`\n"
-    "- `Memory/` - bộ nhớ dài hạn của Jarvis (facts + conversations)\n"
+    "- `Memory/` - bộ nhớ dài hạn của Javis (facts + conversations)\n"
     "- `Jarvis/` - agents + workflows\n\n"
     "Nguyên lý: Sources → (ingest) → Wiki. Tri thức tích luỹ, không tái phát hiện.\n"
 )
@@ -1396,7 +1396,7 @@ def _ensure_brain_scaffold(root):
                 (root / it["create"]).write_text(SCHEMA_SEED, encoding="utf-8")
         except Exception as e:
             print(f"[brain scaffold] {it['key']}: {e}", file=__import__('sys').stderr)
-    jr = root / "Jarvis" / "README.md"
+    jr = root / "Javis" / "README.md"
     if not jr.exists():
         jr.parent.mkdir(parents=True, exist_ok=True)
         jr.write_text(JARVIS_README, encoding="utf-8")
@@ -1408,7 +1408,7 @@ def _ensure_brain_scaffold(root):
 
 def _ensure_default_brain():
     """Seed brain mặc định (<BRAINS_DIR>/Brain Default) lúc khởi động → deploy mới có ngay 'bộ não
-    Jarvis khởi đầu', không hiện banner 'cấu trúc chưa chuẩn'."""
+    Javis khởi đầu', không hiện banner 'cấu trúc chưa chuẩn'."""
     try:
         _ensure_brain_scaffold(_default_brain_dir())
     except Exception as e:
@@ -1457,7 +1457,7 @@ async def vault_check(brain: str = Query("brain")):
 
 @app.post("/vault/init")
 async def vault_init(brain: str = Form("brain")):
-    """Tạo các mục cấu trúc còn thiếu để vault chạy với Jarvis."""
+    """Tạo các mục cấu trúc còn thiếu để vault chạy với Javis."""
     root = Path(_brain_root(brain))
     items = _check_structure(root)
     present_keys = {i["key"] for i in items if i["present"]}
@@ -1476,7 +1476,7 @@ async def vault_init(brain: str = Form("brain")):
             print(f"[vault init error] {it['key']}: {e}", file=__import__('sys').stderr)
     # Seed Jarvis/README + Memory
     try:
-        jr = root / "Jarvis" / "README.md"
+        jr = root / "Javis" / "README.md"
         if not jr.exists():
             jr.parent.mkdir(parents=True, exist_ok=True)
             jr.write_text(JARVIS_README, encoding="utf-8")
@@ -2177,7 +2177,7 @@ async def lint(brain: str = Query("brain")):
 # trong vault (Jarvis/automations.json) + chèn sẵn "Vòng lặp tự cải thiện" (loop nội bộ).
 # ============================================================
 def _automations_path(brain):
-    return Path(_brain_root(brain)) / "Jarvis" / "automations.json"
+    return Path(_brain_root(brain)) / "Javis" / "automations.json"
 
 
 def _read_automations(brain):
@@ -2330,7 +2330,7 @@ async def _start_scheduler():
         if cfgmod.setup_token_required():
             _tok = cfgmod.get_or_create_setup_token()
             print("\n" + "=" * 66 +
-                  "\n  [BẢO MẬT] Jarvis chạy PUBLIC, CHƯA có tài khoản admin."
+                  "\n  [BẢO MẬT] Javis chạy PUBLIC, CHƯA có tài khoản admin."
                   "\n  Mở app → màn tạo tài khoản sẽ hỏi MÃ THIẾT LẬP dưới đây:"
                   f"\n      SETUP TOKEN:  {_tok}"
                   "\n  (Chỉ người xem được log/terminal này tạo được admin. Hoặc đặt"
@@ -2405,7 +2405,7 @@ async def browse(path: str = Query("", description="Thư mục cần liệt kê;
 async def config():
     s = cfgmod.read_settings()
     return {
-        "workspace_name": s.get("workspace_name") or os.getenv("WORKSPACE_NAME", "Jarvis OS"),
+        "workspace_name": s.get("workspace_name") or os.getenv("WORKSPACE_NAME", "Javis OS"),
         "user_name": os.getenv("USER_NAME", "Bạn"),
         "tts_voice": os.getenv("TTS_VOICE", "vi-VN-HoaiMyNeural"),
         "tts_rate": os.getenv("TTS_RATE", "+5%"),
@@ -2987,10 +2987,10 @@ async def websocket_endpoint(ws: WebSocket):
 
             await ws.send_text(json.dumps({
                 "type": "status",
-                "content": "Jarvis đang suy nghĩ..."
+                "content": "Javis đang suy nghĩ..."
             }))
 
-            # Nạp bộ nhớ của vault đang chọn vào system prompt (Jarvis luôn nhớ)
+            # Nạp bộ nhớ của vault đang chọn vào system prompt (Javis luôn nhớ)
             sysprompt = build_system_prompt(brain)
 
             final_text = ""
@@ -2999,7 +2999,7 @@ async def websocket_endpoint(ws: WebSocket):
                 actual_model = api_model or "gpt-5.5"
                 openai_oauth.write_codex_auth()   # bắc cầu token đã nối ở Models → ~/.codex/auth.json (codex dùng được)
                 ccli = CodexCLI(cwd=CLAUDE_CWD, model=actual_model, tag="chat")
-                ccli.profile = _write_codex_profile()   # đẩy MCP của Jarvis (POSCake...) sang codex
+                ccli.profile = _write_codex_profile()   # đẩy MCP của Javis (POSCake...) sang codex
                 if not ccli.is_available():
                     await ws.send_text(json.dumps({"type": "error", "content": "Chưa cài Codex CLI trong container. ChatGPT subscription là THỬ NGHIỆM - dùng Claude Code hoặc OpenRouter cho ổn định (đổi ở Models)."}))
                 else:
@@ -3054,7 +3054,7 @@ async def websocket_endpoint(ws: WebSocket):
                 # ===== PROVIDER anthropic-cli - qua Claude Code, đầy đủ MCP / skill / session =====
                 cli.system_prompt = sysprompt
                 cli.model = api_model or mcfg.get("claude_model") or None   # alias opus/sonnet/haiku/fable
-                _apply_mcp(cli)   # gắn MCP do Jarvis quản lý (nhiều shop POSCake...)
+                _apply_mcp(cli)   # gắn MCP do Javis quản lý (nhiều shop POSCake...)
                 async for event in cli.query(_cli_think(reasoning, user_message)):
                     etype = event["type"]
                     if etype == "tool_call":
@@ -3118,7 +3118,7 @@ async def sessions_delete(session_id: str):
 
 
 # ============================================================
-# Telegram bot - nhắn Telegram ↔ Jarvis (dùng engine theo Settings; CLI thì có cả MCP)
+# Telegram bot - nhắn Telegram ↔ Javis (dùng engine theo Settings; CLI thì có cả MCP)
 # ============================================================
 _TG_BOT = None
 _tg_cli = None
@@ -3167,7 +3167,7 @@ async def _tg_answer(text):
 
 async def _tg_help_text(brain):
     return (
-        "🤖 Jarvis Telegram\n\n"
+        "🤖 Javis Telegram\n\n"
         "Lệnh:\n"
         "/status - engine, model, vault, trạng thái\n"
         "/skills - liệt kê skill\n"
@@ -3178,7 +3178,7 @@ async def _tg_help_text(brain):
         "/or - engine OpenRouter (chat thuần)\n"
         "/retry - gửi lại câu gần nhất\n"
         "/reset - hội thoại mới · /stop - dừng\n\n"
-        "Gửi tin thường để hỏi Jarvis. Gõ /tên-skill để gọi skill (cần engine Claude CLI)."
+        "Gửi tin thường để hỏi Javis. Gõ /tên-skill để gọi skill (cần engine Claude CLI)."
     )
 
 
@@ -3302,7 +3302,7 @@ async def _tg_command(cmd, arg):
     if cmd == "status":
         prov, model = _model_current()
         busy = bool(_TG_BOT and _TG_BOT._current and not _TG_BOT._current.done())
-        return {"reply": ("📊 Trạng thái Jarvis\n"
+        return {"reply": ("📊 Trạng thái Javis\n"
                           f"Provider: {prov}\n"
                           f"Model: {model}\nVault: {brain}\n"
                           f"Đang xử lý: {'có (gửi /stop để dừng)' if busy else 'rảnh'}")}
@@ -3383,7 +3383,7 @@ async def telegram_test():
     try:
         async with httpx.AsyncClient(timeout=15) as c:
             r = await c.post(f"https://api.telegram.org/bot{t['token']}/sendMessage",
-                             json={"chat_id": t["chat_id"], "text": "✅ Jarvis Telegram đã kết nối. Nhắn câu hỏi bất kỳ nhé."})
+                             json={"chat_id": t["chat_id"], "text": "✅ Javis Telegram đã kết nối. Nhắn câu hỏi bất kỳ nhé."})
         d = r.json()
         return {"ok": bool(d.get("ok")), "error": d.get("description", "")}
     except Exception as e:

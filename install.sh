@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================================
-# Jarvis OS - Linux/macOS native installer (no Docker)
+# Javis OS - Linux/macOS native installer (no Docker)
 #   ./install.sh
 # Installs python3 + node + Claude Code CLI, creates a venv, installs deps,
 # seeds .env, and registers a systemd service (or falls back to nohup).
@@ -104,7 +104,7 @@ if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
   log "Installing systemd service..."
   $SUDO tee /etc/systemd/system/jarvis.service >/dev/null <<UNIT
 [Unit]
-Description=Jarvis OS
+Description=Javis OS
 After=network-online.target
 Wants=network-online.target
 StartLimitIntervalSec=0
@@ -137,7 +137,7 @@ else
 fi
 
 echo ""
-ok "Jarvis OS is up at: http://127.0.0.1:7777"
+ok "Javis OS is up at: http://127.0.0.1:7777"
 log "Remote access (SSH tunnel): ssh -L 7777:localhost:7777 $(whoami)@<vps-ip>"
 echo ""
 log "Truy cập từ xa qua Cloudflare Tunnel (không cần mở port, có HTTPS - như Hermes):"

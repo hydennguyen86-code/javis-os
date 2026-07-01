@@ -325,7 +325,7 @@ async def openrouter_stream(api_key, model, messages, reasoning="off"):
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
         "HTTP-Referer": "http://localhost:7777",
-        "X-Title": "Jarvis OS",
+        "X-Title": "Javis OS",
     }
     payload = {"model": model or "openai/gpt-4o-mini", "messages": messages, "stream": True}
     if reasoning not in (None, "", "off"):
@@ -495,7 +495,7 @@ async def openai_responses_stream(access_token, account_id, model, messages, rea
 
 
 # ============================================================
-# MCP đa-model - vòng tool-calling để model API/OAuth dùng MCP của Jarvis (qua mcp_client)
+# MCP đa-model - vòng tool-calling để model API/OAuth dùng MCP của Javis (qua mcp_client)
 # ============================================================
 def _clip_tool_result(result, max_chars: int = 8000, head_ratio: float = 0.6) -> str:
     """Cắt kết quả tool quá dài kiểu head+tail KÈM marker, thay cho hard-cut `[:max]`.
@@ -574,7 +574,7 @@ async def openai_chat_with_mcp(api_key, model, messages, reasoning, mcp_tools, m
 
 async def openrouter_chat_with_mcp(api_key, model, messages, reasoning, mcp_tools, mcp_route):
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json",
-               "HTTP-Referer": "http://localhost:7777", "X-Title": "Jarvis OS"}
+               "HTTP-Referer": "http://localhost:7777", "X-Title": "Javis OS"}
     extra = {}
     if reasoning not in (None, "", "off"):
         extra["reasoning"] = {"effort": reasoning}
