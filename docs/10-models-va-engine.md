@@ -20,7 +20,7 @@ Javis có thể chạy trên nhiều "engine" (nhà cung cấp AI) khác nhau. B
 | **Gọi API thẳng** | OpenRouter, OpenAI (API) | Chat có MCP (vòng gọi công cụ), nhưng không có skill/loop |
 | **Gọi API thẳng** | Anthropic (API) | Chat thuần, không MCP |
 
-Nói ngắn gọn: muốn Javis làm việc thật (đọc file, gọi công cụ, chạy skill) thì để Main Model ở **Claude Code**. Các provider API khác thiên về trò chuyện, phản hồi nhanh và tiết kiệm.
+Nói ngắn gọn: Javis xây trên **CLI dạng agent của nhà cung cấp** - **Claude Code** (gói Claude) và **Codex** (gói ChatGPT). Muốn Javis làm việc thật (đọc/ghi file, gọi công cụ, chạy skill) thì để Main Model ở một trong hai CLI này; cả hai đều tận dụng gói subscription bạn đang trả. Các provider API thẳng (OpenRouter/OpenAI/Anthropic) thiên về trò chuyện, nhanh và tiết kiệm. Agent trong Workflow cũng chọn được model Claude hoặc ChatGPT/Codex - xem [Agents & Workflows](07-agents-va-workflows.md).
 
 ## Mở ở đâu trong Javis
 

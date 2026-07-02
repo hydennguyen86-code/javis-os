@@ -2,9 +2,9 @@
 
 # 🧠 Javis OS
 
-**Trợ lý AI cá nhân + Second Brain - chạy bằng Claude Code, có giọng nói, đồ thị tri thức 3D, và tự thông minh dần lên.**
+**Trợ lý AI cá nhân + Second Brain - xây trên CLI của các nhà cung cấp AI (Claude Code, ChatGPT/Codex), có giọng nói, đồ thị tri thức 3D, và tự thông minh dần lên.**
 
-*A personal AI operating layer powered by Claude Code CLI - voice, a 3D knowledge graph, MCP-driven business reporting, and a self-improvement loop.*
+*A personal AI operating layer built on provider agent CLIs (Claude Code, ChatGPT/Codex) - voice, a 3D knowledge graph, MCP-driven business reporting, and a self-improvement loop.*
 
 </div>
 
@@ -12,7 +12,9 @@
 
 ## Javis là gì?
 
-Javis OS **không phải** một chatbot. Nó là một **lớp điều hành AI** chạy trên máy/VPS của bạn, lấy **Claude Code CLI làm "bộ não"** - nghĩa là nó có đầy đủ khả năng đọc/ghi file, gọi công cụ (MCP), chạy lệnh, và dùng skill của Claude Code - rồi gói tất cả vào một **dashboard đẹp, điều khiển bằng giọng nói**, kèm một **Second Brain** (bộ nhớ + wiki) tích luỹ tri thức theo thời gian.
+Javis OS **không phải** một chatbot. Nó là một **lớp điều hành AI** chạy trên máy/VPS của bạn, lấy **CLI của nhà cung cấp AI làm "bộ não"** - **Claude Code CLI** (gói Claude) hoặc **Codex CLI** (gói ChatGPT). Tận dụng chính **gói subscription bạn đang trả** thay vì phải mua thêm API riêng: bộ não đó có đầy đủ khả năng đọc/ghi file, gọi công cụ (MCP), chạy lệnh, dùng skill - rồi Javis gói tất cả vào một **dashboard đẹp, điều khiển bằng giọng nói**, kèm một **Second Brain** (bộ nhớ + wiki) tích luỹ tri thức theo thời gian.
+
+> Triết lý: nhà cung cấp nào có **CLI dạng agent + gói subscription** (Claude Code, Codex, và các CLI ra sau) thì Javis dùng được làm bộ não. Ngoài ra vẫn hỗ trợ chat thuần qua OpenRouter / OpenAI / Anthropic API.
 
 Bạn đấu các **MCP** của riêng mình vào (bán hàng/POS, quảng cáo, lịch, email, ghi chú…) → Javis tự phát hiện và **báo cáo kinh doanh + cuộc sống** bằng số liệu thật, nói chuyện như người.
 

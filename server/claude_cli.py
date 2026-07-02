@@ -586,7 +586,8 @@ class CodexCLI:
             args += ["-p", self.profile]
         for c in (self.extra_config or []):
             args += ["-c", c]
-        args.append(prompt)
+        # Codex exec không nhận system-prompt riêng → gộp instructions (vai trò agent) vào đầu prompt.
+        args.append((self.instructions.strip() + "\n\n" + prompt) if self.instructions else prompt)
 
         loop = asyncio.get_running_loop()
         queue: asyncio.Queue = asyncio.Queue()

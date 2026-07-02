@@ -4,7 +4,8 @@
 
 ## Tính năng này là gì
 
-- **Agent** là một "nhân viên AI" có vai trò cố định. Mỗi agent gồm: một cái tên, một mô tả vai trò, một hướng dẫn làm việc chi tiết (system prompt), danh sách kỹ năng (skill) được phép dùng, và một model chạy (Sonnet, Opus hoặc Haiku).
+- **Agent** là một "nhân viên AI" có vai trò cố định. Mỗi agent gồm: một cái tên, một mô tả vai trò, một hướng dẫn làm việc chi tiết (system prompt), danh sách kỹ năng (skill) được phép dùng, và một **model chạy**. Model chọn được cả **Claude** (Sonnet/Opus/Haiku/Fable - chạy qua Claude Code CLI) lẫn **ChatGPT/Codex** (GPT-5.x - chạy qua Codex CLI, cần đã đăng nhập ChatGPT ở máy/VPS). Cả hai đều đọc/ghi được file trong vault và dùng được MCP. Để trống = model mặc định của Claude Code. Model của agent được áp THẬT khi workflow chạy.
+  - Lưu ý an toàn: khi workflow chạy **nền tự động** (dispatcher Kanban, chế độ file-only), agent luôn dùng Claude Code để giữ giới hạn công cụ an toàn - kể cả khi bạn chọn model Codex. Model Codex chỉ áp khi bạn chạy workflow trực tiếp ở Studio.
 - **Workflow** là một chuỗi nhiều bước, mỗi bước giao cho một agent làm một nhiệm vụ. Kết quả bước trước có thể chảy sang bước sau. Bạn có thể gắn thêm một **bước kiểm chứng**: một agent khác đóng vai người soi lỗi, mặc định giả định kết quả đang sai và phải tự chứng minh; nếu chưa đạt, workflow tự sửa lại vài lần.
 - Mọi agent và workflow được lưu thành **file .md trong vault** (bộ não đang chọn), nên bạn xem được, sửa tay được, và Javis cũng tạo được bằng lời qua chat.
 

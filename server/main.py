@@ -478,6 +478,15 @@ def _codex_safe_model(model: str) -> str:
         return m
     return cat[0]
 
+def _is_codex_model(model: str) -> bool:
+    """Model này thuộc Codex/ChatGPT (chạy qua Codex CLI) hay Claude? gpt* / *-codex / trong
+    catalog openai-oauth = Codex. Còn lại (sonnet/opus/haiku/fable/claude-*) = Claude."""
+    m = (model or "").strip().lower()
+    if not m:
+        return False
+    cat = [c.lower() for c in (cfgmod.read_settings().get("model", {}).get("catalog", {}).get("openai-oauth") or [])]
+    return m.startswith("gpt") or m.endswith("-codex") or m in cat
+
 def _chat_provider(mcfg):
     """Provider dùng cho chat (id, kind, key, model) - từ model chính hiệu lực."""
     em = _effective_main({"model": mcfg})
@@ -2066,10 +2075,18 @@ async def execute_workflow(brain, slug, input="", tools=None):
     vault_root = str(_brain_root(brain))
 
     def _mk(sysprompt, model=None):
+        # Agent model = Codex/ChatGPT → chạy qua Codex CLI (có tool file + MCP native của codex).
+        # CHỈ ở chế độ foreground (tools is None): codex không giới hạn tool được như Claude
+        # (--allowedTools), nên chạy nền an-toàn-file-only (tools != None) vẫn ép dùng Claude.
+        if model and _is_codex_model(model) and tools is None and find_codex_cli():
+            openai_oauth.write_codex_auth()   # bắc cầu token ChatGPT → ~/.codex/auth.json
+            cc = CodexCLI(cwd=vault_root, tag="workflow", model=_codex_safe_model(model), instructions=sysprompt)
+            cc.profile = _write_codex_profile()   # đẩy MCP của Javis (POS...) sang codex
+            return cc
         c = ClaudeCLI(system_prompt=sysprompt, cwd=vault_root, tag="workflow", allowed_tools=tools)
-        # Model của AGENT (chọn ở Studio: sonnet/opus/haiku/fable) được ÁP THẬT vào CLI.
+        # Model Claude của AGENT (sonnet/opus/haiku/fable) được ÁP THẬT vào CLI.
         # Rỗng → dùng model phụ (việc nền) nếu có, cuối cùng None = mặc định CLI.
-        c.model = (model or _aux_model() or None)
+        c.model = ((model if not _is_codex_model(model) else "") or _aux_model() or None)
         if tools is not None:   # chạy nền hạn chế → cô lập MCP + chặn Bash/Web
             _mcpf = _empty_mcp_file()
             if _mcpf:
