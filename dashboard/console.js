@@ -40,7 +40,7 @@
     { id: "agents",      icon: ICON.agents,      label: "Agents" },
     { id: "skills",      icon: ICON.skills,      label: "Skills" },
     { id: "files",       icon: ICON.files,       label: "Tệp tin" },
-    { id: "selfimprove", icon: ICON.selfimprove, label: "Tự cải thiện" },
+    { id: "selfimprove", icon: ICON.selfimprove, label: "Loop" },
     { id: "learn",       icon: ICON.learn,       label: "Tự học" },
     { id: "kanban",      icon: ICON.kanban,      label: "Việc" },
     { id: "automations", icon: ICON.automations, label: "Lịch" },
@@ -59,7 +59,7 @@
     agents:      { icon: "🤖", label: "Agents", sub: "Trợ lý chuyên biệt" },
     skills:      { icon: "🧩", label: "Skills", sub: "Kỹ năng khả dụng" },
     files:       { icon: "🗂", label: "Tệp tin", sub: "Duyệt · sửa · tải file trong brain" },
-    selfimprove: { icon: "♻", label: "Tự cải thiện", sub: "Nhiệm vụ tự động chạy nền" },
+    selfimprove: { icon: "♻", label: "Loop", sub: "Nhiệm vụ lặp tự động chạy nền" },
     learn:       { icon: "🧠", label: "Tự học", sub: "Rewire Memory · Wiki · Skill (an toàn, undo được)" },
     kanban:      { icon: "🗂", label: "Việc (Kanban)", sub: "Backlog + dispatcher tự làm task nền" },
     automations: { icon: "⏰", label: "Lịch tự động", sub: "Cron · trigger · routine" },
@@ -449,7 +449,6 @@
       <div class="si-actions" style="margin-bottom:14px">
         <button class="s-btn" id="lpNew">+ Loop mới</button>
         <button class="s-btn-ghost" id="lpStop">■ Dừng vòng đang chạy</button>
-        <button class="s-btn-ghost" id="lpLint">🩺 LINT Wiki</button>
       </div>
       <div id="lpForm" style="display:none;margin-bottom:14px;padding:14px;border:1px solid rgba(255,255,255,.1);border-radius:10px;background:rgba(255,255,255,.03)">
         <input type="hidden" id="lpSlug">
@@ -477,7 +476,6 @@
         </div>
       </div>
       <div id="lpCards">Đang tải...</div>
-      <div class="si-status" id="lpStatus" style="display:none"></div>
       <div class="si-log"><h3 style="font-size:15px;color:#cdd8ee">Nhật ký gần đây · <select id="lpLogFilter" class="loop-sel" style="font-size:13px"><option value="">Tất cả loop</option></select></h3><div id="lpLog">Đang tải...</div></div>
     </div>`;
 
@@ -532,13 +530,6 @@
     };
 
     el.querySelector("#lpStop").onclick = async () => { await fetch("/loops/stop", { method: "POST" }); loadLoops(); };
-    el.querySelector("#lpLint").onclick = async () => {
-      const b = el.querySelector("#lpLint"); b.disabled = true; b.textContent = "Đang quét Wiki...";
-      let d = {}; try { d = await (await fetch(`/lint?brain=${encodeURIComponent(fbrain())}`)).json(); } catch (e) { d = { error: e.message }; }
-      b.disabled = false; b.textContent = "🩺 LINT Wiki";
-      const s = el.querySelector("#lpStatus"); s.style.display = "block";
-      s.innerHTML = d.ok ? `<b>🩺 LINT Wiki</b><br><span class="dim" style="color:#9fb0cf;white-space:pre-wrap">${esc(d.report || "")}</span>` : `⚠ LINT lỗi: ${esc(d.error || "không rõ")}`;
-    };
 
     function loopCard(lp) {
       const paused = !!lp.auto_paused_reason;
