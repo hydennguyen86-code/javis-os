@@ -41,6 +41,11 @@ services:
     ports:
       - "7777:7777"                 # đường vào dự phòng (nút Open / http://<ip>:7777)
     labels:
+      # Guide (Documentation / Quick start) trong Docker Manager - trỏ docs GitHub.
+      - org.opencontainers.image.documentation=https://github.com/blogminhquy/javis-os/blob/main/docs/README.md
+      - org.opencontainers.image.source=https://github.com/blogminhquy/javis-os
+      - com.hostinger.documentation=https://github.com/blogminhquy/javis-os/blob/main/docs/README.md
+      - com.hostinger.quickstart=https://github.com/blogminhquy/javis-os/blob/main/QUICKSTART.md
       # Tên router/service = ${COMPOSE_PROJECT_NAME} → chạy nhiều bản trên cùng VPS không đụng nhau.
       # Host = ${DOMAIN_NAME}; chưa đặt thì mặc định "localhost" (deploy vẫn chạy, chỉ chưa có domain/HTTPS).
       - traefik.enable=true

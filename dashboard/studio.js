@@ -254,7 +254,7 @@
       <label>Vai trò (mô tả ngắn)</label><input id="agRole" value="${esc(a ? a.role : "")}">
       <label>System prompt (cách làm việc chi tiết)</label><textarea id="agPrompt" rows="4">${esc(a ? (a.prompt || "") : "")}</textarea>
       <label>Skills</label><div class="skill-pick" id="skillPick">${skills.length ? skills.map(s => `<label class="sp"><input type="checkbox" value="${esc(s.slug)}" ${a && (a.skills || []).includes(s.slug) ? "checked" : ""}> ${esc(s.name)}</label>`).join("") : '<span class="dim">Vault chưa có skill trong .claude/skills - vẫn tạo agent được, gán skill sau.</span>'}</div>
-      <label>Model</label><select id="agModel"><option value="sonnet">Sonnet</option><option value="opus">Opus</option><option value="haiku">Haiku</option></select>
+      <label>Model</label><select id="agModel"><option value="">Mặc định (theo CLI)</option><option value="sonnet">Sonnet</option><option value="opus">Opus</option><option value="haiku">Haiku</option><option value="fable">Fable</option></select>
       <div class="editor-actions"><button class="s-btn-ghost" id="cancelEd">Huỷ</button><button class="s-btn" id="saveAg">Lưu</button></div>`;
     if (a && a.model) box.querySelector("#agModel").value = a.model;
     box.querySelector("#cancelEd").onclick = () => editor.classList.remove("open");
@@ -271,7 +271,7 @@
   async function loadAutomations() {
     const panel = document.getElementById("panel-automations");
     panel.innerHTML = `<div class="panel-bar"><h3>Lịch tự động <span class="dim" id="autoRunning"></span></h3><div class="pb-actions"><button class="s-btn-ghost" id="syncAuto">↻ Đồng bộ cloud</button><button class="s-btn" id="newAuto">+ Lịch</button></div></div>`
-      + `<div class="auto-hint">Bấm <b>↻ Đồng bộ cloud</b> để Javis hỏi Claude (CronList / scheduled tasks) lấy routine THẬT đang chạy trên cloud. Mục ☁ là tự đồng bộ; mục ghi tay vẫn giữ. Vòng lặp tự cải thiện 🔁 bật/tắt ngay tại đây.</div>`
+      + `<div class="auto-hint">Bấm <b>↻ Đồng bộ cloud</b> để Javis hỏi Claude (CronList / scheduled tasks) lấy routine THẬT đang chạy trên cloud. Mục ☁ là tự đồng bộ; mục ghi tay vẫn giữ. Các loop 🔁 (trang Tự cải thiện) bật/tắt được ngay tại đây.</div>`
       + `<div class="cards" id="autoCards">Đang tải...</div>`;
     document.getElementById("newAuto").onclick = () => editAutomation(null);
     document.getElementById("syncAuto").onclick = async (e) => {
@@ -305,7 +305,7 @@
         <div class="wf-desc">⏰ ${esc(a.schedule || "-")} · <span class="dim">${typeLabel}</span></div>
         ${a.note ? `<div class="wf-steps">${esc(a.note)}</div>` : ""}
         <div class="wf-actions">${a.builtin
-          ? `<span class="dim" style="font-size:13px">Cấu hình ở panel “Vòng lặp tự cải thiện”</span>`
+          ? `<span class="dim" style="font-size:13px">Loop - cấu hình/xoá ở trang Tự cải thiện</span>`
           : `<button class="s-btn-ghost edit">Sửa</button><button class="s-btn-ghost del">Xoá</button>`}</div>`;
       div.querySelector(".toggle input").onchange = async () => {
         await api("/automations/toggle", { method: "POST", body: fd({ id: a.id, brain: brain() }) }); loadAutomations();

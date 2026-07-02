@@ -216,6 +216,88 @@ def revert_last_learn(root: str) -> dict:
 
 
 # ============================================================
+# BACKUP lên GitHub (đồng bộ brain lên repo riêng, khôi phục khi mất máy/VPS)
+# ============================================================
+def _redact(text: str, *secrets: str) -> str:
+    """Xoá token khỏi text trước khi trả ra UI/log (git stderr có thể chứa URL kèm token)."""
+    out = text or ""
+    for s in secrets:
+        if s and len(s) >= 6:
+            out = out.replace(s, "***")
+    return out
+
+
+def _auth_url(repo_url: str, token: str) -> str:
+    """Chèn token vào URL https cho 1 lần push (KHÔNG lưu remote → token không nằm trong .git/config).
+    URL scheme khác http(s) (ssh://, git@, file://) để NGUYÊN - dùng key/local, không cần token."""
+    u = (repo_url or "").strip()
+    if u.startswith(("ssh://", "git@", "file://")):
+        return u
+    if u.startswith("http://"):
+        u = "https://" + u[len("http://"):]
+    if not u.startswith("https://"):
+        u = "https://" + u
+    rest = u[len("https://"):]
+    host_part = rest.split("/", 1)[0]
+    if "@" in host_part:                       # bỏ cred cũ nếu user dán sẵn
+        rest = rest.split("@", 1)[1]
+    return f"https://x-access-token:{token}@{rest}"
+
+
+def remote_reachable(repo_url: str, token: str, timeout: int = 30) -> dict:
+    """Kiểm tra token + repo hợp lệ (git ls-remote). Trả {ok, error}. Redact token khỏi lỗi."""
+    if not has_git():
+        return {"ok": False, "error": "Máy chưa cài git"}
+    if not repo_url or not token:
+        return {"ok": False, "error": "Thiếu repo URL hoặc token"}
+    try:
+        r = subprocess.run(["git", "ls-remote", _auth_url(repo_url, token), "HEAD"],
+                           capture_output=True, text=True, encoding="utf-8", errors="replace",
+                           timeout=timeout, creationflags=_no_window())
+        if r.returncode != 0:
+            return {"ok": False, "error": _redact((r.stderr or "không kết nối được").strip()[:250], token)}
+        return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "error": _redact(f"{type(e).__name__}: {e}", token)}
+
+
+def backup_to_github(root: str, repo_url: str, token: str, branch: str = "main") -> dict:
+    """Đồng bộ TOÀN BỘ brain lên repo GitHub riêng (force-push: local là bản gốc).
+    Trả {ok, pushed, committed, error}. Token luôn được redact khỏi mọi chuỗi trả về.
+    An toàn: chỉ đẩy nội dung brain; .gitignore (ensure_git_repo) đã loại lock/log/hội thoại thô.
+    Dùng BrainLock để không đua với engine học đang ghi."""
+    root = str(root)
+    if not has_git():
+        return {"ok": False, "error": "Máy chưa cài git (cần cài git để backup)"}
+    if not repo_url or not token:
+        return {"ok": False, "error": "Chưa cấu hình repo URL hoặc token"}
+    g = ensure_git_repo(root)
+    if not g.get("ok"):
+        return {"ok": False, "error": g.get("error", "git init lỗi")}
+    lock = BrainLock(root, timeout=60)
+    if not lock.acquire():
+        return {"ok": False, "error": "Đang có tiến trình ghi brain khác, thử lại sau"}
+    try:
+        _git(root, "config", "user.email", "javis@localhost")
+        _git(root, "config", "user.name", "Javis Backup")
+        _git(root, "add", "-A")
+        ts = time.strftime("%Y-%m-%d %H:%M:%S")
+        c = _git(root, "commit", "-m", f"backup: {ts}")
+        committed = c.returncode == 0   # False nếu "nothing to commit" - vẫn push (remote có thể sau local)
+        au = _auth_url(repo_url, token)
+        # HEAD:refs/heads/<branch> + --force: brain local là nguồn chính, ghi đè remote (mirror backup).
+        r = _git(root, "push", "--force", au, f"HEAD:refs/heads/{branch}", timeout=150)
+        if r.returncode != 0:
+            return {"ok": False, "committed": committed,
+                    "error": _redact((r.stderr or "push lỗi").strip()[:300], token)}
+        return {"ok": True, "pushed": True, "committed": committed}
+    except Exception as e:
+        return {"ok": False, "error": _redact(f"{type(e).__name__}: {e}", token)}
+    finally:
+        lock.release()
+
+
+# ============================================================
 # BrainLock - khoá cấp file cross-platform (serialize ghi giữa CÁC tiến trình)
 # ============================================================
 class BrainLock:
