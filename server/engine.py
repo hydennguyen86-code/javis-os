@@ -5,6 +5,7 @@ Stream token-by-token; trả các event {"type":"text"|"error","content":...} gi
 """
 import asyncio
 import json
+import os
 import random
 import re
 import threading
@@ -193,6 +194,9 @@ class _ThinkScrubber:
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
+# LM Studio local server (OpenAI-compatible). Docker: đặt LMSTUDIO_BASE_URL=http://host.docker.internal:1234
+LMSTUDIO_BASE = os.environ.get("LMSTUDIO_BASE_URL", "http://127.0.0.1:1234").rstrip("/")
+LMSTUDIO_URL = LMSTUDIO_BASE + "/v1/chat/completions"
 ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
 
 # Model Anthropic hỗ trợ adaptive thinking + output_config.effort (khỏi budget_tokens).
@@ -256,6 +260,50 @@ async def openai_stream(api_key, model, messages, reasoning="off"):
                     yield {"type": "error", "content": "OpenAI trả về rỗng. Thử model khác."}
     except Exception as e:
         yield {"type": "error", "content": f"OpenAI lỗi: {_describe_exc(e)}"}
+
+
+async def lmstudio_stream(model, messages, reasoning="off"):
+    """LM Studio local (OpenAI-compatible, http://127.0.0.1:1234) - chat THUẦN, không cần API key.
+    Timeout dài hơn cloud vì model local load lần đầu + máy yếu sinh token chậm."""
+    headers = {"Content-Type": "application/json"}
+    payload = {"model": model or "", "messages": messages, "stream": True}
+    try:
+        timeout = httpx.Timeout(300.0, connect=10.0)   # 5 phút: model local có thể rất chậm
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            async with client.stream("POST", LMSTUDIO_URL, headers=headers, json=payload) as r:
+                if r.status_code != 200:
+                    body = await r.aread()
+                    yield {"type": "error", "content": f"LM Studio {r.status_code}: {body.decode('utf-8', 'replace')[:300]}"}
+                    return
+                got = False
+                strip = _ThinkScrubber()   # model local (qwen/deepseek-r1...) hay nhét <think> inline
+                async for line in r.aiter_lines():
+                    line = (line or "").strip()
+                    if not line.startswith("data:"):
+                        continue
+                    data = line[5:].strip()
+                    if data == "[DONE]":
+                        break
+                    try:
+                        obj = json.loads(data)
+                    except json.JSONDecodeError:
+                        continue
+                    c = ((obj.get("choices") or [{}])[0].get("delta") or {}).get("content")
+                    if c:
+                        c = strip.feed(_sanitize_surrogates(c))
+                        if c:
+                            got = True
+                            yield {"type": "text", "content": c}
+                tail = strip.flush()
+                if tail:
+                    got = True
+                    yield {"type": "text", "content": tail}
+                if not got:
+                    yield {"type": "error", "content": "LM Studio trả về rỗng. Kiểm tra đã LOAD model trong LM Studio chưa (tab Developer → Start Server)."}
+    except httpx.ConnectError:
+        yield {"type": "error", "content": f"Không kết nối được LM Studio tại {LMSTUDIO_BASE}. Mở LM Studio → Developer → Start Server (port 1234). Chạy Docker thì đặt env LMSTUDIO_BASE_URL=http://host.docker.internal:1234"}
+    except Exception as e:
+        yield {"type": "error", "content": f"LM Studio lỗi: {_describe_exc(e)}"}
 
 
 async def anthropic_stream(api_key, model, messages, reasoning="off"):

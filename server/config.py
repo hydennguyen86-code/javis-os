@@ -69,6 +69,7 @@ _DEFAULT = {
             "openai": ["gpt-4o", "gpt-4o-mini", "o3-mini"],                        # OpenAI API
             "openai-oauth": ["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex"],  # ChatGPT OAuth (Codex; chỉ fallback - picker load động)
             "openrouter": ["openai/gpt-4o-mini", "anthropic/claude-3.5-sonnet", "google/gemini-2.0-flash-001", "deepseek/deepseek-chat"],
+            "lmstudio": [],   # load động từ http://localhost:1234/v1/models (LM Studio)
         },
     },
     "telegram": {"enabled": False, "token": "", "chat_id": ""},

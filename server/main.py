@@ -401,6 +401,8 @@ PROVIDER_DEFS = [   # thứ tự = thứ tự hiển thị card ở trang Models
      "default_models": ["claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"]},
     {"id": "openai",        "label": "OpenAI (ChatGPT API)",    "kind": "api", "key_field": "openai_api_key",    "catalog_key": "openai",
      "default_models": ["gpt-4o", "gpt-4o-mini", "o3-mini"]},
+    {"id": "lmstudio",      "label": "LM Studio (Local)",       "kind": "api", "key_field": None,               "catalog_key": "lmstudio",
+     "default_models": []},   # model load ĐỘNG từ /v1/models của LM Studio (model nào đang load thì hiện)
 ]
 
 def _provider_def(pid):
@@ -418,6 +420,8 @@ def _effective_main(cfg):
         return {"provider": "openrouter", "model": m.get("openrouter_model") or ""}
     if eng == "anthropic-api":
         return {"provider": "anthropic-api", "model": m.get("claude_model") or ""}
+    if eng == "lmstudio":
+        return {"provider": "lmstudio", "model": ""}
     return {"provider": "anthropic-cli", "model": m.get("claude_model") or "opus"}
 
 def _providers_view(cfg):
@@ -459,6 +463,8 @@ def _set_main_model(cfg, provider, model):
         m["engine"] = "openai"
     elif provider == "openai-oauth":
         m["engine"] = "openai-oauth"
+    elif provider == "lmstudio":
+        m["engine"] = "lmstudio"
     else:  # anthropic-cli
         m["engine"] = "cli"; m["claude_model"] = model
 
@@ -483,6 +489,8 @@ def _api_stream(prov, key, model, messages, reasoning="off"):
         return engine.openrouter_stream(key, model, messages, reasoning)
     if prov == "openai":
         return engine.openai_stream(key, model, messages, reasoning)
+    if prov == "lmstudio":
+        return engine.lmstudio_stream(model, messages, reasoning)
     if prov == "openai-oauth":
         creds = openai_oauth.valid_creds() or {}
         return engine.openai_responses_stream(creds.get("access_token", ""), creds.get("account_id", ""), model, messages, reasoning)
@@ -895,6 +903,13 @@ async def _fetch_provider_models(provider, m):
         return [x.get("id") for x in data if x.get("id")] or None
     if provider == "openai-oauth":
         return openai_oauth.list_models(openai_oauth.valid_creds())   # None nếu backend không có endpoint → fallback
+    if provider == "lmstudio":
+        # LM Studio expose /v1/models chuẩn OpenAI → list model ĐANG LOAD trong app
+        async with httpx.AsyncClient(timeout=10) as c:
+            r = await c.get(engine.LMSTUDIO_BASE + "/v1/models")
+            r.raise_for_status()
+            data = r.json().get("data", [])
+        return [x.get("id") for x in data if x.get("id")] or None
     return None   # anthropic-cli: alias CLI, không list được → fallback catalog
 
 
@@ -3035,8 +3050,14 @@ async def websocket_endpoint(ws: WebSocket):
             mcfg = cfgmod.read_settings().get("model", {})
             prov, kind, api_key, api_model = _chat_provider(mcfg)
             reasoning = _reasoning_level(mcfg)
+
+            api_ready = (
+                (kind == "api" and (bool(api_key) or prov == "lmstudio"))
+                or kind == "oauth"
+            )
+
             engine_label = ("codex" if prov == "openai-oauth"
-                            else prov if ((kind == "api" and api_key) or kind == "oauth")
+                            else prov if api_ready
                             else "cli")
 
             # ── Phiên hội thoại: resume-or-create (session_id ở đây là CONV id) ──
@@ -3081,7 +3102,7 @@ async def websocket_endpoint(ws: WebSocket):
                         elif et == "error":
                             await ws.send_text(json.dumps({"type": "error", "content": ev["content"]}))
                     await ws.send_text(json.dumps({"type": "response", "content": final_text, "engine": "codex", "model": actual_model, "session_id": conv_sid}))
-            elif (kind == "api" and api_key) or kind == "oauth":
+            elif api_ready:
                 # ===== PROVIDER API/OAuth (openrouter | openai | anthropic-api) - chat thuần (MCP đa-model cho openrouter/openai) =====
                 label = _api_label(prov)
                 actual_model = api_model or "?"
@@ -3206,7 +3227,7 @@ async def _tg_answer(text):
     prov, kind, api_key, api_model = _chat_provider(mcfg)
     reasoning = _reasoning_level(mcfg)
     sysprompt = build_system_prompt(brain)
-    if (kind == "api" and api_key) or kind == "oauth":
+    if api_ready:
         label = _api_label(prov)
         if _tg_or is None:
             ident = (f"\n\n[Sự thật hệ thống: bạn chạy qua {label}, model '{api_model}'. "
