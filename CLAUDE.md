@@ -36,7 +36,7 @@ type: loop
 name: <Tên hiển thị tiếng Việt>
 slug: <ascii-khong-dau>
 enabled: false            # mặc định TẮT khi tạo qua chat
-mode: suggest             # suggest = chỉ đề xuất/đọc | auto = tự làm + kiểm chứng
+mode: suggest             # suggest = chỉ đọc/đề xuất | auto = tự ghi nháp (an toàn, KHÔNG tiền/đơn) | full = TOÀN QUYỀN (tự thao tác thật)
 interval_min: 120         # tối thiểu 5
 updated: <YYYY-MM-DD>
 ---
@@ -45,10 +45,15 @@ updated: <YYYY-MM-DD>
 - Đây là format ĐƠN GIẢN (mặc định): thân file = mô tả việc loop làm mỗi vòng. Loop chạy nền mặc định **đọc được dữ liệu thật qua MCP** (POS/quảng cáo/lịch...) + thao tác file trong vault.
 - Trường nâng cao (KHÔNG bắt buộc, chỉ thêm khi user cần): `goal: business` (tự bơm số liệu KD mỗi vòng), `quiet_hours: "23-07"` (giờ im lặng), `max_runs_per_day: N`, `workspace: <path>` + `tools_profile: code` (loop sửa mã trên thư mục ngoài - Bash/Web, KHÔNG MCP).
 
+**3 mức quyền của loop (mode):**
+- `suggest`: chỉ đọc (kể cả đọc MCP) + gợi ý, không ghi file. An toàn nhất - MẶC ĐỊNH.
+- `auto`: ghi file nháp trong vault + đọc MCP, nhưng KHÔNG tạo đơn/tiêu tiền/quảng cáo/đăng bài/gửi tin. Có bước tự kiểm chứng.
+- `full`: TOÀN QUYỀN - tự thao tác THẬT ra ngoài qua MCP (tạo đơn, chạy quảng cáo, gửi tin, đăng bài). Rủi ro cao, hành động không hoàn tác được.
+
 **An toàn khi điều phối:**
-- Loop do chat tạo mặc định `mode: suggest` + `enabled: false`. CHỈ bật ngay (`enabled: true`) khi user yêu cầu rõ.
-- Loop ĐƯỢC dùng MCP để ĐỌC dữ liệu, nhưng TUYỆT ĐỐI KHÔNG được tạo/sửa đơn, tiêu tiền, chạy quảng cáo, gửi tin hay đăng bài tự động - chỉ ghi nháp để user duyệt. Nhắc rõ điều này trong mô tả nếu loop chạm dữ liệu tiền/đơn.
-- Hành động tiền / đơn hàng / đăng bài vẫn LUÔN hỏi user trước - không loop/task/workflow nào được tự làm.
+- Loop do chat tạo LUÔN mặc định `mode: suggest` + `enabled: false`. KHÔNG bao giờ tự đặt `mode: full`.
+- CHỈ đặt `mode: full` khi user YÊU CẦU RÕ RÀNG và dứt khoát cho loop đó toàn quyền (vd "cho nó tự chạy quảng cáo luôn", "full quyền", "tự làm hết không cần hỏi"). Khi đó BẮT BUỘC cảnh báo lại rủi ro bằng lời trước khi tạo, và vẫn để `enabled: false` để user tự bật.
+- Với loop `auto`/`suggest`: hành động tiền/đơn/đăng bài vẫn LUÔN cấm tự làm - chỉ ghi nháp để user duyệt.
 - Sau khi điều phối, báo cáo NGẮN bằng văn nói: đã quyết định gì, tạo file nào, chạy khi nào, theo dõi ở đâu. Không bảng, không em dash.
 
 ## Nguyên tắc phản hồi

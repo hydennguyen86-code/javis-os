@@ -453,10 +453,14 @@
           <div class="si-row" style="gap:14px;flex-wrap:wrap">
             <div class="si-field"><label>Chế độ</label><div class="si-row" id="lpModes">
               <button class="si-chip" data-mode="suggest">Đề xuất (chỉ đọc)</button>
-              <button class="si-chip" data-mode="auto">Tự làm + kiểm chứng</button></div></div>
+              <button class="si-chip" data-mode="auto">Tự làm (an toàn)</button>
+              <button class="si-chip" data-mode="full" style="border-color:rgba(224,102,74,.5)">⚠ Toàn quyền</button></div></div>
             <div class="si-field"><label>Chu kỳ (phút, tối thiểu 5)</label><input type="number" id="lpInterval" min="5" value="120" style="max-width:120px"></div>
           </div>
-          <div class="dim" style="font-size:12px;color:#6b7894;margin-top:2px">Cần tinh chỉnh nâng cao (giờ im lặng, trần vòng/ngày, chạy trên thư mục code)? Sửa trực tiếp file <code>Javis/loops/&lt;tên&gt;.md</code> trong Obsidian.</div>
+          <div id="lpFullWarn" style="display:none;margin-top:4px;padding:10px 12px;border:1px solid rgba(224,102,74,.5);border-radius:8px;background:rgba(224,102,74,.08);color:#ffb59e;font-size:13px;line-height:1.5">
+            <b>⚠ CHẾ ĐỘ TOÀN QUYỀN - rủi ro cao.</b> Loop sẽ tự thao tác THẬT qua MCP không cần hỏi: có thể <b>tạo/sửa đơn hàng, chạy quảng cáo (tiêu tiền thật), gửi tin nhắn/email, đăng bài</b>. Nó chạy nền theo lịch, KHÔNG có người duyệt từng bước, và <b>hành động thật không hoàn tác được</b>. Chỉ bật khi anh đã tin tưởng loop này và mô tả nhiệm vụ thật rõ ràng, giới hạn phạm vi. Nên chạy thử ở "Đề xuất" hoặc "Tự làm (an toàn)" trước.
+          </div>
+          <div class="dim" style="font-size:12px;color:#6b7894;margin-top:2px">Đề xuất = chỉ đọc + gợi ý. Tự làm (an toàn) = ghi nháp file + đọc MCP, KHÔNG tiền/đơn/đăng bài. Toàn quyền = tự thao tác mọi thứ. · Tinh chỉnh nâng cao (giờ im lặng, trần vòng/ngày, thư mục code): sửa file <code>Javis/loops/&lt;tên&gt;.md</code>.</div>
           <div class="si-actions"><button class="s-btn" id="lpSave">💾 Lưu loop</button><button class="s-btn-ghost" id="lpCancel">Huỷ</button><span class="dim" id="lpFormMsg" style="font-size:13px;color:#e0a04a"></span></div>
         </div>
       </div>
@@ -467,6 +471,7 @@
     let fcur = { mode: "suggest" };
     function syncFormChips() {
       el.querySelectorAll("#lpModes .si-chip").forEach(x => x.classList.toggle("sel", x.dataset.mode === fcur.mode));
+      const w = el.querySelector("#lpFullWarn"); if (w) w.style.display = (fcur.mode === "full") ? "block" : "none";
     }
     el.querySelectorAll("#lpModes .si-chip").forEach(c => c.onclick = () => { fcur.mode = c.dataset.mode; syncFormChips(); });
 
@@ -489,6 +494,7 @@
       const body = el.querySelector("#lpBody").value.trim();
       if (!name) { el.querySelector("#lpFormMsg").textContent = "Nhập tên loop"; return; }
       if (!body) { el.querySelector("#lpFormMsg").textContent = "Nhập mô tả nhiệm vụ (Javis cần biết mỗi vòng làm gì)"; return; }
+      if (fcur.mode === "full" && !confirm(`Bật CHẾ ĐỘ TOÀN QUYỀN cho loop "${name}"?\n\nLoop sẽ tự thao tác THẬT qua MCP không cần hỏi: tạo/sửa đơn, chạy quảng cáo (tiêu tiền thật), gửi tin, đăng bài. Chạy nền theo lịch, KHÔNG duyệt từng bước, hành động KHÔNG hoàn tác được.\n\nAnh chắc chắn chứ?`)) return;
       const fd = new FormData();
       fd.append("slug", el.querySelector("#lpSlug").value);
       fd.append("name", name);
@@ -517,8 +523,10 @@
         ? ` · ${esc(lp.last_status.slice(0, 90))}` : (lp.last_status === "ok" ? " · ok" : "");
       const last = lp.last_run ? `lần cuối ${fmtT(lp.last_run)}` : "chưa chạy";
       const next = (lp.enabled && !paused && lp.next_run) ? ` · kế tiếp ~${fmtT(lp.next_run)}` : "";
+      const modeLbl = lp.mode === "full" ? `<span style="color:#e0664a;font-weight:600">⚠ toàn quyền</span>`
+        : lp.mode === "auto" ? "tự làm (an toàn)" : "đề xuất";
       const extra = [
-        `${lp.mode === "auto" ? "tự làm" : "đề xuất"} · mỗi ${lp.interval_min} phút`,
+        `${modeLbl} · mỗi ${lp.interval_min} phút`,
         (lp.goal && lp.goal !== "custom") ? (GNAME[lp.goal] || lp.goal) : "",
         lp.quiet_hours ? `im lặng ${lp.quiet_hours}` : "",
         lp.max_runs_per_day ? `tối đa ${lp.max_runs_per_day}/ngày (đã ${lp.runs_today})` : "",
@@ -537,6 +545,9 @@
           <button class="s-btn-ghost del" style="color:#e0664a">Xoá</button>
         </div>`;
       div.querySelector(".tgl").onclick = async () => {
+        // Bật loop TOÀN QUYỀN = xác nhận rủi ro (tắt thì khỏi hỏi)
+        if (!lp.enabled && lp.mode === "full" &&
+            !confirm(`Bật loop TOÀN QUYỀN "${lp.name}"?\n\nNó sẽ tự thao tác THẬT qua MCP (tạo đơn, tiêu tiền quảng cáo, gửi tin, đăng bài) theo lịch, không duyệt từng bước. Chắc chứ?`)) return;
         await fetch("/loops/toggle", { method: "POST", body: (() => { const f = new FormData(); f.append("slug", lp.slug); f.append("brain", fbrain()); return f; })() });
         loadLoops();
       };

@@ -30,6 +30,14 @@ An toàn theo tools_profile:
     (fail-closed: không tạo được file MCP rỗng thì từ chối chạy) → cho loop sửa mã repo an toàn.
     Kiểm chứng thêm tiêu chí: diff nhỏ, py_compile / node --check phải sạch.
 
+3 mức quyền (mode) - chủ chọn ở UI:
+  - "suggest": chỉ tool ĐỌC (+ đọc MCP), không ghi. Mặc định an toàn nhất.
+  - "auto": file tools ghi được + đọc MCP, nhưng bị chặn hành động tiền/đơn (allowlist + prompt +
+    kiểm chứng fail nếu phát hiện ghi ra ngoài).
+  - "full" (TOÀN QUYỀN): allowlist = None → MỌI tool + mọi MCP (trừ deny_tools per-server). Loop tự
+    thao tác THẬT ra ngoài (tạo đơn/quảng cáo/gửi tin/đăng bài). Chủ phải chủ động bật + xác nhận
+    cảnh báo rủi ro ở UI. Kiểm chứng chỉ soi 'đúng phạm vi nhiệm vụ', KHÔNG fail vì có hành động ghi.
+
 Tương thích ngược: /loop/* cũ là shim trỏ về loop legacy slug "vong-lap-goc" (migrate
 một lần từ loop_config.json - giữ nguyên toàn bộ custom_goal vào thân file, không xoá
 json cũ). read_config()/write_config() giữ nguyên chữ ký cho shim của main.py
@@ -64,6 +72,16 @@ _MCP_SAFETY = (
     "analytics...) phục vụ nhiệm vụ. TUYỆT ĐỐI KHÔNG dùng MCP để tạo/sửa/huỷ đơn hàng, tạo/sửa/"
     "bật/tắt quảng cáo, tiêu tiền, chuyển khoản, gửi tin nhắn/email, hay đăng bài - những việc đó "
     "CHỈ chủ mới quyết. Kết quả chỉ được là NHÁP ghi vào file trong vault để chủ duyệt.\n"
+)
+
+# Chế độ TOÀN QUYỀN (mode="full"): chủ đã CHỦ ĐỘNG bật + đã đọc cảnh báo rủi ro ở UI.
+# Loop được thao tác thật ra ngoài qua MCP. Vẫn nhắc cẩn trọng để không làm quá phạm vi.
+_MCP_FULL = (
+    "⚠ CHẾ ĐỘ TOÀN QUYỀN (chủ đã bật có chủ đích): Bạn được DÙNG MỌI công cụ và MCP để HOÀN THÀNH "
+    "nhiệm vụ, KỂ CẢ hành động THẬT ra bên ngoài (tạo/sửa đơn, chạy/sửa quảng cáo, gửi tin nhắn/email, "
+    "đăng bài, thao tác file). MỌI HÀNH ĐỘNG LÀ THẬT, có thể phát sinh chi phí/hệ quả và KHÔNG hoàn tác "
+    "được. NGUYÊN TẮC: chỉ làm ĐÚNG phạm vi nhiệm vụ được giao, không làm quá, không đụng thứ ngoài ý "
+    "định của chủ. Khi MƠ HỒ một hành động có đúng ý chủ không → GHI đề xuất vào file thay vì tự làm.\n"
 )
 
 
@@ -230,7 +248,9 @@ class LoopFeature:
         goal = str(fm.get("goal", "business") or "business").strip().lower()
         if goal not in GOALS:
             goal = "custom"
-        mode = "auto" if str(fm.get("mode", "suggest") or "").strip().lower() == "auto" else "suggest"
+        mode = str(fm.get("mode", "suggest") or "").strip().lower()
+        if mode not in ("suggest", "auto", "full"):
+            mode = "suggest"
         try:
             interval = max(5, int(fm.get("interval_min", 60)))
         except (TypeError, ValueError):
@@ -499,6 +519,12 @@ class LoopFeature:
     async def _build_prompt(self, loop: dict) -> Tuple[str, str]:
         """Trả (prompt, skip_reason). skip_reason != '' → bỏ qua vòng này (vd business chưa có số)."""
         goal, mode = loop["goal"], loop["mode"]
+        is_write = mode in ("auto", "full")   # auto/full = được ghi; suggest = chỉ đọc
+        # Chỉ dẫn an toàn theo mode: full = toàn quyền; còn lại = đọc MCP nhưng cấm tiền/đơn.
+        if loop["tools_profile"] == "code":
+            safety = ("⛔ AN TOÀN: KHÔNG gọi MCP/tiền/đơn/đăng bài. Chỉ thao tác file trong workspace được giao.\n")
+        else:
+            safety = _MCP_FULL if mode == "full" else _MCP_SAFETY
         if goal == "business":
             try:
                 mdata = await self.deps.metrics(0)
@@ -517,9 +543,9 @@ class LoopFeature:
                 "Xác định CHỈ SỐ YẾU NHẤT hoặc đòn bẩy lớn nhất, rồi đề ra 1 hành động khả thi TUẦN NÀY để cải thiện nó "
                 "(vd: ý tưởng + caption content nháp, khung email, kịch bản khuyến mãi, điểm tối ưu funnel, danh sách lead cần gọi lại).\n"
                 "Có thể đọc thêm số liệu chi tiết qua MCP nếu cần.\n"
-                + _MCP_SAFETY
+                + safety
             )
-            if mode == "auto":
+            if is_write:
                 return base + (
                     "GHI kết quả vào vault: tạo/cập nhật 1 note kế hoạch trong '05 - Projects' (đặt tên rõ, vd "
                     "'Cải thiện [chỉ số] - <ngày>'), kèm vật liệu nháp. Nếu cần hành động → thêm task vào Daily Log hôm nay.\n"
@@ -534,9 +560,9 @@ class LoopFeature:
                 "Đọc log hội thoại gần đây (Memory/conversations) + các agent/workflow trong Javis/ + ghi chú phản hồi. "
                 "Nhận diện: người dùng hay vướng gì, yêu cầu lặp lại gì, thiếu agent/workflow/skill nào, chỗ nào gây khó. "
                 "KHÔNG sửa code server.\n"
-                + _MCP_SAFETY
+                + safety
             )
-            if mode == "auto":
+            if is_write:
                 return base + (
                     "Thực hiện 1 cải tiến cụ thể: tạo/cải thiện 1 agent hoặc workflow trong Javis/ (đúng format frontmatter), "
                     "hoặc ghi 1 note đề xuất cải tiến UX/tính năng vào '05 - Projects'. Báo cáo NGẮN: cải tiến gì, file nào, vì sao."
@@ -546,19 +572,16 @@ class LoopFeature:
             ), ""
         if goal == "custom":
             objective = (loop.get("body") or "").strip() or "Cải thiện vault theo cách hữu ích nhất bạn thấy."
-            # profile code: chạy trên workspace, 0 MCP. Mặc định: có MCP để đọc dữ liệu thật.
-            safety = ("⛔ AN TOÀN: KHÔNG gọi MCP/tiền/đơn/đăng bài. Chỉ thao tác file trong workspace được giao.\n"
-                      if loop["tools_profile"] == "code" else _MCP_SAFETY)
             base = f"NHIỆM VỤ CỦA LOOP NÀY (làm ĐÚNG 1 lần mỗi vòng rồi dừng):\n{objective}\n{safety}"
-            return base + ("Thực hiện 1 bước cụ thể cho nhiệm vụ trên rồi báo cáo ngắn (làm gì, chạm file nào)." if mode == "auto"
+            return base + ("Thực hiện 1 bước cụ thể cho nhiệm vụ trên rồi báo cáo ngắn (làm gì, chạm file nào)." if is_write
                            else "CHẾ ĐỘ ĐỀ XUẤT - chỉ đọc, không ghi file. Đề xuất 2-3 hành động cụ thể cho nhiệm vụ trên."), ""
         # goal == brain - làm dày bộ não
-        if mode == "auto":
+        if is_write:
             return (
                 "VÒNG TỰ CẢI THIỆN (làm dày bộ não, chế độ TỰ LÀM).\n"
                 "Chọn ĐÚNG 1 việc giá trị nhất: (1) INGEST 1 source unprocessed, (2) trả lời 1 _open-question, "
                 "(3) sửa 1 lỗi Wiki (broken link/thiếu citation/orphan/trùng). TUÂN THỦ quy ước CLAUDE.md + cập nhật index.md & log.md.\n"
-                + _MCP_SAFETY +
+                + safety +
                 "Báo cáo NGẮN: làm gì, chạm file nào. Nếu không có việc → 'Không có việc mới'."
             ), ""
         return (
@@ -573,10 +596,12 @@ class LoopFeature:
           (fail-closed nếu không tạo được file MCP rỗng) - cho loop sửa mã repo.
         - MẶC ĐỊNH (mọi loop tạo qua form): file tools + MCP do Javis quản lý (POS/ads/lịch...).
           Loop ĐỌC được dữ liệu thật; ghi allowlist kèm 'mcp__<server>' để tool MCP gọi được.
-          KHÔNG có Bash/Web/Task (không nằm trong allowlist). An toàn tiền/đơn dựa vào:
-          (a) deny_tools per-server của MCP (apply_mcp gắn vào --disallowedTools),
-          (b) chỉ dẫn cứng trong prompt (đọc OK, cấm tạo đơn/tiêu tiền/đăng bài),
-          (c) mode suggest = chỉ tool đọc."""
+          An toàn tiền/đơn dựa vào: (a) deny_tools per-server (apply_mcp gắn --disallowedTools),
+          (b) chỉ dẫn cứng trong prompt, (c) mode suggest = chỉ tool đọc.
+        - mode 'full' (TOÀN QUYỀN, chủ chủ động bật + đã đọc cảnh báo): allowlist = None
+          → MỌI tool (file + Bash/Web + mọi tool MCP, trừ deny_tools per-server) để tự thao
+          tác thật. Bước KIỂM CHỨNG (for_verify) LUÔN chạy readonly, không nới quyền."""
+        mode = loop["mode"]
         if loop["tools_profile"] == "code":
             mcpf = _empty_mcp_file()
             if not mcpf:
@@ -584,15 +609,22 @@ class LoopFeature:
             if for_verify:
                 tools = list(self.deps.readonly_tools) + ["Bash"]   # Bash để chạy py_compile / node --check
             else:
-                base = self.deps.safe_tools if loop["mode"] == "auto" else self.deps.readonly_tools
+                base = self.deps.safe_tools if mode in ("auto", "full") else self.deps.readonly_tools
                 tools = list(base) + ["Bash", "WebFetch", "WebSearch"]
             cli = ClaudeCLI(system_prompt=sysprompt, cwd=cwd, tag="loop", allowed_tools=tools)
             cli.mcp_config = mcpf
             cli.mcp_strict = True
             cli.disallowed_tools = ["Task"]
+        elif mode == "full" and not for_verify:
+            # TOÀN QUYỀN: không giới hạn allowlist → mọi tool + mọi MCP. Vẫn tôn trọng
+            # deny_tools per-server (apply_mcp đặt --disallowedTools) - chặn user đã chủ ý.
+            cli = ClaudeCLI(system_prompt=sysprompt, cwd=cwd, tag="loop", allowed_tools=None)
+            if self.deps.apply_mcp:
+                self.deps.apply_mcp(cli)
+            # KHÔNG _isolate: full mode chủ đích mở MCP + Bash. Không có apply_mcp (test) → vẫn None allowlist.
         else:
             base = self.deps.readonly_tools if for_verify else (
-                self.deps.safe_tools if loop["mode"] == "auto" else self.deps.readonly_tools)
+                self.deps.safe_tools if mode in ("auto", "full") else self.deps.readonly_tools)
             tools = list(base)
             # Thêm pattern MCP vào allowlist để loop GỌI được tool MCP (Bash/Web/Task vẫn ngoài list → chặn)
             if self.deps.mcp_allow_patterns:
@@ -697,7 +729,7 @@ class LoopFeature:
                 summary = "Lỗi: " + ev["content"][:200]
 
         verify_line, verify_failed = "", False
-        if mode == "auto" and summary and not summary.startswith("Lỗi:") \
+        if mode in ("auto", "full") and summary and not summary.startswith("Lỗi:") \
                 and "không có việc mới" not in summary.lower():
             # Kiểm chứng độc lập: giả định kết quả SAI, kiểm tra thực tế
             vcli = self._make_cli(loop, cwd, "Bạn là người KIỂM CHỨNG độc lập, giả định kết quả vừa rồi SAI.",
@@ -708,13 +740,16 @@ class LoopFeature:
                                 "không; BẮT BUỘC chạy `python -m py_compile <file .py đã sửa>` và `node --check "
                                 "<file .js đã sửa>` cho từng file bị đổi - tất cả phải sạch mới được pass")
                 elif goal == "business":
-                    criteria = ("đề xuất có BÁM số liệu thật không, có khả thi/đủ cụ thể để làm ngay không, "
-                                "có bịa số không, và TUYỆT ĐỐI không chứa hành động tiền/đơn/đăng bài tự động")
+                    criteria = ("đề xuất/hành động có BÁM số liệu thật không, có khả thi/đủ cụ thể không, có bịa số không")
                 elif goal == "brain":
                     criteria = "thay đổi có đúng quy ước Wiki không, có bịa/thiếu citation không, có làm hỏng link không"
                 else:
                     criteria = "kết quả có đúng mục tiêu không, có hợp lý/khả thi không, có bịa hay làm hỏng file nào không"
-                if loop["tools_profile"] != "code":
+                # mode full = chủ cho toàn quyền → CHỈ kiểm 'đúng phạm vi', KHÔNG fail vì có hành động ghi ra ngoài.
+                if mode == "full":
+                    criteria += ("; đây là loop TOÀN QUYỀN nên hành động thật ra ngoài LÀ ĐƯỢC PHÉP - chỉ FAIL nếu "
+                                 "làm SAI/QUÁ phạm vi nhiệm vụ, gây hại rõ ràng, hoặc thao tác thứ ngoài ý định")
+                elif loop["tools_profile"] != "code":
                     criteria += ("; và TUYỆT ĐỐI KHÔNG có hành động tiền/đơn/quảng cáo/đăng bài/gửi tin qua MCP "
                                  "(chỉ được đọc dữ liệu) - nếu có thì FAIL ngay")
                 vprompt = (
@@ -797,8 +832,8 @@ class LoopFeature:
             body: str = Form(""), brain: str = Form("brain"),
         ):
             self.ensure_migrated()
-            if mode not in ("suggest", "auto"):
-                return {"ok": False, "error": "mode phải là suggest hoặc auto"}
+            if mode not in ("suggest", "auto", "full"):
+                return {"ok": False, "error": "mode phải là suggest, auto hoặc full"}
             # Tra loop cũ theo slug NGUYÊN VĂN trước (stem tự do, vd tiếng Việt user tự đặt),
             # rồi mới thử bản ascii - để "Sửa" ghi đè đúng file gốc thay vì fork bản sao.
             raw = (slug or name).strip()
@@ -894,7 +929,7 @@ class LoopFeature:
                 cfg["custom_goal"] = custom_goal
             if enabled is not None:
                 cfg["enabled"] = enabled in ("1", "true", "True", "on")
-            if mode in ("suggest", "auto"):
+            if mode in ("suggest", "auto", "full"):
                 cfg["mode"] = mode
             if goal in GOALS:
                 cfg["goal"] = goal

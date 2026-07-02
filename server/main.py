@@ -2297,7 +2297,8 @@ def _loops_as_routines(brain):
         for lp in loop_feature.list_loops(brain):
             v = loop_feature.loop_view(brain, lp, st_all)
             paused = bool(v["auto_paused_reason"])
-            note = f"{v['goal']} · {v['mode']}"
+            mode_lbl = "⚠ TOÀN QUYỀN" if v["mode"] == "full" else v["mode"]
+            note = f"{v['goal']} · {mode_lbl}"
             if v["last_status"]:
                 note += f" · {v['last_status'][:80]}"
             if paused:
