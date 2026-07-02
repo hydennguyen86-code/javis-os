@@ -73,6 +73,10 @@ _DEFAULT = {
         },
     },
     "telegram": {"enabled": False, "token": "", "chat_id": ""},
+    # Backup brain lên GitHub (repo RIÊNG TƯ). token = GitHub PAT (fine-grained, quyền Contents).
+    # Lưu trong settings.json (đã gitignored) - KHÔNG bao giờ đẩy lên brain repo.
+    "backup": {"enabled": False, "repo_url": "", "token": "", "branch": "main",
+               "interval_hours": 6, "last_backup": 0.0, "last_status": ""},
     "dashboard": {
         # graph_enabled=False → vào thẳng Console, KHÔNG dựng graph 3D (nhẹ cho VPS/điện thoại).
         # Frontend cũng tự ép lite-mode khi màn hình hẹp dù cờ này bật.

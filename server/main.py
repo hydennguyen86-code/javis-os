@@ -134,17 +134,19 @@ def build_system_prompt(brain: str = "brain") -> str:
         mem = ""
     if mem.strip():
         base += "\n\n# === BỘ NHỚ DÀI HẠN (nạp sẵn) ===\n" + mem
-    # Đường dẫn lớp Agentic của vault đang làm việc (để Javis tạo agent/workflow qua chat)
+    # Đường dẫn lớp Agentic của vault đang làm việc (để Javis tạo agent/workflow/loop qua chat)
     root = _brain_root(brain)
     ag, wf = _agents_dir(brain), _workflows_dir(brain)
+    lp = Path(root) / "Javis" / "loops"
     base += (
         "\n\n# === LỚP AGENTIC (vault đang làm việc) ===\n"
         f"Vault root: {root}\n"
         f"- AGENT: tạo/sửa tại `{ag}/<slug>.md`\n"
         f"- WORKFLOW: tạo/sửa tại `{wf}/<slug>.md`\n"
-        "Khi user yêu cầu tạo/sửa agent hoặc workflow qua chat, ghi file .md đúng định dạng "
-        "(xem mục 'Tạo/sửa Agent & Workflow qua chat' trong system prompt) bằng ĐƯỜNG DẪN TUYỆT ĐỐI ở trên. "
-        "Studio sẽ tự nhận file mới."
+        f"- LOOP (nhiệm vụ lặp vô hạn): tạo/sửa tại `{lp}/<slug>.md`\n"
+        "Khi user yêu cầu tạo/sửa agent, workflow hoặc loop qua chat, ghi file .md đúng định dạng "
+        "(xem mục 'Tạo/sửa Agent & Workflow qua chat' và 'Điều phối' trong system prompt) bằng "
+        "ĐƯỜNG DẪN TUYỆT ĐỐI ở trên. Studio/trang Tự cải thiện sẽ tự nhận file mới."
     )
     return base
 
@@ -472,6 +474,16 @@ def _aux_model():
     """Alias Claude cho việc nền (loop/metrics/ingest). '' = không đổi (mặc định CLI)."""
     return (cfgmod.read_settings().get("model", {}).get("auxiliary") or {}).get("model") or ""
 
+def _codex_safe_model(model: str) -> str:
+    """Model hợp lệ cho Codex/ChatGPT-account. Model API thường (gpt-5-mini, gpt-4o, o3...)
+    KHÔNG chạy được qua Codex → coerce về model Codex trong catalog (mặc định gpt-5.5).
+    Hợp lệ = nằm trong catalog 'openai-oauth' HOẶC kết thúc '-codex'."""
+    m = (model or "").strip()
+    cat = (cfgmod.read_settings().get("model", {}).get("catalog", {}).get("openai-oauth")) or ["gpt-5.5"]
+    if m and (m in cat or m.endswith("-codex")):
+        return m
+    return cat[0]
+
 def _chat_provider(mcfg):
     """Provider dùng cho chat (id, kind, key, model) - từ model chính hiệu lực."""
     em = _effective_main({"model": mcfg})
@@ -493,7 +505,8 @@ def _api_stream(prov, key, model, messages, reasoning="off"):
         return engine.lmstudio_stream(model, messages, reasoning)
     if prov == "openai-oauth":
         creds = openai_oauth.valid_creds() or {}
-        return engine.openai_responses_stream(creds.get("access_token", ""), creds.get("account_id", ""), model, messages, reasoning)
+        return engine.openai_responses_stream(creds.get("access_token", ""), creds.get("account_id", ""),
+                                              _codex_safe_model(model), messages, reasoning)
     return engine.anthropic_stream(key, model, messages, reasoning)
 
 
@@ -758,6 +771,10 @@ async def settings_get():
     safe.setdefault("voice", {})
     safe["voice"]["elevenlabs_key"] = ("••••" + vk[-4:]) if vk else ""
     safe["voice"]["elevenlabs_key_set"] = bool(vk)
+    bt = (cfg.get("backup", {}) or {}).get("token", "")
+    safe.setdefault("backup", {})
+    safe["backup"]["token"] = ("••••" + bt[-4:]) if bt else ""
+    safe["backup"]["token_set"] = bool(bt)
     safe["model"]["providers"] = _providers_view(cfg)   # danh sách provider + trạng thái + model
     safe["model"]["main"] = _effective_main(cfg)         # model chính hiệu lực (suy từ legacy nếu cần)
     return safe
@@ -843,6 +860,83 @@ async def settings_set(section: str = Form(...), data: str = Form("{}")):
         except Exception as e:
             print(f"[telegram restart] {e}", file=__import__('sys').stderr)
     return {"ok": True}
+
+
+# ============================================================
+# BACKUP brain lên GitHub (đồng bộ repo riêng, khôi phục khi mất máy/VPS)
+# UI + hướng dẫn ở trang Tự học (console.js renderLearn). Token lưu settings.json (gitignored).
+# ============================================================
+def _do_backup(brain: str) -> dict:
+    """Chạy 1 lần backup (đồng bộ nghẽn - gọi trong thread). Cập nhật last_backup/last_status."""
+    cfg = cfgmod.read_settings()
+    b = cfg.get("backup", {}) or {}
+    if not (b.get("repo_url") and b.get("token")):
+        return {"ok": False, "error": "Chưa cấu hình repo URL + token"}
+    root = _brain_root(brain)
+    res = git_brain.backup_to_github(root, b["repo_url"], b["token"], b.get("branch") or "main")
+    # Ghi lại trạng thái (đọc lại cfg mới nhất để không đè thay đổi song song)
+    cfg = cfgmod.read_settings()
+    cfg.setdefault("backup", {})
+    cfg["backup"]["last_backup"] = time.time()
+    cfg["backup"]["last_status"] = ("✓ Đã đồng bộ " + time.strftime("%H:%M %d/%m")) if res.get("ok") \
+        else ("✗ " + (res.get("error") or "lỗi")[:150])
+    cfgmod.write_settings(cfg)
+    return res
+
+
+@app.get("/backup/status")
+async def backup_status(brain: str = Query("brain")):
+    cfg = cfgmod.read_settings()
+    b = cfg.get("backup", {}) or {}
+    root = _brain_root(brain)
+    return {
+        "enabled": bool(b.get("enabled")),
+        "repo_url": b.get("repo_url", ""),
+        "branch": b.get("branch", "main"),
+        "interval_hours": b.get("interval_hours", 6),
+        "token_set": bool(b.get("token")),
+        "last_backup": b.get("last_backup", 0.0),
+        "last_status": b.get("last_status", ""),
+        "has_git": git_brain.has_git(),
+        "is_git": git_brain.is_git_checkout(root),
+    }
+
+
+@app.post("/backup/config")
+async def backup_config(
+    repo_url: str = Form(None), token: str = Form(None), branch: str = Form(None),
+    enabled: str = Form(None), interval_hours: str = Form(None),
+):
+    cfg = cfgmod.read_settings()
+    b = cfg.setdefault("backup", {})
+    if repo_url is not None:
+        b["repo_url"] = repo_url.strip()
+    if token:                     # chỉ ghi khi có token MỚI (tránh xoá bằng chuỗi che ••••)
+        b["token"] = token.strip()
+    if branch:
+        b["branch"] = branch.strip() or "main"
+    if enabled is not None:
+        b["enabled"] = enabled in ("1", "true", "True", "on")
+    if interval_hours is not None:
+        try:
+            b["interval_hours"] = max(1, int(interval_hours))
+        except ValueError:
+            pass
+    cfgmod.write_settings(cfg)
+    return {"ok": True}
+
+
+@app.post("/backup/test")
+async def backup_test():
+    """Kiểm tra token + repo hợp lệ (git ls-remote) trước khi bật auto."""
+    cfg = cfgmod.read_settings()
+    b = cfg.get("backup", {}) or {}
+    return await asyncio.to_thread(git_brain.remote_reachable, b.get("repo_url", ""), b.get("token", ""))
+
+
+@app.post("/backup/now")
+async def backup_now(brain: str = Form("brain")):
+    return await asyncio.to_thread(_do_backup, brain)
 
 
 _OR_MODELS_CACHE = {"data": None, "ts": 0.0}
@@ -1661,7 +1755,7 @@ async def save_agent(name: str = Form(...), role: str = Form(""), skills: str = 
     slug = slug or _slugify(name)
     skills_list = [s.strip() for s in re.split(r"[,\n]", skills) if s.strip()]
     meta = {"type": "agent", "name": name, "slug": slug, "role": role,
-            "skills": skills_list, "model": model or "sonnet", "updated": _today()}
+            "skills": skills_list, "model": model, "updated": _today()}  # "" = mặc định theo CLI
     _write_md(_agents_dir(brain) / f"{slug}.md", meta, (prompt.strip() or role))
     return {"ok": True, "slug": slug}
 
@@ -1986,8 +2080,11 @@ async def execute_workflow(brain, slug, input="", tools=None):
     steps = meta.get("steps", []) or []
     vault_root = str(_brain_root(brain))
 
-    def _mk(sysprompt):
+    def _mk(sysprompt, model=None):
         c = ClaudeCLI(system_prompt=sysprompt, cwd=vault_root, tag="workflow", allowed_tools=tools)
+        # Model của AGENT (chọn ở Studio: sonnet/opus/haiku/fable) được ÁP THẬT vào CLI.
+        # Rỗng → dùng model phụ (việc nền) nếu có, cuối cùng None = mặc định CLI.
+        c.model = (model or _aux_model() or None)
         if tools is not None:   # chạy nền hạn chế → cô lập MCP + chặn Bash/Web
             _mcpf = _empty_mcp_file()
             if _mcpf:
@@ -2005,7 +2102,7 @@ async def execute_workflow(brain, slug, input="", tools=None):
             + (f"\n# Bộ nhớ của bạn:\n{amem}\n" if amem else "")
             + "\nLàm việc trong vault. Tập trung hoàn thành nhiệm vụ, trả kết quả rõ ràng, ngắn gọn."
         )
-        return ameta.get("name", aslug), sysprompt
+        return ameta.get("name", aslug), sysprompt, (ameta.get("model") or "").strip() or None
 
     yield {"type": "start", "workflow": meta.get("name", slug), "steps": len(steps)}
     prev = ""
@@ -2014,7 +2111,7 @@ async def execute_workflow(brain, slug, input="", tools=None):
         task = step.get("task", "")
         verify_slug = (step.get("verify_agent") or "").strip()
         max_retries = int(step.get("max_retries", 1) or 0)
-        agent_name, sysprompt = _agent_sysprompt(agent_slug)
+        agent_name, sysprompt, agent_model = _agent_sysprompt(agent_slug)
         task_f = task.replace("{{input}}", input or "").replace("{{prev}}", prev or "")
         yield {"type": "step_start", "i": i, "agent": agent_name, "task": task_f}
 
@@ -2023,7 +2120,7 @@ async def execute_workflow(brain, slug, input="", tools=None):
         verified = None
         attempt = 0
         while True:
-            gcli = _mk(sysprompt)
+            gcli = _mk(sysprompt, agent_model)   # áp model agent đã chọn
             out = ""
             async for ev in gcli.query(cur_prompt):
                 if ev["type"] == "text":
@@ -2039,7 +2136,7 @@ async def execute_workflow(brain, slug, input="", tools=None):
                 break
 
             # --- KIỂM CHỨNG bằng agent KHÁC (giả định kết quả SAI) ---
-            v_name, v_body = _agent_sysprompt(verify_slug)
+            v_name, v_body, v_model = _agent_sysprompt(verify_slug)
             yield {"type": "step_verify", "i": i, "agent": v_name, "attempt": attempt}
             v_sys = (
                 v_body + "\n\nVAI TRÒ KIỂM CHỨNG: Bạn là người ĐÁNH GIÁ độc lập. "
@@ -2052,7 +2149,7 @@ async def execute_workflow(brain, slug, input="", tools=None):
                 f"KẾT QUẢ CẦN KIỂM CHỨNG:\n{out}\n\n"
                 "Đánh giá kết quả có ĐẠT nhiệm vụ không. Trả JSON như hướng dẫn."
             )
-            vcli = _mk(v_sys)
+            vcli = _mk(v_sys, v_model)   # agent kiểm chứng cũng dùng model của nó
             v_out = ""
             async for ev in vcli.query(v_prompt):
                 if ev["type"] == "final":
@@ -2140,10 +2237,36 @@ async def studio_seed(brain: str = Form("brain")):
 SAFE_FILE_TOOLS = ["Read", "Write", "Edit", "Glob", "Grep", "LS"]
 READONLY_TOOLS = ["Read", "Glob", "Grep", "LS"]
 
-# Vòng tự cải thiện đã TÁCH sang module self_improve.py. main.py chỉ tiêm helper sẵn có
-# + giữ shim mỏng để automations / scheduler / Telegram gọi như cũ. Endpoints /loop/*
-# nằm trong router của self_improve.
+# Vòng tự cải thiện đã TÁCH sang module self_improve.py - giờ là MULTI-LOOP: N loop định
+# nghĩa bằng file <vault>/Javis/loops/<slug>.md, state ở <vault>/Javis/loop-state.json,
+# thực thi TUẦN TỰ (1 lock). main.py chỉ tiêm helper + giữ shim mỏng cho code cũ.
+# Endpoints /loops/* (mới) + /loop/* (shim legacy) nằm trong router của self_improve.
 import self_improve
+
+
+async def _loop_notify(text: str) -> None:
+    """Báo Telegram khi loop tự tạm dừng (nice-to-have, im lặng nếu chưa cấu hình bot)."""
+    try:
+        tg = cfgmod.read_settings().get("telegram", {})
+        if not (tg.get("enabled") and tg.get("token") and tg.get("chat_id")):
+            return
+        import httpx
+        async with httpx.AsyncClient(timeout=10) as c:
+            await c.post(f"https://api.telegram.org/bot{tg['token']}/sendMessage",
+                         json={"chat_id": tg["chat_id"], "text": text})
+    except Exception as e:
+        print(f"[loop notify] {e}", file=__import__('sys').stderr)
+
+
+def _loop_mcp_allow():
+    """Pattern MCP cho allowlist của loop: 'mcp__<server>' mỗi server bật (bỏ oauth).
+    Thêm vào --allowedTools để loop GỌI được tool MCP (Bash/Web/Task vẫn ngoài list → chặn)."""
+    try:
+        return [f"mcp__{s['name']}" for s in mcp_store.list_servers()
+                if s.get("enabled") and s.get("auth") != "oauth" and s.get("name")]
+    except Exception:
+        return []
+
 
 loop_feature = self_improve.register(app, self_improve.LoopDeps(
     build_system_prompt=build_system_prompt,
@@ -2155,6 +2278,9 @@ loop_feature = self_improve.register(app, self_improve.LoopDeps(
     state_dir=cfgmod.STATE_DIR,
     safe_tools=SAFE_FILE_TOOLS,
     readonly_tools=READONLY_TOOLS,
+    notify=_loop_notify,
+    apply_mcp=_apply_mcp,               # loop ĐỌC được dữ liệu thật qua MCP Javis-quản-lý
+    mcp_allow_patterns=_loop_mcp_allow,
 ))
 
 _LOOP_LOCK = loop_feature.lock   # shim: giữ tên cũ cho code phía dưới (scheduler/automations)
@@ -2169,7 +2295,8 @@ def _write_loop_config(cfg):
 
 
 async def run_loop_cycle(reason="manual"):
-    return await loop_feature.run_cycle(reason)
+    # Shim: giờ = "chạy loop đến hạn nhất" (multi-loop chọn loop quá hạn lâu nhất)
+    return await loop_feature.run_due(reason)
 
 
 # ============================================================
@@ -2270,22 +2397,37 @@ def _write_automations(brain, items):
         print(f"[automations write] {e}", file=__import__('sys').stderr)
 
 
-def _loop_as_routine():
-    """Vòng lặp tự cải thiện hiện ra như 1 routine nội bộ (trạng thái thật từ loop_config)."""
-    cfg = _read_loop_config()
-    return {
-        "id": "__loop__", "builtin": True, "name": "Vòng lặp tự cải thiện",
-        "type": "routine", "schedule": f"mỗi {cfg.get('interval_min', 60)} phút",
-        "status": "active" if cfg.get("enabled") else "paused",
-        "note": f"mục tiêu: {cfg.get('goal', 'business')} · {cfg.get('mode', 'suggest')}",
-        "last_run": cfg.get("last_run", 0),
-    }
+def _loops_as_routines(brain):
+    """MỌI loop của brain hiện ra trong tab Lịch như routine builtin (id __loop__:<slug>).
+    Toggle được từ Lịch; xoá thì phải sang trang Tự cải thiện (tab Loop)."""
+    out = []
+    try:
+        loop_feature.ensure_migrated()
+        st_all = loop_feature.read_state(brain)
+        for lp in loop_feature.list_loops(brain):
+            v = loop_feature.loop_view(brain, lp, st_all)
+            paused = bool(v["auto_paused_reason"])
+            mode_lbl = "⚠ TOÀN QUYỀN" if v["mode"] == "full" else v["mode"]
+            note = f"{v['goal']} · {mode_lbl}"
+            if v["last_status"]:
+                note += f" · {v['last_status'][:80]}"
+            if paused:
+                note += " · ⚠ tự tạm dừng"
+            out.append({
+                "id": f"__loop__:{v['slug']}", "builtin": True, "name": f"{v['name']}",
+                "type": "routine", "schedule": f"mỗi {v['interval_min']} phút",
+                "status": "active" if (v["enabled"] and not paused) else "paused",
+                "note": note, "last_run": v["last_run"],
+            })
+    except Exception as e:
+        print(f"[automations loops] {type(e).__name__}: {e}", file=__import__('sys').stderr)
+    return out
 
 
 @app.get("/automations")
 async def automations_list(brain: str = Query("brain")):
     items = _read_automations(brain)
-    builtin = [_loop_as_routine()]
+    builtin = _loops_as_routines(brain)
     allitems = builtin + items
     running = sum(1 for a in allitems if a.get("status") == "active")
     return {"automations": items, "builtin": builtin, "running": running, "total": len(allitems)}
@@ -2312,11 +2454,17 @@ async def automations_save(
 
 @app.post("/automations/toggle")
 async def automations_toggle(id: str = Form(...), brain: str = Form("brain")):
-    if id == "__loop__":   # bật/tắt loop nội bộ qua loop_config
-        cfg = _read_loop_config()
-        cfg["enabled"] = not cfg.get("enabled")
-        _write_loop_config(cfg)
-        return {"ok": True, "status": "active" if cfg["enabled"] else "paused"}
+    if id == "__loop__" or id.startswith("__loop__:"):
+        # Toggle loop từ tab Lịch. "__loop__" trần (client cũ) = loop legacy vong-lap-goc.
+        slug = id.split(":", 1)[1] if ":" in id else self_improve.LEGACY_SLUG
+        lp = loop_feature.toggle(brain, slug)
+        if not lp and ":" not in id:
+            # client cũ có thể đang ở brain khác brain legacy → thử brain legacy
+            legacy_brain = _read_loop_config().get("brain") or "brain"
+            lp = loop_feature.toggle(legacy_brain, slug)
+        if not lp:
+            return {"ok": False, "error": "not found"}
+        return {"ok": True, "status": "active" if lp["enabled"] else "paused"}
     items = _read_automations(brain)
     for a in items:
         if a.get("id") == id:
@@ -2328,8 +2476,8 @@ async def automations_toggle(id: str = Form(...), brain: str = Form("brain")):
 
 @app.post("/automations/delete")
 async def automations_delete(id: str = Form(...), brain: str = Form("brain")):
-    if id == "__loop__":
-        return {"ok": False, "error": "Loop nội bộ chỉ tắt được, không xoá"}
+    if id == "__loop__" or id.startswith("__loop__:"):
+        return {"ok": False, "error": "Xóa loop trong tab Loop (trang Tự cải thiện), không xoá từ Lịch"}
     items = [a for a in _read_automations(brain) if a.get("id") != id]
     _write_automations(brain, items)
     return {"ok": True}
@@ -2395,6 +2543,10 @@ async def _start_scheduler():
     _migrate_legacy_brain()   # dữ liệu brain cũ → <BRAINS_DIR>/Brain Default (không mất data)
     _ensure_default_brain()   # brain mặc định có sẵn cấu trúc chuẩn (ghi được trên mount /brains)
     try:
+        loop_feature.ensure_migrated()   # loop_config.json cũ → Javis/loops/vong-lap-goc.md (1 lần)
+    except Exception as e:
+        print(f"[loops migrate] {e}", file=_sys.stderr)
+    try:
         if cfgmod.provision_admin_from_env():
             print("[auth] Đã tạo tài khoản admin từ JAVIS_ADMIN_PASSWORD (env).", file=_sys.stderr)
         if cfgmod.setup_token_required():
@@ -2413,13 +2565,12 @@ async def _start_scheduler():
         while True:
             try:
                 await asyncio.sleep(30)
-                # 1) Vòng tự cải thiện (loop cũ)
-                cfg = _read_loop_config()
-                if cfg.get("enabled") and not _LOOP_LOCK.locked():
-                    interval = max(5, int(cfg.get("interval_min", 60))) * 60
-                    if time.time() - float(cfg.get("last_run", 0)) >= interval:
-                        print("[loop] đến giờ chạy vòng tự cải thiện", file=__import__('sys').stderr)
-                        await run_loop_cycle("scheduled")
+                # 1) Multi-loop tự cải thiện: mỗi tick chọn TỐI ĐA 1 loop đến hạn
+                #    (quá hạn lâu nhất), chạy tuần tự qua lock toàn cục.
+                try:
+                    await loop_feature.tick()
+                except Exception as lpe:
+                    print(f"[loop tick] {type(lpe).__name__}: {lpe}", file=__import__('sys').stderr)
                 # 2) Engine tự học: debounce tick (rewire sau lượt) + curator định kỳ
                 try:
                     await learn_feature.tick()
@@ -2431,6 +2582,18 @@ async def _start_scheduler():
                     await tasks_feature.tick(["brain"])
                 except Exception as te:
                     print(f"[kanban tick] {type(te).__name__}: {te}", file=__import__('sys').stderr)
+                # 4) Backup GitHub tự động: đủ interval → đồng bộ các brain đang học
+                try:
+                    bcfg = cfgmod.read_settings().get("backup", {}) or {}
+                    if bcfg.get("enabled") and bcfg.get("repo_url") and bcfg.get("token") and git_brain.has_git():
+                        interval = max(1, int(bcfg.get("interval_hours", 6))) * 3600
+                        if time.time() - float(bcfg.get("last_backup", 0)) >= interval:
+                            # Backup mỗi brain learn đang theo dõi (nơi có dữ liệu mới); fallback brain mặc định
+                            _bbrains = learn_feature.read_config().get("brains") or ["brain"]
+                            for _bb in _bbrains:
+                                await asyncio.to_thread(_do_backup, _bb)
+                except Exception as be:
+                    print(f"[backup tick] {type(be).__name__}: {be}", file=__import__('sys').stderr)
             except Exception as e:
                 print(f"[scheduler] {type(e).__name__}: {e}", file=__import__('sys').stderr)
     asyncio.create_task(_scheduler_loop())
@@ -3083,7 +3246,14 @@ async def websocket_endpoint(ws: WebSocket):
             final_text = ""
             if prov == "openai-oauth":
                 # ===== ChatGPT subscription qua CODEX CLI - MCP/tool NATIVE (như Hermes, dùng codex của máy) =====
-                actual_model = api_model or "gpt-5.5"
+                actual_model = _codex_safe_model(api_model)   # gpt-5-mini/gpt-4o... → coerce về model Codex hợp lệ
+                if api_model and actual_model != api_model:
+                    # Tự chữa: model đã lưu không hợp lệ cho Codex → ghi lại model đúng (converge sau 1 lượt)
+                    try:
+                        _fix = cfgmod.read_settings(); _set_main_model(_fix, "openai-oauth", actual_model); cfgmod.write_settings(_fix)
+                        await ws.send_text(json.dumps({"type": "system", "content": f"⚠ Model '{api_model}' không chạy được qua Codex (tài khoản ChatGPT) - đã tự đổi sang '{actual_model}'. Đổi model khác ở trang Models nếu muốn."}))
+                    except Exception as _e:
+                        print(f"[codex model self-heal] {_e}", file=__import__('sys').stderr)
                 openai_oauth.write_codex_auth()   # bắc cầu token đã nối ở Models → ~/.codex/auth.json (codex dùng được)
                 ccli = CodexCLI(cwd=CLAUDE_CWD, model=actual_model, tag="chat")
                 ccli.profile = _write_codex_profile()   # đẩy MCP của Javis (POSCake...) sang codex

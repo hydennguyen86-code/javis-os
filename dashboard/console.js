@@ -40,7 +40,7 @@
     { id: "agents",      icon: ICON.agents,      label: "Agents" },
     { id: "skills",      icon: ICON.skills,      label: "Skills" },
     { id: "files",       icon: ICON.files,       label: "Tệp tin" },
-    { id: "selfimprove", icon: ICON.selfimprove, label: "Tự cải thiện" },
+    { id: "selfimprove", icon: ICON.selfimprove, label: "Loop" },
     { id: "learn",       icon: ICON.learn,       label: "Tự học" },
     { id: "kanban",      icon: ICON.kanban,      label: "Việc" },
     { id: "automations", icon: ICON.automations, label: "Lịch" },
@@ -59,7 +59,7 @@
     agents:      { icon: "🤖", label: "Agents", sub: "Trợ lý chuyên biệt" },
     skills:      { icon: "🧩", label: "Skills", sub: "Kỹ năng khả dụng" },
     files:       { icon: "🗂", label: "Tệp tin", sub: "Duyệt · sửa · tải file trong brain" },
-    selfimprove: { icon: "♻", label: "Tự cải thiện", sub: "Nhiệm vụ tự động chạy nền" },
+    selfimprove: { icon: "♻", label: "Loop", sub: "Nhiệm vụ lặp tự động chạy nền" },
     learn:       { icon: "🧠", label: "Tự học", sub: "Rewire Memory · Wiki · Skill (an toàn, undo được)" },
     kanban:      { icon: "🗂", label: "Việc (Kanban)", sub: "Backlog + dispatcher tự làm task nền" },
     automations: { icon: "⏰", label: "Lịch tự động", sub: "Cron · trigger · routine" },
@@ -432,91 +432,171 @@
   // ============================================
   async function renderSelfImprove(el) {
     _injectExtraCss();
+    const myGen = _renderGen;   // chống race: đổi trang → mọi loadLoops/loadLog dở tự bỏ
+    let pollTimer = null;       // 1 chuỗi poll duy nhất (clearTimeout trước khi đặt lại)
     el.innerHTML = `<div class="cview-section"><div class="empty">Đang tải...</div></div>`;
-    let cfg = {};
-    try { cfg = await (await fetch("/loop/config")).json(); } catch (e) {}
-    const GOALS = [
-      ["business", "Kinh doanh", "Đọc số liệu thật → soạn nháp content/khuyến mãi/lead cần gọi lại (chỉ nháp để duyệt)"],
-      ["brain", "Bộ não (Wiki)", "Ingest source mới, trả lời open-question, sửa lỗi Wiki"],
-      ["product", "Cải thiện Javis", "Đọc hội thoại → đề xuất/tạo agent, workflow, cải tiến UX"],
-      ["custom", "Tự định nghĩa", "Bạn mô tả nhiệm vụ cụ thể bên dưới"],
-    ];
-    const goalChips = GOALS.map(([v, l]) => `<button class="si-chip ${cfg.goal === v ? "sel" : ""}" data-goal="${v}">${l}</button>`).join("");
-    const modeChips = [["suggest", "Đề xuất (ghi nháp)"], ["auto", "Tự làm + kiểm chứng"]]
-      .map(([v, l]) => `<button class="si-chip ${cfg.mode === v ? "sel" : ""}" data-mode="${v}">${l}</button>`).join("");
-    const goalDesc = (GOALS.find(g => g[0] === cfg.goal) || GOALS[0])[2];
+    const GNAME = { business: "Kinh doanh", brain: "Bộ não", product: "Cải thiện Javis", custom: "Tự định nghĩa" };
+    const fmtT = ts => ts ? new Date(ts * 1000).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : "-";
+
     el.innerHTML = `<div class="cview-section">
-      <p style="color:#9fb0cf;font-size:15px;max-width:640px;margin:0 0 16px">Javis tự thức theo lịch, làm <b>một nhiệm vụ cụ thể</b> rồi tự kiểm chứng và ghi log. An toàn: chỉ thao tác FILE trong vault - KHÔNG tự gọi MCP tạo đơn, đốt tiền, đăng bài.</p>
-      <div class="si-grid">
-        <div class="si-field"><label>Bật chạy nền</label>
-          <button class="si-chip ${cfg.enabled ? "sel" : ""}" id="siEnabled">${cfg.enabled ? "● Đang bật" : "○ Đang tắt"}</button></div>
-        <div class="si-field"><label>Loại nhiệm vụ</label><div class="si-row" id="siGoals">${goalChips}</div>
-          <div class="dim" id="siGoalDesc" style="font-size:14px;margin-top:6px;color:#7d8aa6">${esc(goalDesc)}</div></div>
-        <div class="si-field" id="siCustomWrap" style="${cfg.goal === "custom" ? "" : "display:none"}">
-          <label>Mô tả nhiệm vụ cụ thể</label>
-          <textarea id="siCustom" placeholder="VD: Mỗi sáng tổng hợp số liệu bán hàng hôm qua, tìm sản phẩm bán chậm và soạn 1 caption đẩy hàng, lưu vào 05 - Projects.">${esc(cfg.custom_goal || "")}</textarea></div>
-        <div class="si-field"><label>Chế độ</label><div class="si-row" id="siModes">${modeChips}</div></div>
-        <div class="si-field"><label>Chu kỳ (phút)</label><input type="number" id="siInterval" min="5" value="${cfg.interval_min || 60}" style="max-width:140px"></div>
-        <div class="si-actions">
-          <button class="s-btn" id="siSave">💾 Lưu cấu hình</button>
-          <button class="s-btn-ghost" id="siRun">▶ Chạy ngay</button>
-          <button class="s-btn-ghost" id="siStop">■ Dừng</button>
-          <button class="s-btn-ghost" id="siLint">🩺 LINT Wiki</button>
+      <p style="color:#9fb0cf;font-size:15px;max-width:680px;margin:0 0 14px">Nhiều <b>loop</b> chạy ngầm: mỗi loop tự thức theo chu kỳ, làm <b>một việc</b> anh mô tả, tự kiểm chứng rồi ghi log. Thực thi <b>tuần tự</b> (1 vòng/lúc). Loop <b>đọc được dữ liệu thật qua MCP</b> (POS, quảng cáo, lịch...) để làm việc, nhưng KHÔNG tự tạo đơn/tiêu tiền/đăng bài - chỉ ghi nháp để anh duyệt. Loop bật sẽ hiện ở tab <b>Lịch</b>.</p>
+      <div class="si-actions" style="margin-bottom:14px">
+        <button class="s-btn" id="lpNew">+ Loop mới</button>
+        <button class="s-btn-ghost" id="lpStop">■ Dừng vòng đang chạy</button>
+      </div>
+      <div id="lpForm" style="display:none;margin-bottom:14px;padding:14px;border:1px solid rgba(255,255,255,.1);border-radius:10px;background:rgba(255,255,255,.03)">
+        <input type="hidden" id="lpSlug">
+        <div class="si-grid">
+          <div class="si-field"><label>Tên loop</label><input id="lpName" placeholder="VD: Đọc source mỗi 2 tiếng"></div>
+          <div class="si-field"><label>Mô tả nhiệm vụ (mỗi vòng Javis làm đúng việc này)</label>
+            <textarea id="lpBody" placeholder="VD: Mỗi vòng đọc 1 source chưa xử lý trong 06 - Sources rồi đề xuất Wiki page nên tạo. Hoặc: đọc số đơn hôm nay qua MCP POS, nếu thấp thì soạn nháp 1 caption đẩy hàng vào 05 - Projects."></textarea></div>
+          <div class="si-row" style="gap:14px;flex-wrap:wrap">
+            <div class="si-field"><label>Chế độ</label><div class="si-row" id="lpModes">
+              <button class="si-chip" data-mode="suggest">Đề xuất (chỉ đọc)</button>
+              <button class="si-chip" data-mode="auto">Tự làm (an toàn)</button>
+              <button class="si-chip" data-mode="full" style="border-color:rgba(224,102,74,.5)">⚠ Toàn quyền</button></div></div>
+            <div class="si-field"><label>Chu kỳ (phút, tối thiểu 5)</label><input type="number" id="lpInterval" min="5" value="120" style="max-width:120px"></div>
+          </div>
+          <div id="lpFullWarn" style="display:none;margin-top:4px;padding:10px 12px;border:1px solid rgba(224,102,74,.5);border-radius:8px;background:rgba(224,102,74,.08);color:#ffb59e;font-size:13px;line-height:1.5">
+            <b>⚠ CHẾ ĐỘ TOÀN QUYỀN - rủi ro cao.</b> Loop sẽ tự thao tác THẬT qua MCP không cần hỏi: có thể <b>tạo/sửa đơn hàng, chạy quảng cáo (tiêu tiền thật), gửi tin nhắn/email, đăng bài</b>. Nó chạy nền theo lịch, KHÔNG có người duyệt từng bước, và <b>hành động thật không hoàn tác được</b>. Chỉ bật khi anh đã tin tưởng loop này và mô tả nhiệm vụ thật rõ ràng, giới hạn phạm vi. Nên chạy thử ở "Đề xuất" hoặc "Tự làm (an toàn)" trước.
+          </div>
+          <div class="dim" style="font-size:12px;color:#6b7894;margin-top:2px">Đề xuất = chỉ đọc + gợi ý. Tự làm (an toàn) = ghi nháp file + đọc MCP, KHÔNG tiền/đơn/đăng bài. Toàn quyền = tự thao tác mọi thứ. · Tinh chỉnh nâng cao (giờ im lặng, trần vòng/ngày, thư mục code): sửa file <code>Javis/loops/&lt;tên&gt;.md</code>.</div>
+          <div class="si-actions"><button class="s-btn" id="lpSave">💾 Lưu loop</button><button class="s-btn-ghost" id="lpCancel">Huỷ</button><span class="dim" id="lpFormMsg" style="font-size:13px;color:#e0a04a"></span></div>
         </div>
       </div>
-      <div class="si-status" id="siStatus"></div>
-      <div class="si-log"><h3 style="font-size:15px;color:#cdd8ee">Nhật ký gần đây</h3><div id="siLog">Đang tải...</div></div>
+      <div id="lpCards">Đang tải...</div>
+      <div class="si-log"><h3 style="font-size:15px;color:#cdd8ee">Nhật ký gần đây · <select id="lpLogFilter" class="loop-sel" style="font-size:13px"><option value="">Tất cả loop</option></select></h3><div id="lpLog">Đang tải...</div></div>
     </div>`;
 
-    let cur = { enabled: !!cfg.enabled, goal: cfg.goal || "business", mode: cfg.mode || "suggest" };
-    const goalDescEl = el.querySelector("#siGoalDesc");
-    el.querySelectorAll("#siGoals .si-chip").forEach(c => c.onclick = () => {
-      cur.goal = c.dataset.goal;
-      el.querySelectorAll("#siGoals .si-chip").forEach(x => x.classList.toggle("sel", x === c));
-      el.querySelector("#siCustomWrap").style.display = cur.goal === "custom" ? "" : "none";
-      goalDescEl.textContent = (GOALS.find(g => g[0] === cur.goal) || GOALS[0])[2];
-    });
-    el.querySelectorAll("#siModes .si-chip").forEach(c => c.onclick = () => {
-      cur.mode = c.dataset.mode;
-      el.querySelectorAll("#siModes .si-chip").forEach(x => x.classList.toggle("sel", x === c));
-    });
-    const enBtn = el.querySelector("#siEnabled");
-    enBtn.onclick = () => { cur.enabled = !cur.enabled; enBtn.classList.toggle("sel", cur.enabled); enBtn.textContent = cur.enabled ? "● Đang bật" : "○ Đang tắt"; };
-
-    async function save() {
-      const fd = new FormData();
-      fd.append("enabled", cur.enabled ? "1" : "0");
-      fd.append("goal", cur.goal); fd.append("mode", cur.mode);
-      fd.append("interval_min", el.querySelector("#siInterval").value || "60");
-      fd.append("custom_goal", el.querySelector("#siCustom") ? el.querySelector("#siCustom").value : "");
-      fd.append("brain", fbrain());
-      return (await fetch("/loop/config", { method: "POST", body: fd })).json();
+    let fcur = { mode: "suggest" };
+    function syncFormChips() {
+      el.querySelectorAll("#lpModes .si-chip").forEach(x => x.classList.toggle("sel", x.dataset.mode === fcur.mode));
+      const w = el.querySelector("#lpFullWarn"); if (w) w.style.display = (fcur.mode === "full") ? "block" : "none";
     }
-    el.querySelector("#siSave").onclick = async () => { const b = el.querySelector("#siSave"); b.textContent = "Đang lưu..."; await save(); b.textContent = "✓ Đã lưu"; setTimeout(() => b.textContent = "💾 Lưu cấu hình", 1500); loadStatus(); };
-    el.querySelector("#siRun").onclick = async () => {
-      const b = el.querySelector("#siRun"); b.disabled = true; b.textContent = "Đang chạy...";
-      await save(); await fetch("/loop/run-now", { method: "POST" });
-      setTimeout(() => { b.disabled = false; b.textContent = "▶ Chạy ngay"; loadStatus(); loadLog(); }, 1500);
-    };
-    el.querySelector("#siStop").onclick = async () => { await fetch("/loop/stop", { method: "POST" }); loadStatus(); };
-    el.querySelector("#siLint").onclick = async () => {
-      const b = el.querySelector("#siLint"); b.disabled = true; b.textContent = "Đang quét Wiki...";
-      let d = {}; try { d = await (await fetch(`/lint?brain=${encodeURIComponent(fbrain())}`)).json(); } catch (e) { d = { error: e.message }; }
-      b.disabled = false; b.textContent = "🩺 LINT Wiki";
-      el.querySelector("#siStatus").innerHTML = d.ok ? `<b>🩺 LINT Wiki</b><br><span class="dim" style="color:#9fb0cf;white-space:pre-wrap">${esc(d.report || "")}</span>` : `⚠ LINT lỗi: ${esc(d.error || "không rõ")}`;
+    el.querySelectorAll("#lpModes .si-chip").forEach(c => c.onclick = () => { fcur.mode = c.dataset.mode; syncFormChips(); });
+
+    function openForm(lp) {
+      fcur = { mode: lp ? lp.mode : "suggest" };
+      el.querySelector("#lpSlug").value = lp ? lp.slug : "";
+      el.querySelector("#lpName").value = lp ? lp.name : "";
+      el.querySelector("#lpBody").value = lp ? (lp.body || "") : "";
+      el.querySelector("#lpInterval").value = lp ? lp.interval_min : 120;
+      el.querySelector("#lpFormMsg").textContent = "";
+      syncFormChips();
+      el.querySelector("#lpForm").style.display = "block";
+      el.querySelector("#lpName").focus();
+    }
+    el.querySelector("#lpNew").onclick = () => openForm(null);
+    el.querySelector("#lpCancel").onclick = () => { el.querySelector("#lpForm").style.display = "none"; };
+
+    el.querySelector("#lpSave").onclick = async () => {
+      const name = el.querySelector("#lpName").value.trim();
+      const body = el.querySelector("#lpBody").value.trim();
+      if (!name) { el.querySelector("#lpFormMsg").textContent = "Nhập tên loop"; return; }
+      if (!body) { el.querySelector("#lpFormMsg").textContent = "Nhập mô tả nhiệm vụ (Javis cần biết mỗi vòng làm gì)"; return; }
+      if (fcur.mode === "full" && !confirm(`Bật CHẾ ĐỘ TOÀN QUYỀN cho loop "${name}"?\n\nLoop sẽ tự thao tác THẬT qua MCP không cần hỏi: tạo/sửa đơn, chạy quảng cáo (tiêu tiền thật), gửi tin, đăng bài. Chạy nền theo lịch, KHÔNG duyệt từng bước, hành động KHÔNG hoàn tác được.\n\nAnh chắc chắn chứ?`)) return;
+      const fd = new FormData();
+      fd.append("slug", el.querySelector("#lpSlug").value);
+      fd.append("name", name);
+      fd.append("mode", fcur.mode);
+      fd.append("interval_min", el.querySelector("#lpInterval").value || "120");
+      fd.append("body", body);
+      fd.append("brain", fbrain());
+      // Không gửi goal/workspace/tools_profile/quiet/maxruns → server giữ giá trị cũ (khi sửa)
+      // hoặc mặc định an toàn (tạo mới: goal=custom, vault + MCP đọc).
+      const b = el.querySelector("#lpSave"); b.textContent = "Đang lưu...";
+      let r = {}; try { r = await (await fetch("/loops", { method: "POST", body: fd })).json(); } catch (e) { r = { error: e.message }; }
+      b.textContent = "💾 Lưu loop";
+      if (!r.ok) { el.querySelector("#lpFormMsg").textContent = "⚠ " + (r.error || "Lưu lỗi"); return; }
+      el.querySelector("#lpForm").style.display = "none";
+      loadLoops(); loadLog();
     };
 
-    async function loadStatus() {
-      let c = {}; try { c = await (await fetch("/loop/config")).json(); } catch (e) { }
-      const when = c.last_run ? new Date(c.last_run * 1000).toLocaleString() : "chưa chạy lần nào";
-      el.querySelector("#siStatus").innerHTML = `<b>${c.running ? "⏳ Đang chạy một vòng…" : "Trạng thái: nghỉ"}</b><br>Lần gần nhất: ${esc(when)}${c.last_status ? " · " + esc(c.last_status) : ""}${c.last_summary ? `<br><span class="dim" style="color:#8aa">${esc((c.last_summary || "").slice(0, 240))}</span>` : ""}`;
+    el.querySelector("#lpStop").onclick = async () => { await fetch("/loops/stop", { method: "POST" }); loadLoops(); };
+
+    function loopCard(lp) {
+      const paused = !!lp.auto_paused_reason;
+      const dot = lp.running ? `<span style="color:#3fdc86">⏳ đang chạy</span>`
+        : paused ? `<span style="color:#e0a04a">⚠ tự tạm dừng</span>`
+        : lp.enabled ? `<span style="color:#3fdc86">● bật</span>` : `<span style="color:#6b7894">○ tắt</span>`;
+      const verify = lp.last_status && lp.last_status !== "ok"
+        ? ` · ${esc(lp.last_status.slice(0, 90))}` : (lp.last_status === "ok" ? " · ok" : "");
+      const last = lp.last_run ? `lần cuối ${fmtT(lp.last_run)}` : "chưa chạy";
+      const next = (lp.enabled && !paused && lp.next_run) ? ` · kế tiếp ~${fmtT(lp.next_run)}` : "";
+      const modeLbl = lp.mode === "full" ? `<span style="color:#e0664a;font-weight:600">⚠ toàn quyền</span>`
+        : lp.mode === "auto" ? "tự làm (an toàn)" : "đề xuất";
+      const extra = [
+        `${modeLbl} · mỗi ${lp.interval_min} phút`,
+        (lp.goal && lp.goal !== "custom") ? (GNAME[lp.goal] || lp.goal) : "",
+        lp.quiet_hours ? `im lặng ${lp.quiet_hours}` : "",
+        lp.max_runs_per_day ? `tối đa ${lp.max_runs_per_day}/ngày (đã ${lp.runs_today})` : "",
+        lp.tools_profile === "code" ? `⚙ code · ${esc(lp.workspace)}` : "",
+      ].filter(Boolean).join(" · ");
+      const div = document.createElement("div");
+      div.className = "wf-card" + (lp.enabled ? "" : " off");
+      div.innerHTML = `
+        <div class="wf-top"><div class="wf-name">🔁 ${esc(lp.name)} <span class="dim" style="font-size:12px">${esc(lp.slug)}</span></div><div>${dot}</div></div>
+        <div class="wf-desc">${extra}</div>
+        <div class="wf-steps">${last}${verify}${next}${paused ? `<br>⚠ ${esc(lp.auto_paused_reason)}` : ""}</div>
+        <div class="wf-actions">
+          <button class="s-btn-ghost tgl">${lp.enabled ? "Tắt" : "Bật"}</button>
+          <button class="s-btn-ghost run">▶ Chạy ngay</button>
+          <button class="s-btn-ghost edit">Sửa</button>
+          <button class="s-btn-ghost del" style="color:#e0664a">Xoá</button>
+        </div>`;
+      div.querySelector(".tgl").onclick = async () => {
+        // Bật loop TOÀN QUYỀN = xác nhận rủi ro (tắt thì khỏi hỏi)
+        if (!lp.enabled && lp.mode === "full" &&
+            !confirm(`Bật loop TOÀN QUYỀN "${lp.name}"?\n\nNó sẽ tự thao tác THẬT qua MCP (tạo đơn, tiêu tiền quảng cáo, gửi tin, đăng bài) theo lịch, không duyệt từng bước. Chắc chứ?`)) return;
+        await fetch("/loops/toggle", { method: "POST", body: (() => { const f = new FormData(); f.append("slug", lp.slug); f.append("brain", fbrain()); return f; })() });
+        loadLoops();
+      };
+      div.querySelector(".run").onclick = async (e) => {
+        e.target.disabled = true; e.target.textContent = "Đang chạy...";
+        await fetch("/loops/run-now", { method: "POST", body: (() => { const f = new FormData(); f.append("slug", lp.slug); f.append("brain", fbrain()); return f; })() });
+        setTimeout(() => { loadLoops(); loadLog(); }, 2500);
+      };
+      div.querySelector(".edit").onclick = () => openForm(lp);
+      div.querySelector(".del").onclick = async () => {
+        if (!confirm(`Xoá loop "${lp.name}"? File Javis/loops/${lp.slug}.md sẽ bị xoá.`)) return;
+        await fetch("/loops/delete", { method: "POST", body: (() => { const f = new FormData(); f.append("slug", lp.slug); f.append("brain", fbrain()); return f; })() });
+        loadLoops(); loadLog();
+      };
+      return div;
+    }
+
+    async function loadLoops() {
+      if (myGen !== _renderGen) return;   // đã rời trang
+      let d = { loops: [] };
+      try { d = await (await fetch(`/loops?brain=${encodeURIComponent(fbrain())}`)).json(); } catch (e) {}
+      if (myGen !== _renderGen) return;   // đổi trang trong lúc chờ fetch
+      const box = el.querySelector("#lpCards");
+      if (!box) return;
+      box.innerHTML = "";
+      if (!(d.loops || []).length) {
+        box.innerHTML = `<div class="empty">Chưa có loop nào. Bấm <b>+ Loop mới</b>, hoặc nói với Javis trong chat (vd "tạo loop mỗi 2 tiếng đọc 1 source rồi đề xuất").</div>`;
+      } else {
+        d.loops.forEach(lp => box.appendChild(loopCard(lp)));
+      }
+      const sel = el.querySelector("#lpLogFilter");
+      const cur = sel.value;
+      sel.innerHTML = `<option value="">Tất cả loop</option>` +
+        (d.loops || []).map(lp => `<option value="${esc(lp.slug)}" ${lp.slug === cur ? "selected" : ""}>${esc(lp.name)}</option>`).join("");
+      clearTimeout(pollTimer);
+      if (d.running) pollTimer = setTimeout(loadLoops, 5000);   // đang có vòng chạy → tự refresh (1 chuỗi)
     }
     async function loadLog() {
-      let d = { entries: [] }; try { d = await (await fetch(`/loop/log?brain=${encodeURIComponent(fbrain())}&limit=8`)).json(); } catch (e) { }
-      const box = el.querySelector("#siLog");
+      if (myGen !== _renderGen) return;
+      const slug = el.querySelector("#lpLogFilter").value;
+      let d = { entries: [] };
+      try { d = await (await fetch(`/loops/log?brain=${encodeURIComponent(fbrain())}&slug=${encodeURIComponent(slug)}&limit=10`)).json(); } catch (e) { }
+      if (myGen !== _renderGen) return;
+      const box = el.querySelector("#lpLog");
+      if (!box) return;
       box.innerHTML = (d.entries || []).length ? d.entries.map(e => `<div class="le">${esc(e)}</div>`).join("") : `<div class="dim" style="color:#6b7894">Chưa có nhật ký.</div>`;
     }
-    loadStatus(); loadLog();
+    el.querySelector("#lpLogFilter").onchange = loadLog;
+    loadLoops(); loadLog();
   }
 
   // ============================================
@@ -537,14 +617,14 @@
     const modeDesc = (MODES.find(m => m[0] === cfg.mode) || MODES[0])[2];
     const capRow = [["memory", "Ký ức (Memory)"], ["wiki", "Tri thức (Wiki)"], ["skill", "Kỹ năng (Skill)"], ["task", "Việc (Kanban)"]]
       .map(([k, l]) => `<button class="si-chip ${caps[k] ? "sel" : ""}" data-cap="${k}">${caps[k] ? "● " : "○ "}${l}</button>`).join("");
-    const gitWarn = cfg.git_available ? "" : `<div class="dim" style="color:#e0a04a;font-size:13px;margin-top:6px">⚠ Máy chưa có <code>git</code> → chế độ Tự ghi sẽ tự hạ về Chạy thử (không undo được nếu không git).</div>`;
+    const gitWarn = cfg.git_available ? "" : `<div class="dim" style="color:#7d8aa6;font-size:13px;margin-top:6px">ℹ Máy chưa có <code>git</code>: Tự học VẪN chạy bình thường, chỉ là chưa có hoàn tác 1-chạm/backup lên GitHub. Cài git để bật undo + sao lưu brain.</div>`;
 
     el.innerHTML = `<div class="cview-section">
-      <p style="color:#9fb0cf;font-size:15px;max-width:660px;margin:0 0 14px">Sau mỗi hội thoại, Javis tự rút <b>ký ức</b>, đúc <b>tri thức Wiki</b> và <b>kỹ năng</b> - qua một tiến trình học <b>chỉ-đọc, cô lập</b> (0 MCP, không xoá). Người ghi file là code tin cậy; mọi lần học đều <b>git-commit + hoàn tác 1 chạm</b>. Mặc định <b>Chạy thử</b> để bạn xem trước.</p>
+      <p style="color:#9fb0cf;font-size:15px;max-width:660px;margin:0 0 14px">Sau mỗi hội thoại, Javis tự rút <b>ký ức</b>, đúc <b>tri thức Wiki</b>, <b>kỹ năng</b> và <b>việc</b> - qua tiến trình học <b>chỉ-đọc, cô lập</b> (0 MCP, không xoá). Người ghi file là code tin cậy. Mặc định <b>bật sẵn + tự ghi</b>; nếu brain có git thì mỗi lần học còn được <b>git-commit để hoàn tác 1 chạm</b>.</p>
       <div class="si-grid">
         <div class="si-field"><label>Bật tự học</label>
           <button class="si-chip ${cfg.enabled ? "sel" : ""}" id="lnEnabled">${cfg.enabled ? "● Đang bật" : "○ Đang tắt"}</button>
-          <div class="dim" id="lnEnableNote" style="font-size:13px;margin-top:6px;color:#7d8aa6">Bật lần đầu sẽ git-init brain để undo được.</div></div>
+          <div class="dim" id="lnEnableNote" style="font-size:13px;margin-top:6px;color:#7d8aa6">Học chạy được ngay cả khi chưa có git. Có git thì thêm undo + sao lưu.</div></div>
         <div class="si-field"><label>Chế độ ghi</label><div class="si-row" id="lnModes">${modeChips}</div>
           <div class="dim" id="lnModeDesc" style="font-size:14px;margin-top:6px;color:#7d8aa6">${esc(modeDesc)}</div>${gitWarn}</div>
         <div class="si-field"><label>Học cái gì</label><div class="si-row" id="lnCaps">${capRow}</div>
@@ -561,6 +641,33 @@
         </div>
       </div>
       <div class="si-status" id="lnMetrics"></div>
+
+      <div class="si-log" id="lnBackupBox">
+        <h3 style="font-size:15px;color:#cdd8ee">☁ Sao lưu brain lên GitHub</h3>
+        <p style="color:#9fb0cf;font-size:14px;max-width:680px;margin:2px 0 10px">Đồng bộ toàn bộ brain (ghi chú, Wiki, ký ức) lên 1 repo GitHub <b>riêng tư</b> để không mất dữ liệu khi hỏng máy/VPS. Xem hướng dẫn chi tiết: <a href="https://github.com/blogminhquy/javis-os/blob/main/docs/18-sao-luu-github.md" target="_blank" style="color:#7fb0ff">docs/18-sao-luu-github.md</a>.</p>
+        <ol style="color:#9fb0cf;font-size:13.5px;line-height:1.7;max-width:680px;margin:0 0 12px;padding-left:20px">
+          <li>Tạo repo GitHub <b>Private</b> (trống, KHÔNG thêm README) - vd <code>javis-brain-backup</code>.</li>
+          <li>Tạo token: GitHub → Settings → Developer settings → <b>Fine-grained tokens</b> → chọn đúng repo đó → quyền <b>Contents: Read and write</b> → tạo và copy token (dạng <code>github_pat_...</code>).</li>
+          <li>Dán URL repo + token vào đây, bấm <b>Kiểm tra</b>, rồi <b>Sao lưu ngay</b>. Bật tự động nếu muốn định kỳ đẩy.</li>
+        </ol>
+        <div class="si-grid">
+          <div class="si-field"><label>URL repo (https)</label><input id="bkRepo" placeholder="https://github.com/blogminhquy/javis-brain-backup"></div>
+          <div class="si-field"><label>GitHub token (fine-grained, quyền Contents)</label><input id="bkToken" type="password" placeholder="github_pat_..."></div>
+          <div class="si-row" style="gap:14px;flex-wrap:wrap">
+            <div class="si-field"><label>Nhánh</label><input id="bkBranch" value="main" style="max-width:120px"></div>
+            <div class="si-field"><label>Tự sao lưu mỗi (giờ)</label><input type="number" id="bkInterval" min="1" value="6" style="max-width:120px"></div>
+            <div class="si-field"><label>Tự động</label><button class="si-chip" id="bkAuto">○ Tắt</button></div>
+          </div>
+          <div class="si-actions">
+            <button class="s-btn-ghost" id="bkTest">🔌 Kiểm tra kết nối</button>
+            <button class="s-btn" id="bkNow">☁ Sao lưu ngay</button>
+            <button class="s-btn-ghost" id="bkSave">💾 Lưu cấu hình</button>
+          </div>
+          <div class="dim" id="bkStatus" style="font-size:13px;color:#7d8aa6"></div>
+          <div class="dim" id="bkWarn" style="font-size:12px;color:#e0a04a;margin-top:2px">⚠ Brain có thể chứa số liệu/thông tin cá nhân - CHỈ dùng repo Private. Token lưu nội bộ (không đẩy lên repo).</div>
+        </div>
+      </div>
+
       <div class="si-log"><h3 style="font-size:15px;color:#cdd8ee">Javis đã tự học gì (commit gần nhất)</h3><div id="lnReview">Đang tải...</div></div>
       <div class="si-log"><h3 style="font-size:15px;color:#cdd8ee">Nhật ký học</h3><div id="lnLog">Đang tải...</div></div>
     </div>`;
@@ -648,7 +755,47 @@
       let d = { entries: [] }; try { d = await (await fetch(`/learn/log?brain=${encodeURIComponent(fbrain())}&limit=10`)).json(); } catch (e) { }
       el.querySelector("#lnLog").innerHTML = (d.entries || []).length ? d.entries.map(e => `<div class="le">${esc(e)}</div>`).join("") : `<div class="dim" style="color:#6b7894">Chưa có nhật ký học.</div>`;
     }
-    function loadAll() { loadMetrics(); loadReview(); loadLog(); }
+    // ── Backup GitHub ──
+    let bkAutoOn = false;
+    const bkAutoBtn = el.querySelector("#bkAuto");
+    bkAutoBtn.onclick = () => { bkAutoOn = !bkAutoOn; bkAutoBtn.classList.toggle("sel", bkAutoOn); bkAutoBtn.textContent = bkAutoOn ? "● Bật" : "○ Tắt"; };
+    async function bkSaveCfg() {
+      const f = new FormData();
+      f.append("repo_url", el.querySelector("#bkRepo").value.trim());
+      const tk = el.querySelector("#bkToken").value.trim();
+      if (tk && !tk.startsWith("••••")) f.append("token", tk);   // chỉ gửi token mới, không gửi chuỗi che
+      f.append("branch", el.querySelector("#bkBranch").value.trim() || "main");
+      f.append("interval_hours", el.querySelector("#bkInterval").value || "6");
+      f.append("enabled", bkAutoOn ? "1" : "0");
+      return (await fetch("/backup/config", { method: "POST", body: f })).json();
+    }
+    el.querySelector("#bkSave").onclick = async () => { const b = el.querySelector("#bkSave"); b.textContent = "Đang lưu..."; await bkSaveCfg(); b.textContent = "✓ Đã lưu"; setTimeout(() => b.textContent = "💾 Lưu cấu hình", 1500); loadBackup(); };
+    el.querySelector("#bkTest").onclick = async () => {
+      const b = el.querySelector("#bkTest"); b.disabled = true; b.textContent = "Đang kiểm tra..."; await bkSaveCfg();
+      let r = {}; try { r = await (await fetch("/backup/test", { method: "POST" })).json(); } catch (e) { r = { error: e.message }; }
+      b.disabled = false; b.textContent = "🔌 Kiểm tra kết nối";
+      el.querySelector("#bkStatus").innerHTML = r.ok ? `<span style="color:#3fdc86">✓ Kết nối OK - token + repo hợp lệ.</span>` : `<span style="color:#e0664a">✗ ${esc(r.error || "không kết nối được")}</span>`;
+    };
+    el.querySelector("#bkNow").onclick = async () => {
+      const b = el.querySelector("#bkNow"); b.disabled = true; b.textContent = "Đang đồng bộ..."; await bkSaveCfg();
+      let r = {}; try { r = await (await fetch("/backup/now", { method: "POST", body: brainForm() })).json(); } catch (e) { r = { error: e.message }; }
+      b.disabled = false; b.textContent = "☁ Sao lưu ngay";
+      el.querySelector("#bkStatus").innerHTML = r.ok ? `<span style="color:#3fdc86">✓ Đã đồng bộ brain lên GitHub.</span>` : `<span style="color:#e0664a">✗ ${esc(r.error || "lỗi")}</span>`;
+      loadBackup();
+    };
+    async function loadBackup() {
+      let s = {}; try { s = await (await fetch(`/backup/status?brain=${encodeURIComponent(fbrain())}`)).json(); } catch (e) { return; }
+      el.querySelector("#bkRepo").value = s.repo_url || "";
+      el.querySelector("#bkBranch").value = s.branch || "main";
+      el.querySelector("#bkInterval").value = s.interval_hours || 6;
+      if (s.token_set && !el.querySelector("#bkToken").value) el.querySelector("#bkToken").placeholder = "•••• (đã lưu, để trống nếu giữ nguyên)";
+      bkAutoOn = !!s.enabled; bkAutoBtn.classList.toggle("sel", bkAutoOn); bkAutoBtn.textContent = bkAutoOn ? "● Bật" : "○ Tắt";
+      const when = s.last_backup ? new Date(s.last_backup * 1000).toLocaleString() : "chưa sao lưu";
+      const gitNote = s.has_git ? "" : " · ⚠ máy chưa cài git (cần git để backup)";
+      el.querySelector("#bkStatus").innerHTML = `Lần cuối: ${esc(when)}${s.last_status ? " · " + esc(s.last_status) : ""}${gitNote}`;
+    }
+
+    function loadAll() { loadMetrics(); loadReview(); loadLog(); loadBackup(); }
     loadAll();
   }
 

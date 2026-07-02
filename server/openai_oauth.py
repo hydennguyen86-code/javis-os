@@ -189,8 +189,10 @@ def list_models(creds):
     }
     if not creds.get("account_id"):
         headers.pop("chatgpt-account-id", None)
-    for url in ("https://chatgpt.com/backend-api/codex/models",
-                "https://chatgpt.com/backend-api/models"):
+    # CHỈ endpoint codex: trả đúng model chạy được qua Codex. KHÔNG fallback /backend-api/models
+    # (nó trả cả model ChatGPT chung như gpt-5-mini/gpt-4o - Codex account từ chối → picker chào sai).
+    # Endpoint codex hỏng → return None → caller dùng catalog curated (đã đúng).
+    for url in ("https://chatgpt.com/backend-api/codex/models",):
         try:
             r = httpx.get(url, headers=headers, timeout=20)
             if r.status_code != 200:

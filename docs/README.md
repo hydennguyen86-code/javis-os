@@ -28,6 +28,7 @@ Hướng dẫn sử dụng chi tiết từng chức năng của Javis OS. Mỗi 
 
 ### Bộ não & dữ liệu
 - [13 - Second Brain: bộ nhớ, Wiki, INGEST](13-second-brain-bo-nho-wiki.md) - đa-brain, bộ nhớ sống, tiêu hoá tri thức.
+- [18 - Sao lưu brain lên GitHub](18-sao-luu-github.md) - đồng bộ brain lên repo riêng, khôi phục khi mất máy/VPS.
 
 ### Tài khoản, thương hiệu, cấu hình
 - [14 - Bảo mật & tài khoản](14-bao-mat-tai-khoan.md) - đăng nhập bắt buộc, mật khẩu, rate-limit, workspace.
