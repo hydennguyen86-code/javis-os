@@ -4,6 +4,11 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.8.13] - 2026-07-03
+### Cải thiện
+- Bảng chọn model trong Telegram làm lại theo UX gateway Hermes: chọn provider ĐÃ KẾT NỐI (Claude Code, **ChatGPT**, OpenRouter, Claude API, OpenAI API - trước đây thiếu hẳn ChatGPT) có dấu ✓ + số model, rồi lưới model 2 cột **phân trang ◀ 1/N ▶**. Danh sách model lấy LIVE từ provider (OpenRouter đủ vài trăm model thay vì vài cái trong catalog; ChatGPT hiện model Codex), có mẹo gõ `/model <id>` chọn nhanh.
+- Gõ tay `/model gpt-5.5` hoặc `/model gpt-5.3-codex` giờ tự hiểu là ChatGPT (Codex) nếu đã kết nối OAuth, không còn bị nhét nhầm sang Claude.
+
 ## [0.8.12] - 2026-07-03
 ### Thêm mới
 - Telegram có lệnh **`/brain`** - xem và đổi brain (vault) cho RIÊNG phiên của mình: gõ `/brain` mở bảng nút bấm chọn (brain đang dùng có dấu ✓), hoặc gõ thẳng tên `/brain <tên>` (khớp một phần cũng được). Đổi xong hội thoại tự reset để nạp đúng bộ nhớ/skill của brain mới; người khác dùng chung bot và dashboard KHÔNG bị ảnh hưởng. `/reset` giữ nguyên brain đã chọn.

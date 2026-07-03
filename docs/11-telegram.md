@@ -100,9 +100,8 @@ Gõ dấu `/` trong chat (hoặc bấm nút Menu của bot) sẽ hiện danh sá
 
 Chi tiết cách gõ `/model`:
 
-- Tên có dấu `/` bên trong (vd `openai/gpt-4o`) được hiểu là model OpenRouter.
-- Tên không có dấu `/` (vd `opus`, `sonnet`, `haiku`, `fable`) được hiểu là model Claude.
-- Bảng nút bấm khi gõ `/model` cho phép chọn nhóm Claude hoặc OpenRouter, rồi bấm chọn model. Model đang dùng có dấu ✓.
+- Bảng nút bấm khi gõ `/model`: chọn provider ĐÃ KẾT NỐI (Claude Code, ChatGPT, OpenRouter, Claude API, OpenAI API - provider đang dùng có dấu ✓ kèm số model), rồi tới lưới model 2 cột, 8 model một trang, nút ◀ ▶ lật trang. Danh sách model lấy TRỰC TIẾP từ provider (OpenRouter hiện đầy đủ vài trăm model, ChatGPT hiện model Codex), không phải danh sách cứng.
+- Gõ thẳng tên cũng được: tên có dấu `/` (vd `openai/gpt-4o`) là model OpenRouter; `gpt-...` hoặc `...-codex` là model ChatGPT (cần đã kết nối OAuth); còn lại (vd `opus`, `sonnet`, `fable`) là model Claude.
 
 ## MCP và skill qua Telegram
 

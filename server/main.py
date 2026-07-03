@@ -3783,14 +3783,46 @@ async def _tg_skills_text(brain):
     return "🧩 Skill có sẵn (gõ /slug để gọi, cần engine Claude CLI):\n" + "\n".join(lines)
 
 
-# ---- Menu chọn model (inline keyboard Telegram) ----
-def _model_catalog():
-    """Đọc danh sách model từ config. Mở rộng = sửa settings.json, không sửa code."""
-    cat = (cfgmod.read_settings().get("model", {}) or {}).get("catalog") or {}
-    return {
-        "claude": [str(x) for x in (cat.get("claude") or ["opus", "sonnet", "haiku", "fable"])],
-        "openrouter": [str(x) for x in (cat.get("openrouter") or [])],
-    }
+# ---- Menu chọn model (inline keyboard Telegram) - kiểu Hermes: chọn provider
+#      (đánh dấu ✓ + số model) → lưới model 2 cột PHÂN TRANG ◀ 1/N ▶.
+#      Danh sách model lấy LIVE qua provider_models() (OpenRouter đầy đủ, ChatGPT,
+#      Claude API...), fallback catalog trong settings khi provider không list được. ----
+_TG_PROVIDERS = [   # (id provider, nhãn nút ngắn)
+    ("anthropic-cli", "Claude Code"),
+    ("openai-oauth", "ChatGPT"),
+    ("openrouter", "OpenRouter"),
+    ("anthropic-api", "Claude API"),
+    ("openai", "OpenAI API"),
+]
+_TG_MODEL_LISTS = {}   # provider -> list model id ĐÃ render (index nút ổn định khi bấm)
+_TG_PAGE = 8           # model mỗi trang (lưới 2 cột x 4 hàng)
+
+
+def _tg_prov_label(pid):
+    return dict(_TG_PROVIDERS).get(pid, pid)
+
+
+def _tg_prov_ready(pid, m):
+    """Provider dùng được ngay chưa? CLI luôn sẵn; OAuth cần đã kết nối; API cần key
+    (cùng logic 'configured' của _providers_view)."""
+    d = _provider_def(pid) or {}
+    if d.get("kind") == "oauth":
+        o = m.get("openai_oauth") or {}
+        return bool(o.get("access_token") or o.get("refresh_token"))
+    kf = d.get("key_field")
+    return True if kf is None else bool(m.get(kf))
+
+
+async def _tg_models_for(pid):
+    """Model của 1 provider (live, cache 10' trong provider_models) + nhớ lại danh sách
+    đã render để index nút bấm không lệch giữa lúc hiện menu và lúc user bấm."""
+    try:
+        d = await provider_models(provider=pid)
+        ids = [str(x) for x in (d.get("models") or [])]
+    except Exception:
+        ids = []
+    _TG_MODEL_LISTS[pid] = ids
+    return ids
 
 
 def _model_current():
@@ -3798,32 +3830,64 @@ def _model_current():
     return em["provider"], em["model"] or "mặc định"
 
 
-def _model_provider_kb():
-    cat = _model_catalog()
-    return {"inline_keyboard": [
-        [{"text": f"Claude ({len(cat['claude'])})", "callback_data": "mp:claude"},
-         {"text": f"OpenRouter ({len(cat['openrouter'])})", "callback_data": "mp:openrouter"}],
-        [{"text": "✕ Đóng", "callback_data": "mx"}],
-    ]}
-
-
-def _model_list_kb(provider):
-    cat = _model_catalog()
-    _, cur = _model_current()
-    rows = []
-    for i, mdl in enumerate(cat.get(provider, [])):
-        mark = "✓ " if mdl == cur else ""
-        rows.append([{"text": f"{mark}{mdl}", "callback_data": f"ms:{provider}:{i}"}])
-    rows.append([{"text": "‹ Quay lại", "callback_data": "mp:back"}, {"text": "✕ Đóng", "callback_data": "mx"}])
+async def _model_provider_kb():
+    m = cfgmod.read_settings().get("model", {})
+    cur_prov, _ = _model_current()
+    ready = [(pid, lb) for pid, lb in _TG_PROVIDERS if _tg_prov_ready(pid, m)]
+    lists = await asyncio.gather(*(_tg_models_for(pid) for pid, _ in ready))
+    rows, row = [], []
+    for (pid, lb), ids in zip(ready, lists):
+        mark = "✓ " if pid == cur_prov else ""
+        row.append({"text": f"{mark}{lb} ({len(ids)})", "callback_data": f"mp:{pid}"})
+        if len(row) == 2:
+            rows.append(row); row = []
+    if row:
+        rows.append(row)
+    rows.append([{"text": "✕ Đóng", "callback_data": "mx"}])
     return {"inline_keyboard": rows}
 
 
+def _model_list_kb(pid, page=0):
+    ids = _TG_MODEL_LISTS.get(pid) or []
+    _, cur = _model_current()
+    pages = max(1, (len(ids) + _TG_PAGE - 1) // _TG_PAGE)
+    page = max(0, min(page, pages - 1))
+    rows, row = [], []
+    for i in range(page * _TG_PAGE, min((page + 1) * _TG_PAGE, len(ids))):
+        mid = ids[i]
+        # OpenRouter id dạng vendor/tên → nút chỉ hiện tên cho gọn (chọn vẫn theo id đầy đủ)
+        disp = mid.split("/", 1)[-1] if pid == "openrouter" else mid
+        mark = "✓ " if mid == cur else ""
+        row.append({"text": f"{mark}{disp}"[:60], "callback_data": f"ms:{pid}:{i}"})
+        if len(row) == 2:
+            rows.append(row); row = []
+    if row:
+        rows.append(row)
+    if pages > 1:
+        nav = []
+        if page > 0:
+            nav.append({"text": "◀", "callback_data": f"ml:{pid}:{page - 1}"})
+        nav.append({"text": f"{page + 1}/{pages}", "callback_data": "noop"})
+        if page < pages - 1:
+            nav.append({"text": "▶", "callback_data": f"ml:{pid}:{page + 1}"})
+        rows.append(nav)
+    rows.append([{"text": "‹ Provider", "callback_data": "mp:back"},
+                 {"text": "✕ Đóng", "callback_data": "mx"}])
+    return {"inline_keyboard": rows}
+
+
+def _tg_model_list_text(pid):
+    n = len(_TG_MODEL_LISTS.get(pid) or [])
+    tip = "\nMẹo: gõ /model <id> để chọn nhanh không cần lật trang." if n > _TG_PAGE else ""
+    return f"⚙️ {_tg_prov_label(pid)} - chọn model ({n}):{tip}"
+
+
 def _model_header():
-    eng, cur = _model_current()
+    prov, cur = _model_current()
     return ("⚙️ Cấu hình model\n"
             f"Hiện tại: {cur}\n"
-            f"Engine: {'OpenRouter (chat thuần)' if eng == 'openrouter' else 'Claude CLI (có MCP)'}\n\n"
-            "Chọn nhóm:")
+            f"Provider: {_tg_prov_label(prov)}\n\n"
+            "Chọn provider (chỉ hiện provider đã kết nối):")
 
 
 # ---- Menu chọn brain cho PHIÊN Telegram (inline keyboard, giống menu model) ----
@@ -3873,33 +3937,50 @@ async def _tg_callback(data, chat=None):
         return {"text": f"🧠 Đã chuyển phiên này sang brain: {hit['name']}\n"
                         "(hội thoại reset để nạp đúng bộ nhớ/skill của brain mới)",
                 "alert": "Đã đổi brain"}
+    if data == "noop":
+        return None   # nút chỉ-hiển-thị (số trang) - answer callback cho tắt spinner, không sửa tin
     if data in ("mp:back", "model"):
-        return {"text": _model_header(), "reply_markup": _model_provider_kb()}
+        return {"text": _model_header(), "reply_markup": await _model_provider_kb()}
     if data.startswith("mp:"):
-        provider = data.split(":", 1)[1]
-        cat = _model_catalog()
-        if provider not in cat:
-            return {"alert": "Nhóm không hợp lệ"}
-        label = "Claude" if provider == "claude" else "OpenRouter"
-        return {"text": f"⚙️ {label} - chọn model:", "reply_markup": _model_list_kb(provider)}
+        pid = data.split(":", 1)[1]
+        if pid not in dict(_TG_PROVIDERS):
+            return {"alert": "Provider không hợp lệ - gõ /model lại"}
+        if not _tg_prov_ready(pid, cfgmod.read_settings().get("model", {})):
+            return {"alert": f"{_tg_prov_label(pid)} chưa kết nối - vào dashboard trang Models"}
+        await _tg_models_for(pid)   # nạp danh sách mới nhất trước khi vẽ trang 1
+        return {"text": _tg_model_list_text(pid), "reply_markup": _model_list_kb(pid, 0)}
+    if data.startswith("ml:"):
+        # lật trang danh sách model
+        try:
+            _, pid, pg = data.split(":")
+            page = int(pg)
+        except ValueError:
+            return {"alert": "Dữ liệu nút lỗi"}
+        if pid not in _TG_MODEL_LISTS:
+            await _tg_models_for(pid)   # server vừa restart → nạp lại rồi vẽ tiếp
+        return {"text": _tg_model_list_text(pid), "reply_markup": _model_list_kb(pid, page)}
     if data.startswith("ms:"):
         try:
-            _, provider, idx = data.split(":")
+            _, pid, idx = data.split(":")
             i = int(idx)
         except ValueError:
             return {"alert": "Dữ liệu nút lỗi"}
-        models = _model_catalog().get(provider, [])
-        if i < 0 or i >= len(models):
-            return {"alert": "Model không tồn tại"}
-        mdl = models[i]
+        ids = _TG_MODEL_LISTS.get(pid) or []
+        if i < 0 or i >= len(ids):
+            return {"alert": "Danh sách đã đổi - gõ /model lại"}
+        mdl = ids[i]
         s = cfgmod.read_settings(); m = s["model"]
-        if provider == "openrouter":
-            if not m.get("openrouter_key"):
-                return {"alert": "Chưa có OpenRouter key (đặt ở dashboard)"}
-            _set_main_model(s, "openrouter", mdl); cfgmod.write_settings(s)
-            return {"text": f"✅ OpenRouter - model: {mdl}\n(chat thuần, không MCP)", "alert": "Đã đổi model"}
-        _set_main_model(s, "anthropic-cli", mdl.lower()); cfgmod.write_settings(s)
-        return {"text": f"✅ Claude Code - model: {mdl.lower()}\n(đầy đủ MCP/skill)", "alert": "Đã đổi model"}
+        if not _tg_prov_ready(pid, m):
+            return {"alert": f"{_tg_prov_label(pid)} chưa kết nối - vào dashboard trang Models"}
+        if pid == "anthropic-cli":
+            mdl = mdl.lower()   # alias opus/sonnet/haiku/fable
+        _set_main_model(s, pid, mdl); cfgmod.write_settings(s)
+        note = {"anthropic-cli": "Claude Code - đầy đủ MCP/skill",
+                "openai-oauth": "ChatGPT qua Codex CLI - có MCP",
+                "openrouter": "OpenRouter - chat + MCP đa-model",
+                "anthropic-api": "Claude API - chat + MCP đa-model",
+                "openai": "OpenAI API - chat + MCP đa-model"}.get(pid, pid)
+        return {"text": f"✅ {note}\nModel: {mdl}", "alert": "Đã đổi model"}
     return None
 
 
@@ -3949,15 +4030,20 @@ async def _tg_command(cmd, arg, chat=None):
         s = cfgmod.read_settings(); m = s["model"]
         a = arg.strip()
         if a:
-            # Không whitelist cứng → model mới (vd "fable") dùng ngay. id OpenRouter chứa "/";
-            # còn lại là alias/id Claude (anthropic-cli).
+            # Không whitelist cứng → model mới dùng ngay. id chứa "/" = OpenRouter;
+            # gpt*/*-codex = ChatGPT (Codex, cần đã kết nối); còn lại = alias/id Claude.
             if "/" in a:
                 _set_main_model(s, "openrouter", a); cfgmod.write_settings(s)
                 return {"reply": f"✅ OpenRouter model: {a}."}
+            if _is_codex_model(a):
+                if not _tg_prov_ready("openai-oauth", m):
+                    return {"reply": "⚠ Chưa kết nối ChatGPT (OpenAI OAuth) - nối ở dashboard trang Models trước."}
+                _set_main_model(s, "openai-oauth", a); cfgmod.write_settings(s)
+                return {"reply": f"✅ ChatGPT (Codex) model: {a}."}
             _set_main_model(s, "anthropic-cli", a.lower()); cfgmod.write_settings(s)
             return {"reply": f"✅ Model Claude: {a.lower()}. Nếu CLI chưa hỗ trợ tên này, query sẽ báo lỗi."}
-        # Không tham số → mở menu nút bấm (chọn provider → chọn model)
-        return {"reply": _model_header(), "reply_markup": _model_provider_kb()}
+        # Không tham số → mở menu nút bấm (chọn provider → chọn model, phân trang)
+        return {"reply": _model_header(), "reply_markup": await _model_provider_kb()}
     if cmd == "agents":
         d = await list_agents(brain); ags = d.get("agents", []) or []
         busy = _tg_chat_busy(chat_key)
