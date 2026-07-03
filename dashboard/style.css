@@ -414,17 +414,26 @@ body {
 #newMsgBtn.show { display: inline-flex; }
 #newMsgBtn:hover { background: rgba(255,107,43,0.15); }
 
-.tool-bar {
-  padding: 7px 10px; background: rgba(124,58,237,0.08);
-  border: 1px solid rgba(124,58,237,0.2); border-radius: 8px;
-  display: flex; align-items: center; gap: 8px; font-size: 13px;
-  color: #a78bfa; font-family: var(--font); margin-top: 8px;
+/* Chip hoạt động trong transcript - "đang suy nghĩ / gọi tool / soạn trả lời"
+   (thay .tool-bar cũ nằm ngoài #chatArea nên biến mất khi phóng to chat workspace) */
+.msg-activity .act-bubble {
+  display: inline-flex; align-items: center; gap: 9px;
+  background: rgba(124,58,237,0.08); border: 1px solid rgba(124,58,237,0.25);
+  border-radius: 3px 12px 12px 12px; padding: 8px 12px;
+  font-size: 13px; color: #a78bfa; font-family: var(--font);
+  animation: actGlow 2.2s ease-in-out infinite;
 }
-.tool-spinner {
-  width: 9px; height: 9px; border: 1.5px solid rgba(124,58,237,0.3);
-  border-top-color: #a78bfa; border-radius: 50%; animation: spin 0.7s linear infinite;
+.act-dots { display: inline-flex; gap: 3px; align-items: center; }
+.act-dots i {
+  width: 5px; height: 5px; border-radius: 50%; background: #a78bfa; opacity: 0.35;
+  animation: actDot 1.2s ease-in-out infinite;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
+.act-dots i:nth-child(2) { animation-delay: 0.18s; }
+.act-dots i:nth-child(3) { animation-delay: 0.36s; }
+@keyframes actDot { 30% { opacity: 1; transform: translateY(-3px); } }
+@keyframes actGlow { 50% { border-color: rgba(124,58,237,0.55); box-shadow: 0 0 14px rgba(124,58,237,0.12); } }
+.act-time { color: var(--text3); font-size: 12px; font-variant-numeric: tabular-nums; }
+@keyframes spin { to { transform: rotate(360deg); } }   /* vẫn dùng cho .rs-spin */
 
 .mem-count {
   background: rgba(124,58,237,0.18); color: #b98cff; border: 1px solid rgba(124,58,237,0.4);

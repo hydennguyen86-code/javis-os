@@ -61,7 +61,10 @@ def build_channel_block(source: str, meta: dict = None, telegram_running: bool =
             "2. GỬI NGAY / file có sẵn từ trước: dùng tool Bash gọi "
             f"`curl -s -X POST http://127.0.0.1:{port}/telegram/send-file "
             "-H \"Content-Type: application/json\" "
-            "-d '{\"path\":\"<đường dẫn tuyệt đối>\",\"caption\":\"<mô tả ngắn>\"}'`",
+            "-d '{\"path\":\"<đường dẫn tuyệt đối>\",\"caption\":\"<mô tả ngắn>\","
+            f"\"chat_id\":\"{chat_id}\"}}'`",
+            f"- LUÔN giữ \"chat_id\":\"{chat_id}\" trong lệnh trên để file về ĐÚNG người đang hỏi "
+            "(bỏ đi thì file sẽ gửi nhầm cho chủ bot).",
             "- KHÔNG nói \"em đã gửi file\" khi chưa làm một trong hai cách trên.",
             "- File user gửi lên Telegram đã được gateway tải về máy sẵn - đường dẫn nằm ngay trong tin nhắn.",
         ]

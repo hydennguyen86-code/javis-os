@@ -112,10 +112,9 @@
           </span>
         </div>
         <div class="transcript" id="chatArea"></div>
-        <div class="tool-bar" id="toolBar" style="display:none">
-          <span class="tool-spinner"></span>
-          <span id="toolBarText">Đang xử lý...</span>
-        </div>
+        <!-- Thanh #toolBar cũ ĐÃ BỎ: trạng thái "đang suy nghĩ / gọi tool" giờ hiện bằng
+             chip hoạt động NGAY TRONG #chatArea (app.js showActivity) → tự đi theo cả khi
+             phóng to chat workspace (chat-zoom chỉ dời #chatArea, trước đây toolBar bị bỏ lại). -->
         <!-- "BỘ NHỚ DÀI HẠN" + auto-reflect "sau mỗi 6 lượt" ĐÃ BỎ: engine tự học mới (learn.py)
              rewire sau MỖI lượt (có debounce, read-only, undo được). Cấu hình + xem "đã học gì" +
              hoàn tác ở trang sidebar "Tự học" (console.js renderLearn). Widget cũ vốn là UI chết,

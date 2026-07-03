@@ -1,7 +1,8 @@
 """
 Telegram bot cho Javis - long-polling getUpdates, whitelist theo chat_id (MỘT hoặc NHIỀU ID).
 - Trả lời chạy ở BACKGROUND task → vẫn nhận /stop giữa chừng.
-- Lệnh /...: command_fn(cmd, arg) -> {"reply": str} | {"ask": str} | None.
+- Lệnh /...: command_fn(cmd, arg, chat) -> {"reply": str} | {"ask": str} | None
+  (chat = chat_id người gõ → /reset //stop /retry chỉ tác động PHIÊN của họ).
 - answer_fn(text, meta) nhận thêm META KÊNH (chat/user/loại chat) để engine biết
   mình đang trả lời qua đâu (port ý tưởng gateway hermes-agent), và có thể trả
   dict {"text":..., "files":[...]} để bot gửi file đính kèm sau câu trả lời.
@@ -110,11 +111,13 @@ class TelegramBot:
         # chat_id nhận chuỗi "id1,id2" hoặc list → whitelist NHIỀU người dùng chung 1 bot.
         self.chat_ids = parse_chat_ids(chat_id)
         self.answer_fn = answer_fn          # async (text, meta) -> str | {"text":..., "files":[...]}
-        self.command_fn = command_fn        # async (cmd, arg) -> dict|None
+        self.command_fn = command_fn        # async (cmd, arg, chat) -> dict|None
         self.callback_fn = callback_fn      # async (data) -> dict|None (xử lý bấm nút inline)
         self.download_dir = download_dir    # str | callable() -> str: nơi lưu file user gửi lên
         self._task = None
-        self._current = None                # task lượt trả lời đang chạy
+        # ĐA PHIÊN: mỗi chat_id có lượt trả lời RIÊNG → các tài khoản chạy song song,
+        # cùng 1 tài khoản vẫn tuần tự (1 lượt/lúc). Map chat_id(str) -> asyncio.Task.
+        self._current = {}
         self._stop = False
         self.offset = 0
         self.status = "off"      # off | starting | polling | conflict | error | stopped
@@ -356,32 +359,41 @@ class TelegramBot:
                     await asyncio.sleep(5)
             print("[telegram] bot stopped", file=sys.stderr)
 
+    def _busy(self, chat):
+        t = self._current.get(chat)
+        return bool(t and not t.done())
+
     async def _dispatch(self, client, chat, text, meta=None):
         # Lệnh bắt đầu bằng /
         if text.startswith("/"):
             head = text.split(maxsplit=1)
             cmd = head[0][1:].lower()
             arg = head[1].strip() if len(head) > 1 else ""
-            # /stop xử lý NGAY (kể cả khi đang có lượt chạy)
+            # /stop xử lý NGAY - CHỈ dừng lượt của CHÍNH chat này (không đụng phiên người khác)
             if cmd == "stop":
-                if self._current and not self._current.done():
-                    self._current.cancel()
-                res = await self.command_fn("stop", "") if self.command_fn else None
+                t = self._current.get(chat)
+                if t and not t.done():
+                    t.cancel()
+                res = await self.command_fn("stop", "", chat) if self.command_fn else None
                 await self._send(client, chat, (res or {}).get("reply", "⏹ Đã dừng."))
                 return
             if self.command_fn:
-                res = await self.command_fn(cmd, arg)
+                res = await self.command_fn(cmd, arg, chat)
                 if res and "reply" in res:
                     await self._send(client, chat, res["reply"], res.get("reply_markup"))
                     return
                 if res and "ask" in res:
                     text = res["ask"]   # chuyển thành câu hỏi cho Javis
                 # res None → coi như tin thường (gửi nguyên text)
-        # Tin thường → chạy nền (1 lượt 1 lúc)
-        if self._current and not self._current.done():
+        # Tin thường → chạy nền. Tuần tự THEO CHAT: chỉ chặn nếu chính chat này đang bận.
+        if self._busy(chat):
             await self._send(client, chat, "⏳ Đang xử lý câu trước. Gửi /stop để dừng rồi hỏi lại.")
             return
-        self._current = asyncio.create_task(self._handle_turn(client, chat, text, meta))
+        task = asyncio.create_task(self._handle_turn(client, chat, text, meta))
+        self._current[chat] = task
+        # Dọn task đã xong khỏi map (tránh phình theo thời gian); chỉ xoá nếu vẫn là task này.
+        task.add_done_callback(
+            lambda _t, c=chat: self._current.pop(c, None) if self._current.get(c) is _t else None)
 
     async def _handle_callback(self, client, cq):
         """Xử lý bấm nút inline: trả lời callback (tắt spinner) + sửa tin để hiện bước kế."""
@@ -424,8 +436,10 @@ class TelegramBot:
     def stop(self):
         self._stop = True
         self.status = "stopped"
-        if self._current and not self._current.done():
-            self._current.cancel()
+        for t in list(self._current.values()):
+            if t and not t.done():
+                t.cancel()
+        self._current.clear()
         if self._task:
             self._task.cancel()
             self._task = None

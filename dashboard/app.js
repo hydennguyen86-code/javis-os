@@ -14,6 +14,7 @@ let convo = [];            // [{role:"user"|"javis", text, atts}]
 let savedSessionId = null; // session_id của Claude để resume sau khi F5
 let savedMetrics = null;   // {cards, status}
 const stopBtn = document.getElementById("stopBtn");
+let stopTag = null;        // tag phiên chat server phát qua message hello → Stop chỉ ngắt phiên MÌNH
 
 function updateStopBtn() {
   const active = isProcessing || voice.isSpeaking();
@@ -24,8 +25,12 @@ function updateStopBtn() {
 function stopCurrent() {
   cancelledTurn = true;
   voice.stopSpeaking();
-  fetch("/stop", { method: "POST" }).catch(() => {});
-  hideToolBar();
+  // Gửi kèm tag phiên → server chỉ giết đúng lượt của kết nối này (đa người dùng song song)
+  fetch("/stop", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(stopTag ? { tag: stopTag } : {}),
+  }).catch(() => {});
+  hideActivity();
   setProcessing(false);
   streamingBubble = null; streamingText = "";
   if (!handsFreeActive()) setOrbState("", "SẴN SÀNG");
@@ -41,8 +46,6 @@ function currentBrainPath() {
 const chatArea = document.getElementById("chatArea");
 const chatInput = document.getElementById("chatInput");
 const sendBtn = document.getElementById("sendBtn");
-const toolBar = document.getElementById("toolBar");
-const toolBarText = document.getElementById("toolBarText");
 const voiceBtn = document.getElementById("voiceBtn");
 const ttsToggle = document.getElementById("ttsToggle");
 const voiceInterim = document.getElementById("voiceInterim");
@@ -108,6 +111,8 @@ function connect() {
 }
 
 function handleMessage(data) {
+  // Server chào khi kết nối: nhận tag phiên để nút Stop chỉ ngắt phiên của mình
+  if (data.type === "hello") { stopTag = data.stop_tag || null; return; }
   // Đã bấm ngắt → bỏ qua mọi message của lượt bị huỷ, chỉ reset khi có message kết thúc
   if (cancelledTurn) {
     if (data.type === "response" || data.type === "error") {
@@ -117,14 +122,17 @@ function handleMessage(data) {
   }
   if (data.type === "status") {
     setOrbState("thinking", "ĐANG SUY NGHĨ");
-    showToolBar(data.content);
+    showActivity(data.content);
   } else if (data.type === "tool_call") {
-    showToolBar(data.content);
+    showActivity(data.content);
     if (data.tool) trackMCP(data.tool);
   } else if (data.type === "tool_result") {
-    showToolBar("✓ Nhận data - đang phân tích...");
+    showActivity("✓ Nhận data - đang phân tích...");
   } else if (data.type === "stream") {
-    if (!streamingBubble) { streamingBubble = createStreamingBubble(); streamingText = ""; }
+    if (!streamingBubble) {
+      streamingBubble = createStreamingBubble(); streamingText = "";
+      showActivity("✍ Đang soạn câu trả lời...");   // chip nhảy xuống DƯỚI bubble đang gõ
+    }
     streamingText += (data.content || "");
     streamingBubble.querySelector(".bubble").innerHTML = markdownToHtml(streamingText);
     scrollBottom();
@@ -137,7 +145,7 @@ function handleMessage(data) {
       spokeStream = true;
     }
   } else if (data.type === "response") {
-    hideToolBar();
+    hideActivity();
     const { clean, cards } = extractMetrics(data.content);
     if (cards) pushMetricsToPanel(cards);
     // Fallback: response rỗng nhưng đã stream được → giữ phần đã stream; nếu vẫn rỗng → báo nhẹ
@@ -160,7 +168,7 @@ function handleMessage(data) {
     maybeAutoLearn();
     notifySessions();   // sidebar lịch sử tự refresh (title/updated_at vừa đổi)
   } else if (data.type === "error") {
-    hideToolBar(); appendJavisMessage("⚠ " + data.content); setProcessing(false);
+    hideActivity(); appendJavisMessage("⚠ " + data.content); setProcessing(false);
     setOrbState("", "SẴN SÀNG");
   } else if (data.type === "system") {
     appendJavisMessage(data.content);
@@ -200,6 +208,7 @@ function sendMessage(text) {
   setProcessing(true);
   updateStopBtn();
   setOrbState("thinking", "ĐANG SUY NGHĨ");
+  showActivity("Javis đang suy nghĩ...");   // hiện NGAY trong khung chat, không đợi server báo
   // session_id: chỉ có tác dụng ở lượt đầu sau khi F5 (server resume mạch cũ)
   ws.send(JSON.stringify({ message: outMsg, brain: currentBrainPath(), session_id: savedSessionId || undefined }));
 }
@@ -263,6 +272,7 @@ async function openStoredSession(id) {
 function newChat() {
   if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ action: "reset" }));
   convo = [];
+  hideActivity();          // dọn chip + timer trước khi xoá trắng khung
   chatArea.innerHTML = "";
   savedSessionId = null;
   persistSession();
@@ -347,8 +357,34 @@ function markdownToHtml(text) {
   return html;
 }
 function escapeHtml(t) { return t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
-function showToolBar(t) { toolBar.style.display = "flex"; toolBarText.textContent = t; }
-function hideToolBar() { toolBar.style.display = "none"; }
+// ---- Chip hoạt động trong transcript (thay #toolBar cũ nằm ngoài #chatArea nên
+//      biến mất khi phóng to chat). Chip là 1 "bong bóng" 3 chấm nhún + dòng trạng thái
+//      + đồng hồ đếm giây, luôn nằm CUỐI khung chat, đi theo cả chế độ zoom. ----
+let activityEl = null, activityT0 = 0, activityTimer = null;
+function showActivity(text) {
+  if (!activityEl) {
+    activityEl = document.createElement("div");
+    activityEl.className = "msg msg-activity";
+    activityEl.innerHTML =
+      '<div class="act-bubble"><span class="act-dots"><i></i><i></i><i></i></span>' +
+      '<span class="act-text"></span><span class="act-time"></span></div>';
+    activityT0 = Date.now();
+    activityTimer = setInterval(() => {
+      if (!activityEl) return;
+      const s = Math.floor((Date.now() - activityT0) / 1000);
+      // 3s đầu khỏi hiện số cho đỡ rối; câu chậm (CLI/MCP) thì thấy rõ đã đợi bao lâu
+      activityEl.querySelector(".act-time").textContent = s >= 3 ? s + "s" : "";
+    }, 1000);
+  }
+  activityEl.querySelector(".act-text").textContent = text || "Đang xử lý...";
+  chatAppend(activityEl);   // re-append → luôn dưới cùng (kể cả dưới bubble đang stream)
+  scrollBottom();
+}
+function hideActivity() {
+  if (activityTimer) { clearInterval(activityTimer); activityTimer = null; }
+  if (activityEl && activityEl.parentNode) activityEl.parentNode.removeChild(activityEl);
+  activityEl = null;
+}
 function setProcessing(s) { isProcessing = s; sendBtn.disabled = s; }
 
 // ============================================

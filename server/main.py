@@ -9,6 +9,7 @@ import os
 import json
 import asyncio
 import glob
+import uuid
 from pathlib import Path
 import re
 import shutil
@@ -286,9 +287,14 @@ async def root():
 
 
 @app.post("/stop")
-async def stop():
-    """Nút Stop: chỉ ngắt lệnh CHAT đang chạy, không đụng tới metrics/loop nền."""
-    n = cancel_all("chat")
+async def stop(payload: dict = Body(None)):
+    """Nút Stop: ngắt lệnh CHAT đang chạy, không đụng tới metrics/loop nền.
+    ĐA PHIÊN: body {"tag": "chat:abcd1234"} (server phát cho mỗi kết nối WS qua message hello)
+    → chỉ ngắt ĐÚNG phiên đó, không giết lượt của người khác đang chat song song.
+    Không có tag (frontend cũ) → ngắt cả họ 'chat' như trước."""
+    tag = str((payload or {}).get("tag") or "").strip()
+    # chỉ chấp nhận tag họ chat - chặn lạm dụng endpoint này để giết loop/workflow nền
+    n = cancel_all(tag if tag.startswith("chat:") else "chat")
     return {"ok": True, "cancelled": n}
 
 
@@ -3423,7 +3429,14 @@ async def websocket_endpoint(ws: WebSocket):
         await ws.close(code=1008)
         return
     await ws.accept()
-    cli = ClaudeCLI(system_prompt=SYSTEM_PROMPT, cwd=CLAUDE_CWD)
+    # ĐA PHIÊN: tag riêng cho từng kết nối → nút Stop của người này không giết lượt người khác.
+    # Frontend nhận tag qua message hello và gửi kèm khi POST /stop.
+    conn_tag = f"chat:{uuid.uuid4().hex[:8]}"
+    cli = ClaudeCLI(system_prompt=SYSTEM_PROMPT, cwd=CLAUDE_CWD, tag=conn_tag)
+    try:
+        await ws.send_text(json.dumps({"type": "hello", "stop_tag": conn_tag}))
+    except Exception:
+        pass
 
     if not cli.is_available():
         await ws.send_text(json.dumps({
@@ -3497,7 +3510,7 @@ async def websocket_endpoint(ws: WebSocket):
                     except Exception as _e:
                         print(f"[codex model self-heal] {_e}", file=__import__('sys').stderr)
                 openai_oauth.write_codex_auth()   # bắc cầu token đã nối ở Models → ~/.codex/auth.json (codex dùng được)
-                ccli = CodexCLI(cwd=CLAUDE_CWD, model=actual_model, tag="chat")
+                ccli = CodexCLI(cwd=CLAUDE_CWD, model=actual_model, tag=conn_tag)
                 ccli.profile = _write_codex_profile()   # đẩy MCP của Javis (POSCake...) sang codex
                 if not ccli.is_available():
                     await ws.send_text(json.dumps({"type": "error", "content": "Chưa cài Codex CLI trong container. ChatGPT subscription là THỬ NGHIỆM - dùng Claude Code hoặc OpenRouter cho ổn định (đổi ở Models)."}))
@@ -3626,10 +3639,32 @@ async def sessions_delete(session_id: str):
 # Telegram bot - nhắn Telegram ↔ Javis (dùng engine theo Settings; CLI thì có cả MCP)
 # ============================================================
 _TG_BOT = None
-_tg_cli = None
-_tg_or = None   # lịch sử hội thoại cho engine openrouter
-_tg_last_msg = None   # câu hỏi gần nhất (cho /retry)
-_tg_turn_sent = set()   # path (normcase) đã gửi qua /telegram/send-file trong LƯỢT hiện tại (chống gửi trùng)
+# ĐA PHIÊN theo tài khoản: mỗi chat_id giữ NGỮ CẢNH RIÊNG để không lẫn hội thoại giữa
+# các người dùng chung 1 bot. Map chat_id(str) -> phiên:
+#   {"cli": ClaudeCLI|None,   # session Claude riêng (giữ session_id để --resume)
+#    "or":  list|None,        # lịch sử hội thoại engine OpenRouter/API
+#    "last": str|None,        # câu hỏi gần nhất của chat này (cho /retry)
+#    "sent": set}             # path đã gửi qua /telegram/send-file trong lượt (chống gửi trùng)
+_TG_SESS = {}
+
+
+def _tg_session(chat_id):
+    """Lấy (tạo nếu chưa có) phiên riêng của 1 chat_id. chat_id rỗng → gộp vào 'default'."""
+    key = str(chat_id or "default")
+    s = _TG_SESS.get(key)
+    if s is None:
+        s = {"cli": None, "or": None, "last": None, "sent": set()}
+        _TG_SESS[key] = s
+    return s
+
+
+def _tg_chat_busy(chat) -> bool:
+    """Chat này đang có lượt trả lời chạy dở không (đa phiên: _current là dict theo chat)."""
+    cur = getattr(_TG_BOT, "_current", None)
+    if not isinstance(cur, dict):
+        return False
+    t = cur.get(str(chat)) if chat else None
+    return bool(t and not t.done())
 
 
 def _javis_port() -> int:
@@ -3640,9 +3675,11 @@ def _javis_port() -> int:
 
 
 async def _tg_answer(text, meta=None):
-    global _tg_cli, _tg_or, _tg_last_msg, _tg_turn_sent
-    _tg_last_msg = text
-    _tg_turn_sent = set()   # lượt mới → reset dedupe (endpoint /telegram/send-file add vào đây)
+    # ĐA PHIÊN: định tuyến theo chat_id → ngữ cảnh của mỗi tài khoản tách biệt.
+    chat_id = str((meta or {}).get("chat_id") or "default")
+    sess = _tg_session(chat_id)
+    sess["last"] = text
+    sess["sent"] = set()    # lượt mới → reset dedupe (endpoint /telegram/send-file add vào đây)
     brain = _read_loop_config().get("brain", "brain")
     mcfg = cfgmod.read_settings().get("model", {})
     prov, kind, api_key, api_model = _chat_provider(mcfg)
@@ -3653,30 +3690,32 @@ async def _tg_answer(text, meta=None):
         "telegram", meta, telegram_running=True, port=_javis_port())
     if (kind == "api" and api_key) or kind == "oauth":
         label = _api_label(prov)
-        if _tg_or is None:
+        if sess["or"] is None:
             ident = (f"\n\n[Sự thật hệ thống: bạn chạy qua {label}, model '{api_model}'. "
                      f"Hỏi model nào thì khai đúng tên này, KHÔNG nhận là model khác.]")
-            _tg_or = [{"role": "system", "content": sysprompt + ident}]
-        _tg_or.append({"role": "user", "content": text})
+            sess["or"] = [{"role": "system", "content": sysprompt + ident}]
+        sess["or"].append({"role": "user", "content": text})
         out = ""
-        async for ev in (await _api_stream_mcp(prov, api_key, api_model, _tg_or, reasoning)):
+        async for ev in (await _api_stream_mcp(prov, api_key, api_model, sess["or"], reasoning)):
             if ev["type"] == "text":
                 out += ev["content"]
             elif ev["type"] == "error":
                 return "⚠ " + ev["content"]
-        _tg_or.append({"role": "assistant", "content": out})
-        _tg_or = _trim_history(_tg_or)   # bound history → payload không phình vô hạn
+        sess["or"].append({"role": "assistant", "content": out})
+        sess["or"] = _trim_history(sess["or"])   # bound history → payload không phình vô hạn
         return out   # engine API không có tool ghi file → không có gì để đính kèm
     else:
-        if _tg_cli is None:
-            _tg_cli = ClaudeCLI(system_prompt=sysprompt, cwd=CLAUDE_CWD, tag="telegram")
-        _tg_cli.system_prompt = sysprompt
-        _tg_cli.model = api_model or mcfg.get("claude_model") or None
-        _apply_mcp(_tg_cli)
+        if sess["cli"] is None:
+            # tag riêng theo chat → /stop chỉ giết đúng subprocess của chat này, không đụng người khác
+            sess["cli"] = ClaudeCLI(system_prompt=sysprompt, cwd=CLAUDE_CWD, tag=f"telegram:{chat_id}")
+        cli = sess["cli"]
+        cli.system_prompt = sysprompt
+        cli.model = api_model or mcfg.get("claude_model") or None
+        _apply_mcp(cli)
         t0 = time.time()
         written = []   # file agent ghi bằng tool Write trong lượt này (ứng viên auto-gửi)
         out = ""
-        async for ev in _tg_cli.query(_cli_think(reasoning, text)):
+        async for ev in cli.query(_cli_think(reasoning, text)):
             if ev["type"] == "final":
                 out = ev.get("content") or out
             elif ev["type"] == "tool_call" and ev.get("name") in ("Write", "NotebookEdit"):
@@ -3687,7 +3726,7 @@ async def _tg_answer(text, meta=None):
                 return "⚠ " + ev["content"]
         # File sinh ra trong lượt → bot gửi đính kèm SAU câu trả lời (xem telegram_bot._handle_turn)
         files = channel_context.collect_turn_files(out, written, t0,
-                                                   cwd=CLAUDE_CWD, exclude=_tg_turn_sent)
+                                                   cwd=CLAUDE_CWD, exclude=sess["sent"])
         return {"text": out, "files": files}
 
 
@@ -3799,18 +3838,23 @@ async def _tg_callback(data):
     return None
 
 
-async def _tg_command(cmd, arg):
-    """Xử lý lệnh Telegram. Trả {'reply':...} hoặc {'ask':...} (chuyển thành câu hỏi) hoặc None."""
-    global _tg_cli, _tg_or
+async def _tg_command(cmd, arg, chat=None):
+    """Xử lý lệnh Telegram cho 1 chat. Trả {'reply':...} hoặc {'ask':...} hoặc None.
+    chat = chat_id của người gõ lệnh → reset/stop/retry chỉ tác động PHIÊN của họ."""
     brain = _read_loop_config().get("brain", "brain")
+    chat_key = str(chat or "default")
     if cmd == "stop":
-        cancel_all("telegram")
+        # Chỉ giết subprocess Claude của CHÍNH chat này (tag telegram:<chat>), không đụng người khác.
+        cancel_all(f"telegram:{chat_key}")
         return {"reply": "⏹ Đã dừng lệnh đang chạy."}
     if cmd in ("reset", "new", "clear"):
-        if _tg_cli:
-            _tg_cli.reset_session()
-        _tg_or = None
-        return {"reply": "🔄 Đã reset hội thoại."}
+        sess = _TG_SESS.get(chat_key)
+        if sess:
+            if sess.get("cli"):
+                sess["cli"].reset_session()
+            sess["or"] = None
+            sess["last"] = None
+        return {"reply": "🔄 Đã reset hội thoại (chỉ phiên của bạn)."}
     if cmd in ("cli", "claude"):
         s = cfgmod.read_settings()
         _set_main_model(s, "anthropic-cli", (s["model"].get("main") or {}).get("model") or s["model"].get("claude_model") or "opus")
@@ -3828,10 +3872,11 @@ async def _tg_command(cmd, arg):
         return {"reply": await _tg_skills_text(brain)}
     if cmd == "status":
         prov, model = _model_current()
-        busy = bool(_TG_BOT and _TG_BOT._current and not _TG_BOT._current.done())
+        busy = _tg_chat_busy(chat_key)
         return {"reply": ("📊 Trạng thái Javis\n"
                           f"Provider: {prov}\n"
                           f"Model: {model}\nVault: {brain}\n"
+                          f"Phiên: {chat_key} (ngữ cảnh riêng)\n"
                           f"Đang xử lý: {'có (gửi /stop để dừng)' if busy else 'rảnh'}")}
     if cmd == "model":
         s = cfgmod.read_settings(); m = s["model"]
@@ -3848,7 +3893,7 @@ async def _tg_command(cmd, arg):
         return {"reply": _model_header(), "reply_markup": _model_provider_kb()}
     if cmd == "agents":
         d = await list_agents(brain); ags = d.get("agents", []) or []
-        busy = bool(_TG_BOT and _TG_BOT._current and not _TG_BOT._current.done())
+        busy = _tg_chat_busy(chat_key)
         if not ags:
             return {"reply": "Chưa có agent nào (tạo trong Studio trên dashboard)."}
         lines = [f"• {a.get('name')} - {(a.get('role') or '')[:50]}" for a in ags[:20]]
@@ -3860,9 +3905,10 @@ async def _tg_command(cmd, arg):
         lines = [f"• {w.get('name')} ({w.get('status')})" for w in wfs[:20]]
         return {"reply": "⚡ Workflows:\n" + "\n".join(lines) + "\n\n(Hiện chạy trên dashboard; chạy qua Telegram sẽ thêm sau.)"}
     if cmd == "retry":
-        if not _tg_last_msg:
+        last = (_TG_SESS.get(chat_key) or {}).get("last")
+        if not last:
             return {"reply": "Chưa có câu nào để gửi lại."}
-        return {"ask": _tg_last_msg}
+        return {"ask": last}
     # /<slug> khác → coi là gọi skill (cần CLI)
     if cfgmod.read_settings().get("model", {}).get("engine") == "openrouter":
         return {"reply": f"⚠ Skill cần engine Claude CLI. Gửi /cli để đổi, rồi /{cmd} lại."}
@@ -3879,12 +3925,12 @@ def _tg_inbox_dir():
 
 def restart_telegram():
     """Bật lại bot theo cấu hình settings.telegram (tắt bot cũ nếu có)."""
-    global _TG_BOT, _tg_or
+    global _TG_BOT
     t = cfgmod.read_settings().get("telegram", {})
     if _TG_BOT:
         _TG_BOT.stop()
         _TG_BOT = None
-    _tg_or = None
+    _TG_SESS.clear()   # xoá mọi phiên hội thoại cũ khi khởi động lại bot
     if t.get("enabled") and t.get("token"):
         _TG_BOT = TelegramBot(t["token"], t.get("chat_id", ""), _tg_answer, _tg_command, _tg_callback,
                               download_dir=_tg_inbox_dir)
@@ -3941,18 +3987,25 @@ async def telegram_test():
 async def telegram_send_file(payload: dict = Body(...)):
     """Gửi 1 file qua Telegram tới chat whitelist. Agent gọi bằng curl từ localhost
     (miễn đăng nhập qua _AUTH_LOCAL_EXACT - request từ ngoài vẫn bị chặn).
-    Body: {"path": "<đường dẫn tuyệt đối>", "caption": "<mô tả ngắn, không bắt buộc>"}."""
+    Body: {"path": "<đường dẫn tuyệt đối>", "caption": "<mô tả ngắn>", "chat_id": "<id người hỏi>"}.
+    ĐA PHIÊN: có chat_id (và trong whitelist) → gửi ĐÚNG người đang hỏi + dedupe theo phiên họ;
+    thiếu chat_id → gửi chủ bot (ID đầu whitelist) như cũ."""
     path = str((payload or {}).get("path", "")).strip().strip('"')
     caption = str((payload or {}).get("caption", "")).strip()
+    chat_id = str((payload or {}).get("chat_id", "")).strip()
     if not (_TG_BOT and _TG_BOT._task and not _TG_BOT._task.done()):
         return {"ok": False, "error": "Bot Telegram chưa chạy (bật ở Settings → Telegram)."}
     if not path:
         return {"ok": False, "error": "Thiếu path"}
-    ok, err = await _TG_BOT.send_file(path, caption)
+    # chỉ nhận chat_id nằm trong whitelist (chống gửi tới ID lạ); ngoài whitelist → về chủ bot
+    target = chat_id if (chat_id and chat_id in (_TG_BOT.chat_ids or [])) else None
+    ok, err = await _TG_BOT.send_file(path, caption, chat=target)
     if ok:
-        # ghi nhận để auto-attach cuối lượt không gửi lại đúng file này lần nữa
+        # ghi nhận vào ĐÚNG phiên để auto-attach cuối lượt không gửi lại file này lần nữa
         try:
-            _tg_turn_sent.add(os.path.normcase(os.path.normpath(os.path.abspath(path))))
+            sess = _TG_SESS.get(chat_id) if chat_id else None
+            if sess is not None:
+                sess["sent"].add(os.path.normcase(os.path.normpath(os.path.abspath(path))))
         except Exception:
             pass
     return {"ok": ok, "error": err}

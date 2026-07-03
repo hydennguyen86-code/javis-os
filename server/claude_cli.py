@@ -22,9 +22,12 @@ _ACTIVE_PROCS = {}
 _PROC_LOCK = threading.Lock()
 
 def cancel_all(tag=None):
-    """Ngắt tiến trình Claude. tag=None → tất cả; có tag → chỉ ngắt nhóm khớp (vd nút Stop chỉ ngắt 'chat')."""
+    """Ngắt tiến trình Claude. tag=None → tất cả; có tag → ngắt nhóm khớp.
+    Khớp theo HỌ tag: 'chat' ngắt cả 'chat:abc' (tag đa phiên per-kết-nối/per-chat_id);
+    'chat:abc' chỉ ngắt đúng phiên đó. Tương tự 'telegram' vs 'telegram:<chat_id>'."""
     with _PROC_LOCK:
-        procs = [p for p, t in _ACTIVE_PROCS.items() if tag is None or t == tag]
+        procs = [p for p, t in _ACTIVE_PROCS.items()
+                 if tag is None or t == tag or str(t).startswith(str(tag) + ":")]
     for p in procs:
         try:
             if os.name == "nt":

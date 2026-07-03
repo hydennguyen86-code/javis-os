@@ -4,6 +4,18 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.8.11] - 2026-07-03
+### Thêm mới
+- Telegram **đa phiên theo tài khoản**: mỗi chat ID giờ có ngữ cảnh hội thoại RIÊNG, không còn lẫn lộn khi nhiều người dùng chung 1 bot. Trước đây tất cả người dùng dùng chung một session (người sau nối tiếp mạch của người trước, và chỉ 1 người được trả lời tại một thời điểm). Nay mỗi tài khoản có session Claude riêng (giữ `--resume` độc lập), lịch sử OpenRouter riêng, câu `/retry` riêng.
+- Các tài khoản **chạy song song**: A đang được trả lời thì B hỏi vẫn được xử lý ngay, không phải xếp hàng chờ. Trong CÙNG một tài khoản vẫn tuần tự 1 lượt/lúc (gửi câu mới khi đang bận sẽ báo "đang xử lý câu trước").
+- `/reset` và `/stop` chỉ tác động **phiên của chính người gõ**: reset xoá đúng ngữ cảnh của họ, stop chỉ giết đúng tiến trình Claude của họ (không đụng người khác đang chat). `/status` hiển thị mã phiên.
+- File Javis tạo ra gửi về **đúng người đang hỏi**: endpoint `POST /telegram/send-file` nhận thêm `chat_id`, và gateway nhắc engine luôn gắn chat_id của người hỏi vào lệnh gửi (thiếu thì rơi về chủ bot như cũ). Whitelist vẫn chặn ID lạ.
+### Sửa lỗi
+- Dashboard web: nút **Stop không còn giết nhầm lượt của người khác** đang chat song song. Mỗi kết nối WebSocket giờ có tag phiên riêng (server phát qua message hello, frontend gửi kèm khi POST `/stop`) - web vốn đã đa phiên (mỗi tab/kết nối một session, lưu SQLite resume được), đây là lỗ hổng chéo duy nhất còn lại.
+- Khung chat **phóng to (chat workspace) trước đây KHÔNG hiện trạng thái** "đang suy nghĩ / đang gọi tool": thanh trạng thái cũ nằm ngoài `#chatArea` nên bị bỏ lại khi phóng to. Đã thay bằng chip hoạt động ngay trong khung chat.
+### Cải thiện
+- **Chip hoạt động trong khung chat** (cả thường lẫn phóng to): bong bóng 3 chấm nhún + dòng trạng thái sống ("Javis đang suy nghĩ...", "⚙ Đang gọi: pos_statistics", "✍ Đang soạn câu trả lời...") + đồng hồ đếm giây khi đợi lâu (hiện từ giây thứ 3). Chip hiện NGAY khi bấm gửi, luôn nằm dưới cùng kể cả dưới bubble đang stream, tự biến mất khi xong lượt.
+
 ## [0.8.10] - 2026-07-03
 ### Thêm mới
 - Telegram hỗ trợ **NHIỀU chat ID** dùng chung 1 bot: ô "Chat ID được phép dùng" giờ nhận nhiều ID cách nhau dấu phẩy (vd `123456789, 987654321`) - thêm người thân/nhân viên nhắn với Javis mà không phải dựng bot riêng. Whitelist chặn đúng theo danh sách; ID nhóm (số âm) cũng dùng được.
