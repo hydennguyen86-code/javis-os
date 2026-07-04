@@ -170,6 +170,13 @@ def get_connection(cid):
     return _public(c) if c else None
 
 
+def connection_secrets(cid):
+    """Trả map secrets (fields) ĐÃ GIẢI MÃ của 1 connection - chỉ cho code nội bộ
+    (vd oauth_mcp lấy client_id/client_secret BYO). TUYỆT ĐỐI không trả ra frontend."""
+    c = _find(_load(), cid)
+    return secrets_store.decrypt_map((c or {}).get("secrets") or {})
+
+
 @_locked
 def add_connection(connector_id, data):
     """Thêm 1 tài khoản. data: {label?, fields{}, headers{}, env{}, url?, command?, args?,

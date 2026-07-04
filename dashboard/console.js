@@ -899,7 +899,7 @@
       const board = el.querySelector("#knBoard");
       board.innerHTML = _KCOLS.map(([s, label, color]) => {
         const arr = (d.columns && d.columns[s]) || [];
-        const cards = arr.length ? arr.map(cardHtml).join("") : `<div class="dim" style="font-size:12px;color:#556;text-align:center;padding:14px 0">— trống —</div>`;
+        const cards = arr.length ? arr.map(cardHtml).join("") : `<div class="dim" style="font-size:12px;color:#556;text-align:center;padding:14px 0">- trống -</div>`;
         return `<div style="min-width:210px;max-width:240px;flex:1;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:10px">
           <div style="font-size:13px;font-weight:600;color:${color};margin-bottom:8px;display:flex;justify-content:space-between"><span>● ${label}</span><span>${arr.length}</span></div>
           ${cards}</div>`;
@@ -1535,15 +1535,33 @@
   }
 
   function openOauthFlow(el, con) {
+    // Provider không tự đăng ký client (vd Google) khai sẵn fields client_id/secret user tự tạo.
+    const fields = (con.fields || []).map(f =>
+      '<label class="mcp-lb">' + esc(f.label || f.key)
+      + '<input class="js-input" data-f="' + esc(f.key) + '" placeholder="' + esc(f.placeholder || "") + '"></label>').join("");
     const m = connModal(mHead("KẾT NỐI " + esc((con.name || "").toUpperCase()))
-      + '<div class="conn-form"><div class="conn-guide">' + esc(con.guide || "Đăng nhập bằng tài khoản của nhà cung cấp.") + '</div>'
-      + '<button class="mp-btn primary" id="oGo">Mở trang đăng nhập</button></div>'
+      + '<div class="conn-form"><div class="conn-guide">' + esc(con.guide || "Đăng nhập bằng tài khoản của nhà cung cấp.")
+      + (con.guide_url ? ' <a href="' + esc(con.guide_url) + '" target="_blank">Hướng dẫn ↗</a>' : "") + '</div>'
+      + fields
+      + '<button class="mp-btn primary" id="oGo">' + (fields ? "Lưu & mở trang đăng nhập" : "Mở trang đăng nhập") + '</button></div>'
       + '<div class="mp-foot"><span class="mp-note" id="oErr"></span><button class="mp-btn" data-act="close">Đóng</button></div>');
     m.querySelector("#oGo").onclick = async () => {
-      const r = await postJson("/connect/oauth/start", { connector_id: con.id });
-      if (!r.ok) { m.querySelector("#oErr").textContent = r.error || "Lỗi"; return; }
+      const err = m.querySelector("#oErr"), go = m.querySelector("#oGo");
+      const fieldsVal = {};
+      let missing = "";
+      m.querySelectorAll("[data-f]").forEach(inp => {
+        const k = inp.dataset.f, v = inp.value.trim();
+        fieldsVal[k] = v;
+        const fd = (con.fields || []).find(x => x.key === k) || {};
+        if (!v && !fd.optional) missing = fd.label || k;
+      });
+      if (missing) { err.textContent = "Thiếu: " + missing; return; }
+      go.disabled = true; err.textContent = "";
+      const r = await postJson("/connect/oauth/start", { connector_id: con.id, fields: fieldsVal });
+      go.disabled = false;
+      if (!r.ok) { err.textContent = r.error || "Lỗi"; return; }
       window.open(r.url, "_blank");
-      m.querySelector("#oErr").textContent = "Hoàn tất đăng nhập ở tab mới, xong quay lại bấm Làm mới trang này.";
+      err.textContent = "Hoàn tất đăng nhập ở tab mới, xong quay lại bấm Làm mới trang này.";
     };
   }
 

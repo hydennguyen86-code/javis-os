@@ -257,6 +257,203 @@
       },
       "default_perm": "safe",
       "risk": "Mức Toàn quyền cho phép Javis GỬI EMAIL THẬT và XOÁ file/thư/lịch bằng tài khoản Google của bạn. Mức Ghi nháp (mặc định) chỉ soạn nháp, tạo lịch, tạo tài liệu - an toàn hơn."
+    },
+    {
+      "id": "meta-ads",
+      "name": "Meta Ads (Facebook & Instagram)",
+      "icon": "📣",
+      "category": "Quảng cáo",
+      "description": "Quảng cáo Facebook/Instagram qua MCP chính chủ của Meta: tài khoản ads, hiệu suất chiến dịch, benchmark ngành, catalog sản phẩm. Đăng nhập Facebook 1 chạm - không cần tạo app hay dán key.",
+      "status": "beta",
+      "transport": "http",
+      "url": "https://mcp.facebook.com/ads",
+      "auth": {
+        "type": "oauth",
+        "fields": [],
+        "guide": "Bấm Kết nối rồi đăng nhập Facebook và cấp quyền cho tài khoản quảng cáo (tài khoản phải thuộc Business Manager). Khi Meta hỏi mức quyền, chọn mức CHỈ XEM nếu chỉ cần báo cáo. Meta đang mở beta dần theo từng tài khoản - nếu đăng nhập bị từ chối nghĩa là tài khoản của bạn chưa được mở, thử lại sau.",
+        "guide_url": "https://www.facebook.com/business/help/1456422242197840"
+      },
+      "validate": {
+        "tool": "ads_get_ad_accounts",
+        "args": {},
+        "label_paths": ["data.0.name", "adaccounts.data.0.name", "ad_accounts.0.name", "accounts.0.name", "0.name", "name"]
+      },
+      "tool_meta": {
+        "read": ["ads_get_*", "ads_insights_*", "ads_catalog_get_*"],
+        "write": ["ads_catalog_*"],
+        "danger": ["ads_create_*", "ads_update_entity", "ads_activate_entity"]
+      },
+      "default_perm": "readonly",
+      "risk": "Mức Toàn quyền cho phép Javis tạo/sửa chiến dịch quảng cáo tiêu TIỀN THẬT trên tài khoản của bạn (chiến dịch tạo qua đây luôn ở trạng thái TẠM DỪNG, bạn phải tự bật trong Ads Manager). Chỉ cần xem số liệu thì giữ mức Chỉ đọc."
+    },
+    {
+      "id": "google-ads",
+      "name": "Google Ads",
+      "icon": "🎯",
+      "category": "Quảng cáo",
+      "description": "Số liệu Google Ads qua MCP chính chủ của Google (chỉ đọc): chiến dịch, chi phí, chuyển đổi, từ khoá qua truy vấn GAQL. Chạy local; cần developer token + Google Cloud, cài 1 lần hơi kỹ thuật.",
+      "status": "beta",
+      "transport": "stdio",
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/googleads/google-ads-mcp.git", "google-ads-mcp"],
+      "auth": {
+        "type": "apikey",
+        "fields": [
+          {
+            "key": "developer_token",
+            "label": "Developer token (Google Ads API Center)",
+            "placeholder": "chuỗi 22 ký tự, lấy ở tài khoản quản lý MCC",
+            "env": "GOOGLE_ADS_DEVELOPER_TOKEN"
+          },
+          {
+            "key": "project_id",
+            "label": "Google Cloud Project ID",
+            "placeholder": "vd my-ads-project",
+            "env": "GOOGLE_PROJECT_ID"
+          },
+          {
+            "key": "adc_json",
+            "label": "Nội dung file đăng nhập ADC (application_default_credentials.json)",
+            "placeholder": "{ \"client_id\": ..., \"refresh_token\": ... }",
+            "file": true,
+            "env": "GOOGLE_APPLICATION_CREDENTIALS",
+            "multiline": true
+          },
+          {
+            "key": "login_customer_id",
+            "label": "ID tài khoản quản lý MCC (tuỳ chọn - khi tài khoản ads nằm dưới MCC/agency)",
+            "placeholder": "10 số, bỏ dấu gạch",
+            "env": "GOOGLE_ADS_LOGIN_CUSTOMER_ID",
+            "optional": true
+          }
+        ],
+        "guide": "Cần cài uv (winget install astral-sh.uv), Git và Google Cloud CLI (gcloud). Làm 1 lần: (1) Google Ads > tài khoản quản lý MCC > Công cụ > API Center: lấy developer token (mức Explorer đủ để đọc). (2) console.cloud.google.com: tạo project, bật Google Ads API, tạo OAuth client (Desktop app) và tải file JSON của client. (3) Chạy: gcloud auth application-default login --scopes=https://www.googleapis.com/auth/adwords,https://www.googleapis.com/auth/cloud-platform --client-id-file=<file JSON vừa tải> rồi đăng nhập Google. (4) Dán TOÀN BỘ nội dung file nó tạo ra (Windows: %APPDATA%\\gcloud\\application_default_credentials.json) vào ô trên. Lần kết nối đầu tải gói, có thể mất 1-2 phút.",
+        "guide_url": "https://developers.google.com/google-ads/api/docs/developer-toolkit/mcp-server?hl=vi"
+      },
+      "validate": {
+        "tool": "customers_list_accessible_customers",
+        "args": {}
+      },
+      "tool_meta": {
+        "read": ["customers_*", "metadata_*", "search_*"]
+      },
+      "default_perm": "readonly"
+    },
+    {
+      "id": "tiktok-ads",
+      "name": "TikTok Ads",
+      "icon": "🎵",
+      "category": "Quảng cáo",
+      "description": "Số liệu quảng cáo TikTok (chỉ đọc): tài khoản, chiến dịch, nhóm quảng cáo, creative, báo cáo hiệu suất. Server cộng đồng chạy local trên Marketing API chính thức - dán App ID + Secret + Access Token.",
+      "status": "beta",
+      "transport": "stdio",
+      "command": "uvx",
+      "args": ["tiktok-ads-mcp"],
+      "auth": {
+        "type": "apikey",
+        "fields": [
+          {
+            "key": "app_id",
+            "label": "App ID (TikTok for Business Developers)",
+            "placeholder": "vd 7123456789...",
+            "env": "TIKTOK_APP_ID"
+          },
+          {
+            "key": "app_secret",
+            "label": "App Secret",
+            "placeholder": "dán secret của app...",
+            "env": "TIKTOK_SECRET"
+          },
+          {
+            "key": "access_token",
+            "label": "Access Token (long-term)",
+            "placeholder": "dán access token đã authorize với tài khoản ads...",
+            "env": "TIKTOK_ACCESS_TOKEN"
+          }
+        ],
+        "guide": "Cần cài uv (winget install astral-sh.uv). Làm 1 lần: vào business-api.tiktok.com > My Apps > tạo app loại Marketing API với quyền đọc Ads Management + Reporting; duyệt xong lấy App ID + Secret, rồi authorize app với tài khoản quảng cáo của bạn để lấy long-term Access Token (token Marketing API không tự hết hạn). Chi tiết từng bước xem link hướng dẫn.",
+        "guide_url": "https://github.com/ysntony/tiktok-ads-mcp#readme"
+      },
+      "validate": {
+        "tool": "get_authorized_ad_accounts_tool",
+        "args": {},
+        "label_paths": ["data.list.0.advertiser_name", "list.0.advertiser_name", "0.advertiser_name", "advertiser_name"]
+      },
+      "tool_meta": {
+        "read": ["get_*"]
+      },
+      "default_perm": "readonly"
+    },
+    {
+      "id": "google-calendar",
+      "name": "Google Calendar",
+      "icon": "📅",
+      "category": "Văn phòng",
+      "description": "Lịch Google qua MCP chính chủ của Google: xem lịch, tìm chỗ trống, tạo/sửa sự kiện, nhắc hẹn. Đăng nhập Google trong dashboard, chạy được cả trên VPS. Cần tạo OAuth client 1 lần (~10 phút).",
+      "status": "beta",
+      "transport": "http",
+      "url": "https://calendarmcp.googleapis.com/mcp/v1",
+      "auth": {
+        "type": "oauth",
+        "provider": "google",
+        "authorize_url": "https://accounts.google.com/o/oauth2/v2/auth",
+        "token_url": "https://oauth2.googleapis.com/token",
+        "scopes": ["openid", "email", "https://www.googleapis.com/auth/calendar"],
+        "authorize_params": { "access_type": "offline", "prompt": "consent", "include_granted_scopes": "true" },
+        "fields": [
+          { "key": "client_id", "label": "OAuth Client ID", "placeholder": "xxxx.apps.googleusercontent.com" },
+          { "key": "client_secret", "label": "OAuth Client Secret", "placeholder": "GOCSPX-..." }
+        ],
+        "guide": "Làm 1 lần (~10 phút): console.cloud.google.com > tạo project > bật Google Calendar API > Màn hình đồng ý OAuth (chọn External, thêm email của bạn vào Test users) > Thông tin xác thực > Tạo OAuth client ID loại 'Ứng dụng web'. Ở phần 'URI chuyển hướng được ủy quyền', thêm đúng địa chỉ này: http://localhost:7777/connect/oauth/callback (nếu chạy trên VPS thì thêm cả https://<tên-miền>/connect/oauth/callback). Copy Client ID + Client Secret dán vào đây rồi bấm Kết nối - trình duyệt sẽ mở để bạn đăng nhập Google và bấm đồng ý (gặp cảnh báo 'ứng dụng chưa được xác minh' thì bấm Nâng cao > Tiếp tục, vì đây là app của chính bạn).",
+        "guide_url": "https://console.cloud.google.com/apis/credentials"
+      },
+      "validate": {
+        "tool": "list_calendars",
+        "args": {},
+        "label_paths": ["calendars.0.id", "items.0.id", "data.0.id", "0.id", "primary.id"]
+      },
+      "tool_meta": {
+        "read": ["list_events", "get_event", "list_calendars", "suggest_time"],
+        "write": ["create_event", "update_event", "respond_to_event"],
+        "danger": ["delete_event"]
+      },
+      "default_perm": "readonly",
+      "risk": "Mức Ghi nháp cho phép Javis TẠO và SỬA sự kiện thật trên lịch của bạn (tiện để nhờ 'nhắc tôi gọi nhà cung cấp thứ 5'). Mức Toàn quyền thêm quyền XOÁ sự kiện. Chỉ cần xem lịch thì giữ mức Chỉ đọc."
+    },
+    {
+      "id": "gmail",
+      "name": "Gmail",
+      "icon": "📧",
+      "category": "Văn phòng",
+      "description": "Gmail qua MCP chính chủ của Google: đọc và tìm thư, soạn NHÁP, gắn nhãn sắp xếp hộp thư. Server chính chủ KHÔNG có tool gửi thẳng - luôn dừng ở bản nháp để bạn tự bấm gửi. Cần tạo OAuth client 1 lần.",
+      "status": "beta",
+      "transport": "http",
+      "url": "https://gmailmcp.googleapis.com/mcp/v1",
+      "auth": {
+        "type": "oauth",
+        "provider": "google",
+        "authorize_url": "https://accounts.google.com/o/oauth2/v2/auth",
+        "token_url": "https://oauth2.googleapis.com/token",
+        "scopes": ["openid", "email", "https://www.googleapis.com/auth/gmail.modify"],
+        "authorize_params": { "access_type": "offline", "prompt": "consent", "include_granted_scopes": "true" },
+        "fields": [
+          { "key": "client_id", "label": "OAuth Client ID", "placeholder": "xxxx.apps.googleusercontent.com" },
+          { "key": "client_secret", "label": "OAuth Client Secret", "placeholder": "GOCSPX-..." }
+        ],
+        "guide": "Làm 1 lần (~10 phút): console.cloud.google.com > tạo project > bật Gmail API > Màn hình đồng ý OAuth (chọn External, thêm email của bạn vào Test users) > Thông tin xác thực > Tạo OAuth client ID loại 'Ứng dụng web'. Ở phần 'URI chuyển hướng được ủy quyền', thêm đúng địa chỉ này: http://localhost:7777/connect/oauth/callback (nếu chạy trên VPS thì thêm cả https://<tên-miền>/connect/oauth/callback). Copy Client ID + Client Secret dán vào đây rồi bấm Kết nối - trình duyệt sẽ mở để bạn đăng nhập Google và bấm đồng ý (gặp cảnh báo 'ứng dụng chưa được xác minh' thì bấm Nâng cao > Tiếp tục, vì đây là app của chính bạn). Có thể dùng CHUNG một OAuth client với Google Calendar - chỉ cần bật thêm Gmail API.",
+        "guide_url": "https://console.cloud.google.com/apis/credentials"
+      },
+      "validate": {
+        "tool": "list_labels",
+        "args": {}
+      },
+      "tool_meta": {
+        "read": ["list_drafts", "get_thread", "search_threads", "list_labels"],
+        "write": ["create_draft", "create_label", "*label*"],
+        "danger": []
+      },
+      "default_perm": "readonly",
+      "risk": "Mức Ghi nháp cho phép Javis SOẠN NHÁP thư và gắn/gỡ nhãn trong hộp thư của bạn. Server Gmail chính chủ không có tool gửi thẳng nên Javis không tự gửi được - luôn dừng ở bản nháp để bạn tự bấm gửi. Chỉ cần đọc/tìm thư thì giữ mức Chỉ đọc."
     }
   ]
 }

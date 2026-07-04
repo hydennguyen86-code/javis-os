@@ -4,6 +4,22 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.3] - 2026-07-04
+### Thêm mới
+- **Kho Kết nối có Google Calendar và Gmail** (MCP chính chủ của Google, remote - chạy được cả trên VPS): Calendar xem lịch, tìm chỗ trống, tạo/sửa/xoá sự kiện; Gmail đọc/tìm thư, soạn NHÁP, gắn nhãn. Gmail bản chính chủ KHÔNG có tool gửi thẳng nên Javis luôn dừng ở bản nháp để bạn tự bấm gửi. Đăng nhập Google ngay trong dashboard; cần tạo OAuth client 1 lần (~10 phút, hướng dẫn từng bước trong cửa sổ kết nối, dùng chung 1 client cho cả hai). Mặc định Chỉ đọc; nâng lên Ghi nháp để tạo sự kiện/soạn nháp, Toàn quyền mới xoá được sự kiện.
+### Cải thiện
+- Hub OAuth giờ nhận **client tự khai (BYO client_id/secret)** cho nhà cung cấp không hỗ trợ tự đăng ký client như Google (trước đây chỉ chạy với server có DCR). Tự xin `access_type=offline` để giữ kết nối lâu dài (tự làm mới token), gửi kèm client secret khi đổi/làm mới token, và tự đặt tên tài khoản bằng email Google sau khi đăng nhập.
+
+## [0.9.2] - 2026-07-04
+### Thêm mới
+- **Kho Kết nối có nhóm Quảng cáo - đủ 3 nền tảng lớn**: **Meta Ads** (Facebook & Instagram) qua MCP chính chủ của Meta - bấm Kết nối là đăng nhập Facebook, không cần tạo app hay dán key; **Google Ads** qua MCP chính chủ của Google (chỉ đọc, truy vấn GAQL: chi phí, chuyển đổi, từ khoá); **TikTok Ads** qua server cộng đồng trên Marketing API chính thức (chỉ đọc - TikTok chưa mở MCP chính chủ, khi mở sẽ thay trong kho). Cả 3 mặc định Chỉ đọc; Meta bật Toàn quyền mới tạo/sửa được chiến dịch (cảnh báo tiền thật, chiến dịch tạo mới luôn ở trạng thái tạm dừng chờ bạn tự bật).
+### Cải thiện
+- Kết nối OAuth (vd Meta Ads) sau khi đăng nhập giờ **tự đặt tên tài khoản** (lấy đúng tên tài khoản ads) như flow dán key, và ghi ngay profile MCP cho Codex - trước đây tên để mặc định và Codex phải đợi lần đổi cấu hình sau.
+
+## [0.9.1] - 2026-07-04
+### Sửa lỗi
+- `start-javis.bat` chạy server ẩn hoàn toàn - hết cửa sổ CMD đen nằm lì.
+
 ## [0.9.0] - 2026-07-04
 ### Thêm mới
 - **Trang "Kết nối" thay trang MCP**: kho connector cài sẵn (Pancake POS, Zalo cá nhân, Webcake Landing, Botcake) - bấm Kết nối, dán key (hoặc quét QR với Zalo) là xong, không còn tự gõ URL/transport/header. Javis tự kiểm tra key và tự đặt tên tài khoản (lấy đúng tên cửa hàng từ POS). Form kỹ thuật cũ vẫn còn ở card "Tự thêm (nâng cao)".

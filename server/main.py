@@ -915,6 +915,8 @@ async def connect_zalo_cancel(request: Request):
 async def connect_oauth_start(request: Request):
     data = await request.json()
     conn_id = data.get("id")
+    # fields: client_id/secret user tự khai (BYO) cho provider không DCR (vd Google). Rỗng với Meta.
+    fields = {k: v for k, v in (data.get("fields") or {}).items() if v}
     if not conn_id and data.get("connector_id"):
         # Tái dùng connection oauth dở dang (chưa có token) của connector này -
         # tránh mỗi lần bấm nút lại đẻ 1 connection mồ côi.
@@ -923,11 +925,15 @@ async def connect_oauth_start(request: Request):
                      and not oauth_mcp.status(c["id"]).get("connected")), None)
         if pend:
             conn_id = pend["id"]
+            if fields:   # cập nhật lại client_id/secret nếu user nhập mới ở lần bấm này
+                mcp_store.update_connection(conn_id, {"fields": fields})
         else:
             conn_id, err = mcp_store.add_connection(data["connector_id"],
-                                                    {"label": (data.get("label") or "").strip(), "auth": "oauth"})
+                {"label": (data.get("label") or "").strip(), "auth": "oauth", "fields": fields})
             if err:
                 return {"ok": False, "error": err}
+    elif conn_id and fields:
+        mcp_store.update_connection(conn_id, {"fields": fields})
     redirect = str(request.base_url).rstrip("/") + "/connect/oauth/callback"
     res = await oauth_mcp.start_auth(conn_id, redirect)
     res["id"] = conn_id
@@ -939,6 +945,24 @@ async def connect_oauth_callback(state: str = Query(""), code: str = Query("")):
     res = await oauth_mcp.handle_callback(state, code)
     mcp_hub.invalidate_cache()
     if res.get("ok"):
+        _write_codex_profile()
+        # Tự đặt tên tài khoản như flow dán key (vd lấy tên tài khoản ads từ Meta) -
+        # chỉ ở lần đăng nhập ĐẦU và khi label còn là tên mặc định (đăng nhập lại giữ tên user
+        # đã đặt, kể cả khi trùng tên connector); lỗi thì bỏ qua, không phá trang báo thành công.
+        try:
+            cid = res.get("conn_id")
+            c = mcp_store.get_connection(cid) or {}
+            con = mcp_catalog.get(c.get("connector_id")) or {}
+            if (cid and res.get("first_auth", True)
+                    and c.get("label") in ("", None, con.get("name"), c.get("connector_id"))):
+                label = res.get("email") or ""   # email từ id_token (Google) chắc chắn hơn validate
+                if not label:
+                    val = await mcp_hub.validate_connection(cid)
+                    label = val.get("label") or ""
+                if label:
+                    mcp_store.update_connection(cid, {"label": label})
+        except Exception as e:
+            print(f"[oauth label] {e}")
         html = ("<html><body style='font-family:sans-serif;background:#111;color:#eee;text-align:center;padding-top:80px'>"
                 "<h2>✓ Đã kết nối thành công</h2><p>Đóng tab này và quay lại Javis, bấm Làm mới ở trang Kết nối.</p></body></html>")
     else:
