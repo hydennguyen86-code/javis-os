@@ -4,6 +4,14 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.4] - 2026-07-04
+### Thêm mới
+- **Slack** vào kho Kết nối (MCP chính chủ của Slack, remote): tìm/đọc/gửi tin, xem kênh và thành viên, quản lý canvas. Đăng nhập bằng OAuth qua một Slack app của chính bạn (Slack không cho tự đăng ký client, cần tạo app trong workspace + admin duyệt). Mặc định Chỉ đọc; gửi tin phải nâng Toàn quyền.
+- **Systeme.io** vào kho Kết nối (MCP chính chủ, remote): quản lý liên hệ, tag, trường tuỳ biến, newsletter, phễu. Chỉ cần dán MCP key (tạo trong Cài đặt hồ sơ, hạn tối đa 90 ngày). Mặc định Chỉ đọc.
+- **Logo thương hiệu cho connector**: các thẻ trong kho Kết nối giờ hiện logo thật (Pancake POS, Botcake, Webcake, Meta Ads, Google Calendar, Gmail, Slack, Systeme.io) thay cho biểu tượng emoji; connector chưa có logo vẫn dùng emoji như cũ.
+### Cải thiện
+- Nhánh OAuth explicit của hub nhận thêm 2 tinh chỉnh theo hãng: tên tham số scope và dấu ngăn (Slack dùng `user_scope` + dấu phẩy cho token người dùng, Google giữ `scope` + dấu cách) - để hỗ trợ đúng các nhà cung cấp OAuth không theo chuẩn chung.
+
 ## [0.9.3] - 2026-07-04
 ### Thêm mới
 - **Kho Kết nối có Google Calendar và Gmail** (MCP chính chủ của Google, remote - chạy được cả trên VPS): Calendar xem lịch, tìm chỗ trống, tạo/sửa/xoá sự kiện; Gmail đọc/tìm thư, soạn NHÁP, gắn nhãn. Gmail bản chính chủ KHÔNG có tool gửi thẳng nên Javis luôn dừng ở bản nháp để bạn tự bấm gửi. Đăng nhập Google ngay trong dashboard; cần tạo OAuth client 1 lần (~10 phút, hướng dẫn từng bước trong cửa sổ kết nối, dùng chung 1 client cho cả hai). Mặc định Chỉ đọc; nâng lên Ghi nháp để tạo sự kiện/soạn nháp, Toàn quyền mới xoá được sự kiện.

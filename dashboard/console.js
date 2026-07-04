@@ -1425,6 +1425,11 @@
     const m = PERM_META[p] || PERM_META.full;
     return '<span class="perm-chip" style="color:' + m.color + ';border-color:' + m.color + '55">' + m.label + '</span>';
   }
+  function iconInner(con) {
+    // icon là URL/đường dẫn ảnh (logo hãng) → render <img>; còn lại là emoji → in thẳng.
+    const ic = (con && con.icon) || "🔌";
+    return /^(https?:|\/)/.test(ic) ? '<img class="ico-img" src="' + esc(ic) + '" alt="" loading="lazy">' : ic;
+  }
   function connChip(c) {
     return '<button class="conn-chip' + (c.enabled ? "" : " off") + '" data-conn="' + c.id + '">'
       + '<span class="cdot' + (c.enabled ? " on" : "") + '">●</span> ' + esc(c.label || c.name || "?")
@@ -1434,7 +1439,7 @@
     const chips = conns.map(connChip).join("")
       + '<button class="conn-chip add" data-addacc="' + esc(con.id) + '">＋ Thêm tài khoản</button>';
     return '<div class="prov-card conn-card">'
-      + '<div class="prov-head"><span class="conn-ico">' + (con.icon || "🔌") + '</span>'
+      + '<div class="prov-head"><span class="conn-ico">' + iconInner(con) + '</span>'
       + '<div class="prov-info"><div class="prov-name">' + esc(con.name || con.id) + '</div>'
       + '<div class="prov-status">' + esc(con.description || "") + '</div></div></div>'
       + '<div class="conn-accounts">' + chips + '</div></div>';
@@ -1445,7 +1450,7 @@
       + (con.status === "beta" ? ' <span class="prov-kind" style="color:#d9a521">beta</span>' : "")
       + (soon ? ' <span class="prov-kind">sắp có</span>' : "");
     return '<div class="cat-card' + (soon ? " soon" : "") + '" data-cat="' + esc(con.category || "Khác") + '">'
-      + '<div class="cat-ico">' + (con.icon || "🔌") + '</div>'
+      + '<div class="cat-ico">' + iconInner(con) + '</div>'
       + '<div class="cat-name">' + esc(con.name) + ' ' + badge + '</div>'
       + '<div class="cat-desc">' + esc(con.description || "") + '</div>'
       + (soon

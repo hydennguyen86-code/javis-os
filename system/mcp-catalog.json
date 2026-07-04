@@ -5,7 +5,7 @@
     {
       "id": "pancake-pos",
       "name": "Pancake POS",
-      "icon": "🛒",
+      "icon": "/static/logos/pancake-pos.png",
       "category": "Bán hàng",
       "description": "Đơn hàng, doanh thu, khách hàng, tồn kho, quảng cáo từ Pancake POS. Mỗi cửa hàng 1 API key - thêm nhiều tài khoản cho nhiều shop.",
       "status": "ready",
@@ -74,7 +74,7 @@
     {
       "id": "webcake-landing",
       "name": "Webcake Landing",
-      "icon": "📄",
+      "icon": "/static/logos/webcake.jpg",
       "category": "Marketing",
       "description": "Để AI tự thiết kế và sửa landing page Webcake bằng lời nói (tạo trang, sửa section, publish...). Chạy local qua npx, mỗi tài khoản 1 JWT.",
       "status": "ready",
@@ -116,7 +116,7 @@
     {
       "id": "botcake",
       "name": "Botcake",
-      "icon": "🤖",
+      "icon": "/static/logos/botcake.png",
       "category": "Nhắn tin",
       "description": "Khách hàng, tag, flow và gửi tin từ chatbot Botcake (qua Public API - Javis tự dựng cầu nối, không cần cài gì thêm).",
       "status": "beta",
@@ -261,7 +261,7 @@
     {
       "id": "meta-ads",
       "name": "Meta Ads (Facebook & Instagram)",
-      "icon": "📣",
+      "icon": "/static/logos/meta-ads.webp",
       "category": "Quảng cáo",
       "description": "Quảng cáo Facebook/Instagram qua MCP chính chủ của Meta: tài khoản ads, hiệu suất chiến dịch, benchmark ngành, catalog sản phẩm. Đăng nhập Facebook 1 chạm - không cần tạo app hay dán key.",
       "status": "beta",
@@ -387,7 +387,7 @@
     {
       "id": "google-calendar",
       "name": "Google Calendar",
-      "icon": "📅",
+      "icon": "/static/logos/google-calendar.png",
       "category": "Văn phòng",
       "description": "Lịch Google qua MCP chính chủ của Google: xem lịch, tìm chỗ trống, tạo/sửa sự kiện, nhắc hẹn. Đăng nhập Google trong dashboard, chạy được cả trên VPS. Cần tạo OAuth client 1 lần (~10 phút).",
       "status": "beta",
@@ -423,7 +423,7 @@
     {
       "id": "gmail",
       "name": "Gmail",
-      "icon": "📧",
+      "icon": "/static/logos/gmail.webp",
       "category": "Văn phòng",
       "description": "Gmail qua MCP chính chủ của Google: đọc và tìm thư, soạn NHÁP, gắn nhãn sắp xếp hộp thư. Server chính chủ KHÔNG có tool gửi thẳng - luôn dừng ở bản nháp để bạn tự bấm gửi. Cần tạo OAuth client 1 lần.",
       "status": "beta",
@@ -454,6 +454,65 @@
       },
       "default_perm": "readonly",
       "risk": "Mức Ghi nháp cho phép Javis SOẠN NHÁP thư và gắn/gỡ nhãn trong hộp thư của bạn. Server Gmail chính chủ không có tool gửi thẳng nên Javis không tự gửi được - luôn dừng ở bản nháp để bạn tự bấm gửi. Chỉ cần đọc/tìm thư thì giữ mức Chỉ đọc."
+    },
+    {
+      "id": "slack",
+      "name": "Slack",
+      "icon": "/static/logos/slack.webp",
+      "category": "Nhắn tin",
+      "description": "Tìm kiếm và đọc/gửi tin nhắn Slack, xem kênh và thành viên, quản lý canvas qua MCP chính chủ của Slack. Cần tạo một Slack app trong workspace và được admin duyệt (đây là yêu cầu bắt buộc của Slack).",
+      "status": "beta",
+      "transport": "http",
+      "url": "https://mcp.slack.com/mcp",
+      "auth": {
+        "type": "oauth",
+        "provider": "slack",
+        "authorize_url": "https://slack.com/oauth/v2_user/authorize",
+        "token_url": "https://slack.com/api/oauth.v2.user.access",
+        "scope_param": "user_scope",
+        "scope_sep": ",",
+        "scopes": ["openid", "email", "profile", "search:read.public", "channels:read", "channels:history", "groups:read", "users:read", "chat:write", "canvases:read"],
+        "fields": [
+          { "key": "client_id", "label": "Client ID (từ Slack app)", "placeholder": "1234567890.1234567890" },
+          { "key": "client_secret", "label": "Client Secret", "placeholder": "dán client secret của app..." }
+        ],
+        "guide": "Slack yêu cầu MCP đi qua một app của chính bạn (không cho tự đăng ký). Làm 1 lần: vào api.slack.com/apps > Create New App (from scratch) trong workspace của bạn > OAuth & Permissions: thêm 'Redirect URL' đúng địa chỉ http://localhost:7777/connect/oauth/callback (VPS thì thêm https://<tên-miền>/connect/oauth/callback) và thêm các 'User Token Scopes' khớp với quyền (search:read.public, channels:read, channels:history, users:read, chat:write, canvases:read...). Ở Basic Information copy Client ID + Client Secret dán vào đây. Nếu workspace yêu cầu admin duyệt app thì cần admin chấp thuận. Bấm Kết nối để đăng nhập Slack và cấp quyền.",
+        "guide_url": "https://docs.slack.dev/ai/slack-mcp-server/"
+      },
+      "tool_meta": {
+        "danger": ["*send*", "*post*", "*add_message*", "*create*", "*update*", "*archive*", "*upload*", "*invite*"]
+      },
+      "default_perm": "readonly",
+      "risk": "Mức Toàn quyền cho phép Javis GỬI TIN NHẮN THẬT và tạo/sửa canvas bằng tài khoản Slack của bạn. Chỉ cần đọc/tìm tin thì giữ mức Chỉ đọc. Lưu ý: tên tool chính xác của Slack MCP chưa công bố nên phân loại quyền dựa trên heuristic (mọi tool có động từ hành động bị coi là GHI và chặn ở mức Chỉ đọc); nếu một công cụ đọc bị chặn nhầm, nâng quyền hoặc báo lại để chỉnh."
+    },
+    {
+      "id": "systeme-io",
+      "name": "Systeme.io",
+      "icon": "/static/logos/systeme-io.png",
+      "category": "Marketing",
+      "description": "Quản lý liên hệ, tag, trường tuỳ biến, newsletter và phễu từ Systeme.io qua MCP chính chủ. Dán MCP key là xong (key có hạn tối đa 90 ngày, tối đa 2 key mỗi tài khoản).",
+      "status": "beta",
+      "transport": "http",
+      "url": "https://mcp.systeme.io/mcp",
+      "auth": {
+        "type": "apikey",
+        "fields": [
+          {
+            "key": "mcp_key",
+            "label": "MCP key",
+            "placeholder": "dán MCP key từ Systeme.io...",
+            "header": "X-MCP-Key: {mcp_key}"
+          }
+        ],
+        "guide": "Vào systeme.io > Cài đặt hồ sơ > 'MCP & API keys' (menu trái) > kéo xuống mục MCP keys > Create > đặt tên + hạn dùng (tối đa 90 ngày) > lưu và copy key dán vào đây. Mỗi tài khoản tối đa 2 MCP key; key hết hạn thì tạo key mới và cập nhật lại.",
+        "guide_url": "https://help.systeme.io/article/9489-how-to-use-systeme-ios-mcp"
+      },
+      "tool_meta": {
+        "write": ["create_*", "update_*", "assign_*", "set_*", "add_*", "remove_*", "*_assign", "*_remove"],
+        "danger": ["delete_*", "*_delete"]
+      },
+      "default_perm": "readonly",
+      "risk": "Mức Ghi nháp cho phép Javis TẠO/SỬA liên hệ, tag, newsletter, phễu thật trên Systeme.io. Mức Toàn quyền thêm quyền XOÁ. Chỉ cần xem dữ liệu thì giữ mức Chỉ đọc. Lưu ý: tên tool chính xác chưa công bố nên phân loại dựa trên heuristic (tool có động từ hành động bị coi là GHI, xoá là NGUY HIỂM); nếu công cụ đọc bị chặn nhầm ở mức Chỉ đọc, báo lại để chỉnh."
     }
   ]
 }

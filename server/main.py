@@ -75,6 +75,9 @@ async def _auth_guard(request: Request, call_next):
     return await call_next(request)
 
 DASHBOARD_PATH = Path(__file__).parent.parent / "dashboard"
+# Windows/mimetypes không biết .webp -> StaticFiles trả text/plain; khai rõ để logo webp đúng kiểu ảnh.
+import mimetypes
+mimetypes.add_type("image/webp", ".webp")
 app.mount("/static", StaticFiles(directory=str(DASHBOARD_PATH)), name="static")
 
 CLAUDE_MD_PATH = Path(__file__).parent.parent / "CLAUDE.md"

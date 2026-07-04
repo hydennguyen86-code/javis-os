@@ -109,10 +109,14 @@ async def start_auth(conn_id, redirect_uri):
         client_secret = creds.get("client_secret") or ""
         if not client_id:
             return {"ok": False, "error": "Chưa có Client ID. Dán Client ID + Client Secret bạn tạo "
-                                          "trong Google Cloud rồi bấm Kết nối lại."}
+                                          "ở nhà cung cấp (Google Cloud / Slack app) rồi bấm Kết nối lại."}
         authorize_endpoint = auth["authorize_url"]
         token_endpoint = auth["token_url"]
         scopes = auth.get("scopes") or []
+        # Tên param mang scope + dấu ngăn khác nhau theo hãng: Google dùng scope + dấu cách (mặc định),
+        # Slack dùng user_scope + dấu phẩy (token người dùng).
+        scope_param = auth.get("scope_param") or "scope"
+        scope_sep = auth.get("scope_sep") or " "
         extra_params = dict(auth.get("authorize_params") or {})
         add_resource = False
     else:
@@ -141,6 +145,7 @@ async def start_auth(conn_id, redirect_uri):
         if not client_id:
             return {"ok": False, "error": "Server không hỗ trợ tự đăng ký client (DCR) - cần client_id thủ công"}
         scopes = md.get("scopes_supported") or []
+        scope_param, scope_sep = "scope", " "
         extra_params = {}
         add_resource = True
 
@@ -156,7 +161,7 @@ async def start_auth(conn_id, redirect_uri):
     q = {"response_type": "code", "client_id": client_id, "redirect_uri": redirect_uri,
          "state": state, "code_challenge": challenge, "code_challenge_method": "S256"}
     if scopes:
-        q["scope"] = " ".join(scopes)
+        q[scope_param] = scope_sep.join(scopes)
     if add_resource:
         q["resource"] = conn["url"]   # RFC 8707 - server bỏ qua nếu không dùng
     q.update(extra_params)            # vd Google: access_type=offline, prompt=consent (để có refresh_token)

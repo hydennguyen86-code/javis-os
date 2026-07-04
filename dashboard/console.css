@@ -301,7 +301,9 @@ body.has-rail .hud { margin-left: var(--rail-w); width: calc(100% - var(--rail-w
 .cat-card { border: 1px solid var(--border, #333); border-radius: 12px; padding: 14px;
   background: rgba(255,255,255,.03); display: flex; flex-direction: column; gap: 8px; }
 .cat-card.soon { opacity: .55; }
-.cat-ico { font-size: 30px; }
+.cat-ico { font-size: 30px; height: 34px; display: flex; align-items: center; }
+.ico-img { width: 32px; height: 32px; object-fit: contain; border-radius: 7px; vertical-align: middle; }
+.conn-card .conn-ico .ico-img { display: block; margin: 0 auto; }
 .cat-name { font-weight: 600; font-size: 14.5px; }
 .cat-desc { font-size: 12.5px; opacity: .7; flex: 1; line-height: 1.45; }
 .cat-doc { font-size: 12px; opacity: .7; }
