@@ -62,7 +62,7 @@ https://raw.githubusercontent.com/blogminhquy/javis-os/main/docker-compose.hosti
 ```
 Ô **Environment** đặt biến `DOMAIN_NAME` (BẮT BUỘC, để Traefik của Hostinger cấp HTTPS):
 - **Link miễn phí** (không cần mua tên miền): `DOMAIN_NAME=javis.<hostname-vps>.hstgr.cloud`
-  (hostname xem ở hPanel → VPS, vd `javis.srv1782015.hstgr.cloud`).
+  (hostname xem ở hPanel → VPS, vd `javis.srv1562015.hstgr.cloud`).
 - **Tên miền riêng:** `DOMAIN_NAME=tenmien.com` + trỏ DNS A về IP VPS.
 
 Deploy → đợi 1-3 phút Traefik cấp SSL → mở `https://<DOMAIN_NAME>`. (Chi tiết + xử lý sự cố: [DEPLOY.md](DEPLOY.md).)
