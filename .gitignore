@@ -72,3 +72,4 @@ parse_ads*.ps1
 .DS_Store
 Thumbs.db
 desktop.ini
+server/stop-last.log

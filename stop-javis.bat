@@ -1,13 +1,11 @@
 @echo off
 chcp 65001 >nul
 title Dung Javis OS
-echo Dang tim va tat Javis OS (port 7777)...
-set FOUND=0
-for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":7777" ^| findstr "LISTENING"') do (
-  taskkill /F /T /PID %%a >nul 2>&1
-  set FOUND=1
-  echo   - Da tat PID %%a
-)
-if "%FOUND%"=="0" echo   (Khong thay server nao dang chay)
+echo Dang tim va tat Javis OS...
+REM Logic giet nam trong stop-javis.ps1 (giet theo dung python cua venv + chu port 7777).
+REM KHONG dung timeout o day: chay an qua VBS se loi "Input redirection is not supported".
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0stop-javis.ps1"
+REM Don cua so CMD den "Javis OS" kieu cu con sot (flow moi chay an, khong tao cua so nay).
+taskkill /F /FI "IMAGENAME eq cmd.exe" /FI "WINDOWTITLE eq Javis OS*" >nul 2>&1
 echo Xong.
-timeout /t 2 >nul
+exit /b 0
