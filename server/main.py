@@ -3529,6 +3529,18 @@ async def brand_logo():
     return FileResponse(str(p), headers={"Cache-Control": "public, max-age=60"})
 
 
+@app.get("/favicon.ico")
+async def favicon_ico():
+    """Favicon = logo hiện tại. Trình duyệt LUÔN tự gọi /favicon.ico và cache rất lì;
+    trước đây route này trả 404 nên tab giữ icon cũ. Trả thẳng ảnh logo cho khớp app."""
+    p = _current_logo_file() or _DEFAULT_LOGO
+    if not p.exists():
+        return JSONResponse({"error": "no favicon"}, status_code=404)
+    media = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+             ".webp": "image/webp", ".gif": "image/gif"}.get(p.suffix.lower(), "image/png")
+    return FileResponse(str(p), media_type=media, headers={"Cache-Control": "public, max-age=300"})
+
+
 @app.post("/branding/logo")
 async def branding_logo_set(file: UploadFile = File(...)):
     ext = os.path.splitext(file.filename or "")[1].lower()

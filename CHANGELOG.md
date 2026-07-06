@@ -4,6 +4,12 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.15] - 2026-07-06
+### Sửa lỗi
+- **Favicon giờ khớp logo app**: icon trên tab trình duyệt trước đây vẫn là ảnh mặc định cũ dù link đã trỏ đúng. Nguyên nhân: đường `/favicon.ico` (trình duyệt LUÔN tự gọi) trả về 404 nên trình duyệt giữ icon cache cũ. Đã thêm route trả thẳng logo hiện tại (mặc định `logo.png`, tự đổi theo ảnh bạn tải lên). Trình duyệt cache favicon rất lì nên cần đóng mở lại tab để thấy icon mới.
+- **Dải trống bên trên khung chat**: lưới `.hud` khai báo thiếu một hàng nên thanh đính kèm (lúc trống) chiếm mất hàng 70px, để lại một dải trống chạy hết bề ngang ngay trên ô nhập. Đã thêm hàng `auto` cho thanh đính kèm để nó co về 0 khi trống; phần thân giờ giãn hết xuống sát ô chat.
+- **Nút "Lịch sử" đè lên nút header**: nút "Lịch sử" để nổi cố định ở góc phải, che mất các nút Cài đặt / Đọc / Reset hội thoại phía dưới. Đã đưa nút vào nằm chung hàng với dãy nút header nên không còn chồng lên nhau.
+
 ## [0.9.14] - 2026-07-06
 ### Thêm mới
 - **Panel "Mức dùng" - đo token đa nhà cung cấp**: sidebar giờ hiện lượng token Javis **tự đo** qua từng nhà cung cấp/model trong ngày (vào ↑ / ra ↓ + ước tính chi phí ở nơi provider trả về, vd Claude Code), cộng tổng. Đồng nhất cho mọi engine (Claude Code, ChatGPT/Codex, OpenRouter, OpenAI API, Anthropic API) vì Javis đọc usage trong mọi phản hồi. Kèm **số dư THẬT của OpenRouter** nếu đã cắm key (provider duy nhất lộ số dư qua API). Đây là lượng Javis dùng, KHÔNG phải hạn mức gói thuê bao - đa số nhà cung cấp không cho lấy hạn mức tài khoản qua API nên xem trong app của họ.

@@ -162,10 +162,12 @@
   function bindGlobal() {
     var gs = document.getElementById("graphSource");
     if (gs) gs.addEventListener("change", refresh);
-    // Nút "Lịch sử" cố định (góc trên phải) → mở thẳng workspace với sidebar
+    // Nút "Lịch sử" → mở thẳng workspace với sidebar. Đặt INLINE trong hàng nút header
+    // (.hud-actions) để không đè lên nút Cài đặt/Reset; fallback về body nếu chưa có header.
     var btn = el('<div id="jv-sess-btn" title="Lịch sử hội thoại">🕘 <span>Lịch sử</span></div>');
     btn.onclick = function () { if (window.JavisChatStage) window.JavisChatStage.showSide(); };
-    document.body.appendChild(btn);
+    var host = document.querySelector(".hud-actions");
+    (host || document.body).appendChild(btn);
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", bindGlobal);
   else bindGlobal();
