@@ -32,6 +32,7 @@ from fastapi import APIRouter, Form, Query
 
 from claude_cli import ClaudeCLI, cancel_all, _empty_mcp_file
 import git_brain
+import skill_router
 
 
 def _now_vn() -> datetime:
@@ -540,10 +541,10 @@ class LearnFeature:
                     self._merge_wiki_index(wiki_dir, title, w.get("hook") or body[:80], written_paths, root)
                     self._append_wiki_log(wiki_dir, title, written_paths, root)
 
-            # ---- SKILLS (draft/disabled) ----
+            # ---- SKILLS (tự học) - tạo BẬT sẵn (chính sách user), đánh dấu origin để nhận diện ----
             if caps.get("skill"):
-                # Ghi vào CANONICAL <root>/skills/.disabled (draft luôn TẮT; mirror bỏ qua .disabled).
-                sk_dis = Path(root) / "skills" / ".disabled"
+                sk_root = Path(root) / "skills"
+                cl_dis = Path(root) / ".claude" / "skills" / ".disabled"
                 for s in (manifest.get("skills") or []):
                     slug = _slugify(s.get("slug") or s.get("name") or "")
                     body = (s.get("body") or "").strip()
@@ -551,10 +552,17 @@ class LearnFeature:
                         continue
                     if secret_hits(body) or injection_in_output(body):
                         rep["blocked"].append(f"skill '{slug}': nội dung không an toàn"); continue
-                    d = sk_dis / slug
+                    # AN TOÀN: KHÔNG ghi đè skill ĐÃ CÓ (của user, bất kỳ vị trí nào) và KHÔNG hồi sinh
+                    # skill user đã TẮT → tránh mất dữ liệu / bật lại thứ user cố ý tắt.
+                    if (skill_router.resolve_skill_file(root, slug)
+                            or (sk_root / ".disabled" / slug / "SKILL.md").is_file()
+                            or (cl_dis / slug / "SKILL.md").is_file()):
+                        rep["blocked"].append(f"skill '{slug}': đã tồn tại → không ghi đè")
+                        continue
+                    d = sk_root / slug   # vị trí BẬT (canonical) → mirror sang .claude ở lượt sysprompt kế
                     d.mkdir(parents=True, exist_ok=True)
                     fm = (f"---\nname: {s.get('name', slug)}\ndescription: {s.get('description','')}\n"
-                          f"origin: javis-learned\nstatus: draft\ncreated: {today}\n---\n")
+                          f"origin: javis-learned\nstatus: active\ncreated: {today}\n---\n")
                     self.deps.atomic_write_text(d / "SKILL.md", fm + body + "\n")
                     written_paths.append(str((d / 'SKILL.md').relative_to(root)).replace("\\", "/"))
                     rep["skills"].append(slug)

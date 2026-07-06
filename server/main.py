@@ -2122,12 +2122,21 @@ async def save_skill(name: str = Form(...), description: str = Form(""), group: 
     slug = (slug or _ascii_slug(name)).strip()
     if not skill_router.valid_slug(slug):
         return JSONResponse({"error": "Tên skill không hợp lệ"}, status_code=400)
-    d = _skills_dir(brain) / slug
+    root = _brain_root(brain)
+    try:
+        system_sync.migrate_brain(root)   # brain cũ: chuẩn hoá về skills/ trước khi ghi
+    except Exception:
+        pass
+    sk = _skills_dir(brain)
+    # SỬA skill đang TẮT thì GIỮ nguyên trạng thái tắt (ghi lại vào .disabled), không tự bật lên
+    # + không để lại bản mồ côi. Skill MỚI (chưa có ở đâu) → ghi vào vị trí BẬT (mặc định bật).
+    disabled_dir = sk / ".disabled" / slug
+    d = disabled_dir if disabled_dir.is_dir() else (sk / slug)
     d.mkdir(parents=True, exist_ok=True)
     meta = {"name": name, "description": description, "group": (group or "Chung").strip()}
     _write_md(d / "SKILL.md", meta, body or f"# {name}\n\n{description}")
     try:
-        system_sync.mirror_skills(_brain_root(brain))
+        system_sync.mirror_skills(root)   # bật → cập nhật mirror; tắt (.disabled) → mirror bỏ qua
     except Exception:
         pass
     return {"ok": True, "slug": slug}

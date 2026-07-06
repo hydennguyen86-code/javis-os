@@ -90,7 +90,8 @@ updated: <YYYY-MM-DD>
   ngay khi user yêu cầu RÕ RÀNG, và phải cảnh báo rủi ro (full = tự tạo đơn/tiêu tiền/đăng bài).
 - KHÔNG tạo năng lực tự làm hành động tiền/đơn/quảng cáo/gửi tin/đăng bài mà không có người duyệt.
 - KHÔNG bao giờ để một loop/automation tự tạo hoặc tự bật loop khác (chống phình vô hạn) - chỉ ĐỀ XUẤT.
-- Skill/agent do TỰ ĐỘNG (loop/engine học) sinh ra -> để dạng nháp chờ duyệt. Skill do user yêu cầu
-  trực tiếp -> tạo bật luôn nhưng phải kiểm trùng + `description` trigger rõ (skill rác làm Javis
-  chọn skill sai). Đừng tạo skill trùng chức năng skill đã có.
+- Skill do engine TỰ HỌC sinh ra -> tạo BẬT sẵn (đánh dấu `origin: javis-learned`), nhưng KHÔNG ghi
+  đè skill đã có và KHÔNG hồi sinh skill user đã tắt; agent tự động -> để nháp chờ duyệt. Skill do
+  user yêu cầu trực tiếp -> tạo bật luôn nhưng phải kiểm trùng + `description` trigger rõ (skill rác
+  làm Javis chọn skill sai). Đừng tạo skill trùng chức năng skill đã có.
 - Sau khi tạo, KHÔNG tự chạy thứ có side-effect; để user xem trước.
