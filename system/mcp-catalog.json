@@ -289,7 +289,7 @@
     {
       "id": "google-ads",
       "name": "Google Ads",
-      "icon": "🎯",
+      "icon": "/static/logos/google-ads.webp",
       "category": "Quảng cáo",
       "description": "Số liệu Google Ads qua MCP chính chủ của Google (chỉ đọc): chiến dịch, chi phí, chuyển đổi, từ khoá qua truy vấn GAQL. Chạy local; cần developer token + Google Cloud, cài 1 lần hơi kỹ thuật.",
       "status": "beta",
@@ -342,7 +342,7 @@
     {
       "id": "tiktok-ads",
       "name": "TikTok Ads",
-      "icon": "🎵",
+      "icon": "/static/logos/tiktok-ads.webp",
       "category": "Quảng cáo",
       "description": "Số liệu quảng cáo TikTok (chỉ đọc): tài khoản, chiến dịch, nhóm quảng cáo, creative, báo cáo hiệu suất. Server cộng đồng chạy local trên Marketing API chính thức - dán App ID + Secret + Access Token.",
       "status": "beta",
@@ -555,7 +555,7 @@
     {
       "id": "higgsfield",
       "name": "Higgsfield",
-      "icon": "🎬",
+      "icon": "/static/logos/higgsfield.png",
       "category": "Sáng tạo",
       "description": "Tạo và chỉnh ảnh/video bằng AI của Higgsfield qua MCP chính chủ: sinh ảnh, sinh video, nâng nét (upscale), mở rộng khung hình, xoá nền, cắt nhân vật, điều khiển chuyển động. Đăng nhập Higgsfield 1 chạm - không cần tạo app hay dán key. Lưu ý: mỗi lần tạo/chỉnh tiêu credit Higgsfield của bạn.",
       "status": "beta",
@@ -574,6 +574,36 @@
       },
       "default_perm": "safe",
       "risk": "Higgsfield là công cụ TẠO nội dung - mỗi lần sinh/chỉnh ảnh hoặc video sẽ TIÊU CREDIT trả trước trong tài khoản Higgsfield của bạn (không trừ tiền trực tiếp mỗi lần). Mặc định để mức Ghi nháp để Javis tạo được nội dung ngay và chặn các thao tác xoá/thanh toán. Muốn Javis chỉ xem lịch sử/kết quả mà không tự tạo (đỡ tốn credit) thì hạ xuống Chỉ đọc; muốn mở tất cả thì nâng Toàn quyền. Tên tool chính xác của Higgsfield chưa công bố nên phân loại quyền dựa trên heuristic."
+    },
+    {
+      "id": "x-twitter",
+      "name": "X (Twitter)",
+      "icon": "/static/logos/x.png",
+      "category": "Mạng xã hội",
+      "description": "Tìm kiếm và đọc bài đăng, xem hồ sơ và số liệu công khai trên X (Twitter) qua MCP chính chủ của X. Dán Bearer Token (App-only) từ X Developer Portal - dùng để đọc/tìm; đăng bài cần OAuth người dùng (sẽ bổ sung nếu cần).",
+      "status": "beta",
+      "transport": "http",
+      "url": "https://api.x.com/mcp",
+      "auth": {
+        "type": "apikey",
+        "fields": [
+          {
+            "key": "bearer_token",
+            "label": "Bearer Token (App-only)",
+            "placeholder": "dán App-only Bearer Token từ X Developer Portal...",
+            "header": "Authorization: Bearer {bearer_token}"
+          }
+        ],
+        "guide": "Vào developer.x.com > Developer Portal > Projects & Apps > chọn App (hoặc Create Project/App nếu chưa có) > tab 'Keys and tokens' > mục 'Bearer Token' > Generate rồi copy dán vào đây. Đây là token App-only: đọc/tìm bài đăng và hồ sơ công khai. Muốn ĐĂNG bài / thao tác theo tài khoản người dùng thì cần OAuth ngữ cảnh người dùng (hiện chưa hỗ trợ trong Javis, báo em nếu cần bổ sung).",
+        "guide_url": "https://docs.x.com/tools/mcp"
+      },
+      "tool_meta": {
+        "read": ["*search*", "*get*", "*lookup*", "*list*", "*read*", "*timeline*", "*_by_*", "*show*", "*count*"],
+        "write": ["*create*", "*post*", "*send*", "*reply*", "*like*", "*retweet*", "*repost*", "*follow*", "*update*", "*add*"],
+        "danger": ["*delete*", "*remove*", "*dm*", "*message*", "*block*", "*mute*"]
+      },
+      "default_perm": "readonly",
+      "risk": "Token App-only chỉ ĐỌC/TÌM bài đăng và hồ sơ công khai của X - không đăng bài, không nhắn tin, nên rất an toàn ở mức Chỉ đọc (mặc định). Tên tool chính xác của X MCP chưa công bố nên phân loại quyền dựa trên heuristic; nếu sau này đấu OAuth để đăng bài thì cân nhắc mức quyền kỹ hơn."
     }
   ]
 }

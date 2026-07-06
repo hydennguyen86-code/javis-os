@@ -4,6 +4,12 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.11] - 2026-07-06
+### Thêm mới
+- **X (Twitter) vào kho Kết nối** (MCP chính chủ của X, remote): tìm và đọc bài đăng, xem hồ sơ và số liệu công khai. Dán Bearer Token App-only từ X Developer Portal; mặc định Chỉ đọc (token app-only không đăng bài/nhắn tin được nên an toàn). Đăng bài theo tài khoản người dùng cần OAuth - sẽ bổ sung khi bạn cần.
+### Cải thiện
+- **Logo thương hiệu cho connector**: X, Higgsfield, TikTok Ads, Google Ads và Gmail giờ hiện logo thật thay cho biểu tượng emoji.
+
 ## [0.9.10] - 2026-07-06
 ### Thêm mới
 - **Higgsfield vào kho Kết nối** (MCP chính chủ, remote): tạo và chỉnh ảnh/video bằng AI - sinh ảnh, sinh video, nâng nét (upscale), mở rộng khung hình, xoá nền, cắt nhân vật, điều khiển chuyển động. Đăng nhập Higgsfield 1 chạm: Javis tự đăng ký ứng dụng theo chuẩn OAuth của MCP (tự dò metadata + DCR + PKCE, không cần tạo app hay dán key), dùng được trên mọi engine. Mặc định mức Ghi nháp để Javis tạo được nội dung ngay và chặn thao tác xoá/thanh toán; mỗi lần tạo tiêu credit Higgsfield trả trước của bạn.
