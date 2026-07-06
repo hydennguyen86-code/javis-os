@@ -45,6 +45,8 @@ brain/Memory/
 # Thư mục CHA chứa MỌI second brain (mô hình mới) - DỮ LIỆU CÁ NHÂN, không đẩy vào repo code.
 # Backup riêng lên git repo khác (xem comment bind-mount trong docker-compose.yml).
 brains/
+# Bản backup brain do server tự tạo (DỮ LIỆU CÁ NHÂN) - tuyệt đối không version.
+brains-backup/
 
 # Dữ liệu CÁ NHÂN trong brain mặc định CŨ (không version): bộ nhớ, cache số liệu KD,
 # automations (chứa chat_id). Cấu trúc thư mục + agent/workflow mẫu vẫn được version.

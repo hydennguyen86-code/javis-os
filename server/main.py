@@ -18,7 +18,7 @@ import yaml
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, UploadFile, File, Form, Request, Body
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, FileResponse
+from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, FileResponse, Response
 import edge_tts
 from dotenv import load_dotenv
 
@@ -38,6 +38,8 @@ import zalo_login
 import oauth_mcp
 import system_sync   # tầng năng lực HỆ THỐNG (skill/loop mặc định) - update theo phiên bản app
 import skill_router   # nguồn chân lý khám phá skill (canonical <brain>/skills) dùng chung mọi engine
+import share_bundle   # xuất/nhập gói agent/skill/workflow (.zip) để chia sẻ giữa brain/người dùng
+import usage_store   # đếm token/chi phí Javis tự đo (đa nhà cung cấp)
 from telegram_bot import TelegramBot, parse_chat_ids as tg_parse_ids
 import channel_context   # metadata kênh + gom file trả về kênh chat (port gateway hermes-agent)
 from sessions import get_store   # kho phiên hội thoại (sqlite + fts5): list/resume/search
@@ -183,6 +185,18 @@ def build_system_prompt(brain: str = "brain") -> str:
         pass
     try:
         base += _skill_router_block(brain, root)   # ROUTER SKILL đa-engine: list skill + cách gọi
+    except Exception:
+        pass
+    try:
+        # 1 dòng MỨC DÙNG để Javis TRẢ LỜI được khi user hỏi "token tiêu bao nhiêu" (chi tiết ở panel).
+        _t = usage_store.summary().get("today", {}).get("total", {})
+        if _t.get("in") or _t.get("out"):
+            _c = f", ~${_t.get('cost', 0):.4f}" if _t.get("cost") else ""
+            base += (f"\n\n# === MỨC DÙNG HÔM NAY (Javis tự đo) ===\n"
+                     f"{_t.get('in', 0):,} token vào + {_t.get('out', 0):,} token ra qua "
+                     f"{_t.get('turns', 0)} lượt{_c}. Đây là token Javis TỰ ĐO, KHÔNG phải hạn mức gói "
+                     f"thuê bao (đa số nhà cung cấp không cho lấy hạn mức tài khoản qua API). Chi tiết "
+                     f"từng nhà cung cấp ở panel 'Mức dùng' trên dashboard.")
     except Exception:
         pass
     return base
@@ -2386,6 +2400,85 @@ async def delete_workflow(slug: str = Form(...), brain: str = Form("brain")):
         f.unlink()
     return {"ok": True}
 
+# ---- Xuất / Nhập năng lực (chia sẻ agent/skill/workflow qua file .zip) ----
+def _app_version() -> str:
+    try:
+        return (PROJECT_ROOT / "VERSION").read_text(encoding="utf-8").strip()
+    except Exception:
+        return ""
+
+
+@app.get("/export")
+async def export_capability(kind: str = Query(...), slug: str = Query(...),
+                            brain: str = Query("brain"), deps: int = Query(1)):
+    """Xuất 1 agent/skill/workflow (kèm phụ thuộc nếu deps=1) thành gói .zip để tải về, chia sẻ."""
+    if kind not in ("agent", "skill", "workflow"):
+        return JSONResponse({"error": "kind phải là agent/skill/workflow"}, status_code=400)
+    if not skill_router.valid_slug(slug):
+        return JSONResponse({"error": "slug không hợp lệ"}, status_code=400)
+    data, fname = share_bundle.build_bundle(
+        kind, slug,
+        agents_dir=_agents_dir(brain), workflows_dir=_workflows_dir(brain),
+        skills_root=_skills_dir(brain), include_deps=bool(deps),
+        system_slugs=system_sync.system_skill_slugs(), app_version=_app_version())
+    if not data:
+        return JSONResponse({"error": f"Không tìm thấy {kind} '{slug}' để xuất"}, status_code=404)
+    return Response(content=data, media_type="application/zip",
+                    headers={"Content-Disposition": f'attachment; filename="{fname}"'})
+
+
+@app.post("/import")
+async def import_capability(file: UploadFile = File(...), brain: str = Form("brain"),
+                            overwrite: str = Form("0")):
+    """Nhập gói .zip (hoặc file .md lẻ cho agent/workflow) vào brain. Trùng slug thì bỏ qua trừ khi
+    tick ghi đè. Có rào chống zip-slip + giới hạn dung lượng ở share_bundle."""
+    data = await file.read()
+    if not data:
+        return JSONResponse({"error": "File rỗng"}, status_code=400)
+    if len(data) > 25 * 1024 * 1024:
+        return JSONResponse({"error": "File quá lớn (>25MB)"}, status_code=413)
+    root = _brain_root(brain)
+    res = share_bundle.import_bundle(
+        data, file.filename,
+        agents_dir=_agents_dir(brain), workflows_dir=_workflows_dir(brain),
+        skills_root=_skills_dir(brain),
+        overwrite=(overwrite in ("1", "true", "True", "on")))
+    if any(str(k).startswith("skill:") for k in res.get("imported", [])):
+        try:
+            system_sync.mirror_skills(root)   # skill mới → mirror sang .claude cho Claude native
+        except Exception:
+            pass
+    try:
+        rebuild_javis_index(root)
+    except Exception:
+        pass
+    return {"ok": not res.get("errors"), **res}
+
+
+@app.get("/usage")
+async def usage_stats():
+    """Token/chi phí Javis TỰ ĐO theo nhà cung cấp (hôm nay + tổng). Kèm số dư THẬT của OpenRouter
+    nếu có key (provider duy nhất lộ số dư qua API); các provider còn lại API không cho lấy hạn mức."""
+    out = usage_store.summary()
+    orb = None
+    try:
+        key = (cfgmod.read_settings().get("model", {}) or {}).get("openrouter_key")
+        if key:
+            import httpx
+            async with httpx.AsyncClient(timeout=8) as client:
+                r = await client.get("https://openrouter.ai/api/v1/credits",
+                                     headers={"Authorization": f"Bearer {key}"})
+            if r.status_code == 200:
+                d = (r.json() or {}).get("data") or {}
+                tc, tu = d.get("total_credits"), d.get("total_usage")
+                if tc is not None and tu is not None:
+                    orb = {"total": round(float(tc), 4), "used": round(float(tu), 4),
+                           "remaining": round(float(tc) - float(tu), 4)}
+    except Exception:
+        orb = None
+    out["openrouter"] = orb
+    return out
+
 async def execute_workflow(brain, slug, input="", tools=None):
     """Chạy workflow nhiều agent tuần tự, YIELD event dict (KHÔNG bọc SSE). Dùng CHUNG cho:
       - /workflows/run  : user bấm ở Studio (full quyền, stream SSE).
@@ -3832,6 +3925,7 @@ async def websocket_endpoint(ws: WebSocket):
                             await ws.send_text(json.dumps({"type": "stream", "content": ev["content"], "tts": False}))
                         elif et == "final":
                             final_text = ev.get("content") or final_text
+                            usage_store.record("codex", actual_model, ev.get("tokens_in", 0), ev.get("tokens_out", 0))
                         elif et == "error":
                             await ws.send_text(json.dumps({"type": "error", "content": ev["content"]}))
                     await ws.send_text(json.dumps({"type": "response", "content": final_text, "engine": "codex", "model": actual_model, "session_id": conv_sid}))
@@ -3859,6 +3953,8 @@ async def websocket_endpoint(ws: WebSocket):
                 async for ev in gen:
                     if ev["type"] == "meta":
                         actual_model = ev.get("model") or actual_model
+                    elif ev["type"] == "usage":
+                        usage_store.record(prov, actual_model, ev.get("input", 0), ev.get("output", 0))
                     elif ev["type"] == "tool_call":
                         await ws.send_text(json.dumps({"type": "tool_call", "tool": ev.get("name", ""), "content": f"⚙ MCP: {ev.get('name', '')}"}))
                     elif ev["type"] == "text":
@@ -3887,6 +3983,8 @@ async def websocket_endpoint(ws: WebSocket):
                         final_text = event.get("content") or final_text
                         if event.get("session_id"):
                             store.set_cli_session_id(conv_sid, event["session_id"])
+                        usage_store.record("cli", cli.model or mcfg.get("claude_model") or "mặc định",
+                                           event.get("tokens_in", 0), event.get("tokens_out", 0), event.get("cost_usd") or 0)
                         await ws.send_text(json.dumps({"type": "response", "content": final_text, "session_id": conv_sid, "cli_session_id": event.get("session_id"), "cost_usd": event.get("cost_usd"), "engine": "cli", "model": (mcfg.get("claude_model") or "mặc định")}))
                     elif etype == "error":
                         await ws.send_text(json.dumps({"type": "error", "content": event["content"]}))

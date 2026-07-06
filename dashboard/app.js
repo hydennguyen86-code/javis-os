@@ -167,6 +167,7 @@ function handleMessage(data) {
     if (finalText.trim()) recordTurn("javis", finalText);   // KHÔNG lưu lượt rỗng (tránh khôi phục bong bóng trống)
     maybeAutoLearn();
     notifySessions();   // sidebar lịch sử tự refresh (title/updated_at vừa đổi)
+    refreshUsage();     // cập nhật panel Mức dùng sau mỗi lượt
   } else if (data.type === "error") {
     hideActivity(); appendJavisMessage("⚠ " + data.content); setProcessing(false);
     setOrbState("", "SẴN SÀNG");
@@ -1390,6 +1391,44 @@ async function refreshEngineBadge() {
 }
 
 // ============================================
+// Mức dùng (token Javis tự đo, đa nhà cung cấp) - panel sidebar
+// ============================================
+const _PROV_LABEL = { cli: "Claude Code", codex: "ChatGPT", openrouter: "OpenRouter", openai: "OpenAI", "anthropic-api": "Anthropic" };
+function _fmtTok(n) {
+  n = +n || 0;
+  if (n >= 1e6) return (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + "M";
+  if (n >= 1e3) return (n / 1e3).toFixed(n >= 1e4 ? 0 : 1) + "k";
+  return "" + n;
+}
+function _shortModel(m) { return (m || "").split("/").pop().replace(/^(claude-|gpt-)/, "").slice(0, 22); }
+async function refreshUsage() {
+  const el = document.getElementById("usagePanel"); if (!el) return;
+  let d; try { d = await (await fetch("/usage")).json(); } catch (e) { return; }
+  // Hôm nay chưa có lượt nào → hiện TỔNG tích luỹ để không trống trơn.
+  let src = d.today, scope = "hôm nay";
+  if ((!src || !(src.items || []).length) && d.all_time && (d.all_time.items || []).length) { src = d.all_time; scope = "tổng"; }
+  const items = (src && src.items) || [];
+  const tot = (src && src.total) || { in: 0, out: 0, cost: 0 };
+  const row = (nameHtml, tok, extra) => `<div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:2px 0;${extra || ""}"><span style="color:#aebbd6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${nameHtml}</span><span style="color:#7aa2ff;white-space:nowrap;font-variant-numeric:tabular-nums">${tok}</span></div>`;
+  let html;
+  if (!items.length) {
+    html = `<div class="mcp-item dim">Chưa có lượt nào hôm nay</div>`;
+  } else {
+    html = items.map(i => {
+      const lbl = _PROV_LABEL[i.provider] || escapeHtml(i.provider);
+      const cost = i.cost > 0 ? ` · $${i.cost.toFixed(i.cost < 0.01 ? 4 : 2)}` : "";
+      const nm = `${escapeHtml(lbl)} <span class="dim">${escapeHtml(_shortModel(i.model))}</span>`;
+      return row(nm, `${_fmtTok(i.in)}↑ ${_fmtTok(i.out)}↓${cost}`);
+    }).join("");
+    html += row(`<b>Tổng ${scope}</b>`, `<b>${_fmtTok(tot.in)}↑ ${_fmtTok(tot.out)}↓${tot.cost > 0 ? " · $" + tot.cost.toFixed(2) : ""}</b>`, "border-top:1px solid rgba(255,255,255,.1);margin-top:2px;padding-top:3px");
+  }
+  if (d.openrouter && d.openrouter.remaining != null) {
+    html += row("OpenRouter còn", `$${(+d.openrouter.remaining).toFixed(2)}`, "margin-top:4px;color:#8fd0a0");
+  }
+  el.innerHTML = html;
+}
+
+// ============================================
 // Auth (đăng nhập) + Settings
 // ============================================
 const authOverlay = document.getElementById("authOverlay");
@@ -1648,6 +1687,7 @@ if (document.getElementById("wzFinish")) {
 // ============================================
 initAuthGate();
 refreshEngineBadge();
+refreshUsage();
 connect();
 initStarfield();
 initGraph().then(connectGraphWatch).catch(connectGraphWatch);

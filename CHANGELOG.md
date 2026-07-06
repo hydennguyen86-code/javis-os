@@ -4,6 +4,14 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.14] - 2026-07-06
+### Thêm mới
+- **Panel "Mức dùng" - đo token đa nhà cung cấp**: sidebar giờ hiện lượng token Javis **tự đo** qua từng nhà cung cấp/model trong ngày (vào ↑ / ra ↓ + ước tính chi phí ở nơi provider trả về, vd Claude Code), cộng tổng. Đồng nhất cho mọi engine (Claude Code, ChatGPT/Codex, OpenRouter, OpenAI API, Anthropic API) vì Javis đọc usage trong mọi phản hồi. Kèm **số dư THẬT của OpenRouter** nếu đã cắm key (provider duy nhất lộ số dư qua API). Đây là lượng Javis dùng, KHÔNG phải hạn mức gói thuê bao - đa số nhà cung cấp không cho lấy hạn mức tài khoản qua API nên xem trong app của họ.
+
+## [0.9.13] - 2026-07-06
+### Thêm mới
+- **Chia sẻ agent / skill / workflow qua file**: mỗi agent, skill, workflow giờ có nút **⤓ Xuất** để tải về một gói `.zip`, và mỗi trang (Agents / Skills / Workflows) có nút **⤒ Nhập** để tải gói lên - trao đổi năng lực với người khác dễ dàng. Gói workflow tự **kèm các agent nó dùng + skill của agent** (skill của bạn, KHÔNG kèm skill hệ thống) để bên nhận chạy được ngay; gói agent kèm skill của nó. Nhập chấp nhận `.zip`, file `.md` lẻ (agent/workflow), và **cả gói skill `.skill` của Claude** (Javis tự nhận diện `SKILL.md` trong gói và đưa vào đúng thư mục skill). Có rào an toàn (chống zip-slip, giới hạn dung lượng) và trùng tên thì bỏ qua trừ khi bạn chọn ghi đè.
+
 ## [0.9.12] - 2026-07-06
 ### Bảo mật
 - **Vá 2 lỗ hổng DoS trong thư viện nền** (CVE-2024-47874 Starlette, CVE-2024-53981 python-multipart): nâng fastapi lên 0.115.6 (kéo Starlette lên 0.41.3) và python-multipart lên 0.0.18. Trước đây kẻ tấn công CHƯA đăng nhập có thể gửi multipart form dị dạng vào endpoint công khai (đăng nhập / thiết lập) để làm quá tải server VPS.

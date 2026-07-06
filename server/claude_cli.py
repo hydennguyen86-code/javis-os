@@ -520,12 +520,17 @@ class ClaudeCLI:
                 continue
 
             if etype == "result":
+                u = event.get("usage") or {}
                 yield {
                     "type": "final",
                     "content": event.get("result", ""),
                     "session_id": self.session_id,
                     "cost_usd": event.get("total_cost_usd"),
                     "duration_ms": event.get("duration_ms"),
+                    # token (gồm cache read/creation) để đếm usage; Claude Code trả sẵn trong 'usage'
+                    "tokens_in": ((u.get("input_tokens") or 0) + (u.get("cache_read_input_tokens") or 0)
+                                  + (u.get("cache_creation_input_tokens") or 0)),
+                    "tokens_out": u.get("output_tokens") or 0,
                 }
 
     def reset_session(self):
@@ -681,7 +686,10 @@ class CodexCLI:
                     name = it.get("name") or it.get("server") or it.get("command") or itype
                     yield {"type": "tool_call", "name": str(name)[:80]}
             elif t == "turn.completed":
-                yield {"type": "final", "content": final_text, "session_id": None}
+                u = ev.get("usage") or {}
+                yield {"type": "final", "content": final_text, "session_id": None,
+                       "tokens_in": (u.get("input_tokens") or 0) + (u.get("cached_input_tokens") or 0),
+                       "tokens_out": u.get("output_tokens") or 0}
             elif t in ("error", "turn.failed", "thread.error", "stream.error"):
                 msg = ev.get("message") or (ev.get("error") or {}).get("message") or json.dumps(ev)[:200]
                 yield {"type": "error", "content": "Codex: " + str(msg)}

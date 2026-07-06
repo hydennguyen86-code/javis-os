@@ -145,6 +145,14 @@ Sửa file rồi lưu thì trang Studio tự nhận nội dung mới ở lần t
 - **Chọn model theo việc.** Bước nặng suy luận (phân tích, kiểm chứng) dùng Opus; bước đơn giản, số lượng nhiều dùng Haiku cho nhanh và tiết kiệm. Chi tiết ở [Models & engine](10-models-va-engine.md).
 - **Gán skill đúng chỗ.** Agent chỉ mạnh khi có skill phù hợp. Ví dụ agent viết sales page nên gán skill viết sales page. Quản lý skill ở [Skills](06-skills.md).
 
+## Chia sẻ: Xuất / Nhập (agent, skill, workflow)
+
+Bạn có thể đóng gói một agent, skill hoặc workflow thành **một file `.zip`** để gửi cho người khác, và nhận file của người khác về brain của mình.
+
+- **Xuất:** mỗi thẻ agent / skill / workflow có nút **⤓ Xuất**. Bấm là tải về một gói `.zip`. Gói này **tự kèm phụ thuộc** để bên nhận chạy được ngay: xuất một workflow sẽ kèm luôn các agent mà workflow đó dùng và các skill của những agent đó; xuất một agent sẽ kèm skill của agent. Skill **hệ thống** (javis-builder, ingest, query, lint...) không được đóng gói vì brain nào cũng đã có sẵn.
+- **Nhập:** mỗi trang **Agents / Skills / Workflows** có nút **⤒ Nhập**. Chọn file `.zip` (gói Javis), file `.md` lẻ (agent/workflow), hoặc **gói skill `.skill` của Claude** (Javis tự nhận diện `SKILL.md` trong gói và đưa vào đúng thư mục skill) để đưa vào brain đang chọn. Javis hỏi có **ghi đè** khi trùng tên không: bấm Huỷ để giữ nguyên cái đã có (chỉ nhập cái mới), bấm OK để ghi đè bằng bản trong gói. Sau khi nhập, Javis báo đã nhập gì, bỏ qua gì.
+- **An toàn:** khi nhập, Javis chặn các đường dẫn bất thường trong gói (không cho ghi ra ngoài các thư mục agent/skill/workflow) và giới hạn dung lượng để tránh file độc. Dù vậy, chỉ nên nhập gói từ nguồn bạn tin tưởng, vì nội dung skill là hướng dẫn cho AI làm theo.
+
 ## Sự cố thường gặp
 
 - **Bấm + Workflow báo "Chưa có agent nào".** Bạn chưa tạo agent. Sang trang Agents tạo ít nhất một agent, hoặc bấm Tạo mẫu ở trang Workflows để có sẵn bộ ví dụ.
