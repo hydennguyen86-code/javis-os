@@ -320,6 +320,9 @@ function createStreamingBubble() {
   return div;
 }
 function markdownToHtml(text) {
+  // Render đầy đủ (markdown + tô màu code + artifact) nằm ở chat-render.js.
+  if (typeof window.mdToHtml === "function") return window.mdToHtml(text);
+  // Fallback nếu chat-render.js chưa nạp: bộ render gọn cũ (không có artifact).
   const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   const safeHref = (x) => /^(https?:\/\/|mailto:|\/)/i.test((x || "").trim()) ? x : "";
   // 1) Tách & giữ code block ```...``` ra placeholder để không bị xử lý nhầm
@@ -446,7 +449,8 @@ function flashCopied(btn, label) {
 chatArea.addEventListener("click", (e) => {
   const t = e.target;
   if (t.classList.contains("code-copy")) {
-    const pre = t.parentElement && t.parentElement.querySelector("pre");
+    const wrap = t.closest(".code-wrap");
+    const pre = wrap && wrap.querySelector("pre");
     if (pre) copyText(pre.innerText).then(() => flashCopied(t, "⧉ Copy"));
   } else if (t.classList.contains("msg-copy")) {
     const b = t.closest(".msg") && t.closest(".msg").querySelector(".bubble");

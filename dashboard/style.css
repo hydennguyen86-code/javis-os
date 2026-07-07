@@ -893,3 +893,92 @@ body.chat-zoomed #jv-sess-btn { display: none; }
   font-family: var(--font); }
 .mb-eff-btn:hover { color: var(--text); }
 .mb-eff-btn.cur { background: rgba(139,92,246,.18); color: var(--accent2); border-color: var(--accent2); }
+
+/* ============================================================
+   Chat render (chat-render.js): markdown day du + code highlight + ARTIFACT
+   ============================================================ */
+
+/* Markdown block trong bong bong Javis */
+.msg-javis .bubble h1 { font-size: 19px; }
+.msg-javis .bubble h2 { font-size: 17px; }
+.msg-javis .bubble h1, .msg-javis .bubble h2,
+.msg-javis .bubble h4, .msg-javis .bubble h5, .msg-javis .bubble h6 {
+  color: var(--text); margin: 10px 0 4px; line-height: 1.3; }
+.msg-javis .bubble p { margin: 6px 0; }
+.msg-javis .bubble p:first-child { margin-top: 0; }
+.msg-javis .bubble p:last-child { margin-bottom: 0; }
+.msg-javis .bubble ol { padding-left: 20px; margin: 5px 0; }
+.msg-javis .bubble li { margin: 2px 0; }
+.msg-javis .bubble ul ul, .msg-javis .bubble ul ol,
+.msg-javis .bubble ol ol, .msg-javis .bubble ol ul { margin: 2px 0; }
+.msg-javis .bubble blockquote { margin: 6px 0; padding: 2px 12px; color: var(--text2);
+  border-left: 3px solid var(--accent); background: rgba(255,255,255,.02); border-radius: 0 6px 6px 0; }
+.msg-javis .bubble hr { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
+.msg-javis .bubble del { opacity: .65; }
+.msg-javis .bubble em { font-style: italic; }
+.msg-javis .bubble a { color: #7fb0ff; text-decoration: none; }
+.msg-javis .bubble a:hover { text-decoration: underline; }
+.msg-javis .bubble .task-item { list-style: none; margin-left: -16px; }
+.msg-javis .bubble .task-item input { margin-right: 6px; vertical-align: middle; }
+.chat-img { max-width: min(100%, 440px); border-radius: 8px; display: block; margin: 6px 0; cursor: zoom-in; }
+
+/* Code block: header nhan ngon ngu + nut Copy + to mau cu phap */
+.code-wrap { position: relative; margin: 8px 0; }
+.code-head { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 5px 10px; background: #0c0c16; border: 1px solid var(--border); border-bottom: none;
+  border-radius: 8px 8px 0 0; }
+.code-lang { font-family: var(--font); font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text3); }
+.code-wrap .code-copy { position: static; top: auto; right: auto; opacity: 0;
+  background: var(--bg3); border: 1px solid var(--border); color: var(--text2);
+  border-radius: 6px; padding: 2px 8px; font-size: 12px; cursor: pointer; }
+.code-wrap:hover .code-copy { opacity: 1; }
+.code-wrap .code-block { margin: 0; border-radius: 0 0 8px 8px; border-top: none; }
+.code-wrap.code-live { outline: 1px solid rgba(255,122,60,.25); }
+.code-wrap.code-live .code-lang::after { content: " · dang go"; color: var(--accent); }
+.code-block .tok-c { color: #6b7a8f; font-style: italic; }
+.code-block .tok-s { color: #7ee787; }
+.code-block .tok-n { color: #f0883e; }
+.code-block .tok-k { color: #c792ea; font-weight: 600; }
+
+/* The artifact trong luong chat */
+.jv-art { display: flex; align-items: center; gap: 10px; margin: 8px 0; padding: 10px 12px;
+  max-width: 420px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer;
+  background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,0));
+  transition: border-color .15s, background .15s; }
+.jv-art:hover { border-color: var(--accent); background: rgba(255,122,60,.06); }
+.jv-art:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.jv-art-ic { font-size: 20px; flex: none; }
+.jv-art-meta { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.jv-art-title { color: var(--text); font-size: 14px; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jv-art-sub { color: var(--text3); font-size: 12px; }
+.jv-art-open { color: var(--accent); font-size: 13px; font-weight: 600; flex: none; }
+
+/* Panel artifact (drawer ben phai, chay ca o chat thuong lan chat phong to) */
+.jv-artpanel { position: fixed; top: 0; right: 0; bottom: 0; width: min(52vw, 720px);
+  z-index: 390; display: none; flex-direction: column; background: var(--bg2);
+  border-left: 1px solid var(--border); box-shadow: -16px 0 50px rgba(0,0,0,.5); }
+.jv-artpanel.open { display: flex; animation: artIn .18s ease; }
+@keyframes artIn { from { transform: translateX(24px); opacity: .4; } to { transform: translateX(0); opacity: 1; } }
+.jv-ap-head { display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+  border-bottom: 1px solid var(--border); }
+.jv-ap-title { font-weight: 600; font-size: 14px; color: var(--text); flex: none; max-width: 30%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jv-ap-tabs { display: flex; gap: 4px; flex: 1; }
+.jv-ap-tab { background: var(--bg3); border: 1px solid var(--border); color: var(--text2);
+  border-radius: 7px; padding: 4px 12px; font-size: 13px; cursor: pointer; }
+.jv-ap-tab.active { color: var(--accent); border-color: var(--accent); }
+.jv-artpanel.no-preview .jv-ap-tabs { display: none; }
+.jv-ap-actions { display: flex; gap: 6px; flex: none; }
+.jv-ap-btn { background: var(--bg3); border: 1px solid var(--border); color: var(--text2);
+  width: 30px; height: 30px; border-radius: 7px; cursor: pointer; font-size: 14px; }
+.jv-ap-btn:hover { color: #fff; border-color: var(--accent); }
+.jv-ap-body { flex: 1; min-height: 0; overflow: auto; background: var(--bg); }
+.jv-ap-frame { width: 100%; height: 100%; border: 0; background: #fff; display: block; }
+.jv-ap-mermaid { min-height: 100%; display: flex; align-items: center; justify-content: center;
+  padding: 16px; background: var(--bg); color: var(--text2); }
+.jv-ap-mermaid svg { max-width: 100%; height: auto; }
+.jv-ap-code { margin: 0; border: 0; border-radius: 0; min-height: 100%; box-sizing: border-box; }
+.jv-ap-note { color: var(--text3); font-size: 13px; padding: 10px 12px; }
+@media (max-width: 900px) { .jv-artpanel { width: 100vw; } }
