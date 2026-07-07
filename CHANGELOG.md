@@ -4,6 +4,10 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.17] - 2026-07-07
+### Thêm mới
+- **Đổi model + effort ngay trên khung chat**: thêm một thanh nhỏ ngay phía trên ô chat của dashboard, hiện nhà cung cấp, model và mức "Suy nghĩ" (effort) đang chạy. Bấm vào mở một menu gộp: danh sách model gom theo 6 nhà cung cấp (Claude Code, ChatGPT, OpenRouter, Anthropic API, OpenAI API, Google Gemini), có ô tìm model và hàng chọn effort (Tắt/Thấp/Vừa/Cao) ở dưới. Nhà cung cấp đã nối thì bung ra chọn model (danh sách nạp động theo tài khoản), nhà cung cấp chưa nối hiện khoá kèm lối tắt sang trang Models để thêm key. Chọn model hay effort là lưu ngay vào cấu hình và có hiệu lực ở lượt chat kế, badge engine tự cập nhật. Toàn bộ tái dùng các endpoint sẵn có nên không đổi luồng chat/engine.
+
 ## [0.9.16] - 2026-07-07
 ### Thêm mới
 - **Tự khởi động cùng máy (Windows)**: thêm mục "Khởi động cùng máy" ở trang Tổng quan để bật/tắt việc Javis tự chạy khi mở máy. Bật lên là Javis chạy nền ẩn ngay sau khi bạn đăng nhập Windows (không cửa sổ đen, mở `localhost:7777` để dùng), và tự tắt bản cũ trước khi chạy nên không mở trùng. Cơ chế dùng khóa registry theo tài khoản (`HKCU...\Run`, không cần quyền admin) trỏ tới `start-javis.vbs` sẵn có; kèm 2 endpoint `/autostart` để xem trạng thái và bật/tắt, có cờ nhận biết khi bạn dời thư mục cài đặt. Mục này tự ẩn trên bản Docker/Linux.

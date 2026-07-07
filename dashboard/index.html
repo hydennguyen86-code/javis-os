@@ -268,6 +268,18 @@
     <!-- Attachment chips -->
     <div class="attach-bar" id="attachBar"></div>
 
+    <!-- Chọn model (đa nhà cung cấp) + effort ngay trên khung chat -->
+    <div class="model-bar" id="modelBar">
+      <button class="mb-chip" id="mbOpen" title="Đổi model / nhà cung cấp / effort">
+        <span class="mb-dot"></span>
+        <span id="mbModelTxt">Model</span>
+        <span class="mb-sep">·</span>
+        <span id="mbEffortTxt" class="mb-eff">Effort</span>
+        <span class="mb-caret">▾</span>
+      </button>
+      <div class="mb-pop" id="mbPop" hidden></div>
+    </div>
+
     <!-- ===== BOTTOM: voice bar ===== -->
     <div class="hud-voice" id="hudVoice">
       <button class="mic-big" id="voiceBtn" title="Bấm để nói (hoặc giữ Space)">
@@ -532,6 +544,7 @@
   <script src="https://unpkg.com/3d-force-graph@1.73.4/dist/3d-force-graph.min.js"></script>
   <script src="/static/graph3d.js?v=15"></script>
   <script src="/static/app.js?v=55"></script>
+  <script src="/static/model-picker.js?v=1"></script>
   <script src="/static/branding.js?v=7"></script>
   <script src="/static/quick-settings.js?v=3"></script>
   <script src="/static/chat-zoom.js?v=4"></script>
