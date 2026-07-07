@@ -194,6 +194,9 @@ class _ThinkScrubber:
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
+# Google Gemini qua endpoint TƯƠNG THÍCH OpenAI → dùng lại nguyên logic Chat Completions
+# (stream, usage, tool-calling) như OpenAI, chỉ khác base URL + auth Bearer bằng Gemini API key.
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 
 # Model Anthropic hỗ trợ adaptive thinking + output_config.effort (khỏi budget_tokens).
 _ADAPTIVE_THINKING = ("opus-4-8", "opus-4-7", "opus-4-6", "opus-4-5", "sonnet-4-6", "fable-5", "mythos-5")
@@ -222,20 +225,28 @@ def _openai_is_reasoning(model):
     return m.startswith(("o1", "o3", "o4")) or "gpt-5" in m
 
 
-async def openai_stream(api_key, model, messages, reasoning="off"):
-    """OpenAI Chat Completions (provider 'openai') - chat thuần, định dạng giống OpenRouter."""
+def _gemini_is_reasoning(model):
+    """Gemini: model 'thinking' (2.5 trở lên) nhận reasoning_effort qua endpoint OpenAI-compat.
+    Model cũ (1.5 / 2.0-flash không thinking) → KHÔNG gửi để tránh 400."""
+    m = (model or "").lower()
+    return "2.5" in m or "gemini-3" in m or "thinking" in m
+
+
+async def _openai_compat_stream(url, label, api_key, model, messages, reasoning, send_reasoning):
+    """Chat Completions dạng OpenAI (dùng chung cho OpenAI + Gemini qua endpoint tương thích).
+    Stream token-by-token + usage token ở chunk cuối. label chỉ dùng cho thông báo lỗi."""
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    payload = {"model": model or "gpt-4o-mini", "messages": messages, "stream": True,
+    payload = {"model": model, "messages": messages, "stream": True,
                "stream_options": {"include_usage": True}}   # → chunk cuối kèm usage token
-    if reasoning not in (None, "", "off") and _openai_is_reasoning(model):
+    if reasoning not in (None, "", "off") and send_reasoning:
         payload["reasoning_effort"] = reasoning
     try:
         timeout = httpx.Timeout(120.0, connect=15.0)
         async with httpx.AsyncClient(timeout=timeout) as client:
-            async with client.stream("POST", OPENAI_URL, headers=headers, json=payload) as r:
+            async with client.stream("POST", url, headers=headers, json=payload) as r:
                 if r.status_code != 200:
                     body = await r.aread()
-                    yield {"type": "error", "content": f"OpenAI {r.status_code}: {body.decode('utf-8', 'replace')[:300]}"}
+                    yield {"type": "error", "content": f"{label} {r.status_code}: {body.decode('utf-8', 'replace')[:300]}"}
                     return
                 got = False
                 usage = None
@@ -259,9 +270,23 @@ async def openai_stream(api_key, model, messages, reasoning="off"):
                 if usage:
                     yield {"type": "usage", "input": usage.get("prompt_tokens", 0), "output": usage.get("completion_tokens", 0)}
                 if not got:
-                    yield {"type": "error", "content": "OpenAI trả về rỗng. Thử model khác."}
+                    yield {"type": "error", "content": f"{label} trả về rỗng. Thử model khác."}
     except Exception as e:
-        yield {"type": "error", "content": f"OpenAI lỗi: {_describe_exc(e)}"}
+        yield {"type": "error", "content": f"{label} lỗi: {_describe_exc(e)}"}
+
+
+async def openai_stream(api_key, model, messages, reasoning="off"):
+    """OpenAI Chat Completions (provider 'openai') - chat thuần, định dạng giống OpenRouter."""
+    async for ev in _openai_compat_stream(OPENAI_URL, "OpenAI", api_key, model or "gpt-4o-mini",
+                                          messages, reasoning, _openai_is_reasoning(model)):
+        yield ev
+
+
+async def gemini_stream(api_key, model, messages, reasoning="off"):
+    """Google Gemini qua endpoint OpenAI-compatible (provider 'gemini') - chat thuần, cùng định dạng."""
+    async for ev in _openai_compat_stream(GEMINI_URL, "Gemini", api_key, model or "gemini-2.5-flash",
+                                          messages, reasoning, _gemini_is_reasoning(model)):
+        yield ev
 
 
 async def anthropic_stream(api_key, model, messages, reasoning="off"):
@@ -601,6 +626,18 @@ async def openai_chat_with_mcp(api_key, model, messages, reasoning, mcp_tools, m
         extra["reasoning_effort"] = reasoning
     yield {"type": "meta", "model": model}
     async for ev in _cc_tool_loop(OPENAI_URL, headers, model or "gpt-4o-mini", messages, mcp_tools, mcp_route, extra, "OpenAI"):
+        yield ev
+
+
+async def gemini_chat_with_mcp(api_key, model, messages, reasoning, mcp_tools, mcp_route):
+    """Google Gemini (endpoint OpenAI-compat) + vòng tool-calling MCP - Gemini cũng thành
+    agent dùng MCP của Javis, y như OpenAI. Non-stream từng vòng (dùng _cc_tool_loop chung)."""
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    extra = {}
+    if reasoning not in (None, "", "off") and _gemini_is_reasoning(model):
+        extra["reasoning_effort"] = reasoning
+    yield {"type": "meta", "model": model}
+    async for ev in _cc_tool_loop(GEMINI_URL, headers, model or "gemini-2.5-flash", messages, mcp_tools, mcp_route, extra, "Gemini"):
         yield ev
 
 

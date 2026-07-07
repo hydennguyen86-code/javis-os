@@ -58,7 +58,7 @@ _AUTH_PUBLIC_EXACT = ("/", "/favicon.ico", "/auth/status", "/auth/login", "/auth
                       "/hub/mcp", "/connect/oauth/callback")
 # Endpoint CHỈ-LOCALHOST: agent (Claude CLI chạy cùng máy/container) curl được mà không cần
 # cookie đăng nhập; request từ ngoài (qua Traefik/Caddy/LAN) đến từ IP khác loopback → vẫn bị chặn.
-_AUTH_LOCAL_EXACT = ("/telegram/send-file",)
+_AUTH_LOCAL_EXACT = ("/telegram/send-file", "/reminders")
 
 
 @app.middleware("http")
@@ -459,6 +459,8 @@ PROVIDER_DEFS = [   # thứ tự = thứ tự hiển thị card ở trang Models
      "default_models": ["claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"]},
     {"id": "openai",        "label": "OpenAI (ChatGPT API)",    "kind": "api", "key_field": "openai_api_key",    "catalog_key": "openai",
      "default_models": ["gpt-4o", "gpt-4o-mini", "o3-mini"]},
+    {"id": "gemini",        "label": "Google Gemini (API)",     "kind": "api", "key_field": "gemini_api_key",    "catalog_key": "gemini",
+     "default_models": ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"]},
 ]
 
 def _provider_def(pid):
@@ -517,6 +519,8 @@ def _set_main_model(cfg, provider, model):
         m["engine"] = "openai"
     elif provider == "openai-oauth":
         m["engine"] = "openai-oauth"
+    elif provider == "gemini":
+        m["engine"] = "gemini"
     else:  # anthropic-cli
         m["engine"] = "cli"; m["claude_model"] = model
 
@@ -560,6 +564,8 @@ def _api_stream(prov, key, model, messages, reasoning="off"):
         return engine.openrouter_stream(key, model, messages, reasoning)
     if prov == "openai":
         return engine.openai_stream(key, model, messages, reasoning)
+    if prov == "gemini":
+        return engine.gemini_stream(key, model, messages, reasoning)
     if prov == "openai-oauth":
         creds = openai_oauth.valid_creds() or {}
         return engine.openai_responses_stream(creds.get("access_token", ""), creds.get("account_id", ""),
@@ -597,7 +603,7 @@ async def _api_stream_mcp(prov, key, model, messages, reasoning="off", brain=Non
     (file vault, use_skill) → engine API cũng là agent thực thụ. anthropic-api giờ CÓ tool loop.
     ChatGPT OAuth (backend Codex responses) không nhận function tool → vẫn chat thuần."""
     tools, route = [], {}
-    if prov in ("openrouter", "openai", "anthropic-api"):
+    if prov in ("openrouter", "openai", "anthropic-api", "gemini"):
         try:
             if _hub_enabled():
                 vault_root = _brain_root(brain) if brain else None
@@ -615,11 +621,13 @@ async def _api_stream_mcp(prov, key, model, messages, reasoning="off", brain=Non
             return engine.openai_chat_with_mcp(key, model, messages, reasoning, tools, route)
         if prov == "anthropic-api":
             return engine.anthropic_chat_with_mcp(key, model, messages, reasoning, tools, route)
+        if prov == "gemini":
+            return engine.gemini_chat_with_mcp(key, model, messages, reasoning, tools, route)
     return _api_stream(prov, key, model, messages, reasoning)
 
 def _api_label(prov):
     return {"openrouter": "OpenRouter", "openai": "OpenAI", "anthropic-api": "Anthropic API",
-            "openai-oauth": "ChatGPT (OAuth)"}.get(prov, prov)
+            "openai-oauth": "ChatGPT (OAuth)", "gemini": "Google Gemini"}.get(prov, prov)
 
 def _reasoning_level(mcfg):
     r = (mcfg or {}).get("reasoning", "off")
@@ -1006,7 +1014,7 @@ async def settings_get():
     cfg = cfgmod.read_settings()
     safe = json.loads(json.dumps(cfg))
     safe["auth"] = {"username": cfg["auth"].get("username", ""), "has_password": bool(cfg["auth"].get("password_hash"))}
-    for kf in ("openrouter_key", "anthropic_api_key", "openai_api_key"):
+    for kf in ("openrouter_key", "anthropic_api_key", "openai_api_key", "gemini_api_key"):
         k = cfg["model"].get(kf, "")
         safe["model"][kf] = ("••••" + k[-4:]) if k else ""
         safe["model"][kf + "_set"] = bool(k)
@@ -1052,7 +1060,7 @@ async def settings_set(section: str = Form(...), data: str = Form("{}")):
             if _provider_def(prov) and mod:
                 _set_main_model(cfg, prov, mod)
         # Nhập credential provider (chỉ ghi khi có giá trị mới - tránh xoá bằng giá trị che ••••)
-        for kf in ("openrouter_key", "anthropic_api_key", "openai_api_key"):
+        for kf in ("openrouter_key", "anthropic_api_key", "openai_api_key", "gemini_api_key"):
             if patch.get(kf):
                 m[kf] = patch[kf]
         # Ngắt kết nối 1 provider (xoá key). Nếu nó đang là MAIN → quay về Claude Code CLI để chat không gãy.
@@ -1274,6 +1282,18 @@ async def _fetch_provider_models(provider, m):
             r.raise_for_status()
             data = r.json().get("data", [])
         return [x.get("id") for x in data if x.get("id")] or None
+    if provider == "gemini":
+        key = m.get("gemini_api_key")
+        if not key:
+            return None
+        async with httpx.AsyncClient(timeout=20) as c:
+            r = await c.get("https://generativelanguage.googleapis.com/v1beta/models", params={"key": key})
+            r.raise_for_status()
+            data = r.json().get("models", [])
+        # name dạng 'models/gemini-2.5-flash' → lấy đuôi; chỉ giữ model sinh nội dung (bỏ embedding/aqa)
+        ids = [(x.get("name") or "").split("/")[-1] for x in data
+               if "generateContent" in (x.get("supportedGenerationMethods") or [])]
+        return sorted(i for i in ids if i.startswith("gemini")) or None
     if provider == "openai-oauth":
         return openai_oauth.list_models(openai_oauth.valid_creds())   # None nếu backend không có endpoint → fallback
     return None   # anthropic-cli: alias CLI, không list được → fallback catalog
@@ -2690,6 +2710,38 @@ async def _loop_notify(text: str) -> None:
         print(f"[loop notify] {e}", file=__import__('sys').stderr)
 
 
+async def _tg_send_to(chat_id, text) -> tuple:
+    """Gửi 1 tin Telegram tới ĐÚNG chat_id (dùng cho nhắc hẹn). chat_id rỗng hoặc không nằm
+    trong whitelist → gửi cho CHỦ bot (mọi ID whitelist). Trả (ok, error)."""
+    tg = cfgmod.read_settings().get("telegram", {})
+    token = tg.get("token")
+    ids = tg_parse_ids(tg.get("chat_id"))
+    if not (tg.get("enabled") and token):
+        return False, "Bot Telegram chưa bật"
+    cid = str(chat_id or "").strip()
+    targets = [cid] if (cid and (not ids or cid in ids)) else (ids or ([cid] if cid else []))
+    if not targets:
+        return False, "Chưa có chat_id đích"
+    import httpx
+    ok_any, errs = False, []
+    try:
+        async with httpx.AsyncClient(timeout=15) as c:
+            for t in targets:
+                try:
+                    r = await c.post(f"https://api.telegram.org/bot{token}/sendMessage",
+                                     json={"chat_id": t, "text": text})
+                    d = r.json() if r.content else {}
+                    if d.get("ok"):
+                        ok_any = True
+                    else:
+                        errs.append(str(d.get("description") or f"HTTP {r.status_code}")[:80])
+                except Exception as e:
+                    errs.append(type(e).__name__)
+    except Exception as e:
+        return False, f"{type(e).__name__}: {e}"
+    return ok_any, "; ".join(e for e in errs if e)[:200]
+
+
 def _loop_mcp_allow():
     """Pattern MCP cho allowlist của loop. Hub bật: mọi tool nằm dưới server 'javis' → 1 pattern;
     quyền đọc/ghi thật sự do hub chặn theo X-Javis-Mode. Hub tắt: 'mcp__<namespace>' như cũ."""
@@ -2779,6 +2831,27 @@ tasks_feature = tasks_mod.register(app, tasks_mod.TasksDeps(
 learn_feature.deps.enqueue_task = tasks_feature.enqueue
 
 
+# ============================================================
+# NHẮC HẸN TỪ CHAT (reminders.py) - "30 phút nữa nhắc anh...", "8h30 sáng mai...".
+# Javis tự đặt qua POST /reminders (localhost), scheduler nền đánh thức đúng giờ → bắn Telegram.
+# mode notify = nhắn lại · mode task = chạy engine (đọc MCP, ghi nháp) rồi báo. KHÔNG tiền/đơn.
+# ============================================================
+import reminders as reminders_mod
+
+reminders_feature = reminders_mod.register(app, reminders_mod.RemindersDeps(
+    brain_root=_brain_root,
+    atomic_write_text=_atomic_write_text,
+    send_telegram=_tg_send_to,
+    build_system_prompt=build_system_prompt,
+    aux_model=_aux_model,
+    safe_tools=SAFE_FILE_TOOLS,
+    readonly_tools=READONLY_TOOLS,
+    scheduler_brains=loop_feature.scheduler_brains,
+    apply_mcp=_apply_mcp,                 # nhắc mode 'task' ĐỌC được dữ liệu thật qua MCP
+    mcp_allow_patterns=_loop_mcp_allow,
+))
+
+
 @app.get("/lint")
 async def lint(brain: str = Query("brain")):
     """LINT - health-check Wiki (chỉ đọc, không sửa). Trả danh sách 8 loại vấn đề."""
@@ -2864,7 +2937,7 @@ def _loops_as_routines(brain):
 @app.get("/automations")
 async def automations_list(brain: str = Query("brain")):
     items = _read_automations(brain)
-    builtin = _loops_as_routines(brain)
+    builtin = _loops_as_routines(brain) + reminders_feature.pending_as_automations(brain)
     allitems = builtin + items
     running = sum(1 for a in allitems if a.get("status") == "active")
     return {"automations": items, "builtin": builtin, "running": running, "total": len(allitems)}
@@ -2891,6 +2964,11 @@ async def automations_save(
 
 @app.post("/automations/toggle")
 async def automations_toggle(id: str = Form(...), brain: str = Form("brain")):
+    if id.startswith("__reminder__:"):
+        # Tab Lịch chỉ có 1 nút gạt → coi như HUỶ nhắc hẹn (nhắc là 1-lần, không "tạm dừng").
+        async with reminders_feature._io:
+            hit = reminders_feature.cancel(brain, id.split(":", 1)[1])
+        return {"ok": hit, "status": "paused", "error": ("" if hit else "not found")}
     if id == "__loop__" or id.startswith("__loop__:"):
         # Toggle loop từ tab Lịch. "__loop__" trần (client cũ) = loop legacy vong-lap-goc.
         slug = id.split(":", 1)[1] if ":" in id else self_improve.LEGACY_SLUG
@@ -2913,6 +2991,10 @@ async def automations_toggle(id: str = Form(...), brain: str = Form("brain")):
 
 @app.post("/automations/delete")
 async def automations_delete(id: str = Form(...), brain: str = Form("brain")):
+    if id.startswith("__reminder__:"):
+        async with reminders_feature._io:
+            hit = reminders_feature.cancel(brain, id.split(":", 1)[1])
+        return {"ok": hit, "error": ("" if hit else "not found")}
     if id == "__loop__" or id.startswith("__loop__:"):
         return {"ok": False, "error": "Xóa loop trong tab Loop (trang Tự cải thiện), không xoá từ Lịch"}
     items = [a for a in _read_automations(brain) if a.get("id") != id]
@@ -3203,6 +3285,11 @@ async def _start_scheduler():
                     await tasks_feature.tick(["brain"])
                 except Exception as te:
                     print(f"[kanban tick] {type(te).__name__}: {te}", file=__import__('sys').stderr)
+                # 3b) Nhắc hẹn từ chat: tới giờ → bắn Telegram (mode task: chạy engine rồi báo)
+                try:
+                    await reminders_feature.tick()
+                except Exception as rte:
+                    print(f"[reminders tick] {type(rte).__name__}: {rte}", file=__import__('sys').stderr)
                 # 4) Đồng bộ GitHub tự động (2 CHIỀU): đủ interval → kéo về + hoà nhập + đẩy lên
                 try:
                     bcfg = cfgmod.read_settings().get("backup", {}) or {}
@@ -3436,6 +3523,71 @@ async def do_update():
         return {"ok": True, "mode": mode, "message": "Đang cập nhật + khởi động lại (log: update.log)."}
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e), "manual": "./update.sh"}, status_code=500)
+
+
+# ============================================================
+# Tự khởi động cùng máy (autostart) - Windows: ghi HKCU Run key trỏ wscript chạy
+# start-javis.vbs (đã tự tắt bản cũ + chạy NỀN ẩn). Per-user, KHÔNG cần quyền admin.
+# Registry là nguồn sự thật duy nhất - không lưu trùng vào settings.json.
+# ============================================================
+_AUTOSTART_NAME = "JavisOS"
+_AUTOSTART_RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
+
+
+def _autostart_command() -> str:
+    """Lệnh chạy khi đăng nhập Windows: wscript chạy start-javis.vbs ẩn (kill cũ + chạy nền)."""
+    vbs = str(PROJECT_ROOT / "start-javis.vbs")
+    return f'wscript.exe //nologo "{vbs}"'
+
+
+def _autostart_status() -> dict:
+    """{supported, enabled, command, stale}. stale = đang bật nhưng trỏ đường dẫn cũ (đã move folder)."""
+    if os.name != "nt":
+        return {"supported": False, "enabled": False}
+    expected = _autostart_command()
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, _AUTOSTART_RUN_KEY) as k:
+            try:
+                val, _ = winreg.QueryValueEx(k, _AUTOSTART_NAME)
+                return {"supported": True, "enabled": bool(val),
+                        "command": val, "expected": expected,
+                        "stale": bool(val) and val.strip() != expected}
+            except FileNotFoundError:
+                return {"supported": True, "enabled": False, "expected": expected}
+    except FileNotFoundError:
+        return {"supported": True, "enabled": False, "expected": expected}
+    except Exception as e:
+        return {"supported": True, "enabled": False, "expected": expected, "error": str(e)}
+
+
+def _autostart_set(enabled: bool) -> dict:
+    if os.name != "nt":
+        return {"ok": False, "error": "Chỉ hỗ trợ trên Windows"}
+    try:
+        import winreg
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, _AUTOSTART_RUN_KEY) as k:
+            if enabled:
+                winreg.SetValueEx(k, _AUTOSTART_NAME, 0, winreg.REG_SZ, _autostart_command())
+            else:
+                try:
+                    winreg.DeleteValue(k, _AUTOSTART_NAME)
+                except FileNotFoundError:
+                    pass
+        return {"ok": True, "enabled": enabled}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.get("/autostart")
+async def autostart_get():
+    return _autostart_status()
+
+
+@app.post("/autostart")
+async def autostart_post(enabled: str = Form(...)):
+    on = str(enabled).strip().lower() in ("1", "true", "on", "yes")
+    return _autostart_set(on)
 
 
 # ---- Nhật ký cập nhật (changelog) -------------------------------------------

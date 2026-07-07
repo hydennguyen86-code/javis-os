@@ -67,6 +67,30 @@ def build_channel_block(source: str, meta: dict = None, telegram_running: bool =
             "(bỏ đi thì file sẽ gửi nhầm cho chủ bot).",
             "- KHÔNG nói \"em đã gửi file\" khi chưa làm một trong hai cách trên.",
             "- File user gửi lên Telegram đã được gateway tải về máy sẵn - đường dẫn nằm ngay trong tin nhắn.",
+            "",
+            "## Đặt nhắc hẹn (Javis TỰ thức dậy gửi sau - dùng khi user muốn được nhắc)",
+            "Khi user muốn được NHẮC vào lúc nào đó (\"30 phút nữa nhắc anh...\", \"8h30 sáng mai nhắc...\", "
+            "\"mỗi sáng 7h nhắc uống thuốc\", \"tối 9h báo doanh thu hôm nay\"): dùng tool Bash gọi "
+            f"`curl -s -X POST http://127.0.0.1:{port}/reminders "
+            "-H \"Content-Type: application/json\" "
+            "-d '{\"text\":\"<nội dung nhắc, ngắn gọn>\",\"delay_min\":30,"
+            f"\"chat_id\":\"{chat_id}\",\"mode\":\"notify\"}}'`",
+            "- THỜI ĐIỂM (chọn 1): \"delay_min\": số phút nữa (vd 30, 120); HOẶC \"at\":\"HH:MM\" giờ trong "
+            "ngày (đã qua thì tự sang mai); HOẶC \"at\":\"YYYY-MM-DD HH:MM\" cho ngày cụ thể. Server TỰ tính "
+            "giờ Việt Nam - bạn KHỎI cần biết bây giờ là mấy giờ, cứ map thẳng câu user nói.",
+            "- LỊCH ĐỊNH KỲ PHỨC TẠP (mỗi sáng, thứ 2 hằng tuần, mỗi 15 phút...): dùng \"cron\" thay cho "
+            "delay_min/at, là biểu thức cron 5 trường \"phút giờ ngày tháng thứ\" (thứ: 0=CN..6=T7). Ví dụ "
+            "mỗi ngày 7h = \"0 7 * * *\"; mỗi 15 phút = \"*/15 * * * *\"; 8h thứ 2 = \"0 8 * * 1\"; 9h ngày 1 "
+            "hằng tháng = \"0 9 1 * *\". Bạn tự đổi câu user thành cron. Có cron thì tự lặp, KHỎI cần repeat_min.",
+            "- LẶP đơn giản (không cần cron): thêm \"repeat_min\": số phút (vd 1440 = mỗi ngày, 60 = mỗi giờ).",
+            "- \"mode\":\"notify\" (mặc định) = tới giờ nhắn lại đúng câu nhắc. \"mode\":\"task\" = tới giờ "
+            "Javis TỰ LÀM việc mô tả trong text (đọc số liệu MCP, soạn nháp) rồi gửi kết quả về đây.",
+            "- \"mode\":\"script\" = job giám sát KHÔNG cần AI (rẻ): chạy 1 file script CÓ SẴN trong "
+            "Javis/scripts (\"script\":\"<tên file .py/.sh/.ps1>\"), đẩy stdout về đây; stdout rỗng thì im lặng, "
+            "exit khác 0 thì báo lỗi. Chỉ chạy file user đã tự bỏ vào folder đó - KHÔNG bịa lệnh tuỳ ý.",
+            f"- LUÔN giữ \"chat_id\":\"{chat_id}\" để nhắc về ĐÚNG người đang nói. Gọi curl xong, đọc JSON "
+            "trả về: ok=true kèm due_human là đã đặt - xác nhận lại NGẮN bằng lời (vd \"Ok, 8h30 sáng mai "
+            "em nhắc anh nhé\"). KHÔNG nói đã đặt nếu curl chưa trả ok=true.",
         ]
     else:
         lines += [
@@ -79,6 +103,11 @@ def build_channel_block(source: str, meta: dict = None, telegram_running: bool =
                 f"`curl -s -X POST http://127.0.0.1:{port}/telegram/send-file "
                 "-H \"Content-Type: application/json\" "
                 "-d '{\"path\":\"<đường dẫn tuyệt đối>\",\"caption\":\"...\"}'`",
+                "- Nếu user muốn được NHẮC sau (\"30 phút nữa nhắc...\", \"8h sáng mai...\"): dùng tool Bash gọi "
+                f"`curl -s -X POST http://127.0.0.1:{port}/reminders -H \"Content-Type: application/json\" "
+                "-d '{\"text\":\"<nội dung>\",\"delay_min\":30}'` (hoặc \"at\":\"HH:MM\" / "
+                "\"at\":\"YYYY-MM-DD HH:MM\", thêm \"repeat_min\" để lặp). Server tính giờ VN; tới giờ Javis "
+                "tự gửi nhắc qua Telegram cho chủ bot.",
             ]
     return "\n".join(lines) + "\n"
 

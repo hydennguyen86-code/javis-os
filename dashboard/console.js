@@ -993,6 +993,17 @@
           </div>
         </div>
       </div>
+      <div class="cview-section" id="ovAutostartSec" style="display:none">
+        <h3>Khởi động cùng máy</h3>
+        <div class="cgrid">
+          <div class="gcard">
+            <div class="gcard-top"><span class="gcard-name">Tự bật Javis khi mở máy</span><span class="gcard-tag" id="ovAutoTag">…</span></div>
+            <div class="gcard-meta" id="ovAutoMeta">Đang kiểm tra…</div>
+            <button class="gcard-btn" id="ovAutoToggle" style="display:none"></button>
+            <div class="gcard-meta" id="ovAutoStatus" style="margin-top:8px"></div>
+          </div>
+        </div>
+      </div>
       <div class="cview-section">
         <h3>Cấu trúc brain</h3>
         <div class="cgrid">
@@ -1074,6 +1085,40 @@
     };
     ovLoadVersion();
 
+    // ---- Tự khởi động cùng máy (chỉ Windows) ----
+    async function ovLoadAutostart() {
+      const sec = document.getElementById("ovAutostartSec");
+      if (!sec) return;
+      let j = {};
+      try { j = await (await fetch("/autostart", { cache: "no-store" })).json(); }
+      catch (e) { sec.style.display = "none"; return; }
+      if (!j.supported) { sec.style.display = "none"; return; }   // Docker/Linux: ẩn hẳn
+      sec.style.display = "";
+      const on = !!j.enabled;
+      document.getElementById("ovAutoTag").textContent = on ? "bật" : "tắt";
+      const meta = document.getElementById("ovAutoMeta");
+      meta.innerHTML = on
+        ? "Javis tự chạy nền mỗi khi anh đăng nhập Windows - không cần bật tay. Chạy ẩn, mở <code>localhost:7777</code> để dùng."
+        : "Bật để Javis tự khởi động mỗi khi mở máy. Chạy ẩn ở nền, không hiện cửa sổ.";
+      if (j.stale) meta.innerHTML += '<br><span class="dim">⚠ Đường dẫn cài đặt đã đổi - bấm bật lại để cập nhật.</span>';
+      const btn = document.getElementById("ovAutoToggle");
+      btn.style.display = "";
+      btn.disabled = false;
+      btn.textContent = on ? "Tắt tự khởi động" : "Bật tự khởi động";
+      btn.onclick = async () => {
+        btn.disabled = true;
+        const st = document.getElementById("ovAutoStatus");
+        st.textContent = "Đang lưu…";
+        const fd = new FormData(); fd.append("enabled", on ? "0" : "1");
+        let r = {};
+        try { r = await (await fetch("/autostart", { method: "POST", body: fd })).json(); }
+        catch (e) { r = { ok: false, error: e.message }; }
+        if (r.ok) { st.textContent = ""; ovLoadAutostart(); }
+        else { st.textContent = "⚠ " + esc(r.error || "Lỗi"); btn.disabled = false; }
+      };
+    }
+    ovLoadAutostart();
+
     const btn = document.getElementById("ovGraphToggle");
     if (btn) btn.onclick = async () => {
       btn.disabled = true;
@@ -1114,7 +1159,7 @@
     const reasonChips = [["off", "Tắt"], ["low", "Thấp"], ["medium", "Vừa"], ["high", "Cao"]]
       .map(([v, l]) => `<button class="aux-chip ${reasoning === v ? "sel" : ""}" data-reason="${v}">${l}</button>`).join("");
 
-    const KEYFIELD = { "openrouter": "openrouter_key", "anthropic-api": "anthropic_api_key", "openai": "openai_api_key" };
+    const KEYFIELD = { "openrouter": "openrouter_key", "anthropic-api": "anthropic_api_key", "openai": "openai_api_key", "gemini": "gemini_api_key" };
     const provHead = (p, on, kindLabel, statusText) => `
         <div class="prov-head">
           <span class="prov-shield ${on ? "on" : ""}">${_shield(on)}</span>
@@ -1185,7 +1230,7 @@
       <div class="cview-section">
         <h3>◆ Suy nghĩ <span style="opacity:.5">độ sâu reasoning khi trả lời</span></h3>
         <div class="gcard" style="max-width:540px">
-          <div class="gcard-meta">Bật để model suy nghĩ kỹ hơn trước khi trả lời - chính xác hơn nhưng chậm & tốn token hơn. Claude API/OpenRouter dùng adaptive thinking + effort; OpenAI chỉ áp cho model o-series; Claude Code chèn gợi ý think/ultrathink.</div>
+          <div class="gcard-meta">Bật để model suy nghĩ kỹ hơn trước khi trả lời - chính xác hơn nhưng chậm & tốn token hơn. Claude API/OpenRouter dùng adaptive thinking + effort; OpenAI chỉ áp cho model o-series; Gemini áp cho model 2.5 trở lên; Claude Code chèn gợi ý think/ultrathink.</div>
           <div class="aux-chips">${reasonChips}</div>
         </div>
       </div>`;

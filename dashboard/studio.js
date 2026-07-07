@@ -327,17 +327,21 @@
     cards.innerHTML = "";
     all.forEach(a => {
       const active = a.status === "active";
-      const typeLabel = a.type === "trigger" ? "Trigger" : a.type === "routine" ? "Routine" : "Cron";
+      const isRem = a.type === "reminder" || a.type === "script";
+      const typeLabel = a.type === "script" ? "Script (không AI)" : a.type === "reminder" ? "Nhắc hẹn" : a.type === "trigger" ? "Trigger" : a.type === "routine" ? "Routine" : "Cron";
+      const prefix = a.type === "script" ? "🖥 " : isRem ? "⏰ " : a.builtin ? "🔁 " : (a.source === "cloud" ? "☁ " : "");
       const div = document.createElement("div");
       div.className = "wf-card" + (active ? "" : " off");
       div.innerHTML = `
         <div class="wf-top">
-          <div class="wf-name">${a.builtin ? "🔁 " : (a.source === "cloud" ? "☁ " : "")}${esc(a.name)} <span class="wf-status ${active ? "on" : "off"}">${active ? "ĐANG CHẠY" : "TẮT"}</span></div>
+          <div class="wf-name">${prefix}${esc(a.name)} <span class="wf-status ${active ? "on" : "off"}">${active ? "ĐANG CHẠY" : "TẮT"}</span></div>
           <label class="toggle"><input type="checkbox" ${active ? "checked" : ""}><span></span></label>
         </div>
         <div class="wf-desc">⏰ ${esc(a.schedule || "-")} · <span class="dim">${typeLabel}</span></div>
         ${a.note ? `<div class="wf-steps">${esc(a.note)}</div>` : ""}
-        <div class="wf-actions">${a.builtin
+        <div class="wf-actions">${isRem
+          ? `<span class="dim" style="font-size:13px">${a.type === "script" ? "Job script" : "Nhắc hẹn"} - gạt công tắc để huỷ</span>`
+          : a.builtin
           ? `<span class="dim" style="font-size:13px">Loop - cấu hình/xoá ở trang Tự cải thiện</span>`
           : `<button class="s-btn-ghost edit">Sửa</button><button class="s-btn-ghost del">Xoá</button>`}</div>`;
       div.querySelector(".toggle input").onchange = async () => {
