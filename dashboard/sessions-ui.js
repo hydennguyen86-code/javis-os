@@ -100,8 +100,9 @@
         lastGroup = g;
       }
       var eng = (s.engine || "").toString().slice(0, 10);
-      var item = el('<div class="cside-item' + (s.id === cur ? " active" : "") + '">' +
-        '<div class="ci-title">' + esc(s.title || s.preview || "(chưa đặt tên)") + '</div>' +
+      var isRun = !!(window.JavisRunning && window.JavisRunning.has(s.id));
+      var item = el('<div class="cside-item' + (s.id === cur ? " active" : "") + (isRun ? " running" : "") + '">' +
+        '<div class="ci-title">' + (isRun ? '<span class="ci-run" title="Đang trả lời">⏳</span> ' : '') + esc(s.title || s.preview || "(chưa đặt tên)") + '</div>' +
         '<div class="ci-meta"><span>' + fmtT(s.updated_at) + '</span>' +
         (eng ? '<span class="ci-badge">' + esc(eng) + '</span>' : '') +
         '<span>' + (s.msg_count || 0) + ' tin</span>' +

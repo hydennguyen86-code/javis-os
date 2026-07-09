@@ -2,11 +2,18 @@
 const WS_ORIGIN = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}`;
 const WS_URL = `${WS_ORIGIN}/ws`;
 let ws = null;
-let isProcessing = false;
-let streamingBubble = null;
-let streamingText = "";
-let cancelledTurn = false;
-let spokeStream = false;   // đã đọc đoạn trung gian nào trong lượt này chưa
+let isProcessing = false;      // = phiên ĐANG XEM có lượt chạy không (dẫn xuất từ turns[savedSessionId])
+let cancelledTurn = false;     // (giữ để tương thích - không còn dùng)
+// ĐA HỘI THOẠI SONG SONG: mỗi phiên giữ trạng thái stream RIÊNG, định tuyến theo session_id. Mở
+// "hội thoại mới" KHÔNG giết phiên đang chạy - nó chạy nền + tự lưu, vào Lịch sử bấm lại xem tiếp.
+const turns = {};              // sid -> { text, bubble, spoke, running }
+if (!window.JavisRunning) window.JavisRunning = new Set();   // sid đang generate → sidebar hiện ⏳
+function newSid() { try { return crypto.randomUUID().replace(/-/g, ""); } catch (e) { return Date.now().toString(36) + Math.random().toString(36).slice(2, 10); } }
+function setSessionRunning(sid, on) {
+  if (!sid) return;
+  if (on) window.JavisRunning.add(sid); else window.JavisRunning.delete(sid);
+  try { if (window.JavisChatSide && window.JavisChatSide.refresh) window.JavisChatSide.refresh(); } catch (e) {}
+}
 
 // Lưu & khôi phục phiên gần nhất (hội thoại + số liệu + session Claude)
 const SESSION_KEY = "javis.session.v1";
@@ -22,19 +29,24 @@ function updateStopBtn() {
   sendBtn.style.display = active ? "none" : "flex";
 }
 
-function stopCurrent() {
-  cancelledTurn = true;
-  voice.stopSpeaking();
-  // Gửi kèm tag phiên → server chỉ giết đúng lượt của kết nối này (đa người dùng song song)
-  fetch("/stop", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(stopTag ? { tag: stopTag } : {}),
-  }).catch(() => {});
-  hideActivity();
-  setProcessing(false);
-  streamingBubble = null; streamingText = "";
-  if (!handsFreeActive()) setOrbState("", "SẴN SÀNG");
+// Đồng bộ nút gửi/dừng + cờ isProcessing theo lượt của phiên ĐANG XEM (savedSessionId).
+function syncActiveUI() {
+  const t = savedSessionId ? turns[savedSessionId] : null;
+  isProcessing = !!(t && t.running);
+  sendBtn.disabled = isProcessing;
   updateStopBtn();
+}
+
+function stopCurrent() {
+  voice.stopSpeaking();
+  const sid = savedSessionId;
+  // Dừng ĐÚNG phiên đang xem (phiên nền khác vẫn chạy). Server huỷ lượt + gửi turn_done về.
+  if (sid && ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ action: "stop", session_id: sid }));
+  hideActivity();
+  if (sid && turns[sid]) turns[sid].running = false;
+  setSessionRunning(sid, false);
+  if (!handsFreeActive()) setOrbState("", "SẴN SÀNG");
+  syncActiveUI();
 }
 function handsFreeActive() { return typeof handsFree !== "undefined" && handsFree; }
 function currentBrainPath() {
@@ -113,66 +125,65 @@ function connect() {
 function handleMessage(data) {
   // Server chào khi kết nối: nhận tag phiên để nút Stop chỉ ngắt phiên của mình
   if (data.type === "hello") { stopTag = data.stop_tag || null; return; }
-  // Đã bấm ngắt → bỏ qua mọi message của lượt bị huỷ, chỉ reset khi có message kết thúc
-  if (cancelledTurn) {
-    if (data.type === "response" || data.type === "error") {
-      cancelledTurn = false; setProcessing(false); updateStopBtn();
-    }
-    return;
-  }
+
+  // Định tuyến theo session_id: sự kiện của phiên ĐANG XEM thì render trực tiếp; phiên nền thì
+  // chỉ tích luỹ vào buffer + đánh dấu "đang chạy" ở Lịch sử (server đã tự lưu vào DB).
+  const sid = data.session_id || null;
+  const isActive = !!sid && sid === savedSessionId;
+  const t = sid ? (turns[sid] || (turns[sid] = { text: "", bubble: null, spoke: false, running: true })) : null;
+
   if (data.type === "status") {
-    setOrbState("thinking", "ĐANG SUY NGHĨ");
-    showActivity(data.content);
+    if (t) t.running = true;
+    setSessionRunning(sid, true);
+    if (isActive) { setOrbState("thinking", "ĐANG SUY NGHĨ"); showActivity(data.content); syncActiveUI(); }
   } else if (data.type === "tool_call") {
-    showActivity(data.content);
     if (data.tool) trackMCP(data.tool);
+    if (isActive) showActivity(data.content);
   } else if (data.type === "tool_result") {
-    showActivity("✓ Nhận data - đang phân tích...");
+    if (isActive) showActivity("✓ Nhận data - đang phân tích...");
   } else if (data.type === "stream") {
-    if (!streamingBubble) {
-      streamingBubble = createStreamingBubble(); streamingText = "";
-      showActivity("✍ Đang soạn câu trả lời...");   // chip nhảy xuống DƯỚI bubble đang gõ
-    }
-    streamingText += (data.content || "");
-    streamingBubble.querySelector(".bubble").innerHTML = markdownToHtml(streamingText);
-    scrollBottom();
-    // Đọc NGAY đoạn trung gian này (CLI: cả câu). OpenRouter gửi tts:false (token lẻ) → chỉ hiển thị, đọc 1 lần ở cuối.
-    if (voice.ttsEnabled && data.tts !== false) {
-      setOrbState("speaking", "ĐANG NÓI");
-      // Bỏ phần metrics block khỏi TTS (không đọc JSON)
-      const safeChunk = data.content.replace(/<!--[\s\S]*/, "");
-      if (safeChunk) voice.enqueueSpeak(safeChunk);
-      spokeStream = true;
+    if (!t) return;
+    t.text += (data.content || "");
+    if (isActive) {
+      if (!t.bubble) { t.bubble = createStreamingBubble(); showActivity("✍ Đang soạn câu trả lời..."); }
+      t.bubble.querySelector(".bubble").innerHTML = markdownToHtml(t.text);
+      scrollBottom();
+      // Đọc NGAY đoạn trung gian (chỉ đọc phiên đang xem). OpenRouter gửi tts:false → đọc 1 lần ở cuối.
+      if (voice.ttsEnabled && data.tts !== false) {
+        setOrbState("speaking", "ĐANG NÓI");
+        const safeChunk = (data.content || "").replace(/<!--[\s\S]*/, "");
+        if (safeChunk) voice.enqueueSpeak(safeChunk);
+        t.spoke = true;
+      }
     }
   } else if (data.type === "response") {
-    hideActivity();
     const { clean, cards } = extractMetrics(data.content);
-    if (cards) pushMetricsToPanel(cards);
-    // Fallback: response rỗng nhưng đã stream được → giữ phần đã stream; nếu vẫn rỗng → báo nhẹ
-    const finalText = clean || streamingText || "";
+    const finalText = clean || (t && t.text) || "";
     const shownText = finalText || "_(không có nội dung trả về - thử lại hoặc đổi model)_";
-    let bubble;
-    if (!streamingBubble) { appendJavisMessage(shownText); bubble = chatArea.lastChild; }
-    else { streamingBubble.querySelector(".bubble").innerHTML = markdownToHtml(shownText); bubble = streamingBubble; streamingBubble = null; streamingText = ""; }
-    setProcessing(false);
-    if (voice.ttsEnabled && !spokeStream && finalText) {
-      setOrbState("speaking", "ĐANG NÓI");
-      voice.speak(finalText);
-    } else if (!voice.ttsEnabled) {
-      setOrbState("", "SẴN SÀNG");
+    if (t) t.text = shownText;
+    if (isActive) {
+      hideActivity();
+      if (cards) pushMetricsToPanel(cards);
+      if (!t || !t.bubble) appendJavisMessage(shownText);
+      else t.bubble.querySelector(".bubble").innerHTML = markdownToHtml(shownText);
+      if (data.engine) setEngineBadge(data.engine, data.model);   // sự thật engine+model của lượt này
+      if (finalText.trim()) recordTurn("javis", finalText);
+      if (voice.ttsEnabled && t && !t.spoke && finalText) { setOrbState("speaking", "ĐANG NÓI"); voice.speak(finalText); }
+      else if (!voice.ttsEnabled) setOrbState("", "SẴN SÀNG");
+      maybeAutoLearn();
     }
-    spokeStream = false;
-    savedSessionId = data.session_id || savedSessionId;
-    if (data.engine) setEngineBadge(data.engine, data.model);   // sự thật engine+model của lượt này
-    if (finalText.trim()) recordTurn("javis", finalText);   // KHÔNG lưu lượt rỗng (tránh khôi phục bong bóng trống)
-    maybeAutoLearn();
-    notifySessions();   // sidebar lịch sử tự refresh (title/updated_at vừa đổi)
     refreshUsage();     // cập nhật panel Mức dùng sau mỗi lượt
   } else if (data.type === "error") {
-    hideActivity(); appendJavisMessage("⚠ " + data.content); setProcessing(false);
-    setOrbState("", "SẴN SÀNG");
+    if (isActive) { hideActivity(); appendJavisMessage("⚠ " + data.content); setOrbState("", "SẴN SÀNG"); }
   } else if (data.type === "system") {
-    appendJavisMessage(data.content);
+    if (isActive) appendJavisMessage(data.content);
+  } else if (data.type === "turn_done") {
+    // Lượt của phiên này kết thúc (xong / lỗi / bị dừng): bỏ cờ chạy, dọn buffer, refresh Lịch sử.
+    if (t) t.running = false;
+    setSessionRunning(sid, false);
+    if (isActive) syncActiveUI();
+    if (sid) delete turns[sid];
+    notifySessions();
   }
 }
 
@@ -182,7 +193,10 @@ function handleMessage(data) {
 function sendMessage(text) {
   const msg = (text || chatInput.value).trim();
   const atts = pendingAttachments.filter(a => a.path);  // chỉ file đã upload xong
-  if ((!msg && atts.length === 0) || isProcessing || !ws || ws.readyState !== WebSocket.OPEN) return;
+  if ((!msg && atts.length === 0) || !ws || ws.readyState !== WebSocket.OPEN) return;
+  if (!savedSessionId) savedSessionId = newSid();        // hội thoại mới → mint id để định tuyến
+  const sid = savedSessionId;
+  if (turns[sid] && turns[sid].running) return;          // phiên này đang trả lời → chưa gửi tiếp
   voice.stopSpeaking();
   appendUserMessage(msg, atts);
   recordTurn("user", msg, atts.map(a => ({ name: a.name, kind: a.kind })));
@@ -204,14 +218,12 @@ function sendMessage(text) {
 
   chatInput.value = ""; chatInput.style.height = "auto";
   clearAttachments();
-  cancelledTurn = false;
-  spokeStream = false;
-  setProcessing(true);
-  updateStopBtn();
+  turns[sid] = { text: "", bubble: null, spoke: false, running: true };
+  setSessionRunning(sid, true);
   setOrbState("thinking", "ĐANG SUY NGHĨ");
   showActivity("Javis đang suy nghĩ...");   // hiện NGAY trong khung chat, không đợi server báo
-  // session_id: chỉ có tác dụng ở lượt đầu sau khi F5 (server resume mạch cũ)
-  ws.send(JSON.stringify({ message: outMsg, brain: currentBrainPath(), session_id: savedSessionId || undefined }));
+  syncActiveUI();
+  ws.send(JSON.stringify({ message: outMsg, brain: currentBrainPath(), session_id: sid }));
 }
 
 // ============================================
@@ -259,25 +271,37 @@ async function openStoredSession(id) {
     const sess = await (await fetch(`/sessions/${encodeURIComponent(id)}`)).json();
     if (!sess || sess.error) return;
     convo = [];
+    hideActivity();
     chatArea.innerHTML = "";
     (sess.messages || []).forEach(m => {
       if (m.role === "user") { appendUserMessage(m.content || "", []); convo.push({ role: "user", text: m.content || "", atts: [] }); }
       else if (m.role === "assistant") { appendJavisMessage(m.content || ""); convo.push({ role: "javis", text: m.content || "", atts: [] }); }
     });
     savedSessionId = id;          // lượt gửi tiếp theo → server resume đúng phiên này
+    // Phiên này đang generate NỀN → gắn bong bóng SỐNG (kèm phần đã stream) để xem tiếp trực tiếp.
+    const t = turns[id];
+    if (t && t.running) {
+      t.bubble = createStreamingBubble();
+      if (t.text) t.bubble.querySelector(".bubble").innerHTML = markdownToHtml(t.text);
+      showActivity("✍ Đang soạn câu trả lời...");
+      setOrbState("thinking", "ĐANG SUY NGHĨ");
+    }
     persistSession();
     scrollBottom(true);
     notifySessions();
+    syncActiveUI();
   } catch (e) {}
 }
 function newChat() {
-  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ action: "reset" }));
+  // KHÔNG reset server, KHÔNG đụng lượt đang chạy của phiên khác - chúng chạy nền + tự lưu; vào
+  // Lịch sử bấm lại để xem tiếp. Ở đây chỉ mở một khung trống cho hội thoại mới (mint id khi gửi).
   convo = [];
   hideActivity();          // dọn chip + timer trước khi xoá trắng khung
   chatArea.innerHTML = "";
   savedSessionId = null;
   persistSession();
   notifySessions();
+  syncActiveUI();
   try { chatInput.focus(); } catch (e) {}
 }
 window.JavisSessions = { open: openStoredSession, new: newChat, brain: () => currentBrainPath(), current: () => savedSessionId };

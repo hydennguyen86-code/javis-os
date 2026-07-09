@@ -4125,61 +4125,56 @@ async def websocket_endpoint(ws: WebSocket):
     # ĐA PHIÊN: tag riêng cho từng kết nối → nút Stop của người này không giết lượt người khác.
     # Frontend nhận tag qua message hello và gửi kèm khi POST /stop.
     conn_tag = f"chat:{uuid.uuid4().hex[:8]}"
-    cli = ClaudeCLI(system_prompt=SYSTEM_PROMPT, cwd=CLAUDE_CWD, tag=conn_tag)
+    _real_ws = ws                       # ws THẬT; mỗi lượt dùng proxy (bơm session_id + khoá ghi)
+    store = get_store()
     try:
-        await ws.send_text(json.dumps({"type": "hello", "stop_tag": conn_tag}))
+        await _real_ws.send_text(json.dumps({"type": "hello", "stop_tag": conn_tag}))
     except Exception:
         pass
 
-    if not cli.is_available():
-        await ws.send_text(json.dumps({
-            "type": "error",
-            "content": "Claude Code CLI chưa được cài. Chạy: npm install -g @anthropic-ai/claude-code"
-        }))
-        await ws.close()
-        return
+    # ĐA HỘI THOẠI SONG SONG: mỗi lượt chat chạy như 1 task nền (không chặn vòng nhận tin), engine
+    # riêng từng lượt nên 2 hội thoại generate cùng lúc được. Mọi gói gửi kèm session_id để client
+    # định tuyến về đúng phiên; mở "hội thoại mới" KHÔNG giết lượt cũ (nó chạy nốt + tự lưu).
+    send_lock = asyncio.Lock()          # nhiều lượt ghi chung 1 ws → khoá cho khỏi xen kẽ hỏng gói
+    running: dict = {}                  # conv_sid -> asyncio.Task (lượt đang chạy của phiên đó)
 
-    or_messages = None   # lịch sử chat cho engine API (seed lại từ DB khi resume)
-    store = get_store()
-    conv_sid = None      # id phiên hội thoại (KHÁC cli.session_id của Claude)
-    seeded = False       # đã nạp lịch sử cũ từ DB vào or_messages chưa
+    async def send_raw(obj):
+        async with send_lock:
+            try:
+                await _real_ws.send_text(json.dumps(obj))
+            except Exception:
+                pass
+
+    class _SendProxy:
+        """Đội lốt ws bên trong 1 lượt: mọi send_text tự gắn session_id của lượt + qua khoá ghi.
+        Nhờ vậy toàn bộ code các nhánh engine bên dưới KHÔNG cần sửa mà vẫn định tuyến đúng phiên."""
+        def __init__(self, sid):
+            self._sid = sid
+
+        async def send_text(self, txt):
+            try:
+                o = json.loads(txt); o["session_id"] = self._sid; txt = json.dumps(o)
+            except Exception:
+                pass
+            async with send_lock:
+                try:
+                    await _real_ws.send_text(txt)
+                except Exception:
+                    pass
+
     try:
-        while True:
-            raw = await ws.receive_text()
-            payload = json.loads(raw)
-
-            # Lệnh đặc biệt
-            if payload.get("action") == "reset":
-                cli.reset_session()
-                or_messages = None
-                conv_sid = None      # bắt đầu 1 phiên hội thoại mới ở lượt sau
-                seeded = False
-                await ws.send_text(json.dumps({"type": "system", "content": "Đã reset hội thoại."}))
-                continue
-
-            user_message = payload.get("message", "").strip()
-            if not user_message:
-                continue
-            brain = payload.get("brain", "brain")
-
+        async def _do_turn(conv_sid, user_message, brain):
+            ws = _SendProxy(conv_sid)               # các nhánh engine bên dưới dùng ws proxy này
+            turn_tag = f"{conn_tag}:{conv_sid[:8]}"
             mcfg = cfgmod.read_settings().get("model", {})
             prov, kind, api_key, api_model = _chat_provider(mcfg)
             reasoning = _reasoning_level(mcfg)
-            engine_label = ("codex" if prov == "openai-oauth"
-                            else prov if ((kind == "api" and api_key) or kind == "oauth")
-                            else "cli")
-
-            # ── Phiên hội thoại: resume-or-create (session_id ở đây là CONV id) ──
-            incoming_sid = payload.get("session_id")
-            if conv_sid is None:
-                conv_sid = store.get_or_create(
-                    incoming_sid, brain=brain, engine=engine_label,
-                    model=(api_model or mcfg.get("claude_model")))
-                # Resume hội thoại CLI cũ → nạp lại session_id của Claude cho --resume.
-                _row = store.get_session(conv_sid)
-                if _row and _row.get("cli_session_id") and not cli.session_id:
-                    cli.session_id = _row["cli_session_id"]
-            store.append_message(conv_sid, "user", user_message)
+            or_messages = None
+            seeded = False
+            _row0 = store.get_session(conv_sid) or {}
+            cli = ClaudeCLI(system_prompt=SYSTEM_PROMPT, cwd=CLAUDE_CWD, tag=turn_tag)
+            cli.session_id = _row0.get("cli_session_id") or None    # --resume đúng mạch phiên này
+            final_text = ""
 
             await ws.send_text(json.dumps({
                 "type": "status",
@@ -4296,8 +4291,53 @@ async def websocket_endpoint(ws: WebSocket):
                 except Exception as _e:
                     print(f"[learn enqueue hook] {_e}", file=__import__('sys').stderr)
 
+        async def run_turn(conv_sid, user_message, brain):
+            try:
+                await _do_turn(conv_sid, user_message, brain)
+            except asyncio.CancelledError:
+                await send_raw({"type": "system", "content": "Đã dừng lượt này.", "session_id": conv_sid})
+            except Exception as e:
+                await send_raw({"type": "error", "content": f"Lỗi xử lý: {type(e).__name__}: {e}", "session_id": conv_sid})
+            finally:
+                running.pop(conv_sid, None)
+                await send_raw({"type": "turn_done", "session_id": conv_sid})
+
+        while True:
+            raw = await _real_ws.receive_text()
+            payload = json.loads(raw)
+            action = payload.get("action")
+            if action == "reset":
+                continue                        # client tự quản phiên; reset KHÔNG còn giết lượt nào
+            if action == "stop":
+                _sid = payload.get("session_id") or ""
+                _t = running.get(_sid)
+                if _t and not _t.done():
+                    _t.cancel()
+                cancel_all(f"{conn_tag}:{_sid[:8]}")     # giết subprocess engine của đúng lượt đó
+                continue
+            user_message = payload.get("message", "").strip()
+            if not user_message:
+                continue
+            brain = payload.get("brain", "brain")
+            mcfg = cfgmod.read_settings().get("model", {})
+            prov, kind, api_key, api_model = _chat_provider(mcfg)
+            engine_label = ("codex" if prov == "openai-oauth"
+                            else prov if ((kind == "api" and api_key) or kind == "oauth")
+                            else "cli")
+            conv_sid = store.get_or_create(
+                payload.get("session_id"), brain=brain, engine=engine_label,
+                model=(api_model or mcfg.get("claude_model")))
+            if conv_sid in running and not running[conv_sid].done():
+                await send_raw({"type": "error", "content": "Phiên này đang trả lời - đợi lượt hiện tại xong đã.", "session_id": conv_sid})
+                continue
+            store.append_message(conv_sid, "user", user_message)
+            running[conv_sid] = asyncio.create_task(run_turn(conv_sid, user_message, brain))
     except WebSocketDisconnect:
         pass
+    finally:
+        for _t in list(running.values()):
+            if not _t.done():
+                _t.cancel()
 
 
 # ============================================================

@@ -4,6 +4,12 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.26] - 2026-07-09
+### Thêm mới
+- **Nhiều hội thoại chạy song song (như Claude)**: bấm "Hội thoại mới" giờ KHÔNG còn làm dừng hội thoại đang trả lời. Mỗi lượt chat chạy nền độc lập, nên bạn có thể mở một hội thoại mới và hỏi việc khác NGAY trong khi hội thoại cũ vẫn đang generate - cả hai chạy cùng lúc. Danh sách Lịch sử hiện dấu ⏳ ở hội thoại đang trả lời; bấm vào một hội thoại đang chạy nền để xem tiếp phần đang soạn trực tiếp, và mọi lượt tự lưu vào phiên của nó dù bạn đang xem chỗ khác. Nút Dừng chỉ ngắt đúng hội thoại đang xem, các hội thoại nền khác không bị ảnh hưởng.
+### Cải thiện
+- **Lõi chat xử lý mỗi lượt như một tác vụ nền**: server không còn khoá kiểu một-kết-nối-một-lượt-một-lúc; mỗi lượt có engine riêng và mọi gói gửi kèm session_id để giao diện định tuyến đúng phiên (có khoá ghi để nhiều lượt không xen kẽ làm hỏng gói). Toàn bộ luồng stream, phiên, MCP/skill và giọng nói giữ nguyên. Ngoài ra nếu chưa cài Claude Code CLI mà dùng engine API/OpenRouter thì không còn bị chặn kết nối như trước (báo lỗi theo từng lượt nếu thực sự cần CLI).
+
 ## [0.9.25] - 2026-07-09
 ### Thêm mới
 - **Tab "Trò chuyện" - màn chat riêng, rộng rãi**: thêm tab mới trên thanh bên trái (ngay dưới "Javis") mở khung chat toàn màn hình kiểu Claude, tiện hơn hẳn khung chat chật ở cạnh màn hình 3D. Cột trái là lịch sử hội thoại (nút tạo mới, ô tìm trong mọi hội thoại, nhóm theo Hôm nay / 7 ngày qua / Cũ hơn, đổi tên và xoá, phiên đang mở được tô sáng); giữa là khung chat lớn dễ đọc kèm tiêu đề và badge engine thật (vd "CLI · opus"); ngay trên ô nhập là thanh chọn model + effort, dưới cùng là ô gõ kèm nút mic và đính kèm file. Tab này KHÔNG viết lại bộ máy chat mà dùng lại chính khung chat của màn 3D (mượn rồi trả về khi rời tab) nên cùng một cuộc trò chuyện hiện ở cả hai nơi, giữ nguyên WebSocket, stream, phiên, giọng nói và đính kèm; rời tab thì màn 3D vẫn chat bình thường. Vào tab chat, đồ hoạ 3D tự tắt cho nhẹ máy. Màn hẹp (điện thoại) thì cột lịch sử thu thành ngăn kéo, bấm nút 🕘 để mở.
