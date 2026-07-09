@@ -140,7 +140,8 @@ class LoopDeps:
     state_dir: Path
     safe_tools: List[str]
     readonly_tools: List[str]
-    notify: Optional[Callable] = None        # async notify(text) - báo Telegram khi auto-pause (tùy chọn)
+    notify: Optional[Callable] = None        # async notify(text) - broadcast Telegram khi auto-pause (mọi admin)
+    report: Optional[Callable] = None        # async report(owner_chat, text) - báo NGƯỜI YÊU CẦU loop mỗi vòng
     apply_mcp: Optional[Callable] = None      # apply_mcp(cli): gắn MCP Javis-quản-lý (config+strict+deny) - loop ĐỌC được dữ liệu thật
     mcp_allow_patterns: Optional[Callable] = None  # () -> ["mcp__<server>", ...] để thêm vào allowlist (MCP mới gọi được)
 
@@ -260,6 +261,9 @@ class LoopFeature:
         except (TypeError, ValueError):
             maxr = 0
         prof = "code" if str(fm.get("tools_profile", "") or "").strip().lower() == "code" else "vault-safe"
+        # notify: mặc định BẬT (báo Telegram mỗi vòng cho chủ loop). Chỉ tắt khi ghi rõ false/0/no.
+        notify_raw = fm.get("notify", True)
+        notify = str(notify_raw).strip().lower() not in ("false", "0", "no", "off", "")
         return {
             # identity = TÊN FILE (stem) - frontmatter slug chỉ để hiển thị, tránh lệch nhau
             "slug": stem,
@@ -270,6 +274,9 @@ class LoopFeature:
             "tools_profile": prof,
             "quiet_hours": str(fm.get("quiet_hours", "") or "").strip(),
             "max_runs_per_day": maxr,
+            # owner_chat = chat_id người YÊU CẦU loop (để báo về đúng người). Rỗng = web → ID đầu.
+            "owner_chat": str(fm.get("owner_chat", "") or "").strip(),
+            "notify": notify,
             "updated": str(fm.get("updated", "") or ""),
             "body": (body or "").strip(),
         }
@@ -318,7 +325,9 @@ class LoopFeature:
             "enabled": bool(loop["enabled"]), "goal": loop["goal"], "mode": loop["mode"],
             "interval_min": int(loop["interval_min"]), "workspace": loop["workspace"],
             "tools_profile": loop["tools_profile"], "quiet_hours": loop["quiet_hours"],
-            "max_runs_per_day": int(loop["max_runs_per_day"]), "updated": _today(),
+            "max_runs_per_day": int(loop["max_runs_per_day"]),
+            "owner_chat": loop.get("owner_chat", ""), "notify": bool(loop.get("notify", True)),
+            "updated": _today(),
         }
         y = yaml.safe_dump(fm, allow_unicode=True, sort_keys=False, default_flow_style=False, width=1000).strip()
         d = self._loops_dir(brain)
@@ -696,7 +705,27 @@ class LoopFeature:
             if paused_now:
                 body += f"\n\n⚠ **{patch['auto_paused_reason']}** - bật lại hoặc bấm Chạy ngay để tiếp tục."
             self._log_append(brain, {"title": title, "body": body})
-            if paused_now and self.deps.notify:
+            # BÁO CÁO mỗi vòng cho NGƯỜI YÊU CẦU loop (mặc định của Javis; đặt notify: false
+            # trong frontmatter để tắt loop nào quá ồn). owner_chat rỗng (loop tạo trên web) →
+            # helper report tự gửi ID Telegram đầu tiên.
+            report_sent = False
+            if loop.get("notify", True) and self.deps.report:
+                head = "⚠" if failed else "✅"
+                parts = [f"{head} Loop '{loop['name']}' vừa chạy ({reason})."]
+                if summary:
+                    parts.append(summary[:1500])
+                if verify_line:
+                    parts.append("Kiểm chứng: " + verify_line)
+                if paused_now:
+                    parts.append("⚠ " + patch["auto_paused_reason"] + " - bật lại hoặc bấm Chạy ngay để tiếp tục.")
+                try:
+                    asyncio.create_task(self.deps.report(loop.get("owner_chat", ""), "\n\n".join(parts)))
+                    report_sent = True
+                except Exception:
+                    pass
+            # Auto-pause: broadcast tới MỌI admin (sự kiện an toàn hiếm). Bỏ nếu báo-mỗi-vòng đã
+            # gửi chủ loop rồi (tránh nhắn trùng ở setup 1 người dùng).
+            if paused_now and self.deps.notify and not report_sent:
                 try:
                     asyncio.create_task(self.deps.notify(
                         f"⚠ Loop '{loop['name']}' ({slug}) đã tự tạm dừng sau 3 lần lỗi liên tiếp. "
@@ -838,6 +867,7 @@ class LoopFeature:
             goal: str = Form(None), mode: str = Form("suggest"), interval_min: str = Form("60"),
             workspace: str = Form(None), tools_profile: str = Form(None),
             quiet_hours: str = Form(None), max_runs_per_day: str = Form(None),
+            owner_chat: str = Form(None), notify: str = Form(None),
             body: str = Form(""), brain: str = Form("brain"),
         ):
             self.ensure_migrated()
@@ -874,10 +904,15 @@ class LoopFeature:
                 mr = 0
             en = (enabled in ("1", "true", "True", "on")) if enabled is not None \
                 else bool(old and old["enabled"])
+            # owner_chat: web KHÔNG gửi → giữ của loop cũ, hoặc rỗng (→ báo ID Telegram đầu tiên).
+            oc = owner_chat if owner_chat is not None else (old["owner_chat"] if old else "")
+            nf = (notify in ("1", "true", "True", "on", "yes")) if notify is not None \
+                else (bool(old["notify"]) if old else True)
             loop = self.save_loop(brain, {
                 "slug": s, "name": name.strip() or s, "enabled": en, "goal": goal, "mode": mode,
                 "interval_min": iv, "workspace": ws, "tools_profile": tools_profile,
-                "quiet_hours": quiet_hours.strip(), "max_runs_per_day": mr, "body": body,
+                "quiet_hours": quiet_hours.strip(), "max_runs_per_day": mr,
+                "owner_chat": (oc or "").strip(), "notify": nf, "body": body,
             })
             self.register_brain(brain)
             return {"ok": True, "loop": self.loop_view(brain, loop)}

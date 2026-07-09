@@ -4,8 +4,10 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
-## [0.9.19] - 2026-07-07
+## [0.9.20] - 2026-07-09
 ### Thêm mới
+- **Loop và Việc tự báo kết quả về Telegram người yêu cầu**: giờ là hành vi mặc định của Javis - mỗi vòng loop chạy nền chạy xong, và mỗi việc (Kanban task) hoàn tất, đều tự nhắn kết quả về Telegram của đúng người đã yêu cầu (kèm tóm tắt, dòng kiểm chứng, và cảnh báo nếu loop tự tạm dừng). Loop hoặc việc tạo trên bản web (không rõ chủ) thì báo về ID Telegram đầu tiên trong whitelist. Loop lưu thêm `owner_chat` (chat_id người tạo) trong frontmatter; việc lưu `chat_id` tương ứng - Javis tự gắn khi bạn tạo qua chat. Vòng bị bỏ qua vì chưa có số liệu thì không nhắn để khỏi làm phiền; muốn một loop ngừng báo mỗi vòng thì đặt `notify: false` trong frontmatter loop đó.
+
 - **Khung chat render chân thật như Claude, xem được Artifact**: câu trả lời của AI giờ hiện đầy đủ như trên khung chat Claude. Khi trả về một trang HTML tự chứa, ảnh SVG, sơ đồ mermaid hoặc một file code dài, Javis hiện một thẻ artifact gọn trong luồng chat; bấm vào mở một panel bên phải có tab Xem trước / Mã nguồn cùng nút Copy và Tải về. HTML chạy trong iframe sandbox cô lập (không đụng được trang cha), SVG render không cho script, mermaid vẽ thành sơ đồ (offline thì tự hạ xuống hiện mã nguồn kèm ghi chú). Nhấn Esc để đóng panel, không thu nhỏ luôn khung chat đang phóng to.
 ### Cải thiện
 - **Markdown và code block đầy đủ hơn**: thêm heading nhiều cấp, danh sách đánh số + lồng nhau + checkbox, blockquote, đường kẻ ngang, in nghiêng, gạch ngang; code block có nhãn ngôn ngữ và tô màu cú pháp, giữ nút Copy. Lúc đang stream, đoạn code chưa đóng vẫn hiện gọn dạng khối code đang gõ thay vì chữ thô. Bộ render tách sang file riêng `dashboard/chat-render.js`, giữ nguyên số liệu panel trái, ảnh vault và link như cũ.

@@ -40,12 +40,14 @@ slug: <ascii-khong-dau>
 enabled: false            # mặc định TẮT khi tạo qua chat
 mode: suggest             # suggest = chỉ đọc/đề xuất | auto = tự ghi nháp (an toàn, KHÔNG tiền/đơn) | full = TOÀN QUYỀN (tự thao tác thật)
 interval_min: 120         # tối thiểu 5
+owner_chat: "<chat_id>"   # chat_id NGƯỜI YÊU CẦU (tạo qua chat Telegram) → báo kết quả về đúng họ; bỏ trống/tạo trên web → báo ID Telegram đầu tiên
 updated: <YYYY-MM-DD>
 ---
 <Mô tả nhiệm vụ: mỗi vòng Javis làm ĐÚNG việc này. Viết rõ, tự-đủ - đây chính là prompt của loop.>
 ```
 - Đây là format ĐƠN GIẢN (mặc định): thân file = mô tả việc loop làm mỗi vòng. Loop chạy nền mặc định **đọc được dữ liệu thật qua MCP** (POS/quảng cáo/lịch...) + thao tác file trong vault.
-- Trường nâng cao (KHÔNG bắt buộc, chỉ thêm khi user cần): `goal: business` (tự bơm số liệu KD mỗi vòng), `quiet_hours: "23-07"` (giờ im lặng), `max_runs_per_day: N`, `workspace: <path>` + `tools_profile: code` (loop sửa mã trên thư mục ngoài - Bash/Web, KHÔNG MCP).
+- **Báo cáo mặc định (BẮT BUỘC của Javis):** mỗi vòng loop chạy xong + mỗi việc (Kanban task) hoàn tất đều **tự gửi kết quả về Telegram NGƯỜI YÊU CẦU**. Tạo qua chat thì gắn `owner_chat: "<chat_id người đang nói>"` (loop) / kèm `"chat_id"` khi POST /kanban/task (task); tạo trên bản web (không rõ người) thì báo về **ID Telegram đầu tiên** trong whitelist. Muốn 1 loop ngừng báo mỗi vòng (quá ồn) thì đặt `notify: false` trong frontmatter loop đó.
+- Trường nâng cao (KHÔNG bắt buộc, chỉ thêm khi user cần): `goal: business` (tự bơm số liệu KD mỗi vòng), `quiet_hours: "23-07"` (giờ im lặng), `max_runs_per_day: N`, `notify: false` (tắt báo mỗi vòng), `workspace: <path>` + `tools_profile: code` (loop sửa mã trên thư mục ngoài - Bash/Web, KHÔNG MCP).
 
 **3 mức quyền của loop (mode):**
 - `suggest`: chỉ đọc (kể cả đọc MCP) + gợi ý, không ghi file. An toàn nhất - MẶC ĐỊNH.

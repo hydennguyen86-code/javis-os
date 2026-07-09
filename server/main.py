@@ -2742,6 +2742,32 @@ async def _tg_send_to(chat_id, text) -> tuple:
     return ok_any, "; ".join(e for e in errs if e)[:200]
 
 
+async def _notify_owner(owner_chat, text) -> tuple:
+    """Báo cáo cho NGƯỜI YÊU CẦU loop/task (mặc định của Javis). Quy tắc:
+      - owner_chat có + nằm trong whitelist → gửi ĐÚNG người đó.
+      - owner_chat rỗng (vd loop/task tạo trên bản WEB) hoặc không rõ → gửi ID ĐẦU TIÊN
+        trong whitelist (chủ bot).
+    Im lặng (trả (False, lý do)) nếu bot chưa bật / chưa có chat_id. Trả (ok, error)."""
+    tg = cfgmod.read_settings().get("telegram", {})
+    token = tg.get("token")
+    ids = tg_parse_ids(tg.get("chat_id"))
+    if not (tg.get("enabled") and token and ids):
+        return False, "Bot Telegram chưa bật hoặc chưa có chat_id"
+    cid = str(owner_chat or "").strip()
+    target = cid if (cid and cid in ids) else ids[0]
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=15) as c:
+            r = await c.post(f"https://api.telegram.org/bot{token}/sendMessage",
+                             json={"chat_id": target, "text": text})
+            d = r.json() if r.content else {}
+            if d.get("ok"):
+                return True, ""
+            return False, str(d.get("description") or f"HTTP {r.status_code}")[:200]
+    except Exception as e:
+        return False, f"{type(e).__name__}: {e}"
+
+
 def _loop_mcp_allow():
     """Pattern MCP cho allowlist của loop. Hub bật: mọi tool nằm dưới server 'javis' → 1 pattern;
     quyền đọc/ghi thật sự do hub chặn theo X-Javis-Mode. Hub tắt: 'mcp__<namespace>' như cũ."""
@@ -2768,6 +2794,7 @@ loop_feature = self_improve.register(app, self_improve.LoopDeps(
     safe_tools=SAFE_FILE_TOOLS,
     readonly_tools=READONLY_TOOLS,
     notify=_loop_notify,
+    report=_notify_owner,               # báo Telegram cho NGƯỜI YÊU CẦU loop mỗi vòng (web → ID đầu)
     apply_mcp=_apply_mcp,               # loop ĐỌC được dữ liệu thật qua MCP Javis-quản-lý
     mcp_allow_patterns=_loop_mcp_allow,
 ))
@@ -2824,6 +2851,7 @@ tasks_feature = tasks_mod.register(app, tasks_mod.TasksDeps(
     build_system_prompt=build_system_prompt,
     aux_model=_aux_model,
     safe_tools=SAFE_FILE_TOOLS,
+    report=_notify_owner,               # báo Telegram cho NGƯỜI YÊU CẦU task khi chạy xong (web → ID đầu)
 ))
 
 # Nối learn → Kanban: engine học đề xuất việc nền → enqueue vào backlog.
