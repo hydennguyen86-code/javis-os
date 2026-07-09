@@ -15,6 +15,7 @@
   const _svg = (p) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
   const ICON = {
     home:        _svg('<path d="M12 2l8.66 5v10L12 22 3.34 17V7L12 2z"/>'),
+    chat:        _svg('<path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8A8.5 8.5 0 1 1 21 11.5z"/>'),
     overview:    _svg('<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>'),
     workflows:   _svg('<path d="M13 2L4.5 13.5H11l-1 8.5L19.5 10H13l0-8z"/>'),
     agents:      _svg('<rect x="5" y="7" width="14" height="13" rx="2"/><path d="M12 7V3M8 3h8"/><circle cx="9.2" cy="13" r="1.1"/><circle cx="14.8" cy="13" r="1.1"/>'),
@@ -35,6 +36,7 @@
 
   const RAIL_ITEMS = [
     { id: "home",        icon: ICON.home,        label: "Javis" },
+    { id: "chat",        icon: ICON.chat,        label: "Trò chuyện" },
     { id: "overview",    icon: ICON.overview,    label: "Tổng quan" },
     { id: "settings",    icon: ICON.settings,    label: "Cài đặt" },
     { id: "workflows",   icon: ICON.workflows,   label: "Workflows" },
@@ -55,6 +57,7 @@
 
   const VIEW_META = {
     home:        { icon: "⬡", label: "Javis OS", sub: "" },
+    chat:        { icon: "💬", label: "Trò chuyện", sub: "Khung chat rộng · lịch sử hội thoại" },
     overview:    { icon: "◎", label: "Tổng quan", sub: "Trạng thái hệ thống" },
     settings:    { icon: "⚙", label: "Cài đặt", sub: "Giọng nói · avatar · tên miền" },
     workflows:   { icon: "⚡", label: "Workflows", sub: "Chuỗi agent tự động" },
@@ -106,9 +109,15 @@
   }
 
   // ---- Chuyển trang (có View Transition cho mượt) ----
+  // Hook "rời trang": trang nào mượn DOM dùng chung (vd tab Trò chuyện mượn khung chat của
+  // cockpit) đặt _pageLeave để TRẢ node về chỗ cũ TRƯỚC khi cviewBody bị ghi đè / cview bị ẩn.
+  let _pageLeave = null;
   function navigateTo(id) {
     const store = Alpine.store("nav");
+    if (store.active === id) return;   // đang ở trang này → khỏi đổi (tránh nháy + mượn/trả node thừa)
     const swap = () => {
+      const leave = _pageLeave; _pageLeave = null;
+      if (leave) { try { leave(); } catch (e) {} }   // dọn trang cũ trước khi thay nội dung
       store.active = id;
       // Nút điều khiển cockpit (⚙🔊↻) chỉ hiện ở trang Javis, không hiện navbar trang quản lý
       document.body.classList.toggle("in-console", id !== "home");
@@ -117,7 +126,10 @@
       if (id !== "home") renderPage(id);
       recomputeGraph();
     };
-    if (document.startViewTransition) document.startViewTransition(swap);
+    // Dính tab Trò chuyện thì BỎ View Transition: nó chụp snapshot cảnh 3D nặng của home rồi
+    // cross-fade → loé orb ~1s (bitmap chụp trước cả khi ẩn graph). Swap thẳng cho sạch, tức thì.
+    const skipVT = (id === "chat" || store.active === "chat");
+    if (document.startViewTransition && !skipVT) document.startViewTransition(swap);
     else swap();
   }
 
@@ -125,9 +137,15 @@
   // Render từng trang vào #cviewBody
   // ============================================
   async function renderPage(id) {
-    const el = body();
+    let el = body();
     if (!el) return;
-    _renderGen++;   // đổi trang → vô hiệu mọi render async đang dở
+    // Thay #cviewBody bằng node MỚI mỗi lần đổi trang: renderer async của trang CŨ (đang await
+    // fetch) nếu ghi trễ (el.innerHTML=...) sẽ ghi vào node cũ ĐÃ THÁO RỜI → vô hại, không phá
+    // nội dung/nút của trang mới. Đặc biệt bảo vệ các node chat mà tab Trò chuyện mượn vào
+    // cviewBody (trước đây bị 1 render async trễ xoá mất → chat vỡ). Cũng hết nháy nội dung cũ.
+    const fresh = el.cloneNode(false); el.parentNode.replaceChild(fresh, el); el = fresh;
+    _renderGen++;   // đổi trang → vô hiệu mọi render async đang dở (guard bổ sung cho renderer đã có)
+    if (id === "chat")     return renderChat(el);
     if (STUDIO_PAGES.includes(id)) return renderStudioPage(el, id);
     if (id === "overview") return renderOverview(el);
     if (id === "settings") return renderSettings(el);
@@ -2141,6 +2159,122 @@
           : "⚠ Lỗi lưu.";
       };
     }
+  }
+
+  // ============================================
+  // Trang TRÒ CHUYỆN - khung chat toàn khung (mượn node chat của cockpit + sidebar lịch sử)
+  // Không nhân đôi bộ máy chat: relocate chính #chatArea/#attachBar/#modelBar/#hudVoice
+  // (giữ nguyên mọi handler + WebSocket + streaming đã gắn trong app.js) rồi TRẢ về HUD khi
+  // rời trang. Cùng một cuộc trò chuyện hiển thị ở cả màn 3D lẫn tab này.
+  // ============================================
+  const CHAT_NODE_IDS = ["chatArea", "attachBar", "modelBar", "hudVoice"];
+  let _chatSlots = [];        // vị trí gốc từng node để trả về đúng chỗ trong HUD
+  let _chatEngObs = null;     // theo dõi engineBadge gốc để phản chiếu badge trong tab
+
+  function _injectChatCss() {
+    if (document.getElementById("cp-css")) return;
+    const css = `
+    body.on-chat .cview-head{ display:none; }
+    body.on-chat .cview-body{ padding:0; overflow:hidden; }
+    /* Ẩn hẳn THÂN HUD (metrics/orb 3D/panels) khi ở tab chat. cview fade-in 200ms của Alpine
+       + canvas WebGL bị đẩy lớp compositing có thể để lộ HUD phía sau (loé orb) lúc mở tab. Giữ
+       .hud-top (thanh trên toàn cục) hiển thị. Rời tab (bỏ .on-chat) HUD tự hiện lại + graph thức. */
+    body.on-chat .hud-body{ visibility:hidden; }
+    .chatpage{ display:flex; height:100%; min-height:0; position:relative; }
+    .chatpage-side{ width:280px; flex:none; display:flex; flex-direction:column; gap:10px;
+      min-height:0; padding:14px 12px; border-right:1px solid var(--glass-brd); background:rgba(255,255,255,.015); }
+    .chatpage-main{ flex:1 1 auto; min-width:0; display:flex; flex-direction:column; min-height:0; padding:14px 20px 16px; }
+    .chatpage-bar{ display:flex; align-items:center; gap:10px; padding:0 4px 10px; flex:none; }
+    .cp-title{ font-family:var(--font); font-weight:700; letter-spacing:.5px; color:var(--text); }
+    .cp-engine{ margin-left:auto; font-size:12px; color:var(--text2); font-family:var(--font); white-space:nowrap; }
+    .cp-ico-btn{ background:none; border:1px solid var(--border); color:var(--text2); border-radius:8px;
+      padding:4px 10px; cursor:pointer; font-size:14px; line-height:1; }
+    .cp-ico-btn:hover{ color:var(--accent); border-color:var(--accent); }
+    .cp-side-toggle{ display:none; }
+    .chatpage-slot{ flex:1 1 auto; min-height:0; display:flex; flex-direction:column; gap:10px; }
+    .chatpage-slot > *{ width:100%; max-width:900px; margin-left:auto; margin-right:auto; }
+    .chatpage-slot .transcript{ flex:1 1 auto; min-height:0; max-height:none; background:transparent; }
+    .chatpage-slot .hud-voice{ background:rgba(24,24,34,.6); border:1px solid var(--border); border-radius:12px; }
+    .chatpage-slot .attach-bar{ flex:none; }
+    @media (max-width:860px){
+      .cp-side-toggle{ display:inline-block; }
+      .chatpage-side{ position:absolute; left:0; top:0; bottom:0; z-index:6; width:min(84vw,300px);
+        transform:translateX(-105%); transition:transform .2s ease; box-shadow:10px 0 40px rgba(0,0,0,.5); background:var(--bg); }
+      .chatpage.side-open .chatpage-side{ transform:none; }
+      .chatpage-main{ padding:10px 12px 12px; }
+    }`;
+    const st = document.createElement("style"); st.id = "cp-css"; st.textContent = css; document.head.appendChild(st);
+  }
+
+  function _borrowChatNodes(into) {
+    _chatSlots = [];
+    CHAT_NODE_IDS.forEach(id => {
+      const n = document.getElementById(id);
+      if (!n) return;
+      _chatSlots.push({ node: n, parent: n.parentNode, next: n.nextSibling });
+      into.appendChild(n);
+    });
+  }
+  function _returnChatNodes() {
+    if (_chatEngObs) { try { _chatEngObs.disconnect(); } catch (e) {} _chatEngObs = null; }
+    for (let i = _chatSlots.length - 1; i >= 0; i--) {
+      const s = _chatSlots[i];
+      if (!s.parent) continue;
+      if (s.next && s.next.parentNode === s.parent) s.parent.insertBefore(s.node, s.next);
+      else s.parent.appendChild(s.node);
+    }
+    _chatSlots = [];
+    document.body.classList.remove("on-chat");
+  }
+
+  function renderChat(el) {
+    _injectChatCss();
+    // Vào lại trang này (vd đổi brain gọi thẳng renderPage) trong khi node đang mượn ở cviewBody
+    // cũ → TRẢ về HUD trước, nếu không el.innerHTML bên dưới sẽ xoá luôn #chatArea đang nằm trong đó.
+    if (_chatSlots.length) _returnChatNodes();
+    // chat-zoom overlay cũng mượn cùng các node → thu lại trước cho khỏi giành
+    try { if (window.JavisChatStage && window.JavisChatStage.isOpen()) window.JavisChatStage.collapse(); } catch (e) {}
+    document.body.classList.add("on-chat");
+    el.innerHTML =
+      '<div class="chatpage" id="chatPage">' +
+        '<aside class="chatpage-side" id="chatPageSide"></aside>' +
+        '<div class="chatpage-main">' +
+          '<div class="chatpage-bar">' +
+            '<button class="cp-ico-btn cp-side-toggle" type="button" title="Ẩn/hiện lịch sử">🕘</button>' +
+            '<span class="cp-title">Trò chuyện với Javis</span>' +
+            '<span class="cp-engine" id="cpEngine"></span>' +
+          '</div>' +
+          '<div class="chatpage-slot" id="chatPageSlot"></div>' +
+        '</div>' +
+      '</div>';
+    const page = el.querySelector("#chatPage");
+    const slot = el.querySelector("#chatPageSlot");
+    _borrowChatNodes(slot);
+
+    // Sidebar lịch sử hội thoại (dùng lại module chung của chat workspace)
+    try { if (window.JavisChatSide) window.JavisChatSide.mount(el.querySelector("#chatPageSide")); } catch (e) {}
+
+    // Badge engine: phản chiếu từ badge gốc trong HUD (không mượn node để khỏi phá HUD)
+    const eb = document.getElementById("engineBadge"), cpe = el.querySelector("#cpEngine");
+    if (eb && cpe) {
+      const sync = () => { cpe.textContent = (eb.textContent || "").trim(); };
+      sync();
+      try { _chatEngObs = new MutationObserver(sync); _chatEngObs.observe(eb, { childList: true, characterData: true, subtree: true }); } catch (e) {}
+    }
+
+    // Mobile: nút 🕘 mở/đóng drawer lịch sử; bấm vào vùng chat thì đóng drawer
+    const isNar = () => window.matchMedia("(max-width: 860px)").matches;
+    el.querySelector(".cp-side-toggle").onclick = () => page.classList.toggle("side-open");
+    slot.addEventListener("click", () => { if (isNar() && page.classList.contains("side-open")) page.classList.remove("side-open"); });
+    el.querySelector("#chatPageSide").addEventListener("click", (e) => {
+      if (isNar() && e.target.closest(".cside-item")) page.classList.remove("side-open");
+    });
+
+    // Cuộn xuống đáy + focus ô nhập cho tiện gõ ngay
+    const ca = document.getElementById("chatArea"); if (ca) ca.scrollTop = ca.scrollHeight;
+    const ci = document.getElementById("chatInput"); if (ci) { try { ci.focus(); } catch (e) {} }
+
+    _pageLeave = _returnChatNodes;   // rời tab → trả node về HUD trước khi cviewBody bị ghi đè
   }
 
   // ============================================
