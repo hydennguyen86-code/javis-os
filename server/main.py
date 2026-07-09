@@ -34,6 +34,9 @@ import mcp_store
 import mcp_client
 import mcp_catalog
 import mcp_hub
+import plugins_host   # hệ PLUGIN: thư mục Python thả vào, tự thêm tool/hook cho mọi engine qua hub
+import web_security   # chống CSRF-to-localhost + DNS-rebinding cho web API cục bộ
+import image_gen      # tạo ảnh bằng gói ChatGPT (OAuth) - Codex Responses + tool image_generation
 import zalo_login
 import oauth_mcp
 import system_sync   # tầng năng lực HỆ THỐNG (skill/loop mặc định) - update theo phiên bản app
@@ -45,7 +48,11 @@ import channel_context   # metadata kênh + gom file trả về kênh chat (port
 from sessions import get_store   # kho phiên hội thoại (sqlite + fts5): list/resume/search
 
 app = FastAPI(title="Javis OS")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+# CORS KHÔNG dùng '*' nữa: dashboard cùng-origin (không cần CORS). Chỉ mở cross-origin cho localhost
+# (tiện dev). Chống trang web độc ĐỌC API qua trình duyệt; phần chống GHI/CSRF ở _csrf_guard bên dưới.
+app.add_middleware(CORSMiddleware,
+                   allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$",
+                   allow_methods=["*"], allow_headers=["*"])
 
 # Đường dẫn KHÔNG cần đăng nhập. CHỈ các auth endpoint công khai (status/login/setup) -
 # KHÔNG để cả prefix /auth public vì /auth/disable, /auth/logout phải yêu cầu đăng nhập.
@@ -59,6 +66,17 @@ _AUTH_PUBLIC_EXACT = ("/", "/favicon.ico", "/auth/status", "/auth/login", "/auth
 # Endpoint CHỈ-LOCALHOST: agent (Claude CLI chạy cùng máy/container) curl được mà không cần
 # cookie đăng nhập; request từ ngoài (qua Traefik/Caddy/LAN) đến từ IP khác loopback → vẫn bị chặn.
 _AUTH_LOCAL_EXACT = ("/telegram/send-file", "/reminders")
+
+
+@app.middleware("http")
+async def _csrf_guard(request: Request, call_next):
+    """Chống CSRF-to-localhost + DNS-rebinding (xem web_security.py). Chạy TRƯỚC auth guard.
+    Không đụng client không-trình-duyệt (Claude CLI/Codex/curl không gửi Origin) và cùng-origin."""
+    d = web_security.csrf_decision(request.method, request.headers.get("host", ""),
+                                   request.headers.get("origin"), cfgmod.gate_active())
+    if d:
+        return JSONResponse({"error": d[1], "blocked": "web_security"}, status_code=d[0])
+    return await call_next(request)
 
 
 @app.middleware("http")
@@ -3090,7 +3108,7 @@ async def automations_sync(brain: str = Form("brain")):
 # ============================================================
 def _gather_capabilities(brain: str) -> dict:
     root = Path(_brain_root(brain))
-    caps = {"agents": [], "skills": [], "workflows": [], "loops": [], "automations": []}
+    caps = {"agents": [], "skills": [], "workflows": [], "loops": [], "automations": [], "plugins": []}
     ad = _agents_dir(brain)
     if ad.is_dir():
         for f in sorted(ad.glob("*.md")):
@@ -3121,18 +3139,28 @@ def _gather_capabilities(brain: str) -> dict:
     for a in _read_automations(brain):
         caps["automations"].append({"id": a.get("id"), "name": a.get("name"), "type": a.get("type"),
             "schedule": a.get("schedule", ""), "status": a.get("status", "active")})
+    try:
+        for p in plugins_host.describe(str(root)):
+            caps["plugins"].append({"slug": p["slug"], "name": p["name"], "source": p["source"],
+                "description": p["description"], "enabled": p["enabled"], "loaded": p["loaded"],
+                "gated": p["gated"], "min_mode": p["min_mode"], "tools": p["tools"],
+                "hooks": p["hooks"], "error": p["error"]})
+    except Exception:
+        pass
     return caps
 
 
 def _render_javis_index(caps: dict) -> str:
     n_on_loops = sum(1 for l in caps["loops"] if l["enabled"])
     n_on_wf = sum(1 for w in caps["workflows"] if w["status"] == "active")
+    plugins = caps.get("plugins", [])
+    n_on_plugins = sum(1 for p in plugins if p.get("loaded"))
     L = ["# Javis Index (tầng vận hành)", "",
          "> Tự sinh từ file - ĐỪNG sửa tay. Chỉ mục mọi năng lực của Javis trong brain này để bất kỳ "
          "AI/engine đọc 1 chỗ là hiểu Javis làm được gì. Song song `wiki/index.md` (tri thức).", "",
          f"**Tổng quan:** {len(caps['agents'])} agents · {len(caps['skills'])} skills · "
          f"{len(caps['workflows'])} workflows ({n_on_wf} bật) · {len(caps['loops'])} loops ({n_on_loops} bật) · "
-         f"{len(caps['automations'])} lịch", ""]
+         f"{len(caps['automations'])} lịch · {len(plugins)} plugins ({n_on_plugins} chạy)", ""]
     L.append("## Agents")
     if caps["agents"]:
         for a in caps["agents"]:
@@ -3171,6 +3199,25 @@ def _render_javis_index(caps: dict) -> str:
         L.append("\n## Lịch (automations)")
         for a in caps["automations"]:
             L.append(f"- **{a['name']}** - {a['type']} · {a['schedule']} · {a['status']}")
+    if plugins:
+        L.append("\n## Plugins (tool/hook native cho mọi engine)")
+        for p in plugins:
+            if p.get("loaded"):
+                stt = "chạy"
+            elif p.get("gated"):
+                stt = "⚠ chờ env JAVIS_ENABLE_VAULT_PLUGINS"
+            elif p.get("error"):
+                stt = "⚠ lỗi"
+            else:
+                stt = "tắt"
+            extra = []
+            if p.get("tools"):
+                extra.append("tools: " + ", ".join(p["tools"]))
+            if p.get("hooks"):
+                extra.append("hooks: " + ", ".join(p["hooks"]))
+            tail = (" · " + " · ".join(extra)) if extra else ""
+            L.append(f"- **{p['name']}** (`{p['slug']}`) - {p['source']}/{stt}{tail}"
+                     + (f" · {p['description']}" if p.get("description") else ""))
     # Cờ sức khoẻ (mini-LINT tầng vận hành)
     agent_slugs = {a["slug"] for a in caps["agents"]}
     used = {ag for w in caps["workflows"] for ag in w["agents"] if ag}
@@ -3187,6 +3234,12 @@ def _render_javis_index(caps: dict) -> str:
     paused = [l["slug"] for l in caps["loops"] if l["paused"]]
     if paused:
         flags.append(f"- Loop tự tạm dừng (cần xem): {', '.join(paused)}")
+    p_gated = [p["slug"] for p in plugins if p.get("gated")]
+    if p_gated:
+        flags.append(f"- Plugin bật nhưng bị chặn (đặt env JAVIS_ENABLE_VAULT_PLUGINS=true): {', '.join(p_gated)}")
+    p_err = [p["slug"] for p in plugins if p.get("error")]
+    if p_err:
+        flags.append(f"- Plugin lỗi nạp: {', '.join(p_err)}")
     if flags:
         L.append("\n## Cờ sức khoẻ")
         L.extend(flags)
@@ -3227,6 +3280,11 @@ def _javis_capability_summary(brain: str) -> str:
         parts.append("Workflows: " + ", ".join(w["name"] for w in c["workflows"][:20] if w["status"] == "active"))
     if c["loops"]:
         parts.append("Loops: " + ", ".join(f"{l['name']}({'bật' if l['enabled'] else 'tắt'})" for l in c["loops"][:20]))
+    live_plugins = [p for p in c.get("plugins", []) if p.get("loaded")]
+    if live_plugins:
+        tool_names = [t for p in live_plugins for t in p.get("tools", [])]
+        parts.append("Plugins đang chạy: " + ", ".join(p["name"] for p in live_plugins[:12])
+                     + (f" (tool: {', '.join(tool_names[:12])})" if tool_names else ""))
     parts.append("Trước khi tạo năng lực mới, kiểm chỉ mục này để khỏi trùng.")
     return "\n".join(parts)
 
@@ -3263,6 +3321,48 @@ async def javis_index(brain: str = Query("brain")):
     idx = Path(_brain_root(brain)) / "Javis" / "index.md"
     return {"ok": True, "content": idx.read_text(encoding="utf-8") if idx.exists() else "",
             "counts": {k: len(v) for k, v in _gather_capabilities(brain).items()}}
+
+
+# ============================================================
+# PLUGINS - tool/hook native cho MỌI engine (port ý tưởng plugin của Hermes).
+# Plugin = thư mục Python (plugin.yaml + plugin.py với register(ctx)) thả vào:
+#   - bundled  <project>/system/plugins/<slug>/   (ship theo app, tin cậy)
+#   - vault    <brain>/plugins/<slug>/            (user; CHỈ chạy khi env JAVIS_ENABLE_VAULT_PLUGINS=true)
+# ============================================================
+@app.post("/image/generate")
+async def image_generate(prompt: str = Form(...), aspect_ratio: str = Form("square"),
+                         quality: str = Form("medium"), brain: str = Form("brain")):
+    """Tạo ảnh bằng gói ChatGPT (OAuth) → lưu vào attachments/ của vault. Cho UI/gọi trực tiếp;
+    engine LLM dùng tool javis_generate_image (plugin image-chatgpt). Trả rel_path để nhúng ![](...)."""
+    res = await image_gen.generate_chatgpt(prompt, aspect_ratio, quality, vault_root=_brain_root(brain))
+    return JSONResponse(res, status_code=200 if res.get("ok") else 400)
+
+
+@app.get("/plugins")
+async def plugins_list(brain: str = Query("brain")):
+    """Liệt kê MỌI plugin (bundled + vault) kèm trạng thái bật/nạp/gated/lỗi. KHÔNG chạy code plugin."""
+    root = _brain_root(brain)
+    items = plugins_host.describe(root)
+    return {"ok": True, "vault_gate": plugins_host._env_vault_enabled(),
+            "vault_dir": str(plugins_host.vault_plugins_dir(root) or ""), "plugins": items}
+
+
+@app.post("/plugins/toggle")
+async def plugins_toggle(slug: str = Form(...), enabled: str = Form(...), brain: str = Form("brain")):
+    """Bật/tắt 1 plugin. Bundled → ghi STATE_DIR/plugins.json (không đụng file app); vault → ghi
+    frontmatter plugin.yaml. Làm mới cache hub để tool xuất hiện/biến mất ngay."""
+    if not plugins_host.valid_slug(slug):
+        return JSONResponse({"error": "slug không hợp lệ"}, status_code=400)
+    want = enabled in ("1", "true", "True", "on")
+    res = plugins_host.set_enabled(slug, want, _brain_root(brain))
+    if not res.get("ok"):
+        return JSONResponse({"error": res.get("error", "lỗi")}, status_code=400)
+    mcp_hub.invalidate_cache()   # tool builtin/plugin nằm trong route cache của hub → phải làm mới
+    try:
+        rebuild_javis_index(brain)
+    except Exception:
+        pass
+    return res
 
 
 @app.on_event("startup")

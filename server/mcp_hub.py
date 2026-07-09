@@ -316,6 +316,27 @@ async def discover_all(mode="full", vault_root=None):
     tools_spec += b_tools
     route.update(b_route)
 
+    # PLUGIN: tool do plugin đăng ký (bundled + vault) → mọi engine, tôn trọng min_mode.
+    # Trùng tên tool đã có (MCP/builtin) → BỎ QUA (không cho plugin shadow tool lõi).
+    try:
+        import plugins_host
+        p_tools, p_route = plugins_host.plugin_tools(mode, vault_root)
+        for t in p_tools:
+            fn = t["fn"]
+            if fn in route:
+                print(f"[hub] plugin tool '{fn}' trùng tool đã có - bỏ qua", file=sys.stderr)
+                continue
+            tools_spec.append(t)
+            route[fn] = p_route[fn]
+        # HOOK pre/post_tool_call: bọc MỌI tool call (chỉ khi có plugin đăng ký hook → 0 overhead khi không).
+        if plugins_host.has_tool_hooks(vault_root):
+            for fn in list(route):
+                base = route[fn].get("call")
+                if base:
+                    route[fn]["call"] = plugins_host.wrap_with_hooks(fn, base, mode, vault_root)
+    except Exception as e:
+        print(f"[hub] plugin host lỗi: {type(e).__name__}: {e}", file=sys.stderr)
+
     _cache[key] = {"tools": tools_spec, "route": route, "ts": time.time(), "mtime": mt}
     return tools_spec, route
 

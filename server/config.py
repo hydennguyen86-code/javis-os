@@ -91,6 +91,33 @@ _DEFAULT = {
 }
 
 
+# Các trường SECRET trong settings.json → mã hoá at rest (Fernet, qua secrets_store) như MCP secret.
+# Backward-compat: giá trị plaintext cũ đọc vẫn ra nguyên văn; lần ghi kế tiếp tự bọc "enc:".
+# Mất file .secret_key → decrypt trả "" (nhập lại key) - đánh đổi giống MCP secret, an toàn hơn lộ key.
+_SECRET_PATHS = (
+    "model.openrouter_key", "model.anthropic_api_key", "model.openai_api_key", "model.gemini_api_key",
+    "model.openai_oauth.access_token", "model.openai_oauth.refresh_token", "model.openai_oauth.id_token",
+    "telegram.token", "backup.token", "voice.elevenlabs_key",
+)
+
+
+def _transform_secret_fields(cfg, fn):
+    """Áp fn (encrypt|decrypt) lên các trường secret theo _SECRET_PATHS, tại chỗ. Bỏ qua nếu thiếu."""
+    for path in _SECRET_PATHS:
+        parts = path.split(".")
+        parent = cfg
+        for p in parts[:-1]:
+            if isinstance(parent, dict) and isinstance(parent.get(p), dict):
+                parent = parent[p]
+            else:
+                parent = None
+                break
+        key = parts[-1]
+        if isinstance(parent, dict) and isinstance(parent.get(key), str) and parent.get(key):
+            parent[key] = fn(parent[key])
+    return cfg
+
+
 def read_settings():
     cfg = json.loads(json.dumps(_DEFAULT))   # deep copy
     try:
@@ -103,11 +130,23 @@ def read_settings():
                     cfg[k] = v
     except Exception:
         pass
+    try:
+        import secrets_store   # lazy: secrets_store import config → tránh vòng lặp import
+        _transform_secret_fields(cfg, secrets_store.decrypt)
+    except Exception as e:
+        print(f"[config] giải mã secret lỗi: {e}", file=__import__('sys').stderr)
     return cfg
 
 
 def write_settings(cfg):
-    SETTINGS_PATH.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+    # Deep-copy rồi mã hoá BẢN SAO: caller vẫn giữ cfg plaintext để dùng tiếp (không bị hỏng).
+    out = json.loads(json.dumps(cfg))
+    try:
+        import secrets_store
+        _transform_secret_fields(out, secrets_store.encrypt)   # encrypt idempotent (bỏ qua enc:/plain:)
+    except Exception as e:
+        print(f"[config] mã hoá secret lỗi: {e}", file=__import__('sys').stderr)
+    SETTINGS_PATH.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 # ---- Mật khẩu ----

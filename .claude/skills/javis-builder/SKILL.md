@@ -1,6 +1,6 @@
 ---
 name: Javis Builder
-description: Kích hoạt khi người dùng muốn TẠO hoặc SỬA một năng lực của Javis - agent, skill, workflow, hoặc loop (vd "tạo agent chuyên X", "thêm kỹ năng Y", "dựng workflow nghiên cứu rồi viết", "tạo loop mỗi 2 tiếng làm Z", "làm cho Javis biết làm ..."). Đây là hướng dẫn cách ghi đúng file chuẩn của Javis.
+description: Kích hoạt khi người dùng muốn TẠO hoặc SỬA một năng lực của Javis - agent, skill, workflow, loop, hoặc plugin (vd "tạo agent chuyên X", "thêm kỹ năng Y", "dựng workflow nghiên cứu rồi viết", "tạo loop mỗi 2 tiếng làm Z", "viết tool/plugin tính ...", "làm cho Javis biết làm ..."). Đây là hướng dẫn cách ghi đúng file chuẩn của Javis.
 group: AI
 ---
 
@@ -18,6 +18,7 @@ vault (brain đang chọn). Studio / trang tương ứng tự nhận file mới.
    - Một "vai" chuyên môn có system prompt riêng -> **agent**.
    - Chuỗi nhiều bước, nhiều vai nối nhau -> **workflow** (tạo trước các agent còn thiếu).
    - Việc LẶP theo chu kỳ, tự chạy nền -> **loop**.
+   - Cần một TOOL native mới (làm được bằng Python, tái dùng, mọi engine gọi được) mà chưa có MCP -> **plugin**. Chỉ là hướng dẫn cách làm bằng tool sẵn -> skill. Nguồn dữ liệu ngoài có sẵn MCP -> đấu MCP.
    - Việc làm 1 lần -> KHÔNG tạo gì, cứ làm luôn hoặc đề xuất task Kanban.
 3. **Chống trùng.** TRƯỚC khi tạo, đọc folder tương ứng (agents/ workflows/ .claude/skills/
    loops/). Nếu đã có cái gần giống -> cập nhật cái cũ, đừng đẻ bản sao.
@@ -84,6 +85,32 @@ updated: <YYYY-MM-DD>
 <mô tả nhiệm vụ: mỗi vòng loop làm ĐÚNG việc này - đây chính là prompt của loop, viết tự-đủ>
 ```
 
+### Plugin -> `<vault>/plugins/<slug>/` (2 file: plugin.yaml + plugin.py)
+`plugin.yaml`:
+```
+name: <Tên tiếng Việt>
+slug: <ascii>
+version: 1.0.0
+description: <tool này làm gì, khi nào engine nên gọi>
+author: <ai tạo>
+enabled: false            # LUÔN tạo ở trạng thái TẮT
+min_mode: readonly        # readonly=chỉ đọc/tính (mặc định) | safe=có ghi | full=hành động thật
+tools: [<ten_tool>]
+hooks: []                 # vd [post_tool_call] nếu dùng hook
+```
+`plugin.py`:
+```python
+def register(ctx):
+    def handler(args, ctx):            # args=dict; trả str (hoặc dict). Lỗi -> "ERROR: ...". Có thể async.
+        return "..."
+    ctx.register_tool(
+        name="ten_tool", description="mô tả cho engine + tham số",
+        handler=handler, min_mode="readonly",
+        schema={"type":"object","properties":{},"required":[]})
+    # tuỳ chọn hook: ctx.register_hook("post_tool_call", lambda tool_name="", **_: None)
+```
+ctx có `ctx.vault_root`, `ctx.data_dir` (state riêng plugin, không đụng vault), `ctx.slug`.
+
 ## Rào an toàn (BẮT BUỘC)
 
 - Loop tạo qua chat LUÔN `enabled: false` + `mode: suggest`. Chỉ nâng `mode: auto/full` hoặc bật
@@ -94,4 +121,7 @@ updated: <YYYY-MM-DD>
   đè skill đã có và KHÔNG hồi sinh skill user đã tắt; agent tự động -> để nháp chờ duyệt. Skill do
   user yêu cầu trực tiếp -> tạo bật luôn nhưng phải kiểm trùng + `description` trigger rõ (skill rác
   làm Javis chọn skill sai). Đừng tạo skill trùng chức năng skill đã có.
+- Plugin vault chạy CODE PYTHON THẬT trong tiến trình server -> tạo `enabled: false`, `min_mode: readonly`,
+  và NÓI RÕ với user: plugin vault chỉ chạy khi họ đặt env `JAVIS_ENABLE_VAULT_PLUGINS=true` rồi khởi động lại
+  (rào chống chạy code lạ). KHÔNG viết plugin làm hành động tiền/đơn/gửi tin; việc đó để MCP + mức quyền lo.
 - Sau khi tạo, KHÔNG tự chạy thứ có side-effect; để user xem trước.
