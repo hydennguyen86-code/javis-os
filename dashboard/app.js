@@ -539,9 +539,89 @@ async function initGraph() {
 
 // Click node trong graph → Javis mở & thao tác note đó trong vault
 window.onGraphNodeClick = (node) => {
-  if (!node) return;
-  sendMessage(`Đọc note "${node.label}" (${node.path}) trong second brain, tóm tắt ngắn nội dung chính và đề xuất việc tiếp theo nếu có.`);
+  if (!node || !node.path) return;
+  openNodePopup(node);   // click node → mở popup ĐỌC/SỬA (trước đây hỏi thẳng vào chat gây nhầm)
 };
+
+// ============================================
+// Popup đọc / sửa 1 node của graph 3D. Node.path = "<tên thư mục gốc>/<đường dẫn>"; bỏ đoạn gốc
+// để hợp path tương đối của /files. Đọc qua /files/read, lưu qua /files/write (như trang Tệp tin).
+// ============================================
+let _nodeModal = null;
+function _ensureNodeModal() {
+  if (_nodeModal) return _nodeModal;
+  const css = `
+    .node-modal{position:fixed;inset:0;z-index:600;display:none;align-items:center;justify-content:center;background:rgba(4,8,18,.62);backdrop-filter:blur(3px);padding:24px}
+    .node-modal.open{display:flex}
+    .node-card{width:min(820px,94vw);max-height:88vh;display:flex;flex-direction:column;background:#0d0f18;border:1px solid var(--border);border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.6);overflow:hidden}
+    .node-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border)}
+    .node-title{font-family:var(--font);font-weight:700;font-size:16px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .node-actions{display:flex;align-items:center;gap:6px;flex:none}
+    .nm-btn{background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--text2);border-radius:8px;padding:5px 11px;cursor:pointer;font-size:13px;text-decoration:none;display:inline-block;white-space:nowrap}
+    .nm-btn:hover{color:var(--accent);border-color:var(--accent)}
+    .node-path{padding:6px 14px;font-size:12px;color:var(--text3);border-bottom:1px solid var(--border);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .node-body{flex:1 1 auto;min-height:0;display:flex}
+    .node-body textarea{width:100%;min-height:56vh;flex:1;background:#070b16;color:#dce6fb;border:none;outline:none;padding:14px;font:14px/1.6 ui-monospace,Consolas,monospace;resize:none}
+    .node-msg{padding:22px;color:var(--text2);font-size:15px;line-height:1.6}`;
+  const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
+  const m = document.createElement("div");
+  m.className = "node-modal"; m.id = "nodeModal";
+  m.innerHTML =
+    '<div class="node-card">' +
+      '<div class="node-head">' +
+        '<span class="node-title" id="nodeTitle"></span>' +
+        '<span class="node-actions">' +
+          '<a class="nm-btn" id="nodeOpenTab" target="_blank" rel="noopener">↗ Tab mới</a>' +
+          '<button class="nm-btn" id="nodeSave" type="button">💾 Lưu</button>' +
+          '<button class="nm-btn" id="nodeCloseBtn" type="button">✕</button>' +
+        '</span>' +
+      '</div>' +
+      '<div class="node-path" id="nodePath"></div>' +
+      '<div class="node-body" id="nodeBody"></div>' +
+    '</div>';
+  document.body.appendChild(m);
+  m.addEventListener("click", (e) => { if (e.target === m) closeNodePopup(); });
+  m.querySelector("#nodeCloseBtn").addEventListener("click", closeNodePopup);
+  _nodeModal = m;
+  return m;
+}
+function closeNodePopup() { if (_nodeModal) _nodeModal.classList.remove("open"); }
+async function openNodePopup(node) {
+  const m = _ensureNodeModal();
+  const brain = currentBrainPath();
+  const rel = (node.path || "").split("/").slice(1).join("/") || (node.path || "");
+  m.querySelector("#nodeTitle").textContent = node.label || rel || "Note";
+  m.querySelector("#nodePath").textContent = rel;
+  const rawUrl = `/files/raw?brain=${encodeURIComponent(brain)}&path=${encodeURIComponent(rel)}`;
+  m.querySelector("#nodeOpenTab").href = rawUrl;
+  const body = m.querySelector("#nodeBody");
+  const saveBtn = m.querySelector("#nodeSave");
+  saveBtn.style.display = "none";
+  body.innerHTML = '<div class="node-msg">Đang mở…</div>';
+  m.classList.add("open");
+  let d = {};
+  try { d = await (await fetch(`/files/read?brain=${encodeURIComponent(brain)}&path=${encodeURIComponent(rel)}`)).json(); }
+  catch (e) { body.innerHTML = `<div class="node-msg">Lỗi mở file: ${escapeHtml(String((e && e.message) || e))}</div>`; return; }
+  if (!d || d.error || d.editable === false) {
+    body.innerHTML = `<div class="node-msg">${escapeHtml((d && d.error) || "File này không sửa trực tiếp được.")} · <a href="${rawUrl}" target="_blank" style="color:var(--accent)">Mở trong tab mới</a></div>`;
+    return;
+  }
+  body.innerHTML = '<textarea id="nodeText" spellcheck="false"></textarea>';
+  body.querySelector("#nodeText").value = d.content || "";
+  saveBtn.style.display = "";
+  saveBtn.textContent = "💾 Lưu";
+  saveBtn.onclick = async () => {
+    saveBtn.textContent = "Đang lưu…";
+    const fd = new FormData();
+    fd.append("brain", brain); fd.append("path", rel);
+    fd.append("content", body.querySelector("#nodeText").value);
+    let r = {};
+    try { r = await (await fetch("/files/write", { method: "POST", body: fd })).json(); } catch (e) { r = { error: (e && e.message) || "lỗi" }; }
+    saveBtn.textContent = (r && r.ok) ? "✓ Đã lưu" : "⚠ Lỗi";
+    setTimeout(() => { saveBtn.textContent = "💾 Lưu"; }, 1600);
+  };
+  setTimeout(() => { try { body.querySelector("#nodeText").focus(); } catch (e) {} }, 30);
+}
 async function reloadGraph() {
   if (!javisGraph) return;
   graphStats.textContent = "Đang tải...";
@@ -1241,9 +1321,11 @@ document.addEventListener("keydown", (e) => {
     e.preventDefault(); spacePressed = true; voice.startListening();
   }
   if (e.code === "Escape") {
+    // Esc chỉ thoát chế độ rảnh tay + tắt mic + đóng popup node nếu đang mở. KHÔNG còn dừng câu
+    // trả lời hay ngắt Javis đang nói (đã bỏ theo yêu cầu - đã có nút bật/tắt tiếng và nút Dừng).
     handsFree = false; voiceBtn.classList.remove("handsfree");
     voice.stopListening();
-    stopCurrent();   // ngắt lệnh đang chạy + dừng đọc
+    if (typeof closeNodePopup === "function") closeNodePopup();
   }
 });
 document.addEventListener("keyup", (e) => {

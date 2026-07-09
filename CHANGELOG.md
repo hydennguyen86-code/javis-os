@@ -4,6 +4,12 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.27] - 2026-07-09
+### Thêm mới
+- **Click node trên graph 3D mở popup đọc/sửa note**: trước đây bấm một node trên biểu đồ là gửi thẳng một câu hỏi vào khung chat (gây nhầm lẫn). Nay bấm node mở một cửa sổ hiện nội dung note để đọc và sửa trực tiếp rồi Lưu (đọc/ghi qua đúng API Tệp tin), kèm nút mở tab mới; nhấn Esc hoặc ✕ để đóng.
+### Cải thiện
+- **Esc không còn dừng câu trả lời / ngắt Javis đang nói**: trước đây nhấn Esc vừa tạm dừng giọng đọc vừa ngắt luôn lượt đang chạy, rất dễ lỡ tay mất câu trả lời. Nay Esc chỉ thoát chế độ rảnh tay, tắt mic và đóng popup. Muốn dừng thì dùng nút Dừng (ô đỏ) hoặc nút bật/tắt tiếng.
+
 ## [0.9.26] - 2026-07-09
 ### Thêm mới
 - **Nhiều hội thoại chạy song song (như Claude)**: bấm "Hội thoại mới" giờ KHÔNG còn làm dừng hội thoại đang trả lời. Mỗi lượt chat chạy nền độc lập, nên bạn có thể mở một hội thoại mới và hỏi việc khác NGAY trong khi hội thoại cũ vẫn đang generate - cả hai chạy cùng lúc. Danh sách Lịch sử hiện dấu ⏳ ở hội thoại đang trả lời; bấm vào một hội thoại đang chạy nền để xem tiếp phần đang soạn trực tiếp, và mọi lượt tự lưu vào phiên của nó dù bạn đang xem chỗ khác. Nút Dừng chỉ ngắt đúng hội thoại đang xem, các hội thoại nền khác không bị ảnh hưởng.
