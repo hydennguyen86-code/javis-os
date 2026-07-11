@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
- * webcake-pke.js — Bộ giải mã / mã hóa file .pke của Webcake (KHÔNG cần cài gói ngoài).
+ * webcake-pke.js - Bộ giải mã / mã hóa file .pke của Webcake (KHÔNG cần cài gói ngoài).
  *
  * .pke = base64( MessagePack( { source, name, engine, owner_id, email, data_set_id } ) )
  *   source = { settings, popup, page, options, cartConfigs }  ← chính là "page_source" của editor Webcake
