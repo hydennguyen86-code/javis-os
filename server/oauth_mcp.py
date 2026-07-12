@@ -69,13 +69,32 @@ async def _discover(url):
                         issuer = servers[0]
         except Exception:
             pass
+        def _wk(base):
+            """Ứng viên .well-known cho 1 issuer/URL. Issuer CÓ PATH (vd Meta
+            https://mcp.facebook.com/ads) thì RFC 8414 đặt metadata dạng CHÈN GIỮA
+            host và path (/.well-known/oauth-authorization-server/ads) - thử trước;
+            giữ dạng NỐI ĐUÔI làm fallback vì một số server đặt kiểu đó."""
+            b = urllib.parse.urlparse(base)
+            o = f"{b.scheme}://{b.netloc}"
+            path = b.path.rstrip("/")
+            if not path:
+                return [o + "/.well-known/oauth-authorization-server",
+                        o + "/.well-known/openid-configuration"]
+            return [o + "/.well-known/oauth-authorization-server" + path,
+                    o + "/.well-known/openid-configuration" + path,
+                    o + path + "/.well-known/oauth-authorization-server",
+                    o + path + "/.well-known/openid-configuration"]
+
         candidates = []
         if issuer:
-            candidates.append(issuer.rstrip("/") + "/.well-known/oauth-authorization-server")
+            candidates += _wk(issuer)
         p = urllib.parse.urlparse(url)
         origin = f"{p.scheme}://{p.netloc}"
+        candidates += _wk(url)          # metadata treo theo path của chính MCP url (không issuer)
         candidates += [origin + "/.well-known/oauth-authorization-server",
                        origin + "/.well-known/openid-configuration"]
+        seen = set()
+        candidates = [c for c in candidates if not (c in seen or seen.add(c))]
         for c in candidates:
             try:
                 r = await client.get(c)

@@ -4,6 +4,10 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.32] - 2026-07-12
+### Sửa lỗi
+- **Kết nối Meta Ads hết báo "Server này không khai OAuth chuẩn MCP"**: Meta khai issuer OAuth có path (`mcp.facebook.com/ads`) và đặt metadata theo đúng chuẩn RFC 8414 dạng chèn giữa (`/.well-known/oauth-authorization-server/ads`), trong khi Javis chỉ tìm dạng nối đuôi và gốc domain nên không thấy. Nay bước discovery thử đủ cả hai dạng (chèn giữa trước, nối đuôi fallback) cho issuer lẫn URL MCP có path - bấm Kết nối là ra trang đăng nhập Facebook như thiết kế. Các connector OAuth khác không đổi hành vi.
+
 ## [0.9.31] - 2026-07-11
 ### Sửa lỗi
 - **Dán bài dài vào chat không còn nổ "Subprocess error: WinError 206"**: trước đây tin nhắn (cộng system prompt) được truyền cho engine CLI qua command line, mà Windows giới hạn command line tối đa 32767 ký tự - dán một bài báo dài hay đoạn văn bản lớn là vượt trần và lỗi "FileNotFoundError: The filename or extension is too long" ngay trước khi engine kịp chạy. Nay prompt được bơm qua stdin (không đi qua command line) nên dán bao nhiêu cũng chạy; áp dụng cho cả engine Claude Code lẫn Codex. Đã test thật với prompt hơn 40 nghìn ký tự.
