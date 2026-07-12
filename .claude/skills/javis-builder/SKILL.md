@@ -42,6 +42,15 @@ updated: <YYYY-MM-DD>
 <system prompt: cách làm việc, nguyên tắc, định dạng đầu ra mong muốn>
 ```
 
+**Viết system prompt cho agent theo khung metaprompt** (rút từ metaprompt của Anthropic - ĐỪNG viết 1-2 câu chung chung kiểu "bạn là chuyên gia X"):
+1. Vai + mục tiêu: 1 câu nêu vai, 1 câu nêu kết quả tốt trông như thế nào.
+2. Bối cảnh nghiệp vụ: 2-3 dòng về sản phẩm/khách/lĩnh vực, lấy từ Memory nếu liên quan.
+3. Quy trình: các bước làm việc đánh số, đúng thứ tự agent nên làm thật.
+4. Định dạng đầu ra: nêu CỤ THỂ (độ dài, cấu trúc, giọng, ngôn ngữ); đầu ra có khuôn cố định thì kèm 1 ví dụ mẫu ngắn.
+5. Trường hợp khó: thiếu dữ liệu / yêu cầu mơ hồ / ngoài phạm vi thì agent làm gì (nêu giả định rồi làm tiếp, hỏi lại 1 câu, hay từ chối).
+6. Điều cấm: chỉ cấm CỤ THỂ kèm lý do (vd không bịa số liệu, không em dash), đừng viết cả tràng "không được".
+Prompt tốt thường 10-25 dòng. Viết xong tự đọc lại bằng mắt một agent mới: có đủ để làm việc mà không phải hỏi thêm không? Thân skill cũng áp khung này (bỏ mục 1, thay bằng mô tả trigger).
+
 ### Skill -> `.claude/skills/<slug>/SKILL.md`
 ```
 ---

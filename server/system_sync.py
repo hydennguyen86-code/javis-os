@@ -393,7 +393,10 @@ LEGACY_HASHES.update({
     },
     "skills/javis-builder": {
         "24081f68ed0152b09fc482dc79680e68e249e8153bc1c442f4a01af15b7f012f",
+        # bản v0.9.32 (trước khi thêm khung metaprompt v0.9.33)
+        "6f040dde409adf27ee69fed22c2c0490a5717c53a640d02d02fd670ee1bbfd76",
     },
+    # ingest-source bản trước contextual-retrieval (v0.9.33) = 313675bc... đã có ở trên
     "skills/lint-wiki": {
         "d12ab25e78405804c378af7ffb13c136d5fd6639cd5140b17231a533704b8bc8",
     },

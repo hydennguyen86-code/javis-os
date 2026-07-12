@@ -128,6 +128,51 @@ def _apply_anthropic_cache(payload: dict, cache_ttl: str = "5m") -> None:
                 last["cache_control"] = marker
 
 
+def _anthropic_mark_last(conv):
+    """Copy conv + đánh cache_control lên block cuối của message cuối - cho vòng tool MCP.
+    KHÔNG mutate conv gốc nên marker không tích luỹ qua các vòng tool (trần Anthropic
+    4 breakpoint/request; ở đây tối đa 3: tools + system + message cuối). Message cuối
+    lúc gửi luôn là user (câu hỏi hoặc tool_result) - hai loại block đều nhận cache_control."""
+    if not conv:
+        return conv
+    marker = {"type": "ephemeral"}
+    out = list(conv)
+    last = dict(out[-1])
+    c = last.get("content")
+    if isinstance(c, str) and c:
+        last["content"] = [{"type": "text", "text": c, "cache_control": marker}]
+    elif isinstance(c, list) and c:
+        blocks = list(c)
+        if isinstance(blocks[-1], dict):
+            lb = dict(blocks[-1])
+            lb["cache_control"] = marker
+            blocks[-1] = lb
+        last["content"] = blocks
+    out[-1] = last
+    return out
+
+
+def _is_claude_model(model):
+    """Model OpenRouter thuộc họ Claude? (cache_control chỉ pass-through cho Anthropic)."""
+    m = (model or "").lower()
+    return "claude" in m or m.startswith("anthropic/")
+
+
+def _or_mark_system(messages):
+    """Copy messages, đánh cache_control lên system message ĐẦU (định dạng OpenAI-style của
+    OpenRouter). System của Javis ~26k ký tự và bất biến trong phiên - cache được là lãi nhất.
+    KHÔNG mutate list gốc: or_messages sống qua nhiều lượt, mutate là marker dính vĩnh viễn."""
+    out = []
+    marked = False
+    for m in messages:
+        if not marked and m.get("role") == "system" and isinstance(m.get("content"), str) and m["content"]:
+            m = dict(m)
+            m["content"] = [{"type": "text", "text": m["content"], "cache_control": {"type": "ephemeral"}}]
+            marked = True
+        out.append(m)
+    return out
+
+
 # Một số model OpenRouter (qwen, deepseek-r1, minimax...) nhét reasoning INLINE vào
 # content dưới dạng <think>...</think> thay vì field "reasoning" riêng → nếu yield
 # thẳng thì tag lậu lên chat, bẩn conversation log và phá parse JAVIS_METRICS.
@@ -367,6 +412,8 @@ async def openrouter_stream(api_key, model, messages, reasoning="off"):
         "HTTP-Referer": "http://localhost:7777",
         "X-Title": "Javis OS",
     }
+    if _is_claude_model(model):
+        messages = _or_mark_system(messages)   # cache system ~26k cho model Claude qua OpenRouter
     payload = {"model": model or "openai/gpt-4o-mini", "messages": messages, "stream": True,
                "stream_options": {"include_usage": True}}   # → chunk cuối kèm usage token
     if reasoning not in (None, "", "off"):
@@ -572,11 +619,14 @@ def _mcp_to_openai_tools(mcp_tools):
     }} for t in mcp_tools]
 
 
-async def _cc_tool_loop(url, headers, model, messages, mcp_tools, mcp_route, reasoning_extra, label):
-    """Vòng Chat Completions + tool (OpenAI/OpenRouter). Non-stream từng vòng; yield tool_call + text cuối."""
+async def _cc_tool_loop(url, headers, model, messages, mcp_tools, mcp_route, reasoning_extra, label,
+                        cache_system=False):
+    """Vòng Chat Completions + tool (OpenAI/OpenRouter). Non-stream từng vòng; yield tool_call + text cuối.
+    cache_system=True (OpenRouter + model Claude): đánh cache_control lên system - OpenAI/Gemini
+    tự cache nên không cần."""
     import mcp_client
     tools = _mcp_to_openai_tools(mcp_tools)
-    msgs = list(messages)
+    msgs = _or_mark_system(messages) if cache_system else list(messages)
     usage_in = usage_out = 0
     for _ in range(8):
         payload = {"model": model, "messages": msgs, "tools": tools, "stream": False}
@@ -648,7 +698,8 @@ async def openrouter_chat_with_mcp(api_key, model, messages, reasoning, mcp_tool
     if reasoning not in (None, "", "off"):
         extra["reasoning"] = {"effort": reasoning}
     yield {"type": "meta", "model": model}
-    async for ev in _cc_tool_loop(OPENROUTER_URL, headers, model or "openai/gpt-4o-mini", messages, mcp_tools, mcp_route, extra, "OpenRouter"):
+    async for ev in _cc_tool_loop(OPENROUTER_URL, headers, model or "openai/gpt-4o-mini", messages, mcp_tools, mcp_route, extra, "OpenRouter",
+                                  cache_system=_is_claude_model(model)):
         yield ev
 
 
@@ -755,19 +806,22 @@ async def anthropic_chat_with_mcp(api_key, model, messages, reasoning, mcp_tools
     headers = {"x-api-key": api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"}
     tools = [{"name": t["fn"], "description": (t.get("description") or t["fn"])[:1024],
               "input_schema": t.get("schema") or {"type": "object", "properties": {}}} for t in mcp_tools]
+    if tools:
+        tools[-1]["cache_control"] = {"type": "ephemeral"}   # tools = prefix ổn định, cache 1 lần đủ
     yield {"type": "meta", "model": model}
     extras = _anthropic_reasoning(model, reasoning)
     timeout = httpx.Timeout(180, connect=15)
     async with httpx.AsyncClient(timeout=timeout) as client:
         usage_in = usage_out = 0
         for _ in range(8):
+            # Cache theo lối không-mutate (system dựng mới mỗi vòng, conv copy-khi-đánh-dấu)
+            # → marker KHÔNG tích luỹ qua vòng tool, tối đa 3 breakpoint/request (trần API là 4).
+            # Vòng tool là nơi cache lãi nhất: mỗi vòng 1 request chở lại nguyên system+tools+conv.
             payload = {"model": model or "claude-sonnet-4-6", "max_tokens": 4096,
-                       "messages": conv, "tools": tools, "stream": False}
+                       "messages": _anthropic_mark_last(conv), "tools": tools, "stream": False}
             payload.update(extras or {})
             if sys_txt:
-                payload["system"] = sys_txt
-            # KHÔNG dùng _apply_anthropic_cache ở đây: hàm này mutate messages in-place,
-            # marker cache_control TÍCH LUỸ qua các vòng tool → quá 4 block → API 400 giữa chừng.
+                payload["system"] = [{"type": "text", "text": sys_txt, "cache_control": {"type": "ephemeral"}}]
             try:
                 r = await client.post(ANTHROPIC_URL, headers=headers, json=payload)
             except Exception as e:
