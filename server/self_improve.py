@@ -101,7 +101,7 @@ def _ascii_slug(s: str) -> str:
     return t[:60] or "loop"
 
 
-def _isolate(cli: ClaudeCLI) -> ClaudeCLI:
+def _isolate(cli):
     """Cô lập fork nền (profile vault-safe): 0 MCP (file rỗng + strict) + chặn Bash/Web/Task.
     Vá lỗ hổng cũ: trước đây loop chỉ giới hạn allowed_tools nhưng vẫn 'thấy' MCP ambient."""
     mcpf = _empty_mcp_file()
@@ -599,7 +599,7 @@ class LoopFeature:
             "Mỗi việc 1 dòng '- [loại] mô tả → hành động'. Không có gì → 'Không có việc mới'."
         ), ""
 
-    def _make_cli(self, loop: dict, cwd: str, sysprompt: Optional[str], for_verify: bool = False) -> Optional[ClaudeCLI]:
+    def _make_cli(self, loop: dict, cwd: str, sysprompt: Optional[str], for_verify: bool = False):
         """Dựng CLI cho 1 vòng loop.
         - profile 'code' (nâng cao, chỉ đặt qua .md): Bash/Web + file, cwd=workspace, VẪN 0 MCP
           (fail-closed nếu không tạo được file MCP rỗng) - cho loop sửa mã repo.

@@ -24,7 +24,7 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent.parent / ".env")
 
-from claude_cli import ClaudeCLI, CodexCLI, claude_engine, find_claude_cli, find_codex_cli, cancel_all, _empty_mcp_file, auth_status as claude_auth_status, auth_login as claude_auth_login, auth_logout as claude_auth_logout, auth_login_ui_start, auth_login_ui_code, mcp_native_add, mcp_native_remove, mcp_native_status, mcp_open_auth_terminal, mcp_native_list
+from claude_cli import CodexCLI, claude_engine, find_claude_cli, find_codex_cli, cancel_all, _empty_mcp_file, auth_status as claude_auth_status, auth_login as claude_auth_login, auth_logout as claude_auth_logout, auth_login_ui_start, auth_login_ui_code, mcp_native_add, mcp_native_remove, mcp_native_status, mcp_open_auth_terminal, mcp_native_list
 from graph_builder import build_graph, _color_for, _top_folder, WIKILINK_RE
 import config as cfgmod
 import git_brain
@@ -689,7 +689,7 @@ def _write_codex_profile():
 
 
 def _apply_mcp(cli, mode="full"):
-    """Gắn MCP do Javis quản lý vào 1 ClaudeCLI (registry rỗng → không đổi gì, dùng MCP sẵn của máy).
+    """Gắn MCP do Javis quản lý vào 1 engine Claude (registry rỗng → không đổi gì, dùng MCP sẵn của máy).
     Hub bật: config 1 entry trỏ hub kèm X-Javis-Mode - deny/perm/audit chặn TẠI hub (lớp cứng),
     không cần --disallowedTools. Hub tắt: per-server + --disallowedTools như cũ."""
     try:
@@ -4387,7 +4387,7 @@ async def sessions_delete(session_id: str):
 _TG_BOT = None
 # ĐA PHIÊN theo tài khoản: mỗi chat_id giữ NGỮ CẢNH RIÊNG để không lẫn hội thoại giữa
 # các người dùng chung 1 bot. Map chat_id(str) -> phiên:
-#   {"cli": ClaudeCLI|None,   # session Claude riêng (giữ session_id để --resume)
+#   {"cli": engine Claude|None,   # session Claude riêng (giữ session_id để resume)
 #    "or":  list|None,        # lịch sử hội thoại engine OpenRouter/API
 #    "last": str|None,        # câu hỏi gần nhất của chat này (cho /retry)
 #    "sent": set,             # path đã gửi qua /telegram/send-file trong lượt (chống gửi trùng)

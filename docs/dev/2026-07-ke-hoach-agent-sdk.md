@@ -4,9 +4,9 @@
 > `claude` CLI (subprocess + parse stream-json) bằng `claude-agent-sdk` chính chủ, giữ nguyên
 > giao diện với phần còn lại của Javis.
 >
-> **Trạng thái: XONG CẢ 4 PHASE (v0.9.36, cùng ngày). MẶC ĐỊNH đã là `sdk`; lối thoát
-> `JAVIS_CLAUDE_ENGINE=cli` giữ nguyên một bản phát hành. Việc còn lại duy nhất: xoá code
-> Popen chết ở bản SAU khi user xác nhận chạy êm. Nhật ký ở mục 8.**
+> **Trạng thái: HOÀN TẤT - HỒ SƠ ĐÃ KHÉP (v0.9.37). Cả 4 phase xong; nhánh Popen ClaudeCLI
+> đã xoá theo yêu cầu user (bỏ giai đoạn giữ 1 bản phát hành); engine Claude duy nhất là
+> Agent SDK. Nhật ký đầy đủ ở mục 8. Không còn việc treo.**
 
 ## 1. Vì sao (động lực)
 
@@ -176,5 +176,18 @@ Hub HTTP giữ nguyên cho Codex + engine API.
   Telegram không test live (không bot token trong môi trường test) - cùng đường factory +
   hợp đồng event với chat đã test.
 
-**Còn lại (bản phát hành sau):** xoá nhánh Popen trong claude_cli.py khi user xác nhận vài
-tuần chạy êm; cân nhắc đưa công tắc engine lên trang Models thay vì env.
+**2026-07-12 (v0.9.37) - Khép hồ sơ:**
+
+- User yêu cầu xoá luôn nhánh Popen (bỏ giai đoạn giữ 1 bản phát hành). Đã xoá class
+  ClaudeCLI (~219 dòng) khỏi claude_cli.py; giữ nguyên hạ tầng Popen dùng chung
+  (CodexCLI, _kill_tree, registry cancel theo tag, auth Claude Code, _empty_mcp_file).
+- Factory `claude_engine()` giờ luôn trả ClaudeSDK; env `JAVIS_CLAUDE_ENGINE=cli|sdk-loops`
+  chỉ còn giá trị lịch sử (bỏ qua kèm log 1 lần). SDK chưa cài → ClaudeSDK.query() tự báo
+  lỗi hướng dẫn cài, không crash.
+- Tiêu chí thành công mục 6 chốt sổ: (1) mọi luồng chạy SDK không sửa call site - đạt (e2e
+  bake v0.9.36); (2) loop suggest bị chặn Write/Bash thật - đạt (probe gate deny + audit);
+  (3) xoá >= 300 dòng tự chế - đạt (219 dòng class + ~90 dòng factory/flag/test đơn giản hoá);
+  (4) latency không tăng quá 10% - đạt (first-token SDK 3.6s vs Popen 4.0s, lượt sau ~6s).
+- Rollback từ đây = git revert (nhánh cli không còn trong code).
+
+Việc ngoài hồ sơ (tuỳ hứng sau): đưa trạng thái engine lên trang Models cho dễ nhìn.

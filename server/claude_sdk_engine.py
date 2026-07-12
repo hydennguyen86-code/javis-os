@@ -1,7 +1,7 @@
 """
 Engine Claude qua claude-agent-sdk CHÍNH CHỦ (Phase 1-2 của docs/dev/2026-07-ke-hoach-agent-sdk.md).
 
-Cùng "hợp đồng" với ClaudeCLI (claude_cli.py) nên call site không đổi:
+Đây là engine Claude DUY NHẤT từ v0.9.37 (nhánh ClaudeCLI Popen đã gỡ). Hợp đồng engine:
   - __init__(system_prompt, cwd, tag, allowed_tools, model) + các attr gán sau
     (session_id, mcp_config, mcp_strict, disallowed_tools, max_wall_s)
   - .query(prompt) -> async yield dict {type: text|tool_call|tool_result|final|error}
@@ -115,7 +115,7 @@ def map_message(msg):
 
 
 class ClaudeSDK:
-    """Engine Claude qua Agent SDK - thay được ClaudeCLI ở mọi call site."""
+    """Engine Claude qua Agent SDK - engine Claude duy nhất (tạo qua claude_cli.claude_engine)."""
 
     def __init__(self, system_prompt=None, cwd=None, tag="chat", allowed_tools=None, model=None):
         self.system_prompt = system_prompt

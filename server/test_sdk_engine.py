@@ -27,23 +27,22 @@ def check(name, cond):
         _fails.append(name)
 
 
-# ---- 1. Factory chọn engine theo env ----
+# ---- 1. Factory: engine Claude LUÔN là SDK (nhánh Popen ClaudeCLI đã gỡ v0.9.37) ----
 os.environ.pop("JAVIS_CLAUDE_ENGINE", None)
-from claude_cli import claude_engine, ClaudeCLI          # noqa: E402
+import claude_cli                                         # noqa: E402
+from claude_cli import claude_engine                      # noqa: E402
 import claude_sdk_engine                                  # noqa: E402
 from claude_sdk_engine import ClaudeSDK, map_message      # noqa: E402
 
 eng = claude_engine(system_prompt="x", cwd=".", tag="t", allowed_tools=["Read"], model="haiku")
-check("factory: MẶC ĐỊNH (v0.9.36) → ClaudeSDK", isinstance(eng, ClaudeSDK))
+check("factory: mặc định → ClaudeSDK", isinstance(eng, ClaudeSDK))
 check("factory: truyền đủ tham số", eng.system_prompt == "x" and eng.allowed_tools == ["Read"]
       and eng.model == "haiku" and eng.tag == "t")
 os.environ["JAVIS_CLAUDE_ENGINE"] = "cli"
-check("factory: env=cli → ClaudeCLI (lối thoát)", isinstance(claude_engine(), ClaudeCLI))
+check("factory: env=cli (đã gỡ) → vẫn ClaudeSDK", isinstance(claude_engine(), ClaudeSDK))
 os.environ["JAVIS_CLAUDE_ENGINE"] = "sdk-loops"
-check("factory: sdk-loops, tag loop → SDK", isinstance(claude_engine(tag="loop"), ClaudeSDK))
-check("factory: sdk-loops, tag dispatch → SDK", isinstance(claude_engine(tag="dispatch"), ClaudeSDK))
-check("factory: sdk-loops, tag chat:abc → CLI", isinstance(claude_engine(tag="chat:abc12"), ClaudeCLI))
-check("factory: sdk-loops, tag telegram:1 → CLI", isinstance(claude_engine(tag="telegram:1"), ClaudeCLI))
+check("factory: env=sdk-loops (đã gỡ) → vẫn ClaudeSDK", isinstance(claude_engine(tag="chat:abc12"), ClaudeSDK))
+check("factory: class ClaudeCLI đã bị xoá hẳn", not hasattr(claude_cli, "ClaudeCLI"))
 os.environ.pop("JAVIS_CLAUDE_ENGINE", None)
 
 # ---- 2. map_message: parity hợp đồng event ----

@@ -96,7 +96,7 @@ Lưu ý: hai biến TTS này áp cho giọng Edge TTS miễn phí mặc định.
 | `WATCHTOWER_TOKEN` | Token cho nút "Cập nhật ngay" (trang Tổng quan) gọi Watchtower khi chạy Docker | `javis-update` | Muốn chặt hơn: đổi thành chuỗi ngẫu nhiên, đặt cùng giá trị cho cả app lẫn service watchtower. |
 | `METRICS_TTL` | Thời gian cache số liệu kinh doanh, tính bằng giây | `180` | Muốn số liệu MCP làm mới nhanh hơn hoặc chậm hơn. Xem [MCP & số liệu](09-mcp-va-so-lieu.md). |
 | `JAVIS_CLAUDE_IDLE_TIMEOUT` | Thời gian chờ tối đa khi Claude CLI không phản hồi, tính bằng giây | `180` | Tác vụ nền chạy lâu hay bị ngắt sớm thì tăng lên. |
-| `JAVIS_CLAUDE_ENGINE` | Cách chạy engine Claude: `sdk` (Agent SDK chính chủ - chặn quyền per-call cho fork nền, plugin in-process), `sdk-loops` (chỉ fork nền dùng SDK, chat vẫn kiểu cũ), `cli` (cách cũ hoàn toàn) | `sdk` | Engine Claude trục trặc sau bản cập nhật thì đặt `cli` để quay về cách cũ ngay, rồi báo lỗi. |
+| `JAVIS_CLAUDE_ENGINE` | (Lịch sử) Từ 0.9.37 engine Claude luôn chạy qua Agent SDK chính chủ - biến này không còn tác dụng, đặt `cli`/`sdk-loops` sẽ bị bỏ qua kèm một dòng log | `sdk` | Không cần đụng. Engine Claude trục trặc thì báo lỗi kèm log server. |
 | `JAVIS_SESSIONS_DB` | Đường dẫn file cơ sở dữ liệu lưu phiên hội thoại (`conversations.db`) | Nằm trong `JAVIS_STATE_DIR` | Muốn để file lịch sử phiên ở nơi khác. Xem [Phiên hội thoại](04-phien-hoi-thoai.md). |
 
 Các biến nhóm 6 hiếm khi cần đụng. `WATCHTOWER_TOKEN` chỉ liên quan khi bạn chạy bản Docker và muốn dùng nút cập nhật một chạm.

@@ -4,6 +4,10 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.37] - 2026-07-12
+### Cải thiện
+- **Gỡ hẳn nhánh engine Claude kiểu cũ (Popen) - khép hồ sơ kế hoạch Agent SDK**: engine Claude giờ chạy duy nhất qua Agent SDK chính chủ. Xoá ~220 dòng code tự chế spawn/parse tiến trình trong claude_cli.py (nơi từng phát sinh các lỗi kiểu WinError 206); Codex CLI và phần auth/ngắt tiến trình dùng chung giữ nguyên. Biến `JAVIS_CLAUDE_ENGINE` không còn tác dụng (đặt `cli`/`sdk-loops` sẽ bị bỏ qua kèm một dòng log). Máy chưa cài claude-agent-sdk sẽ được engine báo rõ cách cài thay vì lỗi khó hiểu. Toàn bộ 6 bộ test + kiểm tra sống qua factory đều pass; nhật ký hoàn công ở docs/dev/2026-07-ke-hoach-agent-sdk.md.
+
 ## [0.9.36] - 2026-07-12
 ### Thêm mới
 - **Engine Claude chạy Agent SDK chính chủ theo MẶC ĐỊNH (hoàn tất cả 4 phase kế hoạch)**: sau spike và smoke đạt toàn bộ, engine Claude giờ mặc định chạy qua claude-agent-sdk. Người dùng không phải làm gì - vẫn đăng nhập Claude Code như cũ, chat/loop/workflow/Telegram chạy y hệt nhưng nền tảng do Anthropic bảo trì, fork nền được chặn quyền theo từng lần gọi tool kèm audit. Trục trặc thì đặt biến môi trường `JAVIS_CLAUDE_ENGINE=cli` là quay về cách cũ ngay (giữ tối thiểu một bản phát hành); có thêm mức trung gian `sdk-loops` (chỉ tác vụ nền dùng SDK). Đã kiểm chứng bằng phiên chạy thật cô lập đủ 3 luồng: chat 2 lượt có nhớ phiên, workflow chạy trọn chuỗi bước, loop chế độ đề xuất bị lệnh "tạo file bằng được" vẫn không tạo được file; log server sạch không lỗi không fallback.
