@@ -2229,36 +2229,75 @@ async def skill_set_group(slug: str = Form(...), group: str = Form(...), brain: 
 
 
 # ============================================================
-# Quản lý File (File Manager) - duyệt / đọc / sửa / tải / xoá file TRONG brain đang chọn.
-# An toàn: mọi thao tác bị giới hạn trong _brain_root(brain) (chống traversal ../).
+# Quản lý File (File Manager) - duyệt / đọc / sửa / tải / xoá file.
+# TRẦN duyệt (_files_ceiling): mặc định localhost = ổ đĩa chứa brain (out được ra root để
+# đọc/sửa data ngoài vault); public bind (VPS/login) = khoá trong brain. Chỉnh bằng
+# JAVIS_FILES_ROOT. Điểm vào mặc định LUÔN là brain. _safe_path chặn vượt trần (chống ../).
 # ============================================================
 _TEXT_EXTS = {".md", ".txt", ".json", ".yaml", ".yml", ".csv", ".js", ".ts", ".py",
               ".html", ".css", ".toml", ".ini", ".log", ".sh", ".bat", ".xml", ".svg", ".env"}
 
 
+def _files_ceiling(brain: str) -> Path:
+    """Ranh giới trên của File Manager (không cho 'Lên' quá đây). Brain LUÔN nằm trong trần.
+    JAVIS_FILES_ROOT: `brain`/`vault` = khoá trong brain | `drive`/`root` = ổ đĩa chứa brain |
+    <đường dẫn tuyệt đối> = trần tuỳ ý (phải chứa brain). KHÔNG đặt: localhost → ổ đĩa (chủ máy
+    tin cậy), bind public → khoá brain (fail-closed, tránh hở cả ổ đĩa qua web)."""
+    broot = Path(_brain_root(brain)).resolve()
+    env = os.getenv("JAVIS_FILES_ROOT", "").strip()
+    ceil = None
+    if env:
+        low = env.lower()
+        if low in ("brain", "vault"):
+            ceil = broot
+        elif low in ("drive", "root"):
+            ceil = Path(broot.anchor or broot)
+        else:
+            cand = Path(env).expanduser()
+            if cand.is_dir():
+                ceil = cand.resolve()
+    elif not cfgmod.require_login():
+        ceil = Path(broot.anchor or broot)      # localhost = chủ máy → tới ổ đĩa
+    if ceil is None:
+        ceil = broot                            # public / cấu hình lạ → khoá brain
+    try:
+        broot.relative_to(ceil)                 # brain phải trong trần, else fallback brain
+    except ValueError:
+        ceil = broot
+    return ceil
+
+
 def _files_root(brain: str) -> Path:
-    return Path(_brain_root(brain)).resolve()
+    """Trần duyệt hiện hành (mọi path tương đối tính từ đây). Alias giữ tên cũ cho call site."""
+    return _files_ceiling(brain)
 
 
 def _safe_path(brain: str, rel: str) -> Path:
-    """Resolve rel TRONG brain root; ném ValueError nếu vượt ra ngoài (chống ../)."""
+    """Resolve rel TRONG trần duyệt; ném ValueError nếu vượt ra ngoài (chống ../)."""
     root = _files_root(brain)
     rel = (rel or "").strip().replace("\\", "/").lstrip("/")
     target = (root / rel).resolve()
     if target != root and root not in target.parents:
-        raise ValueError("Đường dẫn ngoài phạm vi brain")
+        raise ValueError("Đường dẫn ngoài phạm vi cho phép")
     return target
 
 
+def _files_rel(root: Path, p: Path) -> str:
+    """Đường dẫn POSIX của p tương đối so với trần root ('' nếu p == root)."""
+    return "" if p == root else str(p.relative_to(root)).replace("\\", "/")
+
+
 @app.get("/files/list")
-async def files_list(brain: str = Query("brain"), path: str = Query("")):
+async def files_list(brain: str = Query("brain"), path: str = Query(None)):
+    root = _files_root(brain)
+    broot = Path(_brain_root(brain)).resolve()
     try:
-        d = _safe_path(brain, path)
+        # path VẮNG (None) = điểm vào mặc định = BRAIN; path="" = trần (ổ đĩa); còn lại = tương đối trần
+        d = broot if path is None else _safe_path(brain, path)
     except ValueError as e:
         return JSONResponse({"error": str(e)}, status_code=400)
     if not d.is_dir():
         return JSONResponse({"error": "Không phải thư mục"}, status_code=400)
-    root = _files_root(brain)
     items = []
     for p in sorted(d.iterdir(), key=lambda x: (x.is_file(), x.name.lower())):
         try:
@@ -2266,9 +2305,11 @@ async def files_list(brain: str = Query("brain"), path: str = Query("")):
             items.append({"name": p.name, "type": "dir" if p.is_dir() else "file",
                           "size": st.st_size if p.is_file() else 0, "mtime": st.st_mtime,
                           "ext": p.suffix.lower()})
-        except Exception:
+        except (PermissionError, OSError):
             continue
-    return {"root": root.name, "path": "" if d == root else str(d.relative_to(root)).replace("\\", "/"),
+    return {"root": root.name or str(root), "path": _files_rel(root, d),
+            "home": _files_rel(root, broot),                       # brain = 'nhà' (nút ⌂)
+            "parent": None if d == root else _files_rel(root, d.parent),   # None = đã ở trần → ẩn Lên
             "items": items}
 
 
@@ -2317,8 +2358,8 @@ async def files_delete(brain: str = Form("brain"), path: str = Form(...)):
         p = _safe_path(brain, path)
     except ValueError as e:
         return JSONResponse({"error": str(e)}, status_code=400)
-    if p == _files_root(brain):
-        return JSONResponse({"error": "Không thể xoá thư mục gốc"}, status_code=400)
+    if p == _files_root(brain) or p == Path(_brain_root(brain)).resolve():
+        return JSONResponse({"error": "Không thể xoá thư mục gốc / brain"}, status_code=400)
     try:
         if p.is_dir():
             shutil.rmtree(p)

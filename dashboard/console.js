@@ -329,6 +329,7 @@
         <div class="fm-crumb" id="fmCrumb"></div>
         <div class="fm-actions">
           <button class="s-btn-ghost" id="fmUp">↑ Lên</button>
+          <button class="s-btn-ghost" id="fmHome" title="Về thư mục brain">⌂ Brain</button>
           <button class="s-btn-ghost" id="fmNewDir">+ Thư mục</button>
           <button class="s-btn-ghost" id="fmNewFile">+ File</button>
           <label class="s-btn-ghost fm-uplabel">⤓ Tải lên<input type="file" id="fmUpload" hidden multiple></label>
@@ -347,10 +348,14 @@
     // URL tĩnh phục vụ file inline (ảnh hiện, pdf mở tab). dl=1 → ép tải về.
     const rawUrl = (rel, dl) => `/files/raw?brain=${encodeURIComponent(fbrain())}&path=${encodeURIComponent(rel)}${dl ? "&dl=1" : ""}`;
 
+    // upTarget: đường dẫn nút "Lên" sẽ tới (null = đã ở trần → ẩn nút). Do server tính (parent).
+    let upTarget = null;
     async function load(path) {
-      cur = path || ""; listEl.innerHTML = "Đang tải...";
+      // path === undefined → điểm vào mặc định (brain); "" = trần (ổ đĩa); chuỗi = tương đối trần
+      listEl.innerHTML = "Đang tải...";
+      const qp = (path === undefined || path === null) ? "" : `&path=${encodeURIComponent(path)}`;
       let resp, d;
-      try { resp = await fetch(`/files/list?brain=${encodeURIComponent(fbrain())}&path=${encodeURIComponent(cur)}`); d = await resp.json().catch(() => ({})); }
+      try { resp = await fetch(`/files/list?brain=${encodeURIComponent(fbrain())}${qp}`); d = await resp.json().catch(() => ({})); }
       catch (e) { listEl.innerHTML = `<div class="empty" style="padding:20px;color:#d98">Lỗi kết nối: ${esc(e.message)}</div>`; return; }
       if (!resp.ok || d.error) {
         const msg = d.error || (resp.status === 404
@@ -359,7 +364,9 @@
           : "Lỗi máy chủ (" + resp.status + ").");
         listEl.innerHTML = `<div class="empty" style="padding:20px;color:#d98">⚠ ${esc(msg)}</div>`; return;
       }
-      cur = d.path || ""; crumb(d.root);
+      cur = d.path || ""; upTarget = d.parent;
+      const upBtn = el.querySelector("#fmUp"); if (upBtn) upBtn.style.display = (upTarget === null || upTarget === undefined) ? "none" : "";
+      crumb(d.root);
       const items = d.items || [];
       if (!items.length) { listEl.innerHTML = `<div class="empty" style="padding:20px;text-align:center;color:#6b7894">Thư mục trống.</div>`; return; }
       listEl.innerHTML = ""; items.forEach(it => listEl.appendChild(row(it)));
@@ -450,7 +457,8 @@
       const fd = new FormData(); fd.append("brain", fbrain()); fd.append("path", rel);
       await fetch("/files/delete", { method: "POST", body: fd }); load(cur);
     }
-    el.querySelector("#fmUp").onclick = () => { const p = cur.split("/"); p.pop(); load(p.join("/")); };
+    el.querySelector("#fmUp").onclick = () => { if (upTarget !== null && upTarget !== undefined) load(upTarget); };
+    el.querySelector("#fmHome").onclick = () => load(undefined);   // undefined = về brain (điểm vào mặc định)
     el.querySelector("#fmRefresh").onclick = () => load(cur);
     el.querySelector("#fmNewDir").onclick = async () => {
       const n = prompt("Tên thư mục mới:"); if (!n) return;
@@ -469,7 +477,7 @@
       }
       load(cur);
     };
-    load("");
+    load();   // undefined → điểm vào mặc định = brain (dù trần duyệt có thể là cả ổ đĩa)
   }
 
   // ============================================
