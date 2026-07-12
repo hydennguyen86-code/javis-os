@@ -63,11 +63,30 @@ Mẹo: nếu chỉ cần Gmail/Lịch/Drive và bạn dùng engine Claude Code, 
 
 Cả 3 mặc định ở mức **Chỉ đọc** - Javis xem báo cáo, phân tích chi phí/hiệu quả nhưng không đụng được vào chiến dịch.
 
-- **Meta Ads (Facebook & Instagram)**: dễ nhất - bấm **Kết nối**, đăng nhập Facebook, chọn tài khoản quảng cáo và mức quyền (chọn "chỉ xem" nếu chỉ cần báo cáo). Không cần tạo app hay dán key; đây là MCP chính chủ của Meta (đang beta, mở dần theo từng tài khoản - bị từ chối nghĩa là tài khoản chưa được mở). Nếu sau này bạn bật Toàn quyền để Javis tạo/sửa chiến dịch: mọi chiến dịch tạo qua đây luôn ở trạng thái TẠM DỪNG, bạn phải tự bật trong Ads Manager - tiền chỉ chạy khi chính bạn bấm.
+- **Meta Ads (Facebook & Instagram)** có HAI kết nối trong kho, chọn 1:
+  - **Meta Ads (MCP chính chủ)**: MCP hosted của Meta. Hiện đang beta GIỚI HẠN: Meta chỉ cho vài ứng dụng được cấp phép sẵn (trợ lý ChatGPT/Claude/Perplexity) kết nối và đã tắt tự đăng ký, nên Javis - và cả công cụ khác - CHƯA nối tự phục vụ được. Không phải lỗi máy bạn; chờ Meta mở thêm theo tài khoản. Xem chi tiết bên dưới.
+  - **Meta Ads (tự tạo app - Graph API)**: cách CHẠY ĐƯỢC ngay hôm nay (giống Composio/byadsco dùng) - Javis gọi thẳng Marketing API của Meta bằng một Facebook App do BẠN tạo. CHỈ ĐỌC số liệu, không tiêu tiền. Hướng dẫn tạo app ở mục bên dưới.
 - **Google Ads**: MCP chính chủ của Google, thuần chỉ đọc (truy vấn số liệu GAQL: chiến dịch, chi phí, chuyển đổi, từ khoá). Cài đặt kỹ thuật nhất trong kho: cần developer token (lấy trong Google Ads API Center của tài khoản quản lý MCC) + project Google Cloud + đăng nhập gcloud một lần - cửa sổ kết nối có hướng dẫn từng bước. Chạy ads qua agency/MCC thì điền thêm ID tài khoản quản lý.
 - **TikTok Ads**: TikTok chưa mở MCP chính chủ (mới công bố tại TikTok World 5/2026), nên Javis dùng server cộng đồng chạy trên Marketing API chính thức - thuần chỉ đọc (tài khoản, chiến dịch, báo cáo). Tạo app Marketing API tại business-api.tiktok.com, lấy App ID + Secret + Access Token dán vào. Khi TikTok mở bản chính chủ sẽ thay trong kho.
 
 Google Ads và TikTok Ads chạy local qua công cụ `uv` - máy chạy Javis cần cài một lần: `winget install astral-sh.uv` (Windows) hoặc xem docs.astral.sh/uv.
+
+#### Kết nối Meta Ads qua Graph API (tự tạo Facebook App) - làm 1 lần, ~10 phút
+
+Đây là con đường tự phục vụ chạy được ngay, không phụ thuộc beta MCP của Meta. Bạn tạo một Facebook App của riêng mình, Javis dùng nó để đọc số liệu ad account của bạn. Vì app do chính bạn làm và giữ ở chế độ thử nghiệm, bạn tự cấp được quyền đọc mà KHÔNG cần Meta duyệt.
+
+1. Vào [developers.facebook.com/apps](https://developers.facebook.com/apps) > **Create App**. Chọn loại **Business** (hoặc "Other"), đặt tên bất kỳ (vd "Javis đọc ads").
+2. Trong app, vào **Add Product** > thêm **Facebook Login** (bản THƯỜNG, KHÔNG phải "Facebook Login for Business").
+3. Vào **Facebook Login > Settings**, ô **Valid OAuth Redirect URIs** dán CHÍNH XÁC dòng này rồi Save:
+   `http://localhost:7777/connect/oauth/callback`
+   Lưu ý phải là **localhost** chứ không phải 127.0.0.1 (Meta chỉ miễn HTTP cho localhost). Nếu bạn chạy Javis ở cổng khác 7777 thì đổi số cổng cho khớp.
+4. Giữ app ở chế độ **Development** (công tắc góc trên cùng để ở "In development"). Đảm bảo bạn là **Admin** của app và của tài khoản quảng cáo muốn đọc - khi đó quyền `ads_read` tự cấp được, không cần App Review.
+5. Vào **App settings > Basic**, copy **App ID** và **App Secret**.
+6. Về Javis, trang **Kết nối** > thẻ **Meta Ads (tự tạo app - Graph API)** > dán App ID + App Secret > **Kết nối**. Trình duyệt mở trang Facebook để bạn đồng ý; xong quay lại Javis bấm làm mới.
+
+Sau khi kết nối, hỏi Javis bằng lời: "tài khoản quảng cáo Facebook của tôi tuần này tiêu bao nhiêu, hiệu quả thế nào?". Javis có sẵn các công cụ đọc: danh sách tài khoản ads, hiệu suất (chi tiêu/hiển thị/click/CTR/CPC/reach/chuyển đổi) theo kỳ, và danh sách chiến dịch. Tất cả CHỈ ĐỌC - Javis không tạo/sửa chiến dịch, không tiêu tiền của bạn.
+
+Về thời hạn: token Facebook sống khoảng 60 ngày, Javis tự gia hạn khi còn dùng. Nếu quá lâu không dùng và token hết hạn, chỉ cần bấm Kết nối lại để đăng nhập Facebook một lần nữa.
 
 ### 6. Quản lý một tài khoản (chip)
 
@@ -116,7 +135,9 @@ Không đổi so với trước: hỏi trực tiếp trong chat ("hôm nay bán 
 - **Dán key báo "Key chưa đúng hoặc chưa đủ quyền"**: tạo lại API key trong dịch vụ, dán lại. Với Pancake kiểm tra key thuộc đúng cửa hàng.
 - **Zalo báo "Cần cài Node.js 20+"**: cài Node.js từ nodejs.org rồi thử lại.
 - **Google Ads / TikTok Ads báo không kết nối được**: kiểm tra máy đã cài `uv` chưa (`winget install astral-sh.uv`). Lần kết nối đầu phải tải gói nên có thể chậm - bấm Test lại sau 1-2 phút.
-- **Meta Ads đăng nhập bị từ chối**: MCP của Meta đang beta, mở dần theo từng tài khoản quảng cáo và yêu cầu tài khoản thuộc Business Manager - chưa được mở thì thử lại sau vài tuần.
+- **Meta Ads (MCP chính chủ) báo "chưa cho kết nối tự phục vụ / DCR"**: đúng thực tế, không phải lỗi máy bạn - MCP hosted của Meta đang beta, chỉ nhận vài ứng dụng được Meta cấp phép sẵn. Muốn đọc số liệu ngay thì dùng kết nối **Meta Ads (tự tạo app - Graph API)** ở trên.
+- **Meta Ads (Graph API) báo "Facebook từ chối / redirect_uri"**: kiểm tra 3 điểm - (1) ô Valid OAuth Redirect URIs trong app khớp CHÍNH XÁC `http://localhost:7777/connect/oauth/callback` (dùng localhost, đúng cổng); (2) app đang ở chế độ Development và bạn là Admin/Developer/Tester; (3) App ID + App Secret dán đúng.
+- **Meta Ads (Graph API) báo "không thấy tài khoản quảng cáo"**: token thiếu quyền `ads_read` hoặc tài khoản Facebook đăng nhập không phải admin của ad account nào - kiểm tra vai trò trong Business/Ads Manager.
 - **Mã QR hết hạn**: bấm thử lại để lấy QR mới (QR Zalo sống ~3 phút).
 - **Tool bị chặn kèm dòng "đang ở mức quyền hạn chế"**: đúng thiết kế - nâng quyền tài khoản trong menu chip nếu bạn thật sự muốn Javis làm việc đó.
 - **Sau khi cập nhật từ bản cũ**: các server MCP cũ tự chuyển thành tài khoản trong trang Kết nối (bản gốc backup ở `mcp_servers.v1.bak.json`), không phải khai lại.

@@ -458,6 +458,10 @@ async def discover_resolved(conns):
     for conn in conns:
         deny = set(conn.get("deny_tools") or [])
         spec = _conn_spec(conn)
+        # Connection OAuth-only (giữ token, tool đến từ plugin - vd Meta Ads Graph API): không có
+        # MCP server để discover → bỏ qua sạch, không thử kết nối (khỏi log lỗi mỗi vòng).
+        if not (spec.get("url") or spec.get("command")):
+            continue
         spec["headers"].update(await _oauth_headers(conn))
         try:
             tools = await pool.list_tools(spec)

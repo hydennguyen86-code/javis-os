@@ -43,6 +43,40 @@ def _conn(conn_id):
     return next((c for c in mcp_store.resolved(enabled_only=False) if c["id"] == conn_id), None)
 
 
+# ─────────────────────── Facebook / Meta (BYO app → Graph API) ───────────────────────
+# Meta KHÁC OAuth chuẩn: (1) đổi code→token bằng GET (không grant_type), client_secret BẮT BUỘC,
+# KHÔNG PKCE ở luồng classic; (2) KHÔNG cấp refresh_token - token dài hạn ~60 ngày lấy bằng
+# grant_type=fb_exchange_token; (3) miễn HTTP chỉ cho host 'localhost' (không phải 127.0.0.1).
+def _meta_localhost(uri):
+    """Ép host redirect về 'localhost' (Meta chỉ miễn HTTP cho localhost, chặn 127.0.0.1)."""
+    return (uri or "").replace("://127.0.0.1", "://localhost")
+
+
+def _meta_token_error(tk, redirect_uri=""):
+    e = (tk or {}).get("error") or {}
+    msg = e.get("message") or (json.dumps(tk, ensure_ascii=False)[:200] if tk else "không rõ")
+    rd = redirect_uri or "http://localhost:7777/connect/oauth/callback"
+    return (f"Facebook từ chối: {msg}. Kiểm tra: (1) 'Valid OAuth Redirect URIs' trong app khớp CHÍNH XÁC "
+            f"{rd} (dùng 'localhost' KHÔNG phải 127.0.0.1); (2) App đang ở Development Mode và bạn là "
+            f"Admin/Developer/Tester của app; (3) App ID + App Secret dán đúng.")
+
+
+async def _meta_longlive(token_endpoint, client_id, client_secret, token):
+    """Đổi token ngắn hạn (~1-2h) → dài hạn (~60 ngày) qua fb_exchange_token. Trả dict token hoặc None."""
+    if not (token_endpoint and client_id and client_secret and token):
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            r = await client.get(token_endpoint, params={
+                "grant_type": "fb_exchange_token", "client_id": client_id,
+                "client_secret": client_secret, "fb_exchange_token": token})
+        d = r.json()
+        return d if isinstance(d, dict) and d.get("access_token") else None
+    except Exception as e:
+        print(f"[oauth meta longlive] {e}", file=sys.stderr)
+        return None
+
+
 async def _discover(url):
     """Tìm authorization server metadata cho 1 MCP url. Trả dict metadata hoặc None."""
     async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
@@ -138,6 +172,7 @@ async def start_auth(conn_id, redirect_uri):
         scope_sep = auth.get("scope_sep") or " "
         extra_params = dict(auth.get("authorize_params") or {})
         add_resource = False
+        provider = (auth.get("provider") or "").strip().lower()
     else:
         if not conn.get("url"):
             return {"ok": False, "error": "Kết nối không có URL"}
@@ -182,7 +217,11 @@ async def start_auth(conn_id, redirect_uri):
         scope_param, scope_sep = "scope", " "
         extra_params = {}
         add_resource = True
+        provider = ""
 
+    is_meta = provider == "meta"
+    if is_meta:
+        redirect_uri = _meta_localhost(redirect_uri)   # Meta chỉ miễn HTTP cho 'localhost'
     verifier = _secrets.token_urlsafe(48)
     challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
     state = _secrets.token_urlsafe(24)
@@ -191,15 +230,17 @@ async def start_auth(conn_id, redirect_uri):
         _pending.pop(k, None)
     _pending[state] = {"conn_id": conn_id, "verifier": verifier, "token_endpoint": token_endpoint,
                        "client_id": client_id, "client_secret": client_secret,
-                       "redirect_uri": redirect_uri, "ts": now}
-    q = {"response_type": "code", "client_id": client_id, "redirect_uri": redirect_uri,
-         "state": state, "code_challenge": challenge, "code_challenge_method": "S256"}
+                       "redirect_uri": redirect_uri, "provider": provider, "ts": now}
+    q = {"response_type": "code", "client_id": client_id, "redirect_uri": redirect_uri, "state": state}
+    if not is_meta:                   # Meta classic flow KHÔNG dùng PKCE (client_secret đủ)
+        q["code_challenge"] = challenge
+        q["code_challenge_method"] = "S256"
     if scopes:
         q[scope_param] = scope_sep.join(scopes)
     if add_resource:
         q["resource"] = conn["url"]   # RFC 8707 - server bỏ qua nếu không dùng
     q.update(extra_params)            # vd Google: access_type=offline, prompt=consent (để có refresh_token)
-    ent.update(client_id=client_id, token_endpoint=token_endpoint)
+    ent.update(client_id=client_id, token_endpoint=token_endpoint, provider=provider)
     store[conn_id] = ent
     _save(store)
     return {"ok": True, "url": authorize_endpoint + "?" + urllib.parse.urlencode(q)}
@@ -221,24 +262,41 @@ async def handle_callback(state, code):
     p = _pending.pop(state or "", None)
     if not p:
         return {"ok": False, "error": "Phiên OAuth không hợp lệ hoặc đã hết hạn - thử lại từ đầu"}
+    is_meta = (p.get("provider") == "meta")
     try:
-        data = {"grant_type": "authorization_code", "code": code, "redirect_uri": p["redirect_uri"],
-                "client_id": p["client_id"], "code_verifier": p["verifier"]}
-        if p.get("client_secret"):   # client bảo mật (vd Google Web app) cần secret khi đổi token
-            data["client_secret"] = p["client_secret"]
-        async with httpx.AsyncClient(timeout=20) as client:
-            r = await client.post(p["token_endpoint"], data=data, headers={"Accept": "application/json"})
-        tk = r.json()
-        if "access_token" not in tk:
-            return {"ok": False, "error": f"Đổi code thất bại: {json.dumps(tk, ensure_ascii=False)[:200]}"}
+        if is_meta:
+            # Facebook: đổi code→token bằng GET, KHÔNG grant_type/PKCE, client_secret bắt buộc.
+            async with httpx.AsyncClient(timeout=20) as client:
+                r = await client.get(p["token_endpoint"], params={
+                    "client_id": p["client_id"], "client_secret": p.get("client_secret", ""),
+                    "redirect_uri": p["redirect_uri"], "code": code})
+            tk = r.json()
+            if not (isinstance(tk, dict) and tk.get("access_token")):
+                return {"ok": False, "error": _meta_token_error(tk, p["redirect_uri"])}
+            # Nâng ngay lên token dài hạn ~60 ngày (short-lived chỉ 1-2h).
+            ll = await _meta_longlive(p["token_endpoint"], p["client_id"], p.get("client_secret", ""),
+                                      tk["access_token"])
+            tk = ll or tk
+        else:
+            data = {"grant_type": "authorization_code", "code": code, "redirect_uri": p["redirect_uri"],
+                    "client_id": p["client_id"], "code_verifier": p["verifier"]}
+            if p.get("client_secret"):   # client bảo mật (vd Google Web app) cần secret khi đổi token
+                data["client_secret"] = p["client_secret"]
+            async with httpx.AsyncClient(timeout=20) as client:
+                r = await client.post(p["token_endpoint"], data=data, headers={"Accept": "application/json"})
+            tk = r.json()
+            if "access_token" not in tk:
+                return {"ok": False, "error": f"Đổi code thất bại: {json.dumps(tk, ensure_ascii=False)[:200]}"}
     except Exception as e:
         return {"ok": False, "error": f"Đổi code thất bại: {type(e).__name__}: {e}"}
     store = _load()
     ent = store.get(p["conn_id"]) or {}
     first_auth = not ent.get("access_token")   # lần đăng nhập ĐẦU (chưa từng có token) mới tự đặt tên
+    # Facebook không cấp refresh_token; long-lived ~60 ngày, gia hạn bằng fb_exchange_token (xem _refresh).
     ent.update(access_token=secrets_store.encrypt(tk["access_token"]),
                refresh_token=secrets_store.encrypt(tk.get("refresh_token", "")),
-               expires_at=time.time() + float(tk.get("expires_in") or 3600))
+               provider=p.get("provider", ""),
+               expires_at=time.time() + float(tk.get("expires_in") or (5184000 if is_meta else 3600)))
     store[p["conn_id"]] = ent
     _save(store)
     return {"ok": True, "conn_id": p["conn_id"], "first_auth": first_auth,
@@ -246,6 +304,20 @@ async def handle_callback(state, code):
 
 
 async def _refresh(conn_id, ent):
+    # Facebook: KHÔNG có refresh_token - gia hạn bằng cách re-exchange chính access_token hiện tại
+    # qua fb_exchange_token. Hết hạn (~60 ngày) hoặc bị thu hồi thì phải đăng nhập lại.
+    if ent.get("provider") == "meta":
+        cur = secrets_store.decrypt(ent.get("access_token", ""))
+        cs = mcp_store.connection_secrets(conn_id).get("client_secret")
+        ll = await _meta_longlive(ent.get("token_endpoint"), ent.get("client_id"), cs, cur)
+        if not ll:
+            return None
+        ent.update(access_token=secrets_store.encrypt(ll["access_token"]),
+                   expires_at=time.time() + float(ll.get("expires_in") or 5184000))
+        store = _load()
+        store[conn_id] = ent
+        _save(store)
+        return ent
     rt = secrets_store.decrypt(ent.get("refresh_token", ""))
     if not (rt and ent.get("token_endpoint") and ent.get("client_id")):
         return None

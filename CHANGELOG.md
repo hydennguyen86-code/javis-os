@@ -4,6 +4,10 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.40] - 2026-07-12
+### Thêm mới
+- **Kết nối Meta Ads bằng cách CHẠY ĐƯỢC ngay: tự tạo Facebook App, gọi thẳng Marketing API (như Composio)**: vì MCP chính chủ của Meta đang beta khóa allowlist (không tự nối được), Javis thêm connector mới "Meta Ads (tự tạo app - Graph API)" đi đường vòng đã được chứng minh - bạn tạo một Facebook App của riêng mình (~10 phút, có hướng dẫn từng bước trong app và trong tài liệu), dán App ID + App Secret, Javis đọc thẳng số liệu quảng cáo của bạn qua Graph API. Có sẵn công cụ: liệt kê tài khoản quảng cáo, hiệu suất (chi tiêu/hiển thị/click/CTR/CPC/reach/chuyển đổi) theo kỳ, danh sách chiến dịch, và một công cụ đọc Graph API tùy ý. TẤT CẢ CHỈ ĐỌC - không tạo/sửa chiến dịch, không tiêu tiền. Token Facebook (~60 ngày) được Javis tự gia hạn; hết hạn thì bấm Kết nối lại. Đây đúng là mô hình các nền tảng như Composio dùng cho Meta Ads. Kèm hướng dẫn tạo app đầy đủ trong [MCP & số liệu](docs/09-mcp-va-so-lieu.md) và test tự động (`test_meta_graph.py`).
+
 ## [0.9.39] - 2026-07-12
 ### Sửa lỗi
 - **Kết nối Meta Ads báo lỗi trung thực, hết ngõ cụt "cần client_id thủ công"**: sau khi điều tra sâu (probe thật endpoint của Meta + đối chiếu tài liệu chính chủ và báo cáo cộng đồng), xác định `mcp.facebook.com/ads` là MCP chính chủ của Meta đang ở beta GIỚI HẠN: máy chủ chỉ chấp nhận vài ứng dụng được Meta cấp phép sẵn (trợ lý của ChatGPT, Claude, Perplexity) và đã TẮT tự đăng ký ứng dụng (DCR) - nên Javis, và cả các công cụ khác, chưa nối tự phục vụ được. Đây là giới hạn phía Meta, không phải lỗi máy người dùng. Thông báo lỗi cũ ("Server không hỗ trợ tự đăng ký client (DCR) - cần client_id thủ công") gây hiểu nhầm rằng chỉ cần dán client_id là xong, giờ đổi thành giải thích rõ + hiện nguyên văn thông báo của Meta. Mô tả và hướng dẫn của connector Meta Ads cũng viết lại đúng thực tế (bỏ câu "đăng nhập 1 chạm, không cần tạo app").

@@ -287,6 +287,34 @@
       "risk": "Mức Toàn quyền cho phép Javis tạo/sửa chiến dịch quảng cáo tiêu TIỀN THẬT trên tài khoản của bạn (chiến dịch tạo qua đây luôn ở trạng thái TẠM DỪNG, bạn phải tự bật trong Ads Manager). Chỉ cần xem số liệu thì giữ mức Chỉ đọc."
     },
     {
+      "id": "meta-ads-graph",
+      "name": "Meta Ads (tự tạo app - Graph API)",
+      "icon": "/static/logos/meta-ads.webp",
+      "category": "Quảng cáo",
+      "description": "Số liệu quảng cáo Facebook/Instagram gọi THẲNG Marketing API của Meta (KHÔNG qua MCP beta bị khoá). Bạn tạo 1 Facebook App, dán App ID + App Secret, Javis đọc tài khoản ads, chiến dịch và hiệu suất của bạn. CHỈ ĐỌC - không tạo/sửa chiến dịch, không tiêu tiền. Đây là cách các nền tảng như Composio dùng.",
+      "status": "beta",
+      "transport": "http",
+      "url": "",
+      "auth": {
+        "type": "oauth",
+        "provider": "meta",
+        "authorize_url": "https://www.facebook.com/v25.0/dialog/oauth",
+        "token_url": "https://graph.facebook.com/v25.0/oauth/access_token",
+        "scopes": ["ads_read", "business_management"],
+        "fields": [
+          { "key": "client_id", "label": "App ID (Facebook)", "placeholder": "vd 1122334455667788" },
+          { "key": "client_secret", "label": "App Secret (Facebook)", "placeholder": "vd a1b2c3d4e5f6..." }
+        ],
+        "guide": "Làm 1 lần (~10 phút): (1) Vào developers.facebook.com/apps > Create App > chọn loại 'Business' (hoặc 'Other'), đặt tên bất kỳ. (2) Trong app, thêm sản phẩm 'Facebook Login' THƯỜNG (không phải 'for Business'). (3) Facebook Login > Settings > 'Valid OAuth Redirect URIs' dán CHÍNH XÁC: http://localhost:7777/connect/oauth/callback (dùng 'localhost' KHÔNG phải 127.0.0.1; nếu bạn chạy Javis cổng khác thì đổi 7777). (4) GIỮ app ở chế độ Development (góc trên), và đảm bảo bạn là Admin của app + ad account - khi đó tự cấp được quyền ads_read mà KHÔNG cần App Review. (5) App Settings > Basic: copy App ID + App Secret, dán vào ô dưới rồi bấm Kết nối. Token sống ~60 ngày, Javis tự gia hạn khi còn dùng; hết hạn thì bấm Kết nối lại.",
+        "guide_url": "https://developers.facebook.com/docs/marketing-api/get-started/authorization"
+      },
+      "tool_meta": {
+        "read": ["meta_ads_*"]
+      },
+      "default_perm": "readonly",
+      "risk": "Connector này CHỈ ĐỌC số liệu quảng cáo - không tạo/sửa chiến dịch, không tiêu tiền. Token chỉ thao tác được trên tài khoản quảng cáo mà chính bạn là admin."
+    },
+    {
       "id": "google-ads",
       "name": "Google Ads",
       "icon": "/static/logos/google-ads.webp",
