@@ -149,6 +149,7 @@ async def start_auth(conn_id, redirect_uri):
         token_endpoint = md["token_endpoint"]
         client_id = ent.get("client_id", "")
         client_secret = ""
+        dcr_detail = ""      # error_description máy chủ trả về khi DCR bị từ chối (để báo minh bạch)
         if not client_id and md.get("registration_endpoint"):
             try:
                 async with httpx.AsyncClient(timeout=20) as client:
@@ -159,10 +160,24 @@ async def start_auth(conn_id, redirect_uri):
                     })
                     if r.status_code in (200, 201):
                         client_id = r.json().get("client_id", "")
+                    else:
+                        try:
+                            dcr_detail = (r.json() or {}).get("error_description", "") or ""
+                        except Exception:
+                            dcr_detail = ""
             except Exception as e:
                 print(f"[oauth dcr] {e}", file=sys.stderr)
         if not client_id:
-            return {"ok": False, "error": "Server không hỗ trợ tự đăng ký client (DCR) - cần client_id thủ công"}
+            # Máy chủ MCP chỉ nhận ứng dụng được cấp phép sẵn + tắt tự đăng ký (DCR). Với Meta Ads
+            # đây là beta giới hạn (allowlist client như ChatGPT/Claude/Perplexity) - không phải lỗi
+            # máy user, và dán client_id thủ công cũng không qua được resource server. Báo trung thực.
+            msg = ("Máy chủ này chưa cho phép kết nối tự phục vụ: nó chỉ chấp nhận các ứng dụng "
+                   "được nhà cung cấp cấp phép sẵn và đã TẮT tự đăng ký ứng dụng (DCR). Đây là giới "
+                   "hạn phía nhà cung cấp (Meta Ads đang mở beta dần theo tài khoản), không phải lỗi "
+                   "máy bạn - thử lại sau khi tài khoản được mở.")
+            if dcr_detail:
+                msg += f" (máy chủ báo: {dcr_detail})"
+            return {"ok": False, "error": msg}
         scopes = md.get("scopes_supported") or []
         scope_param, scope_sep = "scope", " "
         extra_params = {}

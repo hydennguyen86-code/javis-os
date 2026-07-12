@@ -263,14 +263,14 @@
       "name": "Meta Ads (Facebook & Instagram)",
       "icon": "/static/logos/meta-ads.webp",
       "category": "Quảng cáo",
-      "description": "Quảng cáo Facebook/Instagram qua MCP chính chủ của Meta: tài khoản ads, hiệu suất chiến dịch, benchmark ngành, catalog sản phẩm. Đăng nhập Facebook 1 chạm - không cần tạo app hay dán key.",
+      "description": "Số liệu quảng cáo Facebook/Instagram qua MCP chính chủ của Meta (tài khoản ads, hiệu suất chiến dịch, benchmark ngành, catalog sản phẩm). LƯU Ý: đang là beta GIỚI HẠN của Meta - chỉ vài ứng dụng được Meta cấp phép sẵn kết nối được, kết nối tự phục vụ CHƯA khả dụng.",
       "status": "beta",
       "transport": "http",
       "url": "https://mcp.facebook.com/ads",
       "auth": {
         "type": "oauth",
         "fields": [],
-        "guide": "Bấm Kết nối rồi đăng nhập Facebook và cấp quyền cho tài khoản quảng cáo (tài khoản phải thuộc Business Manager). Khi Meta hỏi mức quyền, chọn mức CHỈ XEM nếu chỉ cần báo cáo. Meta đang mở beta dần theo từng tài khoản - nếu đăng nhập bị từ chối nghĩa là tài khoản của bạn chưa được mở, thử lại sau.",
+        "guide": "Kết nối Meta Ads MCP hiện CHƯA tự phục vụ được - đây là giới hạn phía Meta, không phải lỗi máy bạn. Máy chủ mcp.facebook.com/ads của Meta chỉ chấp nhận vài ứng dụng được Meta cấp phép sẵn (trợ lý của ChatGPT, Claude, Perplexity...) và đã TẮT tự đăng ký ứng dụng (DCR), nên Javis - và cả các công cụ khác - chưa nối trực tiếp được. Meta đang mở beta dần theo từng tài khoản (ưu tiên US / chi tiêu cao). Bạn có thể bấm Kết nối để thử xem tài khoản mình đã được mở chưa; nếu báo 'chưa mở đăng ký' thì chờ Meta mở thêm. Cần số liệu quảng cáo Facebook ngay thì nhắn Javis để dựng nguồn khác (gọi thẳng Marketing API bằng app bạn tự tạo).",
         "guide_url": "https://www.facebook.com/business/help/1456422242197840"
       },
       "validate": {

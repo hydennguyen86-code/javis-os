@@ -4,6 +4,10 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.39] - 2026-07-12
+### Sửa lỗi
+- **Kết nối Meta Ads báo lỗi trung thực, hết ngõ cụt "cần client_id thủ công"**: sau khi điều tra sâu (probe thật endpoint của Meta + đối chiếu tài liệu chính chủ và báo cáo cộng đồng), xác định `mcp.facebook.com/ads` là MCP chính chủ của Meta đang ở beta GIỚI HẠN: máy chủ chỉ chấp nhận vài ứng dụng được Meta cấp phép sẵn (trợ lý của ChatGPT, Claude, Perplexity) và đã TẮT tự đăng ký ứng dụng (DCR) - nên Javis, và cả các công cụ khác, chưa nối tự phục vụ được. Đây là giới hạn phía Meta, không phải lỗi máy người dùng. Thông báo lỗi cũ ("Server không hỗ trợ tự đăng ký client (DCR) - cần client_id thủ công") gây hiểu nhầm rằng chỉ cần dán client_id là xong, giờ đổi thành giải thích rõ + hiện nguyên văn thông báo của Meta. Mô tả và hướng dẫn của connector Meta Ads cũng viết lại đúng thực tế (bỏ câu "đăng nhập 1 chạm, không cần tạo app").
+
 ## [0.9.38] - 2026-07-12
 ### Thêm mới
 - **Trang Tệp tin duyệt được ra ngoài brain (tới cả ổ đĩa)**: trước đây File Manager khoá cứng trong thư mục brain, bấm "Lên" tới gốc brain là hết - không đọc/sửa được dữ liệu nằm ngoài vault. Nay khi chạy trên máy cá nhân (localhost), trần duyệt mở tới ổ đĩa chứa brain: mặc định mở vẫn vào đúng thư mục brain như cũ, nhưng bấm "Lên" đi ra được tới tận gốc ổ đĩa để đọc/sửa/tải mọi file. Thêm nút "⌂ Brain" để nhảy nhanh về thư mục brain, và nút "Lên" tự ẩn khi đã ở gốc. An toàn giữ nguyên khi chạy public (VPS/có đăng nhập): vẫn khoá trong brain để không hở cả ổ đĩa ra web. Tinh chỉnh bằng biến `JAVIS_FILES_ROOT` (xem [Cấu hình env](docs/16-cau-hinh-env.md)): ép khoá brain, mở cả ổ đĩa, hay chỉ một thư mục cụ thể. Không xoá được thư mục brain hay gốc ổ đĩa.
