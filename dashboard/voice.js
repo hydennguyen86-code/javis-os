@@ -26,6 +26,8 @@ class JavisVoice {
     this.ttsQueue = [];
     this.speechQueue = [];   // hàng đợi đọc nối tiếp (các bước trung gian + kết quả)
     this.isPlaying = false;
+    this._resumeAfterTTS = false;  // mic đang mở khi TTS bắt đầu → đọc xong tự mở nghe lại
+    this._resumeTimer = null;
 
     // Audio analysis - cho hiệu ứng phát sáng theo âm thanh
     this.audioCtx = null;
@@ -110,6 +112,10 @@ class JavisVoice {
     };
 
     this.recognition.onresult = (event) => {
+      // Đang phát TTS thì BỎ mọi kết quả nhận dạng: đó là mic nghe lại chính giọng Javis
+      // (SpeechRecognition thu riêng, KHÔNG được khử vọng như luồng đo mức âm), không phải
+      // user nói. Không chặn thì giọng Javis bị chép vào khung chat rồi tự gửi đi.
+      if (this.isSpeaking()) return;
       let interim = "", final = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const transcript = event.results[i][0].transcript;
@@ -176,6 +182,9 @@ class JavisVoice {
       return;
     }
     if (this.isListening) return;
+    // Mở nghe chủ động → huỷ mọi lịch tự-mở-lại còn treo
+    this._resumeAfterTTS = false;
+    clearTimeout(this._resumeTimer);
     // Stop TTS đang đọc nếu user bấm nói
     this.synth.cancel();
     this.stopSpeaking();
@@ -189,6 +198,9 @@ class JavisVoice {
 
   stopListening() {
     clearTimeout(this._silenceTimer);
+    // User chủ động tắt nghe → không tự mở lại sau khi TTS đọc xong
+    this._resumeAfterTTS = false;
+    clearTimeout(this._resumeTimer);
     if (this.recognition && this.isListening) {
       this.userStopped = true;     // đánh dấu user chủ động dừng → không auto-restart
       this.recognition.stop();
@@ -218,12 +230,42 @@ class JavisVoice {
 
   // Lấy đoạn kế trong hàng đợi để đọc; hết hàng đợi thì dừng.
   _pumpQueue() {
-    if (!this.speechQueue || this.speechQueue.length === 0) { this.isPlaying = false; this._stopBargeMonitor(); return; }
+    if (!this.speechQueue || this.speechQueue.length === 0) {
+      this.isPlaying = false;
+      this._stopBargeMonitor();
+      this._resumeRecognitionIfNeeded();             // đọc xong hết → mở nghe lại nếu trước đó mic đang mở
+      return;
+    }
     this.isPlaying = true;
+    this._muteRecognition();                         // mic đang mở → tạm ngừng NHẬN DẠNG, khỏi thu giọng TTS vào chat
     this._startBargeMonitor();                       // cho phép ngắt lời bằng giọng khi đang đọc
     const text = this.speechQueue.shift();
     if (this.ttsBackend) this._speakBackend(text);   // Edge TTS (giọng Việt chuẩn)
     else this._speakBrowser(text);                   // fallback Web Speech
+  }
+
+  // Javis bắt đầu đọc mà mic đang nghe → tạm NGỪNG nhận dạng (abort, bỏ kết quả dở),
+  // vì SpeechRecognition sẽ chép chính giọng TTS thành tin nhắn của user. Ngắt lời bằng
+  // giọng vẫn hoạt động - barge-in đo mức âm qua luồng mic đã khử vọng, không cần nhận dạng.
+  _muteRecognition() {
+    if (!this.recognition || !this.isListening) return;
+    this._resumeAfterTTS = true;
+    this.userStopped = true;             // chặn auto-restart trong onend
+    clearTimeout(this._silenceTimer);
+    this.accumulatedTranscript = "";     // bỏ những gì lỡ nghe - không gửi
+    this.onInterim("");                  // xoá chữ đang hiện dở trên màn hình
+    try { this.recognition.abort(); } catch (e) {}
+  }
+
+  // Đọc xong (hoặc bị dừng) → mở nghe lại nếu mic từng bị tạm ngừng vì TTS.
+  // Chờ một nhịp cho đuôi âm tắt hẳn; phiên nhận dạng MỚI nên không dính giọng TTS cũ.
+  _resumeRecognitionIfNeeded() {
+    if (!this._resumeAfterTTS) return;
+    this._resumeAfterTTS = false;
+    clearTimeout(this._resumeTimer);
+    this._resumeTimer = setTimeout(() => {
+      if (!this.isPlaying && !this.isListening) this.startListening();
+    }, 400);
   }
 
   // ---- Ngắt lời (barge-in): đang đọc mà nghe user nói đủ to/đủ lâu → dừng đọc + mở nghe ngay ----
@@ -398,6 +440,7 @@ class JavisVoice {
     this.ttsQueue = [];
     this.speechQueue = [];
     this.isPlaying = false;
+    this._resumeRecognitionIfNeeded();   // mic từng bị tạm ngừng vì TTS → mở nghe lại
   }
 
   setVoice(voiceName) {
