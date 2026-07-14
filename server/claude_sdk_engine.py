@@ -136,6 +136,7 @@ class ClaudeSDK:
         self.disallowed_tools = None
         self.max_wall_s = None
         self.javis_mode = None    # _apply_mcp đặt (suggest|auto|full) - enforce min_mode plugin in-process
+        self._tmp_files = []      # file tạm (system prompt) dọn sau mỗi query
 
     def is_available(self) -> bool:
         if not _SDK_OK:
@@ -214,13 +215,68 @@ class ClaudeSDK:
                 servers["javis"] = hub
         return servers, self.mcp_strict
 
+    def _write_sysprompt_file(self, text):
+        """Ghi system prompt ra file tạm để truyền qua --append-system-prompt-file.
+        Trả path; nhớ vào _tmp_files để query() dọn sau."""
+        import tempfile
+        try:
+            d = STATE_DIR / "tmp"
+            d.mkdir(parents=True, exist_ok=True)
+            fd, path = tempfile.mkstemp(suffix=".txt", prefix="javis-sysprompt-", dir=str(d))
+        except Exception:
+            fd, path = tempfile.mkstemp(suffix=".txt", prefix="javis-sysprompt-")
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(text)
+        self._tmp_files.append(path)
+        return path
+
+    def _cleanup_tmp(self):
+        for p in self._tmp_files:
+            try:
+                os.unlink(p)
+            except Exception:
+                pass
+        self._tmp_files = []
+
+    @staticmethod
+    def _sweep_stale_tmp(max_age_s=3600):
+        """Dọn file system prompt tạm còn sót (crash/kill giữa lượt không kịp finally).
+        Best-effort: bỏ qua mọi lỗi, chỉ xoá file cũ hơn max_age_s."""
+        try:
+            d = STATE_DIR / "tmp"
+            if not d.exists():
+                return
+            now = time.time()
+            for f in d.glob("javis-sysprompt-*.txt"):
+                try:
+                    if now - f.stat().st_mtime > max_age_s:
+                        f.unlink()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
     def _options(self):
         from claude_agent_sdk import ClaudeAgentOptions
-        kw = {
-            "cwd": self.cwd,
-            "system_prompt": ({"type": "preset", "preset": "claude_code", "append": self.system_prompt}
-                              if self.system_prompt else {"type": "preset", "preset": "claude_code"}),
-        }
+        fields = getattr(ClaudeAgentOptions, "__dataclass_fields__", {})
+        kw = {"cwd": self.cwd}
+        # System prompt đẩy qua FILE (--append-system-prompt-file) thay vì nhét vào THAM SỐ dòng lệnh.
+        # Trên Windows tổng dòng lệnh > 32767 ký tự thì CreateProcess CHẾT: Python báo FileNotFoundError,
+        # SDK dán nhãn nhầm "Claude Code not found at ...\\_bundled\\claude.exe". System prompt của Javis
+        # (CLAUDE.md + bộ nhớ brain nhiều note) dễ vượt ngưỡng -> đây là gốc lỗi đó. Đọc qua file thì
+        # không còn giới hạn độ dài. SDK cũ không có extra_args thì fallback nhét inline (chỉ hợp prompt ngắn).
+        if self.system_prompt and "extra_args" in fields:
+            _p = self._write_sysprompt_file(self.system_prompt)
+            kw["system_prompt"] = {"type": "preset", "preset": "claude_code"}
+            kw["extra_args"] = {"append-system-prompt-file": _p}
+        elif self.system_prompt:
+            kw["system_prompt"] = {"type": "preset", "preset": "claude_code", "append": self.system_prompt}
+        else:
+            kw["system_prompt"] = {"type": "preset", "preset": "claude_code"}
+        # SDK mặc định chặn 1 message stdio ở 1MB. Tool trả ảnh (đọc frame video,
+        # ảnh chụp màn hình) vượt ngưỡng này là vỡ buffer -> SDKJSONDecodeError.
+        if "max_buffer_size" in getattr(ClaudeAgentOptions, "__dataclass_fields__", {}):
+            kw["max_buffer_size"] = 32 * 1024 * 1024
         if self.model:
             kw["model"] = self.model
         if self.session_id:
@@ -255,6 +311,7 @@ class ClaudeSDK:
         # (render video, tách nền, build... có thể cả tiếng) - không phải Claude treo.
         # Trước đây dùng chung IDLE 180s nên tác vụ dài bị chém oan giữa chừng.
         TOOL_IDLE = float(os.getenv("JAVIS_CLAUDE_TOOL_TIMEOUT", "3600"))
+        self._sweep_stale_tmp()   # dọn file prompt tạm sót từ lượt trước bị crash/kill
         loop = asyncio.get_running_loop()
         client = ClaudeSDKClient(options=self._options())
         started = time.time()
@@ -311,3 +368,4 @@ class ClaudeSDK:
                 await client.disconnect()
             except Exception:
                 pass
+            self._cleanup_tmp()   # xoá file system prompt tạm của lượt này

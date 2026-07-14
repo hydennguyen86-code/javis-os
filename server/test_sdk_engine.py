@@ -225,6 +225,33 @@ finally:
     os.environ.pop("JAVIS_CLAUDE_IDLE_TIMEOUT", None)
     os.environ.pop("JAVIS_CLAUDE_TOOL_TIMEOUT", None)
 
+# ---- 6. System prompt DÀI đẩy qua FILE, không nhét vào argv (lỗi CLINotFound trên Windows) ----
+# Gốc lỗi: SDK để --append-system-prompt <prompt> trên dòng lệnh; > 32767 ký tự thì Windows
+# CreateProcess chết -> FileNotFoundError bị dán nhãn "Claude Code not found at ...\\_bundled\\claude.exe".
+from pathlib import Path as _Path6  # noqa: E402
+
+_big = "Bạn là Javis.\n" + ("- một dòng hướng dẫn dài để độn kích thước prompt. " * 900)
+_e6 = ClaudeSDK(system_prompt=_big, tag="t6")
+_opts6 = _e6._options()
+_ea6 = getattr(_opts6, "extra_args", None) or {}
+_pf6 = _ea6.get("append-system-prompt-file")
+check("options: prompt dài → dùng --append-system-prompt-file (đọc từ file)", bool(_pf6))
+check("options: system_prompt preset KHÔNG kèm append inline (không lên argv)",
+      isinstance(_opts6.system_prompt, dict) and "append" not in _opts6.system_prompt)
+check("options: file tạm chứa ĐÚNG nội dung system prompt",
+      bool(_pf6) and _Path6(_pf6).read_text(encoding="utf-8") == _big)
+check("options: prompt dài vượt trần dòng lệnh Windows (chứng minh vì sao phải qua file)",
+      len(_big) > 32767)
+_e6._cleanup_tmp()
+check("options: dọn file tạm sau khi xong", bool(_pf6) and not _Path6(_pf6).exists())
+
+# SDK không có extra_args (bản cũ) → fallback nhét inline, vẫn chạy (chỉ hợp prompt ngắn)
+import claude_agent_sdk as _casdk6  # noqa: E402
+if "extra_args" not in getattr(_casdk6.ClaudeAgentOptions, "__dataclass_fields__", {}):
+    _e6b = ClaudeSDK(system_prompt="ngắn", tag="t6b")
+    _o6b = _e6b._options()
+    check("options(SDK cũ): fallback append inline", _o6b.system_prompt.get("append") == "ngắn")
+
 if _fails:
     print(f"\nFAIL - {len(_fails)} test: {_fails}")
     sys.exit(1)
