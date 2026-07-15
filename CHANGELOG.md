@@ -4,6 +4,19 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.55] - 2026-07-16
+### Thêm mới
+- **Giao diện brain mới - cột trái thành Vault explorer (cây thư mục kiểu Obsidian + tìm note)** thay cho panel số liệu kinh doanh cũ. Cây lồng nhiều tầng mở lazy (bấm mới nạp), neo trong gốc brain. Ô tìm 2 chế độ: Tên (quét toàn vault ở trình duyệt qua `/files/list`, bỏ dấu tiếng Việt) và Nội dung (endpoint mới `GET /files/search` quét ruột file text, chạy threadpool, cap kết quả). Rê chuột vào node hiện 3 nút: ＋ thêm file (bấm ở thư mục tạo bên trong, ở file tạo cùng thư mục; mặc định `.md`; tạo xong tự bung cây tới đúng chỗ), ✎ đổi tên, 🗑 xoá.
+- **Trình sửa note đè lên khoang não 3D**: bấm note mở editor neo trong khung giữa (cây trái + chat phải vẫn sống). File `.md` mặc định mở dạng WYSIWYG - sửa trực tiếp trên bản render markdown, có thanh công cụ (đậm, nghiêng, H1-H3, danh sách, trích dẫn, code, link, kẻ ngang); lưu chuyển HTML→markdown (turndown) GIỮ nguyên `[[wikilink]]`. Còn chế độ Nguồn cho markdown thô lossless. Ảnh xem inline, docx/pdf chỉ hiện thẻ tải về. Tái dùng `window.mdToHtml`, cụm endpoint `/files/*` sẵn có.
+- **Công tắc đồ thị 2D / 3D trong Cài đặt (Tổng quan)**, mặc định 2D cho nhẹ máy (render ở trình duyệt, không phải VPS). Bản 2D dùng thư viện `force-graph` (engine d3-force, cùng họ với 3D và Obsidian): node phát sáng tô MÀU THEO DANH MỤC (thư mục), hover rọi đèn (sáng vùng liên kết, mờ phần còn lại, chỉ hiện tên note đang trỏ), co tròn về tâm, kéo node tự trôi về, zoom giới hạn vừa khung, và hiện CẢ note cô đơn (tham số `/graph?orphans=1`). three.js chỉ nạp lazy khi chọn 3D.
+
+### Cải thiện
+- **Đồ thị 3D cũng đa màu theo danh mục + co tròn** như 2D (dùng chung cách gán màu).
+- **Nhãn danh mục quanh não tô chữ "% Vault" đúng màu cụm note** của thư mục đó; bấm nhãn rọi sáng đúng cụm.
+- **Dời HỆ THỐNG + MCP ĐANG DÙNG xuống thanh chọn model** (ngang hàng, giải phóng cột chat). **Dời MỨC DÙNG token thành hộp nổi gọn ở góc dưới-phải khung giữa**, có nút thu nhỏ / mở rộng (nhớ trạng thái).
+- **Click node trong đồ thị mở đúng editor cây** (WYSIWYG + công cụ) thay cho popup đọc/sửa phẳng cũ.
+- Số liệu kinh doanh gỡ khỏi giao diện theo yêu cầu (giữ 3 id ẩn để không lỗi app.js).
+
 ## [0.9.54] - 2026-07-15
 ### Cải thiện
 - **Bấm link/ảnh/thư mục Javis chèn trong chat giờ mở thẳng trang Tệp tin ĐÚNG vị trí (thay vì tải file thô)**: trước đây bấm ảnh hoặc link file mà Javis đính trong chat sẽ mở file thô trong tab mới - thấy nội dung nhưng không biết nó nằm ở đâu trong brain. Nay mọi link trỏ vào file/thư mục trong vault (đường dẫn tương đối gốc brain, vd `attachments/anh.jpg`, `videos/`) khi bấm sẽ nhảy sang trang **Tệp tin** mở đúng thư mục chứa, cuộn tới và tô sáng file mục tiêu để tìm thấy ngay. Link ra ngoài (http, mailto) vẫn mở tab trình duyệt mới như cũ. Ảnh vẫn hiện inline trong chat như trước, chỉ đổi hành vi khi bấm. Giữ deep-link `#open=<đường-dẫn>` trên thẻ link nên Ctrl/Cmd+bấm hoặc chuột giữa vẫn mở TAB TRÌNH DUYỆT MỚI và tab đó cũng tự vào đúng vị trí trong Tệp tin (chat ở tab cũ không mất). Khớp ngữ nghĩa đường dẫn với server: path trong chat tính theo gốc brain, còn File Manager duyệt theo trần (trên localhost là cả ổ đĩa) nên tự ghép tiền tố brain (`home` từ `/files/list`) để ra đúng thư mục. Nếu chat đang mở dạng phóng to (overlay) thì tự thu lại để thấy trang Tệp tin. Đã test trong trình duyệt: render ra đúng thẻ link mở-vị-trí cho ảnh/file/thư mục vault (link ngoài không đổi), bấm điều hướng sang trang Tệp tin, và deep-link `#open=` khi nạp tab mới cũng vào thẳng trang Tệp tin.

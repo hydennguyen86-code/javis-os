@@ -120,6 +120,20 @@ body {
 }
 #starfield { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; display: block; }
 #graph3dContainer { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; cursor: grab; }
+#graph2d { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; cursor: grab; display: none; }
+.concept-label.cl-active .cl-name { color: var(--accent); text-shadow: 0 0 10px rgba(255,122,60,.5); }
+/* MỨC DÙNG token: hộp nổi ở góc dưới-phải khung giữa (dời khỏi cột chat cho rộng chỗ) */
+.usage-float { position: absolute; right: 12px; bottom: 12px; z-index: 5; width: 200px; max-width: 34vw;
+  background: rgba(16,14,28,0.6); border: 1px solid var(--border); border-radius: 10px; padding: 6px 9px;
+  backdrop-filter: blur(8px); box-shadow: 0 6px 20px rgba(0,0,0,0.4); opacity: .92; }
+.usage-float:hover { opacity: 1; }
+.usage-float .uf-label { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  font-family: var(--font); font-size: 10px; letter-spacing: .5px; color: var(--text3); margin-bottom: 4px; }
+.uf-toggle { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 12px; padding: 0 2px; line-height: 1; flex: none; }
+.uf-toggle:hover { color: var(--accent); }
+.usage-float.collapsed { width: auto; }
+.usage-float.collapsed #usagePanel { display: none; }
+.usage-float.collapsed .uf-label { margin-bottom: 0; }
 #graph3dContainer canvas { display: block; background: transparent !important; }
 /* Vignette tối góc - chiều sâu kiểu HUD */
 .hud-center::after {
@@ -864,7 +878,16 @@ body.chat-zoomed #jv-sess-btn { display: none; }
 }
 
 /* ===== Thanh chọn model + effort ngay trên khung chat ===== */
-.model-bar { position: relative; display: flex; align-items: center; padding: 4px 12px 0; }
+.model-bar { position: relative; display: flex; align-items: center; gap: 8px 16px; padding: 5px 16px 3px; }
+/* Dải HỆ THỐNG + MCP dời xuống đây, nằm NGANG bên phải ô chọn model. Một hàng, tràn thì cuộn ngang. */
+.sysbar { display: flex; align-items: center; gap: 6px 12px; flex: 1 1 auto; min-width: 0;
+  flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; }
+.sysbar::-webkit-scrollbar { height: 3px; }
+.sysbar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.sysbar-label { font-family: var(--font); font-size: 11px; letter-spacing: 1px; color: var(--text3); flex: none; white-space: nowrap; }
+.sysbar-sep { width: 1px; height: 13px; background: var(--border); flex: none; }
+.sysbar .sys-status, .sysbar .mcp-list { flex-direction: row; flex-wrap: nowrap; gap: 4px 12px; }
+.sysbar .mcp-item { font-size: 12.5px; white-space: nowrap; }
 .mb-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2);
   background: var(--bg3); border: 1px solid var(--border); border-radius: 999px; padding: 4px 11px;
   cursor: pointer; font-family: var(--font); transition: border-color .15s, color .15s; }
@@ -989,3 +1012,109 @@ body.chat-zoomed #jv-sess-btn { display: none; }
 .jv-ap-code { margin: 0; border: 0; border-radius: 0; min-height: 100%; box-sizing: border-box; }
 .jv-ap-note { color: var(--text3); font-size: 13px; padding: 10px 12px; }
 @media (max-width: 900px) { .jv-artpanel { width: 100vw; } }
+
+/* ============================================================
+   VAULT EXPLORER (cột trái) - cây thư mục kiểu Obsidian + tìm note
+   ============================================================ */
+.hud-left { padding: 12px 0 0; overflow: hidden; }
+.vault-head { display: flex; align-items: center; justify-content: space-between; padding: 0 12px 8px; }
+.vault-title { font-family: var(--font); font-size: 12px; letter-spacing: 2px; color: var(--text3); }
+.vault-tools { display: flex; gap: 6px; }
+.vault-search { display: flex; align-items: center; gap: 6px; margin: 0 12px 6px; background: var(--bg3);
+  border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; }
+.vault-search:focus-within { border-color: var(--accent); }
+.vault-search .vs-ico { font-size: 12px; opacity: .55; }
+.vault-search input { flex: 1; min-width: 0; background: none; border: none; outline: none; color: var(--text);
+  font-size: 13px; font-family: inherit; }
+.vault-search input::placeholder { color: var(--text3); }
+.vs-clear { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 12px; padding: 0 2px; }
+.vs-clear:hover { color: var(--accent); }
+.vault-modes { display: flex; gap: 6px; margin: 0 12px 8px; }
+.vs-chip { font-size: 11px; padding: 3px 11px; border-radius: 20px; background: var(--bg3);
+  border: 1px solid var(--border); color: var(--text3); cursor: pointer; }
+.vs-chip.active { background: rgba(255,122,60,.16); border-color: rgba(255,122,60,.5); color: var(--accent); }
+.vault-tree, .vault-results { flex: 1; overflow-y: auto; padding: 2px 8px 14px; }
+.vault-tree::-webkit-scrollbar, .vault-results::-webkit-scrollbar { width: 4px; }
+.vault-tree::-webkit-scrollbar-thumb, .vault-results::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.vt-info { color: var(--text3); font-size: 13px; padding: 8px 6px; }
+.vt-node { display: flex; align-items: center; gap: 5px; padding: 4px 6px; border-radius: 6px; cursor: pointer;
+  font-size: 13.5px; color: var(--text2); white-space: nowrap; overflow: hidden; }
+.vt-node:hover { background: rgba(120,180,255,.07); color: var(--text); }
+.vt-node.active { background: rgba(120,180,255,.12); box-shadow: inset 3px 0 0 var(--accent); color: var(--text); }
+.vt-chev { flex: none; width: 13px; text-align: center; font-size: 10px; color: var(--text3); transition: transform .12s; }
+.vt-chev.open { transform: rotate(90deg); }
+.vt-chev.leaf { visibility: hidden; }
+.vt-ico { flex: none; font-size: 13px; }
+.vt-name { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.vt-act { display: none; gap: 1px; flex: none; padding-left: 4px; }
+.vt-node:hover .vt-act { display: flex; }
+.vt-act button { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 12px; padding: 0 3px; line-height: 1; }
+.vt-act button:hover { color: var(--accent); }
+.vt-hidden { display: none !important; }
+.vr-item { padding: 7px 8px; border-radius: 8px; cursor: pointer; }
+.vr-item:hover { background: rgba(120,180,255,.07); }
+.vr-name { font-size: 13px; color: var(--text); display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vr-snip { font-size: 12px; color: var(--text3); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vr-empty { color: var(--text3); font-size: 13px; padding: 10px 6px; }
+
+/* ============================================================
+   NOTE EDITOR overlay - đè lên khoang não (.hud-center), giữ cây + chat sống
+   ============================================================ */
+.note-editor { position: absolute; inset: 0; z-index: 12; display: flex; flex-direction: column;
+  background: rgba(8,12,22,.95); }
+.note-editor[hidden] { display: none; }
+.note-editor.ne-full { position: fixed; inset: 0; z-index: 1000; }
+.ne-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 12px;
+  border-bottom: 1px solid var(--border); background: var(--bg2); }
+.ne-title { font-size: 14px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  display: flex; align-items: center; gap: 7px; }
+.ne-actions { display: flex; gap: 5px; flex: none; align-items: center; }
+.ne-actions button { background: rgba(255,255,255,.03); border: 1px solid var(--border); color: var(--text2);
+  cursor: pointer; font-size: 13px; padding: 4px 10px; border-radius: 6px; white-space: nowrap; }
+.ne-actions button:hover { color: var(--text); border-color: rgba(120,180,255,.5); }
+.ne-actions button.ne-saved { color: var(--green); border-color: rgba(52,211,107,.5); }
+.ne-seg { display: flex; }
+.ne-seg button { border-radius: 0; border-right: none; }
+.ne-seg button:first-child { border-radius: 6px 0 0 6px; }
+.ne-seg button:last-child { border-radius: 0 6px 6px 0; border-right: 1px solid var(--border); }
+.ne-seg button.active { background: rgba(255,122,60,.16); border-color: rgba(255,122,60,.5); color: var(--accent); }
+.ne-body { flex: 1; display: flex; min-height: 0; overflow: hidden; }
+.ne-body.ne-md { flex-direction: column; }                    /* .md: thanh công cụ trên, khung soạn/xem dưới */
+.ne-fmt { display: flex; flex-wrap: wrap; gap: 3px; padding: 6px 8px; border-bottom: 1px solid var(--border); background: var(--bg2); flex: none; }
+.ne-fmt button { background: rgba(255,255,255,.03); border: 1px solid var(--border); color: var(--text2); cursor: pointer;
+  font-size: 13px; min-width: 28px; height: 26px; border-radius: 5px; padding: 0 6px; }
+.ne-fmt button:hover { color: var(--text); border-color: rgba(120,180,255,.5); }
+.ne-panes { flex: 1; display: flex; min-height: 0; overflow: hidden; }
+.ne-wys { outline: none; border-left: none; }                  /* bản render sửa trực tiếp: full màn, không viền */
+.ne-wys:focus { outline: none; }
+.ne-body.ne-md.mode-wys .ne-src { display: none; }             /* chế độ Sửa: chỉ hiện bản render */
+.ne-body.ne-md.mode-source .ne-wys { display: none; }          /* chế độ Nguồn: chỉ hiện markdown thô */
+.ne-src, .ne-prev { flex: 1; min-width: 0; overflow: auto; }
+.ne-src { background: #070b16; }
+.ne-src textarea { width: 100%; height: 100%; background: none; color: #dce6fb; border: none; outline: none;
+  padding: 14px; font: 14px/1.6 var(--font); resize: none; }
+.ne-prev { padding: 14px 20px; color: var(--text); background: var(--bg); border-left: 1px solid var(--border); line-height: 1.7; }
+.ne-body.mode-source .ne-prev { display: none; }
+.ne-body.mode-source .ne-src { border-right: none; }
+.ne-body.mode-preview .ne-src { display: none; }
+.ne-body.mode-preview .ne-prev { border-left: none; }
+.ne-img { flex: 1; display: flex; align-items: center; justify-content: center; overflow: auto; padding: 16px; }
+.ne-img img { max-width: 100%; max-height: 100%; border-radius: 8px; }
+.ne-dl { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  color: var(--text2); padding: 24px; text-align: center; }
+.ne-dl .ne-dl-ico { font-size: 46px; }
+.ne-dl a { color: var(--text); }
+/* markdown trong preview */
+.ne-prev h1, .ne-prev h2, .ne-prev h3, .ne-prev h4 { color: var(--text); margin: .6em 0 .3em; line-height: 1.3; }
+.ne-prev h1 { font-size: 1.5em; } .ne-prev h2 { font-size: 1.28em; } .ne-prev h3 { font-size: 1.12em; }
+.ne-prev p, .ne-prev li { margin: .4em 0; }
+.ne-prev ul, .ne-prev ol { padding-left: 1.4em; margin: .4em 0; }
+.ne-prev a { color: #8fb6ff; }
+.ne-prev code { background: rgba(255,255,255,.07); padding: 1px 5px; border-radius: 4px; font-family: var(--font); font-size: .92em; }
+.ne-prev pre { background: #070b16; border: 1px solid var(--border); border-radius: 8px; padding: 12px; overflow: auto; margin: .5em 0; }
+.ne-prev pre code { background: none; padding: 0; }
+.ne-prev blockquote { border-left: 3px solid var(--border); margin: .5em 0; padding: .2em 0 .2em 12px; color: var(--text2); }
+.ne-prev img { max-width: 100%; border-radius: 6px; }
+.ne-prev hr { border: none; border-top: 1px solid var(--border); margin: 1em 0; }
+.ne-prev table { border-collapse: collapse; margin: .5em 0; }
+.ne-prev th, .ne-prev td { border: 1px solid var(--border); padding: 5px 9px; }

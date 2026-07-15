@@ -527,20 +527,84 @@ graph3dContainer.addEventListener("mousemove", (e) => {
   graphTooltip.style.top = (e.clientY + 14) + "px";
 });
 
-async function initGraph() {
-  // graph3d.js là classic script load trước app.js → class có sẵn ngay
-  if (!window.JavisGraph3D || !window.ForceGraph3D) {
-    graphStats.textContent = "⚠ Lỗi tải thư viện 3D (kiểm tra mạng)";
-    return;
+let _graphMode = "2d";                 // mặc định 2D (canvas thuần, nhẹ, đỡ lag). Đổi trong Cài đặt.
+let _libs3dPromise = null;
+function _ensure3DLibs() {              // nạp three.js + 3d-force-graph LAZY, chỉ khi cần 3D
+  if (window.ForceGraph3D) return Promise.resolve();
+  if (_libs3dPromise) return _libs3dPromise;
+  const loadScript = (src) => new Promise((res, rej) => {
+    const s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+  _libs3dPromise = loadScript("https://unpkg.com/three@0.159.0/build/three.min.js")
+    .then(() => loadScript("https://unpkg.com/3d-force-graph@1.73.4/dist/3d-force-graph.min.js"))
+    .catch(() => {});
+  return _libs3dPromise;
+}
+let _lib2dPromise = null;
+function _ensure2DLib() {               // nạp force-graph (2D, d3-force) LAZY khi cần 2D - nhẹ, không WebGL
+  if (window.ForceGraph) return Promise.resolve();
+  if (_lib2dPromise) return _lib2dPromise;
+  _lib2dPromise = new Promise((resolve) => {
+    const s = document.createElement("script");
+    s.src = "https://unpkg.com/force-graph@1.51.4/dist/force-graph.min.js";
+    s.onload = resolve; s.onerror = resolve;
+    document.head.appendChild(s);
+  });
+  return _lib2dPromise;
+}
+
+async function initGraph(forceMode) {
+  const c2d = document.getElementById("graph2d");
+  // Nguồn chọn 2D/3D: forceMode (vừa bấm) → localStorage (bền, không cần server) → /settings → mặc định 2D.
+  if (forceMode === "2d" || forceMode === "3d") {
+    _graphMode = forceMode;
+  } else {
+    const ls = localStorage.getItem("javis.graphMode");
+    if (ls === "2d" || ls === "3d") { _graphMode = ls; }
+    else {
+      try {
+        const s = await (await fetch("/settings")).json();
+        if (s && s.dashboard && s.dashboard.graph_mode) _graphMode = s.dashboard.graph_mode;
+      } catch (e) {}
+    }
   }
-  javisGraph = new JavisGraph3D(graph3dContainer, graphTooltip);
+  if (_graphMode === "3d") {
+    await _ensure3DLibs();
+    if (!window.JavisGraph3D || !window.ForceGraph3D) {
+      graphStats.textContent = "⚠ Lỗi tải thư viện 3D (kiểm tra mạng)";
+      return;
+    }
+    if (c2d) c2d.style.display = "none";
+    graph3dContainer.style.display = "";
+    javisGraph = new JavisGraph3D(graph3dContainer, graphTooltip);
+  } else {
+    graph3dContainer.style.display = "none";
+    if (c2d) c2d.style.display = "block";   // "" sẽ rơi về CSS #graph2d{display:none} → bị ẩn
+    await _ensure2DLib();
+    if (!window.ForceGraph) { graphStats.textContent = "⚠ Lỗi tải thư viện đồ thị 2D (kiểm tra mạng)"; return; }
+    javisGraph = new JavisGraph(c2d, graphTooltip);   // resize() gọi bên trong load()
+  }
   await reloadGraph();
 }
+
+// Đổi 2D/3D trong Cài đặt → dựng lại đồ thị tại chỗ (console.js gọi sau khi lưu setting).
+window.reinitGraph = async function (forceMode) {
+  try { if (javisGraph && javisGraph.pause) javisGraph.pause(); } catch (e) {}
+  javisGraph = null;
+  try { graph3dContainer.innerHTML = ""; } catch (e) {}
+  const c2d = document.getElementById("graph2d");
+  if (c2d) { try { c2d.innerHTML = ""; } catch (e) {} }   // #graph2d giờ là div force-graph gắn canvas vào
+  await initGraph(forceMode);
+  connectGraphWatch();
+};
 
 // Click node trong graph → Javis mở & thao tác note đó trong vault
 window.onGraphNodeClick = (node) => {
   if (!node || !node.path) return;
-  openNodePopup(node);   // click node → mở popup ĐỌC/SỬA (trước đây hỏi thẳng vào chat gây nhầm)
+  const brainRel = (node.path || "").split("/").slice(1).join("/") || node.path;   // bỏ đoạn gốc → path tương đối brain
+  if (typeof window.JavisOpenNote === "function") window.JavisOpenNote(brainRel);   // mở editor cây (WYSIWYG + công cụ)
+  else openNodePopup(node);   // dự phòng nếu editor cây chưa sẵn
 };
 
 // ============================================
@@ -749,8 +813,23 @@ function renderConceptLabels(categories, total) {
     div.className = "concept-label";
     div.style.left = x + "%";
     div.style.top = y + "%";
+    // Tô chữ "% Vault" đúng màu node của thư mục đó (lấy từ bảng màu danh mục của đồ thị) → dễ nhận màu nào của folder nào.
+    const catKey = c.name.replace(/^\d+\s*[-_.]\s*/, "").trim().toLowerCase();
+    const catCol = (window.__javisCatMap || {})[catKey];
     div.innerHTML = `<div class="cl-name">${escapeHtml(c.name.toUpperCase())}</div>` +
-      `<div class="cl-meta">${c.count} note · <span class="cl-fire">${share}% Vault</span></div>`;
+      `<div class="cl-meta">${c.count} note · <span class="cl-fire"${catCol ? ` style="color:${catCol}"` : ""}>${share}% Vault</span></div>`;
+    // Bấm nhãn danh mục → rọi sáng đúng cụm đó trong đồ thị (chỉ đồ thị 2D hỗ trợ; 3D bỏ qua an toàn).
+    div.style.cursor = "pointer";
+    div.title = "Bấm để rọi sáng cụm " + c.name;
+    div.onclick = () => {
+      const g = window.__javisGraph;
+      if (!g || typeof g.spotlightCategory !== "function") return;
+      const key = c.name.replace(/^\d+\s*[-_.]\s*/, "").trim().toLowerCase();
+      const on = g._catFilter === key;
+      g.spotlightCategory(on ? null : c.name);
+      container.querySelectorAll(".concept-label").forEach(d => d.classList.remove("cl-active"));
+      if (!on) div.classList.add("cl-active");
+    };
     container.appendChild(div);
     setTimeout(() => div.classList.add("show"), 120 + i * 110);
   }
@@ -1519,7 +1598,7 @@ async function refreshUsage() {
   if ((!src || !(src.items || []).length) && d.all_time && (d.all_time.items || []).length) { src = d.all_time; scope = "tổng"; }
   const items = (src && src.items) || [];
   const tot = (src && src.total) || { in: 0, out: 0, cost: 0 };
-  const row = (nameHtml, tok, extra) => `<div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:2px 0;${extra || ""}"><span style="color:#aebbd6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${nameHtml}</span><span style="color:#7aa2ff;white-space:nowrap;font-variant-numeric:tabular-nums">${tok}</span></div>`;
+  const row = (nameHtml, tok, extra) => `<div style="display:flex;justify-content:space-between;gap:6px;font-size:11px;padding:1px 0;${extra || ""}"><span style="color:#aebbd6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${nameHtml}</span><span style="color:#7aa2ff;white-space:nowrap;font-variant-numeric:tabular-nums">${tok}</span></div>`;
   let html;
   if (!items.length) {
     html = `<div class="mcp-item dim">Chưa có lượt nào hôm nay</div>`;
@@ -1537,6 +1616,19 @@ async function refreshUsage() {
   }
   el.innerHTML = html;
 }
+
+// Nút thu nhỏ / mở to hộp MỨC DÙNG (nhớ trạng thái qua localStorage).
+(function initUsageToggle() {
+  const box = document.getElementById("usageFloat"), btn = document.getElementById("usageToggle");
+  if (!box || !btn) return;
+  const apply = (col) => { box.classList.toggle("collapsed", col); btn.textContent = col ? "▸" : "▾"; };
+  apply(localStorage.getItem("javis.usageCollapsed") === "1");
+  btn.onclick = () => {
+    const col = !box.classList.contains("collapsed");
+    apply(col);
+    try { localStorage.setItem("javis.usageCollapsed", col ? "1" : "0"); } catch (e) {}
+  };
+})();
 
 // ============================================
 // Auth (đăng nhập) + Settings

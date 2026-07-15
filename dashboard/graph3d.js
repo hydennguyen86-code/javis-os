@@ -51,6 +51,17 @@ function hexA(hex, a) {
   return `rgba(${r},${g},${b},${a})`;
 }
 
+// Lực hút về tâm 3D (x,y,z) → cả tinh vân co tròn lại, node lẻ/cụm xa bị kéo vào gần.
+function centerGravity3D(strength) {
+  let _nodes = [];
+  const force = (alpha) => {
+    const k = strength * alpha;
+    for (let i = 0; i < _nodes.length; i++) { const n = _nodes[i]; n.vx -= n.x * k; n.vy -= n.y * k; n.vz -= (n.z || 0) * k; }
+  };
+  force.initialize = (ns) => { _nodes = ns; };
+  return force;
+}
+
 class JavisGraph3D {
   constructor(container, tooltip) {
     this.container = container;
@@ -72,6 +83,7 @@ class JavisGraph3D {
   async load(query = "source=all") {
     const res = await fetch(`/graph?${query}`);
     const data = await res.json();
+    if (window.JavisCatColorize) window.JavisCatColorize(data.nodes);   // tô màu theo danh mục như 2D
     const links = data.edges.map(e => ({ source: e.source, target: e.target }));
     const THREE = window.THREE;
 
@@ -121,10 +133,11 @@ class JavisGraph3D {
           if (window.onGraphNodeClick) window.onGraphNodeClick(n);
         });
 
-      // Layout cầu chặt: lực đẩy vừa, link ngắn
+      // Layout cầu chặt: lực đẩy vừa, link ngắn, + hút về tâm cho co TRÒN lại (kéo cụm/node xa vào)
       this.graph.d3Force("charge").strength(-45);
       const linkForce = this.graph.d3Force("link");
       if (linkForce) linkForce.distance(28);
+      this.graph.d3Force("gravity", centerGravity3D(0.06));
 
       const controls = this.graph.controls();
       controls.autoRotate = true;

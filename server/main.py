@@ -1146,6 +1146,9 @@ async def settings_set(section: str = Form(...), data: str = Form("{}")):
         cfg.setdefault("dashboard", {})
         if "graph_enabled" in patch:
             cfg["dashboard"]["graph_enabled"] = bool(patch["graph_enabled"])
+        if "graph_mode" in patch:
+            gm = str(patch["graph_mode"]).lower()
+            cfg["dashboard"]["graph_mode"] = gm if gm in ("2d", "3d") else "2d"
     elif section == "voice":
         v = cfg.setdefault("voice", {})
         if patch.get("tts_provider") in ("edge", "openai", "elevenlabs"):
@@ -1506,9 +1509,10 @@ def _resolve_graph_roots(source: str, path: str = None):
 async def graph(
     source: str = Query("all", description="all | brain | vault"),
     path: str = Query(None, description="Đường dẫn folder tùy ý (ưu tiên nếu có)"),
+    orphans: int = Query(0, description="1 = hiện cả note cô đơn (0 kết nối), như graph view Obsidian"),
 ):
     """Lớp Graphify - dựng đồ thị kết nối note từ wikilink."""
-    return build_graph(_resolve_graph_roots(source, path))
+    return build_graph(_resolve_graph_roots(source, path), include_orphans=bool(orphans))
 
 
 # ============================================================
@@ -2383,6 +2387,62 @@ async def files_list(brain: str = Query("brain"), path: str = Query(None)):
             "home": _files_rel(root, broot),                       # brain = 'nhà' (nút ⌂)
             "parent": None if d == root else _files_rel(root, d.parent),   # None = đã ở trần → ẩn Lên
             "items": items}
+
+
+@app.get("/files/search")
+async def files_search(brain: str = Query("brain"), q: str = Query(""), limit: int = Query(50)):
+    """Tìm note trong GỐC BRAIN (KHÔNG phải trần duyệt - tránh quét cả ổ đĩa trên localhost).
+    Khớp TÊN file (mọi loại) + NỘI DUNG file text; bỏ file >1MB và thư mục ẩn/nặng. Path trả về
+    tính theo TRẦN (giống /files/list) để mở bằng cùng quy ước. Walk chạy trong threadpool để
+    không chặn event loop FastAPI."""
+    from starlette.concurrency import run_in_threadpool
+    q = (q or "").strip()
+    if not q:
+        return {"items": [], "q": q}
+    root = _files_root(brain)                        # trần (để tính path trả về, khớp /files/list)
+    broot = Path(_brain_root(brain)).resolve()       # phạm vi quét = gốc brain
+    ql = q.lower()
+    try:
+        limit = max(1, min(int(limit), 200))
+    except (TypeError, ValueError):
+        limit = 50
+    SKIP_DIRS = {".git", "node_modules", "__pycache__", ".obsidian", ".trash", ".venv", ".pytest_cache"}
+
+    def _walk():
+        out = []
+        for dirpath, dirnames, filenames in os.walk(broot):
+            dirnames[:] = [dn for dn in dirnames if not dn.startswith(".") and dn not in SKIP_DIRS]
+            for fn in sorted(filenames):
+                if len(out) >= limit:
+                    return out
+                p = Path(dirpath) / fn
+                ext = p.suffix.lower()
+                name_hit = ql in fn.lower()
+                content_hit = False
+                snippet, line_no = "", 0
+                if ext in _TEXT_EXTS:
+                    try:
+                        if p.stat().st_size <= 1_000_000:
+                            txt = p.read_text(encoding="utf-8", errors="ignore")
+                            idx = txt.lower().find(ql)
+                            if idx >= 0:
+                                content_hit = True
+                                line_no = txt.count("\n", 0, idx) + 1
+                                a = max(0, idx - 40)
+                                snippet = txt[a:idx + 80].replace("\n", " ").replace("\r", " ").strip()
+                    except (OSError, ValueError):
+                        pass
+                if name_hit or content_hit:
+                    try:
+                        rel = _files_rel(root, p)
+                    except ValueError:
+                        continue
+                    out.append({"path": rel, "name": fn, "ext": ext, "snippet": snippet,
+                                "line": line_no, "match": "content" if content_hit else "name"})
+        return out
+
+    items = await run_in_threadpool(_walk)
+    return {"items": items, "q": q}
 
 
 @app.get("/files/read")

@@ -7,7 +7,7 @@
   <!-- Favicon = logo hiện tại (/brand-logo): mặc định theo logo.png, và tự đổi theo ảnh user tải lên. -->
   <link rel="icon" href="/brand-logo?v=5">
   <link rel="apple-touch-icon" href="/brand-logo?v=5">
-  <link rel="stylesheet" href="/static/style.css?v=33">
+  <link rel="stylesheet" href="/static/style.css?v=41">
   <link rel="stylesheet" href="/static/console.css?v=15">
 </head>
 <body>
@@ -58,20 +58,34 @@
     <!-- ===== BODY: 3 columns ===== -->
     <div class="hud-body">
 
-      <!-- LEFT: metrics -->
+      <!-- LEFT: Vault explorer (cây thư mục kiểu Obsidian + tìm note). Thay cho panel số liệu KD cũ. -->
       <aside class="hud-left">
-        <div class="panel-label">
-          SỐ LIỆU KINH DOANH
-          <button class="mini-btn" id="refreshMetrics" title="Cập nhật">⟳</button>
+        <div class="vault-head">
+          <span class="vault-title">VAULT</span>
+          <span class="vault-tools">
+            <button class="mini-btn" id="vtNewFile" title="Tạo file mới ở gốc brain">＋</button>
+            <button class="mini-btn" id="vtNewDir" title="Tạo thư mục mới ở gốc brain">📁</button>
+            <button class="mini-btn" id="vtRefresh" title="Làm mới cây">⟳</button>
+          </span>
         </div>
-        <div class="metric-cards" id="metricCards"></div>
-        <div class="metric-status" id="metricStatus"></div>
+        <div class="vault-search">
+          <span class="vs-ico">🔍</span>
+          <input id="vaultSearch" type="text" placeholder="Tìm note..." spellcheck="false" autocomplete="off">
+          <button class="vs-clear" id="vaultSearchClear" title="Xoá tìm kiếm" hidden>✕</button>
+        </div>
+        <div class="vault-modes">
+          <button class="vs-chip active" id="vsModeName" data-mode="name" title="Lọc nhanh theo tên trong cây">Tên</button>
+          <button class="vs-chip" id="vsModeContent" data-mode="content" title="Tìm sâu theo nội dung (quét toàn vault)">Nội dung</button>
+        </div>
+        <div class="vault-tree" id="vaultTree"><div class="vt-info">Đang tải…</div></div>
+        <div class="vault-results" id="vaultResults" hidden></div>
       </aside>
 
       <!-- CENTER: 3D orb -->
       <div class="hud-center">
         <canvas id="starfield"></canvas>
         <div id="graph3dContainer"></div>
+        <div id="graph2d"></div>
         <div class="concept-labels" id="conceptLabels"></div>
         <div class="orb-overlay">
           <div class="orb-state" id="orbState">SẴN SÀNG</div>
@@ -101,6 +115,22 @@
             <span class="bstat-lbl">ROUTINES</span>
           </button>
         </div>
+
+        <!-- MỨC DÙNG token: dời từ cột phải xuống góc dưới-phải khung giữa (giải phóng chỗ cho chat). -->
+        <div class="usage-float" id="usageFloat">
+          <div class="uf-label"><span>MỨC DÙNG <span class="dim" style="font-weight:400">· hôm nay</span></span><button class="uf-toggle" id="usageToggle" type="button" title="Thu nhỏ / mở rộng">▾</button></div>
+          <div id="usagePanel" class="usage-panel"><div class="mcp-item dim">Chưa có lượt nào hôm nay</div></div>
+        </div>
+
+        <!-- Popup sửa note: neo absolute BÊN TRONG .hud-center → đè lên visual não, cây trái & chat phải vẫn sống.
+             Nội dung (toolbar + thân) do console.js openNote() dựng theo loại file. -->
+        <div class="note-editor" id="noteEditor" hidden>
+          <div class="ne-bar">
+            <span class="ne-title" id="neTitle">note.md</span>
+            <span class="ne-actions" id="neActions"></span>
+          </div>
+          <div class="ne-body" id="neBody"></div>
+        </div>
       </div>
 
       <!-- RIGHT: transcript + activity -->
@@ -112,8 +142,7 @@
             <button class="mini-btn" id="chatZoomBtn" title="Phóng to khung chat (Esc để thu nhỏ)">⛶</button>
           </span>
         </div>
-        <div class="panel-label" title="Token Javis tự đo qua từng nhà cung cấp - KHÔNG phải hạn mức gói thuê bao">MỨC DÙNG <span class="dim" style="font-weight:400">· hôm nay (Javis đo)</span></div>
-        <div id="usagePanel" class="usage-panel" style="margin-bottom:8px"><div class="mcp-item dim">Chưa có lượt nào hôm nay</div></div>
+        <!-- MỨC DÙNG token đã DỜI xuống góc dưới-phải khung giữa (giải phóng chỗ cho khung chat). -->
         <div class="transcript" id="chatArea"></div>
         <!-- Thanh #toolBar cũ ĐÃ BỎ: trạng thái "đang suy nghĩ / gọi tool" giờ hiện bằng
              chip hoạt động NGAY TRONG #chatArea (app.js showActivity) → tự đi theo cả khi
@@ -163,13 +192,8 @@
           <div class="loop-log" id="loopLog"></div>
         </div>
 
-        <div class="panel-label" style="margin-top:10px">HỆ THỐNG</div>
-        <div class="sys-status">
-          <div class="mcp-item" id="claudeStatus">⬤ Claude Code CLI</div>
-          <div class="mcp-item" id="ttsStatus">⬤ Voice (Edge TTS)</div>
-        </div>
-        <div class="panel-label" style="margin-top:8px">MCP ĐANG DÙNG</div>
-        <div id="mcpList" class="mcp-list"><div class="mcp-item dim">Chưa có hoạt động</div></div>
+        <!-- HỆ THỐNG + MCP ĐANG DÙNG đã DỜI xuống thanh model-bar (ngang hàng ô chọn model). -->
+
 
         <!-- ===== CÀI ĐẶT NHANH: avatar + tên miền + giọng nói + tốc độ (gộp về sidebar) ===== -->
         <details class="quick-set" id="quickSet" open>
@@ -278,6 +302,17 @@
         <span class="mb-caret">▾</span>
       </button>
       <div class="mb-pop" id="mbPop" hidden></div>
+      <!-- HỆ THỐNG + MCP ĐANG DÙNG: dời từ cột phải xuống đây, nằm ngang bên phải ô chọn model. -->
+      <div class="sysbar" id="sysBar">
+        <span class="sysbar-label">HỆ THỐNG</span>
+        <div class="sys-status">
+          <div class="mcp-item" id="claudeStatus">⬤ Claude Code CLI</div>
+          <div class="mcp-item" id="ttsStatus">⬤ Voice (Edge TTS)</div>
+        </div>
+        <span class="sysbar-sep"></span>
+        <span class="sysbar-label">MCP</span>
+        <div id="mcpList" class="mcp-list"><div class="mcp-item dim">Chưa có hoạt động</div></div>
+      </div>
     </div>
 
     <!-- ===== BOTTOM: voice bar ===== -->
@@ -545,12 +580,22 @@
   <!-- Holder ẩn giữ #quickSet khi KHÔNG ở trang Cài đặt (node vẫn trong DOM → handler còn sống) -->
   <div id="quickSetHolder" hidden></div>
 
+  <!-- Bảng SỐ LIỆU KINH DOANH đã gỡ khỏi giao diện (thay bằng Vault explorer ở cột trái).
+       Vẫn giữ 3 id ở stub ẩn này vì app.js đọc #metricCards/#metricStatus/#refreshMetrics ngay
+       lúc nạp (getElementById + addEventListener vô điều kiện) - xoá trần sẽ ném null, hỏng dashboard.
+       Ẩn hoàn toàn: block <!-- JAVIS_METRICS --> nếu có vẫn parse vào đây nhưng không hiển thị. -->
+  <div id="metricsStub" hidden aria-hidden="true">
+    <button id="refreshMetrics" tabindex="-1"></button>
+    <div id="metricCards"></div>
+    <div id="metricStatus"></div>
+  </div>
+
   <script src="/static/voice.js?v=14"></script>
-  <script src="https://unpkg.com/three@0.159.0/build/three.min.js"></script>
-  <script src="https://unpkg.com/3d-force-graph@1.73.4/dist/3d-force-graph.min.js"></script>
-  <script src="/static/graph3d.js?v=15"></script>
+  <!-- three.js + 3d-force-graph KHÔNG nạp tĩnh nữa: app.js tự lazy-load qua CDN CHỈ khi chọn đồ thị 3D. -->
+  <script src="/static/graph.js?v=14"></script>
+  <script src="/static/graph3d.js?v=16"></script>
   <script src="/static/chat-render.js?v=2"></script>
-  <script src="/static/app.js?v=58"></script>
+  <script src="/static/app.js?v=66"></script>
   <script src="/static/model-picker.js?v=1"></script>
   <script src="/static/branding.js?v=7"></script>
   <script src="/static/quick-settings.js?v=4"></script>
@@ -559,7 +604,7 @@
   <script src="/static/sessions-ui.js?v=6"></script>
   <script src="/static/studio.js?v=19"></script>
   <!-- Console layer: console.js đăng ký store TRƯỚC khi Alpine khởi động (defer) -->
-  <script src="/static/console.js?v=54"></script>
+  <script src="/static/console.js?v=62"></script>
   <script defer src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>
 </body>
 </html>

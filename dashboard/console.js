@@ -152,6 +152,14 @@
     else navigateTo("files");
   }
   if (typeof window !== "undefined") window.JavisOpenFiles = openFilesAt;
+  // Mở note trong editor cây (dùng cho click node đồ thị) từ đường dẫn TƯƠNG ĐỐI GỐC BRAIN (như openNodePopup).
+  if (typeof window !== "undefined") window.JavisOpenNote = function (brainRel) {
+    if (!brainRel) return;
+    const ceilingRel = _vtHome ? _vtHome + "/" + brainRel : brainRel;   // ghép tiền tố trần như cây
+    const name = brainRel.split("/").pop();
+    const ext = name.includes(".") ? "." + name.split(".").pop().toLowerCase() : ".md";
+    openNote(ceilingRel, { name: name, ext: ext, type: "file" });
+  };
 
   // ============================================
   // Render từng trang vào #cviewBody
@@ -1106,6 +1114,7 @@
     const tg = s.telegram || {};
     const dash = s.dashboard || {};
     const gOn = dash.graph_enabled !== false;
+    const gMode = (((typeof localStorage !== "undefined" && localStorage.getItem("javis.graphMode")) || dash.graph_mode || "2d") === "3d") ? "3d" : "2d";
     el.innerHTML = `
       <div class="cview-section">
         <h3>Phiên bản</h3>
@@ -1132,9 +1141,13 @@
         <h3>Hiệu năng</h3>
         <div class="cgrid">
           <div class="gcard">
-            <div class="gcard-top"><span class="gcard-name">Graph 3D</span><span class="gcard-tag">${gOn ? "bật" : "tắt"}</span></div>
-            <div class="gcard-meta">Tắt để nhẹ máy/VPS. ${isNarrow() ? "Màn hình hẹp đang tự ép lite-mode." : ""}</div>
-            <button class="gcard-btn" id="ovGraphToggle">${gOn ? "Tắt graph 3D" : "Bật graph 3D"}</button>
+            <div class="gcard-top"><span class="gcard-name">Đồ thị não</span><span class="gcard-tag">${gOn ? (gMode === "3d" ? "3D" : "2D") : "tắt"}</span></div>
+            <div class="gcard-meta">2D là canvas thuần, nhẹ và đỡ lag; 3D đẹp hơn nhưng nặng máy (render trên máy anh, không phải VPS). Tắt hẳn để nhẹ nhất. ${isNarrow() ? "Màn hình hẹp đang tự ép lite-mode." : ""}</div>
+            <div class="js-actions">
+              <button class="gcard-btn ${gOn && gMode === "2d" ? "" : "ghost"}" id="ovGraph2d">2D</button>
+              <button class="gcard-btn ${gOn && gMode === "3d" ? "" : "ghost"}" id="ovGraph3d">3D</button>
+              <button class="gcard-btn ghost" id="ovGraphToggle">${gOn ? "Tắt hẳn" : "Bật lại"}</button>
+            </div>
           </div>
         </div>
       </div>
@@ -1273,6 +1286,19 @@
       recomputeGraph();
       renderOverview(el);
     };
+    // Đổi 2D/3D: lưu localStorage (bền ngay, không cần restart server) + lưu server (bền lâu) + dựng lại đồ thị.
+    const setGraphMode = async (mode) => {
+      try { localStorage.setItem("javis.graphMode", mode); } catch (e) {}
+      graphEnabled = true;
+      try { await saveSetting("dashboard", { graph_mode: mode, graph_enabled: true }); } catch (e) {}
+      if (window.reinitGraph) { try { await window.reinitGraph(mode); } catch (e) {} }
+      recomputeGraph();
+      renderOverview(el);
+    };
+    const b2d = document.getElementById("ovGraph2d");
+    if (b2d) b2d.onclick = () => setGraphMode("2d");
+    const b3d = document.getElementById("ovGraph3d");
+    if (b3d) b3d.onclick = () => setGraphMode("3d");
     const mig = document.getElementById("ovMigrate");
     if (mig) mig.onclick = async () => {
       const brain = (window.currentBrainPath ? currentBrainPath() : "brain");
@@ -2347,6 +2373,431 @@
     });
   });
 
+  // ============================================================
+  // VAULT EXPLORER (cột trái) - cây lazy + tìm note + editor overlay đè lên não
+  // Tái dùng thẳng esc / _fileIcon / fbrain / recomputeGraph (đều trong IIFE này).
+  // KHÔNG đụng renderFiles/openVaultTarget (deep-link chat) - openNote là luồng riêng, additive.
+  // ============================================================
+  const VT_IMG_EXTS = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico"];
+  const VT_TEXT_EXTS = [".md", ".txt", ".json", ".yaml", ".yml", ".csv", ".js", ".ts", ".py",
+    ".html", ".css", ".toml", ".ini", ".log", ".sh", ".bat", ".xml", ".svg", ".env"];
+  let _vtHome = "";            // đường dẫn (theo trần duyệt) của gốc brain
+  let _vtCache = new Map();    // key -> items[] (cache con thư mục đã nạp)
+  let _vtActivePath = null;    // file .md đang mở (để tô sáng trong cây)
+  let _vtWired = false;        // đã gắn handler search/toolbar chưa
+  let _vtIndex = null;         // chỉ mục file toàn vault (crawl client) - cho tìm theo Tên không cần server restart
+  let _neSaveFn = null;        // hàm lưu của editor đang mở (cho Ctrl+S)
+  const _vtRaw = (rel, dl) => `/files/raw?brain=${encodeURIComponent(fbrain())}&path=${encodeURIComponent(rel)}${dl ? "&dl=1" : ""}`;
+  const _vtNoAccent = (s) => (s || "").toString().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[đĐ]/g, "d").toLowerCase();
+
+  async function _vtList(path) {
+    const key = (path == null) ? " home" : path;
+    if (_vtCache.has(key)) return _vtCache.get(key);
+    const qp = (path == null) ? "" : `&path=${encodeURIComponent(path)}`;
+    let items = [];
+    try {
+      const d = await (await fetch(`/files/list?brain=${encodeURIComponent(fbrain())}${qp}`)).json();
+      if (d && !d.error) { items = d.items || []; if (path == null && d.home != null) _vtHome = d.home; }
+    } catch (e) {}
+    _vtCache.set(key, items);
+    return items;
+  }
+
+  // Bung cây tới đúng thư mục (nạp tươi từng cấp → thấy file mới). dirRel = đường dẫn thư mục theo trần.
+  async function _vtRevealDir(dirRel) {
+    const tree = document.getElementById("vaultTree"); if (!tree || dirRel == null) return;
+    const escSel = (s) => (window.CSS && CSS.escape) ? CSS.escape(s) : s.replace(/"/g, '\\"');
+    let inner;
+    if (_vtHome && dirRel.indexOf(_vtHome + "/") === 0) inner = dirRel.slice(_vtHome.length + 1);
+    else if (!_vtHome) inner = dirRel;
+    else inner = (dirRel === _vtHome ? "" : dirRel);
+    const segs = inner ? inner.split("/") : [];
+    let acc = _vtHome || "";
+    for (const seg of segs) {
+      acc = acc ? acc + "/" + seg : seg;
+      const node = tree.querySelector(`.vt-node[data-rel="${escSel(acc)}"]`);
+      if (!node) break;
+      const box = node.parentElement && node.parentElement.querySelector(":scope > .vt-children");
+      if (box && box.classList.contains("vt-hidden")) {
+        node.click();
+        for (let i = 0; i < 25 && (box.classList.contains("vt-hidden") || !box.children.length); i++) await new Promise(r => setTimeout(r, 40));
+      }
+    }
+  }
+
+  async function _vtAddFile(rel, isDir) {
+    // Bấm ở thư mục → tạo file BÊN TRONG; bấm ở file → tạo CÙNG thư mục (thư mục cha của file).
+    const dir = isDir ? rel : (rel.includes("/") ? rel.slice(0, rel.lastIndexOf("/")) : "");
+    let n = prompt("Tên file mới (vd ghi-chu):");
+    if (!n) return;
+    if (!/\.[a-z0-9]+$/i.test(n)) n += ".md";   // mặc định file markdown
+    const path = dir ? dir + "/" + n : n;
+    const fd = new FormData(); fd.append("brain", fbrain()); fd.append("path", path); fd.append("content", "");
+    try { await fetch("/files/write", { method: "POST", body: fd }); } catch (e) {}
+    _vtCache.clear(); _vtIndex = null;
+    await renderVaultTree();
+    await _vtRevealDir(dir);                     // tự bung cây tới thư mục vừa tạo → thấy file mới trong cây
+    const ext = "." + n.split(".").pop().toLowerCase();
+    openNote(path, { name: n, ext: ext, type: "file" });
+  }
+
+  async function _vtRename(rel, oldname) {
+    const nn = prompt("Tên mới:", oldname);
+    if (!nn || nn === oldname) return;
+    const fd = new FormData(); fd.append("brain", fbrain()); fd.append("path", rel); fd.append("newname", nn);
+    try { await fetch("/files/rename", { method: "POST", body: fd }); } catch (e) {}
+    _vtCache.clear(); _vtIndex = null; renderVaultTree();
+  }
+  async function _vtDelete(rel, name, isDir) {
+    if (!confirm(`Xoá "${name}"${isDir ? " và toàn bộ bên trong" : ""}? Không hoàn tác được.`)) return;
+    const fd = new FormData(); fd.append("brain", fbrain()); fd.append("path", rel);
+    try { await fetch("/files/delete", { method: "POST", body: fd }); } catch (e) {}
+    if (_vtActivePath === rel) closeNote();
+    _vtCache.clear(); _vtIndex = null; renderVaultTree();
+  }
+
+  function _vtRowEl(it, parentPath, depth) {
+    const rel = parentPath ? parentPath + "/" + it.name : it.name;
+    const isDir = it.type === "dir";
+    const wrap = document.createElement("div"); wrap.className = "vt-branch";
+    const node = document.createElement("div");
+    node.className = "vt-node"; node.dataset.rel = rel; node.dataset.name = it.name;
+    node.style.paddingLeft = (6 + depth * 13) + "px";
+    node.innerHTML = `<span class="vt-chev ${isDir ? "" : "leaf"}">▸</span>`
+      + `<span class="vt-ico">${isDir ? "📁" : _fileIcon(it.ext)}</span>`
+      + `<span class="vt-name">${esc(it.name)}</span>`
+      + `<span class="vt-act"><button data-a="add" title="Thêm file ${isDir ? "trong thư mục này" : "cùng thư mục"}">＋</button><button data-a="ren" title="Đổi tên">✎</button><button data-a="del" title="Xoá">🗑</button></span>`;
+    if (!isDir && rel === _vtActivePath) node.classList.add("active");
+    node.querySelectorAll(".vt-act button").forEach(b => b.onclick = (e) => {
+      e.stopPropagation();
+      const a = b.dataset.a;
+      if (a === "add") _vtAddFile(rel, isDir);
+      else if (a === "ren") _vtRename(rel, it.name);
+      else _vtDelete(rel, it.name, isDir);
+    });
+    wrap.appendChild(node);
+    if (isDir) {
+      const childBox = document.createElement("div"); childBox.className = "vt-children vt-hidden";
+      wrap.appendChild(childBox);
+      let loaded = false;
+      node.onclick = async () => {
+        const chev = node.querySelector(".vt-chev");
+        const willOpen = childBox.classList.contains("vt-hidden");
+        childBox.classList.toggle("vt-hidden", !willOpen);
+        chev.classList.toggle("open", willOpen);
+        if (willOpen && !loaded) {
+          loaded = true;
+          const kids = await _vtList(rel);
+          if (!kids.length) childBox.innerHTML = `<div class="vt-info" style="padding-left:${18 + depth * 13}px">trống</div>`;
+          else kids.forEach(k => childBox.appendChild(_vtRowEl(k, rel, depth + 1)));
+        }
+      };
+    } else {
+      node.onclick = () => openNote(rel, it);
+    }
+    return wrap;
+  }
+
+  // Crawl toàn vault qua /files/list (đã sống) → chỉ mục file để tìm theo TÊN không cần server restart.
+  // Bám trong gốc brain (bắt đầu từ home), có trần chống treo trên vault lớn. Cache lại sau lần đầu.
+  async function _vtBuildIndex() {
+    if (_vtIndex) return _vtIndex;
+    const SKIP = new Set([".git", "node_modules", "__pycache__", ".obsidian", ".trash", ".venv"]);
+    if (!_vtHome && !_vtCache.has(" home")) await _vtList(null);
+    const out = []; const queue = [_vtHome || ""]; let guard = 0;
+    while (queue.length && out.length < 3000 && guard < 600) {
+      guard++;
+      const dir = queue.shift();
+      const items = await _vtList(dir);
+      for (const it of items) {
+        const rel = dir ? dir + "/" + it.name : it.name;
+        if (it.type === "dir") { if (!it.name.startsWith(".") && !SKIP.has(it.name)) queue.push(rel); }
+        else out.push({ name: it.name, ext: it.ext, path: rel, dir: dir });
+      }
+    }
+    _vtIndex = out;
+    return out;
+  }
+
+  function _vtRelHome(dir) {
+    if (!dir) return "";
+    if (_vtHome && dir === _vtHome) return "";
+    if (_vtHome && dir.indexOf(_vtHome + "/") === 0) return dir.slice(_vtHome.length + 1);
+    return dir;
+  }
+
+  function _vtRenderResults(box, list, withSnippet) {
+    box.innerHTML = "";
+    list.forEach(it => {
+      const el = document.createElement("div"); el.className = "vr-item";
+      const sub = withSnippet ? (it.snippet || "") : _vtRelHome(it.dir);
+      el.innerHTML = `<div class="vr-name"><span class="vt-ico">${_fileIcon(it.ext)}</span>${esc(it.name)}</div>`
+        + (sub ? `<div class="vr-snip">${esc(sub)}</div>` : "");
+      el.onclick = () => openNote(it.path, { name: it.name, ext: it.ext, type: "file" });
+      box.appendChild(el);
+    });
+  }
+
+  async function _vtNameSearch(q) {
+    const box = document.getElementById("vaultResults"); if (!box) return;
+    box.innerHTML = `<div class="vr-empty">Đang tìm…</div>`;
+    const idx = await _vtBuildIndex();
+    const nq = _vtNoAccent(q);
+    const hits = idx.filter(f => _vtNoAccent(f.name).includes(nq)).slice(0, 120);
+    if (!hits.length) { box.innerHTML = `<div class="vr-empty">Không thấy note nào tên khớp "${esc(q)}".</div>`; return; }
+    _vtRenderResults(box, hits, false);
+  }
+
+  async function _vtSearchContent(q) {
+    const box = document.getElementById("vaultResults"); if (!box) return;
+    box.innerHTML = `<div class="vr-empty">Đang tìm…</div>`;
+    let resp, d = {};
+    try { resp = await fetch(`/files/search?brain=${encodeURIComponent(fbrain())}&q=${encodeURIComponent(q)}&limit=60`); d = await resp.json().catch(() => ({})); }
+    catch (e) { resp = null; }
+    if (!resp || resp.status === 404) {
+      box.innerHTML = `<div class="vr-empty">Tìm theo <b>nội dung</b> cần khởi động lại Javis một lần (chạy start-javis.bat) để bật. Tạm thời hãy tìm theo <b>Tên</b>.</div>`;
+      return;
+    }
+    if (!resp.ok) { box.innerHTML = `<div class="vr-empty">Lỗi tìm kiếm (${resp.status}).</div>`; return; }
+    const items = (d && d.items) || [];
+    if (!items.length) { box.innerHTML = `<div class="vr-empty">Không thấy note nào chứa "${esc(q)}".</div>`; return; }
+    _vtRenderResults(box, items, true);
+  }
+
+  function _vtWire() {
+    if (_vtWired) return; _vtWired = true;
+    const input = document.getElementById("vaultSearch");
+    const clearBtn = document.getElementById("vaultSearchClear");
+    const chipName = document.getElementById("vsModeName");
+    const chipContent = document.getElementById("vsModeContent");
+    const tree = document.getElementById("vaultTree");
+    const results = document.getElementById("vaultResults");
+    if (!input || !tree) return;
+    let mode = "name", t = null;
+    const apply = () => {
+      const q = input.value.trim();
+      if (clearBtn) clearBtn.hidden = !q;
+      if (!q) { results.hidden = true; tree.hidden = false; return; }   // rỗng → về cây
+      tree.hidden = true; results.hidden = false;
+      if (mode === "name") _vtNameSearch(q); else _vtSearchContent(q);
+    };
+    const deb = () => { clearTimeout(t); t = setTimeout(apply, mode === "name" ? 150 : 280); };
+    input.addEventListener("input", deb);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { clearTimeout(t); apply(); }
+      else if (e.key === "Escape") { input.value = ""; apply(); }
+    });
+    if (clearBtn) clearBtn.onclick = () => { input.value = ""; apply(); input.focus(); };
+    const setMode = (m) => { mode = m; chipName.classList.toggle("active", m === "name"); chipContent.classList.toggle("active", m === "content"); apply(); };
+    chipName.onclick = () => setMode("name");
+    chipContent.onclick = () => setMode("content");
+    const nf = document.getElementById("vtNewFile"), nd = document.getElementById("vtNewDir"), rf = document.getElementById("vtRefresh");
+    if (rf) rf.onclick = () => { _vtCache.clear(); _vtIndex = null; renderVaultTree(); };
+    if (nf) nf.onclick = async () => {
+      let n = prompt("Tên file mới (vd ghi-chu):"); if (!n) return;
+      if (!/\.[a-z0-9]+$/i.test(n)) n += ".md";   // mặc định file markdown
+      const rel = _vtHome ? _vtHome + "/" + n : n;
+      const fd = new FormData(); fd.append("brain", fbrain()); fd.append("path", rel); fd.append("content", "");
+      await fetch("/files/write", { method: "POST", body: fd }); _vtCache.clear(); _vtIndex = null; await renderVaultTree();
+      const ext = "." + n.split(".").pop().toLowerCase();
+      openNote(rel, { name: n, ext: ext, type: "file" });
+    };
+    if (nd) nd.onclick = async () => {
+      const n = prompt("Tên thư mục mới:"); if (!n) return;
+      const fd = new FormData(); fd.append("brain", fbrain()); fd.append("path", _vtHome || ""); fd.append("name", n);
+      await fetch("/files/mkdir", { method: "POST", body: fd }); _vtCache.clear(); renderVaultTree();
+    };
+  }
+
+  async function renderVaultTree() {
+    const tree = document.getElementById("vaultTree"); if (!tree) return;
+    _vtWire();
+    tree.hidden = false;
+    const results = document.getElementById("vaultResults"); if (results) results.hidden = true;
+    tree.innerHTML = `<div class="vt-info">Đang tải…</div>`;
+    const items = await _vtList(null);
+    tree.innerHTML = "";
+    if (!items.length) { tree.innerHTML = `<div class="vt-info">Vault trống.</div>`; return; }
+    items.forEach(it => tree.appendChild(_vtRowEl(it, _vtHome || "", 0)));
+  }
+
+  function _vtMarkActive(rel) {
+    _vtActivePath = rel;
+    const tree = document.getElementById("vaultTree"); if (!tree) return;
+    tree.querySelectorAll(".vt-node.active").forEach(n => n.classList.remove("active"));
+    if (rel) {
+      const sel = (window.CSS && CSS.escape) ? CSS.escape(rel) : rel.replace(/"/g, '\\"');
+      const n = tree.querySelector(`.vt-node[data-rel="${sel}"]`); if (n) n.classList.add("active");
+    }
+  }
+
+  function _neKeyHandler(e) {
+    const ed = document.getElementById("noteEditor"); if (!ed || ed.hidden) return;
+    if ((e.ctrlKey || e.metaKey) && (e.key === "s" || e.key === "S")) { e.preventDefault(); if (_neSaveFn) _neSaveFn(); }
+    else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closeNote(); }
+  }
+  function closeNote() {
+    const ed = document.getElementById("noteEditor"); if (!ed) return;
+    ed.hidden = true; ed.classList.remove("ne-full");
+    document.getElementById("neBody").innerHTML = ""; document.getElementById("neActions").innerHTML = "";
+    _neSaveFn = null;
+    document.removeEventListener("keydown", _neKeyHandler, true);
+    _vtMarkActive(null);
+    try { recomputeGraph(); } catch (e) {}   // chạy lại não (đã gate active===home + không lite + studio đóng)
+  }
+  function _neCommonBtns(actions, rel, it) {
+    const mk = (label, title, fn) => { const b = document.createElement("button"); b.textContent = label; if (title) b.title = title; b.onclick = fn; return b; };
+    const ed = document.getElementById("noteEditor");
+    actions.appendChild(mk("↗", "Mở tab mới", () => window.open(_vtRaw(rel), "_blank")));
+    actions.appendChild(mk("⤓", "Tải về", () => window.open(_vtRaw(rel, 1), "_blank")));
+    actions.appendChild(mk("⛶", "Phóng to / thu nhỏ", () => ed.classList.toggle("ne-full")));
+    actions.appendChild(mk("✕", "Đóng (Esc)", closeNote));
+  }
+  function _neRenderDownload(body, actions, rel, it) {
+    body.className = "ne-body";
+    body.innerHTML = `<div class="ne-dl"><div class="ne-dl-ico">${_fileIcon(it.ext)}</div>`
+      + `<div>Loại file này không xem trực tiếp - hãy tải về.<br><b>${esc(it.name)}</b></div>`
+      + `<div><a href="${_vtRaw(rel, 1)}">⤓ Tải về</a> &nbsp;·&nbsp; <a href="${_vtRaw(rel)}" target="_blank">↗ Mở tab mới</a></div></div>`;
+    _neCommonBtns(actions, rel, it);
+  }
+
+  // Nạp turndown (HTML→markdown) LAZY, chỉ khi cần lưu bản WYSIWYG. + plugin GFM (bảng).
+  let _tdPromise = null, _td = null;
+  function _ensureTurndown() {
+    if (window.TurndownService) return Promise.resolve();
+    if (_tdPromise) return _tdPromise;
+    const load = (src) => new Promise((res) => { const s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = res; document.head.appendChild(s); });
+    _tdPromise = load("https://unpkg.com/turndown@7.2.0/dist/turndown.js")
+      .then(() => load("https://unpkg.com/turndown-plugin-gfm@1.0.2/dist/turndown-plugin-gfm.js"));
+    return _tdPromise;
+  }
+  // HTML (bản render đang sửa) → markdown. GIỮ [[wikilink]] và ![[ảnh]] qua luật riêng theo data-vault-path.
+  function _mdFromHtml(html) {
+    if (!window.TurndownService) return null;
+    if (!_td) {
+      _td = new window.TurndownService({ headingStyle: "atx", bulletListMarker: "-", codeBlockStyle: "fenced", emDelimiter: "*" });
+      try { if (window.turndownPluginGfm) _td.use(window.turndownPluginGfm.gfm); } catch (e) {}
+      _td.addRule("wikilink", { filter: (n) => n.nodeName === "A" && n.getAttribute("data-vault-path") != null,
+        replacement: (c, n) => "[[" + n.getAttribute("data-vault-path") + "]]" });
+      _td.addRule("wikiimg", { filter: (n) => n.nodeName === "IMG" && n.getAttribute("data-vault-path") != null,
+        replacement: (c, n) => "![[" + n.getAttribute("data-vault-path") + "]]" });
+    }
+    try { return _td.turndown(html); } catch (e) { return null; }
+  }
+
+  // Thanh công cụ markdown - hoạt động CẢ trên bản render (WYSIWYG, execCommand) LẪN nguồn thô (chèn cú pháp).
+  function _neBuildToolbar(host, ctx) {
+    if (!host) return;
+    const ta = ctx.ta, wys = ctx.wys, isWys = () => ctx.mode() === "wys";
+    const exec = (cmd, val) => { try { wys.focus(); document.execCommand(cmd, false, val || null); } catch (e) {} };
+    const wrapTa = (b, a, ph) => {
+      const s = ta.selectionStart, e = ta.selectionEnd, sel = ta.value.slice(s, e) || ph || "";
+      ta.value = ta.value.slice(0, s) + b + sel + a + ta.value.slice(e);
+      ta.selectionStart = s + b.length; ta.selectionEnd = s + b.length + sel.length; ta.focus();
+    };
+    const lineTa = (prefix) => {
+      const s = ta.selectionStart, e = ta.selectionEnd, v = ta.value, ls = v.lastIndexOf("\n", s - 1) + 1;
+      const block = v.slice(ls, e).split("\n").map((ln, i) => prefix.replace("{n}", i + 1) + ln).join("\n");
+      ta.value = v.slice(0, ls) + block + v.slice(e); ta.focus();
+    };
+    const insTa = (t) => { const s = ta.selectionStart; ta.value = ta.value.slice(0, s) + t + ta.value.slice(s); ta.selectionStart = ta.selectionEnd = s + t.length; ta.focus(); };
+    const B = (fn) => () => { fn(); };
+    const BTNS = [
+      ["B", "Đậm", () => isWys() ? exec("bold") : wrapTa("**", "**", "chữ đậm"), "font-weight:700"],
+      ["I", "Nghiêng", () => isWys() ? exec("italic") : wrapTa("*", "*", "chữ nghiêng"), "font-style:italic"],
+      ["H1", "Tiêu đề 1", () => isWys() ? exec("formatBlock", "H1") : lineTa("# ")],
+      ["H2", "Tiêu đề 2", () => isWys() ? exec("formatBlock", "H2") : lineTa("## ")],
+      ["H3", "Tiêu đề 3", () => isWys() ? exec("formatBlock", "H3") : lineTa("### ")],
+      ["•", "Gạch đầu dòng", () => isWys() ? exec("insertUnorderedList") : lineTa("- ")],
+      ["1.", "Danh sách số", () => isWys() ? exec("insertOrderedList") : lineTa("{n}. ")],
+      ["❝", "Trích dẫn", () => isWys() ? exec("formatBlock", "BLOCKQUOTE") : lineTa("> ")],
+      ["</>", "Code", () => isWys() ? exec("insertHTML", "<code>code</code>") : wrapTa("`", "`", "code")],
+      ["🔗", "Link", () => { const u = prompt("URL:", "https://"); if (!u) return; isWys() ? exec("createLink", u) : wrapTa("[", "](" + u + ")", "chữ"); }],
+      ["―", "Kẻ ngang", () => isWys() ? exec("insertHorizontalRule") : insTa("\n---\n")],
+    ];
+    host.innerHTML = "";
+    BTNS.forEach(([label, title, fn, style]) => {
+      const b = document.createElement("button"); b.type = "button"; b.textContent = label; b.title = title;
+      if (style) b.style.cssText += style;
+      b.onmousedown = (e) => e.preventDefault();
+      b.onclick = fn;
+      host.appendChild(b);
+    });
+  }
+
+  async function openNote(rel, it) {
+    const ed = document.getElementById("noteEditor"); if (!ed) return;
+    it = it || {}; const ext = (it.ext || "").toLowerCase();
+    ed.hidden = false; ed.classList.remove("ne-full");
+    document.removeEventListener("keydown", _neKeyHandler, true);
+    document.addEventListener("keydown", _neKeyHandler, true);
+    try { if (window.__javisGraph && window.__javisGraph.pause) window.__javisGraph.pause(); } catch (e) {}
+    document.getElementById("neTitle").innerHTML = `<span class="vt-ico">${_fileIcon(ext)}</span>${esc(it.name || rel)}`;
+    const actions = document.getElementById("neActions"); const body = document.getElementById("neBody");
+    actions.innerHTML = ""; body.innerHTML = ""; body.className = "ne-body"; _neSaveFn = null;
+
+    if (VT_IMG_EXTS.includes(ext)) {
+      body.innerHTML = `<div class="ne-img"><img src="${_vtRaw(rel)}" alt="${esc(it.name || "")}"></div>`;
+      _neCommonBtns(actions, rel, it); _vtMarkActive(null); return;
+    }
+    if (VT_TEXT_EXTS.includes(ext)) {
+      body.innerHTML = `<div class="vt-info" style="padding:16px">Đang mở…</div>`;
+      let resp, d = {};
+      try { resp = await fetch(`/files/read?brain=${encodeURIComponent(fbrain())}&path=${encodeURIComponent(rel)}`); d = await resp.json().catch(() => ({})); }
+      catch (e) { _neRenderDownload(body, actions, rel, it); return; }
+      if (!resp.ok || d.error || d.content == null) { _neRenderDownload(body, actions, rel, it); return; }
+      const isMd = ext === ".md";
+      if (isMd) { try { await _ensureTurndown(); } catch (e) {} }   // để lưu bản render (WYSIWYG) → markdown
+      const wysOk = isMd && !!window.TurndownService;
+      body.className = "ne-body" + (isMd ? (wysOk ? " ne-md mode-wys" : " ne-md mode-source") : " mode-source");
+      body.innerHTML = isMd
+        ? `<div class="ne-fmt"></div><div class="ne-panes"><div class="ne-prev ne-wys" id="neWys" contenteditable="true" spellcheck="false"></div><div class="ne-src"><textarea id="neText" spellcheck="false"></textarea></div></div>`
+        : `<div class="ne-src"><textarea id="neText" spellcheck="false"></textarea></div>`;
+      const ta = document.getElementById("neText"); ta.value = d.content || "";
+      let mdGetter = null;
+      if (isMd) {
+        const wys = document.getElementById("neWys");
+        wys.innerHTML = window.mdToHtml ? window.mdToHtml(ta.value) : esc(ta.value);
+        let curMode = wysOk ? "wys" : "source";
+        const wysToSrc = () => { const md = _mdFromHtml(wys.innerHTML); if (md != null) ta.value = md; };
+        const srcToWys = () => { wys.innerHTML = window.mdToHtml ? window.mdToHtml(ta.value) : esc(ta.value); };
+        _neBuildToolbar(body.querySelector(".ne-fmt"), { mode: () => curMode, ta, wys });   // thanh công cụ chạy cả 2 chế độ
+        mdGetter = () => (curMode === "wys" ? (_mdFromHtml(wys.innerHTML) != null ? _mdFromHtml(wys.innerHTML) : ta.value) : ta.value);
+        const seg = document.createElement("span"); seg.className = "ne-seg";
+        [["Sửa", "mode-wys"], ["Nguồn", "mode-source"]].forEach(([lbl, cls]) => {
+          const b = document.createElement("button"); b.textContent = lbl; b.classList.toggle("active", cls === (curMode === "wys" ? "mode-wys" : "mode-source"));
+          b.onclick = () => {
+            const toSrc = cls === "mode-source";
+            if (toSrc && curMode === "wys") wysToSrc();
+            else if (!toSrc && curMode === "source") srcToWys();
+            curMode = toSrc ? "source" : "wys";
+            body.className = "ne-body ne-md " + cls;
+            seg.querySelectorAll("button").forEach(x => x.classList.remove("active")); b.classList.add("active");
+          };
+          seg.appendChild(b);
+        });
+        actions.appendChild(seg);
+      }
+      const saveBtn = document.createElement("button"); saveBtn.textContent = "💾 Lưu"; saveBtn.title = "Lưu (Ctrl+S)";
+      _neSaveFn = async () => {
+        const content = mdGetter ? mdGetter() : ta.value;
+        const fd = new FormData(); fd.append("brain", fbrain()); fd.append("path", rel); fd.append("content", content);
+        try {
+          const r = await (await fetch("/files/write", { method: "POST", body: fd })).json();
+          if (r.ok) { saveBtn.textContent = "✓ Đã lưu"; saveBtn.classList.add("ne-saved"); setTimeout(() => { saveBtn.textContent = "💾 Lưu"; saveBtn.classList.remove("ne-saved"); }, 1400); }
+          else saveBtn.textContent = "⚠ Lỗi";
+        } catch (e) { saveBtn.textContent = "⚠ Lỗi"; }
+      };
+      saveBtn.onclick = _neSaveFn;
+      actions.appendChild(saveBtn);
+      _neCommonBtns(actions, rel, it);
+      _vtMarkActive(isMd ? rel : null);
+      ta.focus();
+      return;
+    }
+    _neRenderDownload(body, actions, rel, it); _vtMarkActive(null);
+  }
+
   function boot() {
     document.body.classList.add("has-rail");
     const ver = document.getElementById("railVersion");
@@ -2367,7 +2818,12 @@
     if (gs) gs.addEventListener("change", () => {
       const active = Alpine.store("nav").active;
       if (active !== "home") renderPage(active);
+      // Cây vault ở cột trái sống ngoài hệ cview → tự làm mới theo brain mới
+      _vtCache.clear(); _vtIndex = null; _vtActivePath = null; renderVaultTree();
     });
+
+    // Cột trái = Vault explorer (luôn có trong DOM ở màn home) → nạp cây ngay khi khởi động
+    renderVaultTree();
 
     freshSettings().then(s => {
       graphEnabled = !(s.dashboard && s.dashboard.graph_enabled === false);
