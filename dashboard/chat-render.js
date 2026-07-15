@@ -41,6 +41,18 @@
     s = String(s || "").trim();
     return /^(https?:|data:|blob:|\/)/i.test(s) ? s : fileUrl(s);
   }
+  // Path tro toi file/thu muc TRONG vault (khong phai URL ngoai / data / o dia)?
+  function isVaultRel(p) {
+    p = String(p == null ? "" : p).trim();
+    return !!p && !/^(https?:|mailto:|data:|blob:|\/)/i.test(p);
+  }
+  // Thuoc tinh <a> mo trang Tep tin dung vi tri file/thu muc. Giu href deep-link (#open=..) de
+  // Ctrl/giua chuot mo tab trinh duyet moi cung nhay dung cho; bam thuong -> mo trong app.
+  function vaultLoc(rawpath) {
+    var clean = String(rawpath || "").replace(/^\.?\//, "");
+    return 'href="#open=' + esc(encodeURIComponent(clean)) + '" data-vault-path="' + esc(clean) +
+      '" class="jv-floc" title="Mo vi tri trong Tep tin"';
+  }
   // FNV-1a -> id ngan on dinh cho artifact (cung noi dung -> cung id qua cac lan re-render khi stream)
   function hashId(s) {
     var h = 0x811c9dc5;
@@ -124,9 +136,11 @@
   }
 
   // ---------------------------------------------------------------- anh, link, bang
-  function imgHtml(u, alt) {
-    var h = safeHref(u);
+  function imgHtml(u, alt, rawpath) {
     var img = '<img class="chat-img" src="' + esc(u) + '" alt="' + esc(alt || "") + '" loading="lazy">';
+    // Anh trong vault: bam mo VI TRI trong Tep tin (thay vi tai anh tho); van hien anh inline.
+    if (rawpath && isVaultRel(rawpath)) return '<a ' + vaultLoc(rawpath) + ">" + img + "</a>";
+    var h = safeHref(u);
     return h ? '<a href="' + esc(h) + '" target="_blank" rel="noopener">' + img + "</a>" : img;
   }
   function tableHtml(tbl) {
@@ -246,16 +260,18 @@
     raw = raw.replace(/`([^`\n]+)`/g, function (_m, c) { return put("<code>" + esc(c) + "</code>"); });
     // 3) anh vault ![[..]] + anh markdown ![]() (giu URL qua placeholder de khong bi escape)
     raw = raw.replace(/!\[\[([^\]|]+?)(?:\|[^\]]*)?\]\]/g, function (_m, name) {
-      return put(imgHtml(resolveSrc(name.trim()), name.trim()));
+      name = name.trim();
+      return put(imgHtml(resolveSrc(name), name, name));
     });
     raw = raw.replace(/!\[([^\]]*)\]\(([^)\s]+)[^)]*\)/g, function (_m, alt, src) {
-      return put(imgHtml(resolveSrc(src), alt));
+      return put(imgHtml(resolveSrc(src), alt, src));
     });
-    // 4) link []()
+    // 4) link []() : URL ngoai -> tab moi; file/thu muc vault -> mo dung vi tri trong Tep tin; con lai giu cu
     raw = raw.replace(/\[([^\]]+)\]\(([^)\s]+)[^)]*\)/g, function (_m, t, href) {
       href = href.trim();
-      var u = /^(https?:|mailto:)/i.test(href) ? href : resolveSrc(href);
-      return put('<a href="' + esc(u) + '" target="_blank" rel="noopener">' + esc(t) + "</a>");
+      if (/^(https?:|mailto:)/i.test(href)) return put('<a href="' + esc(href) + '" target="_blank" rel="noopener">' + esc(t) + "</a>");
+      if (isVaultRel(href)) return put('<a ' + vaultLoc(href) + ">" + esc(t) + "</a>");
+      return put('<a href="' + esc(resolveSrc(href)) + '" target="_blank" rel="noopener">' + esc(t) + "</a>");
     });
     // 5) bang markdown
     raw = raw.replace(/(^\|.+\|[ \t]*\n\|[ \t:|-]+\|[ \t]*\n(?:\|.*\|[ \t]*\n?)*)/gm, function (tbl) {
@@ -438,6 +454,16 @@
   // ---------------------------------------------------------------- wiring (chi khi co DOM)
   if (typeof document !== "undefined") {
     document.addEventListener("click", function (e) {
+      // Link file/thu muc vault: bam thuong -> mo trang Tep tin dung vi tri. Ctrl/Cmd/Shift/giua chuot
+      // -> de trinh duyet dung deep-link href (#open=..) mo tab moi (chat van con o tab cu).
+      var loc = e.target.closest ? e.target.closest("a.jv-floc") : null;
+      if (loc && loc.getAttribute("data-vault-path") != null) {
+        if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || e.button > 0) return;
+        e.preventDefault();
+        if (typeof window.JavisOpenFiles === "function") window.JavisOpenFiles(loc.getAttribute("data-vault-path"));
+        else window.open(loc.href, "_blank");   // du phong: mo tab moi neu console.js chua san sang
+        return;
+      }
       var card = e.target.closest ? e.target.closest(".jv-art") : null;
       if (card && card.dataset.art) { e.preventDefault(); openArtifact(card.dataset.art); }
     });

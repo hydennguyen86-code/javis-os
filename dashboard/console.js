@@ -81,6 +81,7 @@
 
   let _settings = null;
   let _renderGen = 0;         // token chống race: mỗi lần đổi trang tăng 1; render async cũ tự bỏ
+  let _fmPending = null;       // { dir, file } - vị trí mở sẵn cho trang Tệp tin (khi bấm link file/thư mục trong chat)
   let graphEnabled = true;
   const isNarrow = () => window.matchMedia("(max-width: 860px)").matches;
   const liteMode = () => !graphEnabled || isNarrow();
@@ -132,6 +133,25 @@
     if (document.startViewTransition && !skipVT) document.startViewTransition(swap);
     else swap();
   }
+
+  // Mở trang Tệp tin ĐÚNG vị trí một file/thư mục (gọi từ link trong chat qua window.JavisOpenFiles,
+  // hoặc từ deep-link #open=<đường-dẫn> khi mở ở tab trình duyệt mới). fullPath tương đối GỐC BRAIN
+  // (đúng quy ước AI ghi trong chat); trang Tệp tin sẽ tự ghép tiền tố brain để ra path tương đối trần.
+  function openFilesAt(fullPath) {
+    const raw = String(fullPath == null ? "" : fullPath);
+    const clean = raw.replace(/^\.?\//, "").replace(/\/+$/, "");
+    const i = clean.lastIndexOf("/");
+    const base = i >= 0 ? clean.slice(i + 1) : clean;
+    const parent = i >= 0 ? clean.slice(0, i) : "";
+    const isDir = /\/$/.test(raw) || (base !== "" && base.indexOf(".") < 0);   // gạch chéo cuối hoặc không có đuôi → thư mục
+    _fmPending = isDir ? { dir: clean, file: "" } : { dir: parent, file: base };
+    // Chat mở dạng overlay phóng to (chat-stage) sẽ che trang Tệp tin → thu lại trước cho thấy kết quả.
+    try { if (window.JavisChatStage && window.JavisChatStage.isOpen()) window.JavisChatStage.collapse(); } catch (e) {}
+    const active = window.Alpine ? Alpine.store("nav").active : "";
+    if (active === "files") renderPage("files");   // đã ở trang Tệp tin → nạp lại để nhảy tới vị trí mới
+    else navigateTo("files");
+  }
+  if (typeof window !== "undefined") window.JavisOpenFiles = openFilesAt;
 
   // ============================================
   // Render từng trang vào #cviewBody
@@ -296,6 +316,8 @@
     .fm-row:last-child{border-bottom:none} .fm-row:hover{background:rgba(120,180,255,.06)}
     .fm-ico{flex:none} .fm-name{flex:1;color:#e7eefc;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .fm-row.is-dir .fm-ico,.fm-row.is-dir .fm-name{cursor:pointer}
+    .fm-row.fm-target{box-shadow:inset 3px 0 0 #7fb0ff;background:rgba(120,180,255,.10);animation:fmFlash 1.7s ease}
+    @keyframes fmFlash{0%,45%{background:rgba(120,180,255,.42)}100%{background:rgba(120,180,255,.10)}}
     .fm-size{color:#7d8aa6;font-size:13px;min-width:60px;text-align:right}
     .fm-row-act{display:flex;gap:5px;opacity:0;transition:.15s} .fm-row:hover .fm-row-act{opacity:1}
     .fm-row-act button{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);color:#aebbd6;cursor:pointer;font-size:13px;padding:3px 9px;border-radius:6px;white-space:nowrap} .fm-row-act button:hover{color:#fff;border-color:rgba(120,180,255,.5)}
@@ -477,7 +499,31 @@
       }
       load(cur);
     };
-    load();   // undefined → điểm vào mặc định = brain (dù trần duyệt có thể là cả ổ đĩa)
+    // Sau khi nạp thư mục: cuộn tới đúng file mục tiêu + tô sáng để "tìm thấy vị trí" ngay.
+    function revealFile(name) {
+      let hit = null;
+      listEl.querySelectorAll(".fm-row").forEach(r => {
+        r.classList.remove("fm-target");
+        const nm = r.querySelector(".fm-name");
+        if (nm && nm.textContent === name) hit = r;
+      });
+      if (!hit) return;
+      hit.classList.add("fm-target");
+      try { hit.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (e) {}
+    }
+    // Mở đúng vị trí một mục tiêu từ chat: path trong chat tương đối GỐC BRAIN, còn load() tính theo
+    // TRẦN duyệt → cần ghép tiền tố brain (home) mà /files/list trả về.
+    async function openVaultTarget(brainRelDir, fileName) {
+      let home = "";
+      try { const d = await (await fetch(`/files/list?brain=${encodeURIComponent(fbrain())}`)).json(); home = d.home || ""; }
+      catch (e) {}
+      const full = brainRelDir ? (home ? home + "/" + brainRelDir : brainRelDir) : (home || undefined);
+      await load(full);
+      if (fileName) revealFile(fileName);
+    }
+    const pend = _fmPending; _fmPending = null;
+    if (pend) openVaultTarget(pend.dir, pend.file);
+    else load();   // undefined → điểm vào mặc định = brain (dù trần duyệt có thể là cả ổ đĩa)
   }
 
   // ============================================
@@ -2328,6 +2374,11 @@
       // Lite-mode (cờ tắt hoặc màn hẹp) → vào thẳng Tổng quan, không hiện graph
       if (liteMode()) navigateTo("overview");
       recomputeGraph();
+      // Deep-link mở tab mới từ link file trong chat: #open=<đường-dẫn-vault> → mở thẳng Tệp tin đúng vị trí
+      try {
+        const m = /^#open=(.+)$/.exec(location.hash || "");
+        if (m) openFilesAt(decodeURIComponent(m[1]));
+      } catch (e) {}
     });
   }
 
