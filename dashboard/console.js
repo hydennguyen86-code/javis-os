@@ -2403,24 +2403,38 @@
     return items;
   }
 
-  // Bung cây tới đúng thư mục (nạp tươi từng cấp → thấy file mới). dirRel = đường dẫn thư mục theo trần.
-  async function _vtRevealDir(dirRel) {
-    const tree = document.getElementById("vaultTree"); if (!tree || dirRel == null) return;
+  // Dựng lại cây nhưng GIỮ NGUYÊN các thư mục đang mở (thêm/sửa/xoá không làm sập cây).
+  // revealDir (tuỳ chọn) = thư mục cần mở thêm để thấy file vừa tạo.
+  async function _vtRebuildReExpand(revealDir) {
+    const tree = document.getElementById("vaultTree"); if (!tree) return;
     const escSel = (s) => (window.CSS && CSS.escape) ? CSS.escape(s) : s.replace(/"/g, '\\"');
-    let inner;
-    if (_vtHome && dirRel.indexOf(_vtHome + "/") === 0) inner = dirRel.slice(_vtHome.length + 1);
-    else if (!_vtHome) inner = dirRel;
-    else inner = (dirRel === _vtHome ? "" : dirRel);
-    const segs = inner ? inner.split("/") : [];
-    let acc = _vtHome || "";
-    for (const seg of segs) {
-      acc = acc ? acc + "/" + seg : seg;
-      const node = tree.querySelector(`.vt-node[data-rel="${escSel(acc)}"]`);
-      if (!node) break;
+    // 1. Ghi lại các thư mục đang mở (childBox không ẩn).
+    const wanted = new Set();
+    tree.querySelectorAll(".vt-branch > .vt-children:not(.vt-hidden)").forEach(box => {
+      const node = box.previousElementSibling;
+      if (node && node.dataset && node.dataset.rel) wanted.add(node.dataset.rel);
+    });
+    // 2. Thêm chuỗi thư mục cha của revealDir (để thấy file mới dù thư mục đó đang đóng).
+    if (revealDir != null && revealDir !== "") {
+      let inner;
+      if (_vtHome && revealDir.indexOf(_vtHome + "/") === 0) inner = revealDir.slice(_vtHome.length + 1);
+      else if (!_vtHome) inner = revealDir;
+      else inner = (revealDir === _vtHome ? "" : revealDir);
+      const segs = inner ? inner.split("/") : [];
+      let acc = _vtHome || "";
+      for (const seg of segs) { acc = acc ? acc + "/" + seg : seg; wanted.add(acc); }
+    }
+    // 3. Dựng lại (tươi) rồi mở lại từ NÔNG tới SÂU (cha trước con).
+    _vtCache.clear(); _vtIndex = null;
+    await renderVaultTree();
+    const list = [...wanted].sort((a, b) => a.split("/").length - b.split("/").length);
+    for (const rel of list) {
+      const node = tree.querySelector(`.vt-node[data-rel="${escSel(rel)}"]`);
+      if (!node) continue;
       const box = node.parentElement && node.parentElement.querySelector(":scope > .vt-children");
       if (box && box.classList.contains("vt-hidden")) {
         node.click();
-        for (let i = 0; i < 25 && (box.classList.contains("vt-hidden") || !box.children.length); i++) await new Promise(r => setTimeout(r, 40));
+        for (let i = 0; i < 25 && (box.classList.contains("vt-hidden") || !box.children.length); i++) await new Promise(r => setTimeout(r, 30));
       }
     }
   }
@@ -2434,9 +2448,7 @@
     const path = dir ? dir + "/" + n : n;
     const fd = new FormData(); fd.append("brain", fbrain()); fd.append("path", path); fd.append("content", "");
     try { await fetch("/files/write", { method: "POST", body: fd }); } catch (e) {}
-    _vtCache.clear(); _vtIndex = null;
-    await renderVaultTree();
-    await _vtRevealDir(dir);                     // tự bung cây tới thư mục vừa tạo → thấy file mới trong cây
+    await _vtRebuildReExpand(dir);               // giữ thư mục đang mở + bung tới thư mục vừa tạo
     const ext = "." + n.split(".").pop().toLowerCase();
     openNote(path, { name: n, ext: ext, type: "file" });
   }
@@ -2446,14 +2458,14 @@
     if (!nn || nn === oldname) return;
     const fd = new FormData(); fd.append("brain", fbrain()); fd.append("path", rel); fd.append("newname", nn);
     try { await fetch("/files/rename", { method: "POST", body: fd }); } catch (e) {}
-    _vtCache.clear(); _vtIndex = null; renderVaultTree();
+    await _vtRebuildReExpand(null);   // giữ nguyên các thư mục đang mở
   }
   async function _vtDelete(rel, name, isDir) {
     if (!confirm(`Xoá "${name}"${isDir ? " và toàn bộ bên trong" : ""}? Không hoàn tác được.`)) return;
     const fd = new FormData(); fd.append("brain", fbrain()); fd.append("path", rel);
     try { await fetch("/files/delete", { method: "POST", body: fd }); } catch (e) {}
     if (_vtActivePath === rel) closeNote();
-    _vtCache.clear(); _vtIndex = null; renderVaultTree();
+    await _vtRebuildReExpand(null);   // giữ nguyên các thư mục đang mở
   }
 
   function _vtRowEl(it, parentPath, depth) {
@@ -2598,7 +2610,8 @@
       if (!/\.[a-z0-9]+$/i.test(n)) n += ".md";   // mặc định file markdown
       const rel = _vtHome ? _vtHome + "/" + n : n;
       const fd = new FormData(); fd.append("brain", fbrain()); fd.append("path", rel); fd.append("content", "");
-      await fetch("/files/write", { method: "POST", body: fd }); _vtCache.clear(); _vtIndex = null; await renderVaultTree();
+      await fetch("/files/write", { method: "POST", body: fd });
+      await _vtRebuildReExpand(_vtHome || "");   // giữ thư mục đang mở
       const ext = "." + n.split(".").pop().toLowerCase();
       openNote(rel, { name: n, ext: ext, type: "file" });
     };

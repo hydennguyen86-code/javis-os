@@ -4,6 +4,10 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.56] - 2026-07-16
+### Sửa lỗi
+- **Thêm/đổi tên/xoá file trong cây Vault làm SẬP hết các thư mục đang mở**: mỗi thao tác gọi `renderVaultTree()` dựng lại cả cây từ đầu (mọi thư mục về trạng thái đóng), nên đang mở sâu vào thư mục nào là bị đóng mất, rất khó chịu. Sửa: thêm `_vtRebuildReExpand()` - trước khi dựng lại thì GHI LẠI các thư mục đang mở (childBox không ẩn), dựng tươi xong tự mở lại đúng chúng theo thứ tự nông-trước-sâu (cha trước con). Áp cho cả 4 thao tác: thêm file (nút ＋ đầu VAULT và ＋ trên node), đổi tên, xoá. Riêng thêm file còn tự bung thêm tới đúng thư mục vừa tạo để thấy file mới ngay. Nút ↻ làm mới thủ công vẫn thu gọn như cũ.
+
 ## [0.9.55] - 2026-07-16
 ### Thêm mới
 - **Giao diện brain mới - cột trái thành Vault explorer (cây thư mục kiểu Obsidian + tìm note)** thay cho panel số liệu kinh doanh cũ. Cây lồng nhiều tầng mở lazy (bấm mới nạp), neo trong gốc brain. Ô tìm 2 chế độ: Tên (quét toàn vault ở trình duyệt qua `/files/list`, bỏ dấu tiếng Việt) và Nội dung (endpoint mới `GET /files/search` quét ruột file text, chạy threadpool, cap kết quả). Rê chuột vào node hiện 3 nút: ＋ thêm file (bấm ở thư mục tạo bên trong, ở file tạo cùng thư mục; mặc định `.md`; tạo xong tự bung cây tới đúng chỗ), ✎ đổi tên, 🗑 xoá.
