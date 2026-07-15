@@ -4,6 +4,12 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.49] - 2026-07-15
+### Sửa lỗi
+- **Form Kết nối dài không cuộn được, bị cắt mất nút và ô cuối**: modal Kết nối (vd Substack với 3 ô + phần hướng dẫn dài) tràn quá chiều cao màn hình nhưng không cuộn xuống được, che mất ô User ID và nút Kết nối. Nguyên nhân: `.conn-form` nằm trong `.mp-box` giới hạn `max-height: 86vh` nhưng bản thân nó không có vùng cuộn. Sửa: cho `.conn-form` co lại và cuộn (`flex: 1 1 auto; min-height: 0; overflow-y: auto`), phần đầu đề và hàng nút Kết nối/Huỷ vẫn ghim cố định. Áp dụng cho MỌI connector có form dài, không riêng Substack.
+### Cải thiện
+- **Substack: thêm trợ lý lấy nhanh User ID + Publication URL, gọn phần hướng dẫn trong form**: trang hướng dẫn (`/static/docs/substack.html`) nay có công cụ tương tác: (A) dán link trang Hồ sơ là tự bóc ra User ID kèm nút Copy, không cần DevTools; (B) một dòng lệnh dán vào Console DevTools trên substack.com tự lấy cả User ID lẫn Publication URL (gọi `api/v1/user/profile/self`, tự copy User ID). Session token vẫn phải copy tay vì Substack khoá cookie HttpOnly - JS không đọc được, đã nói rõ trong trang. Đồng thời rút gọn đoạn `guide` hiển thị trong form Kết nối cho đỡ dài, dẫn người dùng bấm 'Hướng dẫn' để dùng trợ lý.
+
 ## [0.9.48] - 2026-07-15
 ### Cải thiện
 - **Substack: hướng dẫn riêng trong Docs của Javis (không trỏ ra GitHub nữa)**: thêm trang hướng dẫn tự chứa `dashboard/docs/substack.html` (khớp giao diện tối của Javis, phục vụ tại `/static/docs/substack.html`) và đổi link "Hướng dẫn" của connector Substack trỏ vào trang này thay vì repo GitHub gốc. Trang gồm các bước lấy 3 thông tin đăng nhập (publication URL, cookie `substack.sid`, User ID), giới thiệu 3 tool, bảng mức quyền và cách bật quyền đăng bài, các lớp an toàn (loop không tự đăng, mặc định không gửi email), và bảng markdown gọn dựng nội dung.

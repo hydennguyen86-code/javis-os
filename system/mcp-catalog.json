@@ -661,7 +661,7 @@
             "placeholder": "vd 12345678"
           }
         ],
-        "guide": "Đăng nhập Substack trên trình duyệt rồi lấy 3 thứ. (1) Publication URL: địa chỉ trang Substack của bạn, vd https://tencuaban.substack.com. (2) Session token: mở substack.com > F12 (DevTools) > tab Application (Firefox gọi là Storage) > Cookies > chọn https://substack.com > tìm cookie tên 'substack.sid' > copy TOÀN BỘ giá trị (Value) dán vào đây. Coi như mật khẩu; token hết hạn khi bạn đăng xuất. (3) User ID: bấm avatar góc phải > Profile (Hồ sơ), nhìn URL dạng substack.com/profile/12345678-ten-ban - dãy SỐ trước dấu gạch chính là User ID. Bấm 'Hướng dẫn' để xem chi tiết từng bước và cách bật quyền đăng bài.",
+        "guide": "Cần 3 thứ: (1) Publication URL - địa chỉ trang Substack của bạn (vd https://tencuaban.substack.com); (2) Session token - cookie 'substack.sid' lấy trong DevTools; (3) User ID - dãy số. Bấm 'Hướng dẫn' để mở trang có TRỢ LÝ lấy nhanh User ID + Publication URL và cách bật quyền đăng bài.",
         "guide_url": "/static/docs/substack.html"
       },
       "validate": {
