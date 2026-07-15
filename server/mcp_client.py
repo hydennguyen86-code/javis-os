@@ -28,7 +28,7 @@ import httpx
 
 PROTOCOL = "2025-06-18"
 _IDLE_TTL = 600          # đóng session không dùng > 10 phút
-_INTERNAL = {"botcake": "botcake_mcp"}   # transport internal → tên module
+_INTERNAL = {"botcake": "botcake_mcp", "substack": "substack_mcp"}   # transport internal → tên module
 
 
 def sanitize_fn(name):

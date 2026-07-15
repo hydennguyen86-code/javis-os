@@ -638,42 +638,43 @@
       "name": "Substack",
       "icon": "/static/logos/substack.svg",
       "category": "Marketing",
-      "description": "Tạo BẢN NHÁP bài viết / newsletter trên Substack bằng lời (Javis soạn tiêu đề, phụ đề, nội dung rồi đẩy vào Substack ở dạng nháp để bạn tự bấm đăng). Chạy local qua npx, mỗi tài khoản 1 session token.",
+      "description": "Soạn và ĐĂNG bài viết / newsletter trên Substack bằng lời: liệt kê nháp, tạo nháp, và đăng bài (tuỳ chọn gửi email cho người đăng ký). Javis tự bọc thẳng API Substack (chạy Python nội bộ, KHÔNG cần cài Node/npx), mỗi tài khoản 1 session token.",
       "status": "beta",
-      "transport": "stdio",
-      "command": "npx",
-      "args": ["-y", "substack-mcp@latest"],
-      "requires": { "node": ">=18" },
+      "transport": "internal",
+      "internal": "substack",
       "auth": {
         "type": "apikey",
         "fields": [
           {
             "key": "publication_url",
             "label": "Địa chỉ Substack (publication URL)",
-            "placeholder": "https://tencuaban.substack.com",
-            "env": "SUBSTACK_PUBLICATION_URL"
+            "placeholder": "https://tencuaban.substack.com"
           },
           {
             "key": "session_token",
             "label": "Session token (cookie substack.sid)",
-            "placeholder": "dán giá trị cookie substack.sid...",
-            "env": "SUBSTACK_SESSION_TOKEN"
+            "placeholder": "dán giá trị cookie substack.sid..."
           },
           {
             "key": "user_id",
             "label": "User ID (dãy số)",
-            "placeholder": "vd 12345678",
-            "env": "SUBSTACK_USER_ID"
+            "placeholder": "vd 12345678"
           }
         ],
-        "guide": "Cần Node.js 18+ trên máy chạy Javis và đã đăng nhập Substack trên trình duyệt. (1) Publication URL: địa chỉ trang Substack của bạn, vd https://tencuaban.substack.com. (2) Session token: mở substack.com > F12 (DevTools) > tab Application (Firefox gọi là Storage) > Cookies > chọn https://substack.com > tìm cookie tên 'substack.sid' > copy TOÀN BỘ giá trị (Value) dán vào đây. Coi như mật khẩu; token hết hạn khi bạn đăng xuất. (3) User ID: bấm avatar góc phải > Profile (Hồ sơ), nhìn URL dạng substack.com/profile/12345678-ten-ban - dãy SỐ trước dấu gạch chính là User ID. Tool duy nhất hiện có là tạo BẢN NHÁP - Javis không tự đăng bài.",
+        "guide": "Đăng nhập Substack trên trình duyệt rồi lấy 3 thứ. (1) Publication URL: địa chỉ trang Substack của bạn, vd https://tencuaban.substack.com. (2) Session token: mở substack.com > F12 (DevTools) > tab Application (Firefox gọi là Storage) > Cookies > chọn https://substack.com > tìm cookie tên 'substack.sid' > copy TOÀN BỘ giá trị (Value) dán vào đây. Coi như mật khẩu; token hết hạn khi bạn đăng xuất. (3) User ID: bấm avatar góc phải > Profile (Hồ sơ), nhìn URL dạng substack.com/profile/12345678-ten-ban - dãy SỐ trước dấu gạch chính là User ID. Javis dựng nội dung từ markdown gọn (tiêu đề #, gạch đầu dòng -, **đậm**, [chữ](link)...).",
         "guide_url": "https://github.com/marcomoauro/substack-mcp"
       },
+      "validate": {
+        "tool": "substack_list_drafts",
+        "args": { "limit": 1 }
+      },
       "tool_meta": {
-        "write": ["create_draft_post"]
+        "read": ["substack_list_drafts"],
+        "write": ["substack_create_draft"],
+        "danger": ["substack_publish"]
       },
       "default_perm": "safe",
-      "risk": "Connector này chỉ TẠO BẢN NHÁP bài viết trên tài khoản Substack của bạn - KHÔNG tự xuất bản, không gửi email cho người đăng ký (bạn tự vào Substack bấm Publish). Session token cho toàn quyền tài khoản Substack nên giữ kín như mật khẩu; hết hạn khi đăng xuất thì kết nối lại. Mức mặc định là Ghi nháp để tool tạo nháp chạy được; loop chạy nền vẫn không được tự tạo."
+      "risk": "Mức Ghi nháp (mặc định) cho phép Javis TẠO NHÁP bài viết trên Substack của bạn - chưa đăng, chưa gửi ai. Muốn Javis ĐĂNG BÀI THẬT thì phải nâng kết nối này lên Toàn quyền; khi đó Javis vẫn chỉ đăng khi bạn yêu cầu trực tiếp trong chat (loop chạy nền không bao giờ tự đăng). Đăng mặc định chỉ lên web, KHÔNG gửi email; chỉ khi bạn nói rõ 'gửi email cho người đăng ký' thì Javis mới bật cờ gửi mail - và việc đã gửi mail KHÔNG hoàn tác được. Session token cho toàn quyền tài khoản Substack nên giữ kín như mật khẩu; hết hạn khi đăng xuất thì kết nối lại."
     }
   ]
 }
