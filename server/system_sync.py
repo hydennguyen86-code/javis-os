@@ -265,15 +265,19 @@ def mirror_skills(root) -> None:
         if not lk.acquire(blocking=False):
             return   # luồng khác đang mirror đúng root này -> nó làm rồi, khỏi xếp hàng
         try:
-            # Kiểm lại LẦN NỮA sau khi đã cầm khoá: chờ-để-lấy-khoá không đồng nghĩa "không ai
-            # đụng gì" - luồng đang giữ khoá có thể đã copy xong + cập nhật cache SIG rồi mới
-            # nhả, đúng lúc ta vừa xin được khoá đó. Thiếu bước này, 2 luồng cùng thấy "cây đã
-            # đổi" ở tầng 1 (đọc trước khi ai cập nhật cache) sẽ CÙNG đi copy: một luồng copy
-            # thật, luồng kia lấy khoá SAU khi luồng trước đã nhả xong và copy LẶP LẠI vô ích -
-            # khoá lúc đó chỉ chống chồng-chéo tức thời chứ không chống trùng lặp tuần tự. Đọc
-            # lại _MIRROR_SIG (không tính lại sig - cây nguồn không đổi giữa 2 lần đọc của ta).
+            # Kiểm lại LẦN NỮA sau khi đã cầm khoá (double-checked locking - lần kiểm THỨ HAI
+            # này là LINH HỒN của mẫu đó, thiếu nó thì khoá gần như vô dụng): xin-được-khoá
+            # không đồng nghĩa "không ai vừa làm xong việc của mình". Luồng khác có thể đã copy
+            # xong + ghi cache SIG rồi mới nhả khoá, đúng lúc ta xin được chính khoá đó (khoá
+            # lúc ấy đang RẢNH nên acquire THÀNH CÔNG). Thiếu bước này, 2 luồng cùng thấy "cây
+            # đã đổi" ở tầng 1 sẽ CÙNG copy: một luồng copy thật, luồng kia copy LẶP vô ích.
+            # DÙNG LẠI ĐÚNG `sig` chụp ở tầng 1, KHÔNG tính lại: `sig` là ẢNH CHỤP mà lượt copy
+            # này dựa vào, và chính việc so đúng ảnh chụp đó với cache mới làm re-check ĐÚNG.
+            # (Đừng "sửa" thành _mirror_signature(canonical) - nguồn CÓ THỂ đổi giữa chừng do
+            # POST /skills ghi xen, tính lại sẽ so nhầm ảnh chụp khác với việc mình sắp làm.)
             if sig and _MIRROR_SIG.get(key) == sig:
                 return
+            had_error = False
             for d in sorted(p for p in canonical.iterdir()
                             if p.is_dir() and p.name != ".disabled" and (p / "SKILL.md").is_file()):
                 try:
@@ -285,10 +289,24 @@ def mirror_skills(root) -> None:
                         dst_f.parent.mkdir(parents=True, exist_ok=True)
                         shutil.copy2(str(d / rel), str(dst_f))
                 except Exception as e:
+                    # 1 skill hỏng KHÔNG chặn các skill còn lại, nhưng phải nhớ là lượt này
+                    # KHÔNG trọn vẹn (xem chỗ ghi cache bên dưới).
+                    had_error = True
                     print(f"[skill mirror] {d.name}: {type(e).__name__}: {e}", file=sys.stderr)
-            # Ghi cache SAU khi copy xong. Copy có thể đổi mtime ở đích chứ không đổi nguồn,
-            # nên tính lại chữ ký nguồn cho chắc (rẻ) thay vì tin sig cũ.
-            _MIRROR_SIG[key] = _mirror_signature(canonical)
+            # Ghi cache chữ ký của ẢNH CHỤP mà lượt copy này THỰC SỰ dựa vào (`sig` đọc ở tầng
+            # 1), KHÔNG phải chữ ký tính lại lúc này. Nguồn KHÔNG đứng yên suốt lượt copy: POST
+            # /skills ghi skill giữa phiên là kịch bản chính mà đường nóng này phục vụ. Nếu
+            # nguồn nhảy từ S_cũ sang S_mới giữa chừng, ta vừa chép nội dung của S_cũ; tính lại
+            # sẽ cache S_mới -> cache NÓI DỐI rằng mirror đang là S_mới -> tầng 1 thoát vĩnh
+            # viễn -> MẤT CẬP NHẬT. Cache đúng ảnh chụp thì xấu nhất chỉ là thừa một lượt copy
+            # ở lần gọi sau (an toàn). Đây CŨNG là thứ làm acquire(blocking=False) ở trên hợp
+            # lệ: luồng trượt khoá bỏ về vì tin "luồng kia đang làm việc của mình" - niềm tin
+            # đó chỉ đúng khi cache ghi lại đúng ảnh chụp mà lượt đó dựa vào.
+            # CÓ LỖI thì KHÔNG cache: skill lỗi tạm thời (AV quét/handle đang mở trên Windows)
+            # phải được thử lại ở lượt sau, chứ không im lặng vắng mặt khỏi đường nạp native
+            # cho tới khi restart tiến trình (bản cũ so nguồn-vs-đích mỗi lượt nên tự retry).
+            if not had_error:
+                _MIRROR_SIG[key] = sig
         finally:
             lk.release()
     except Exception as e:
