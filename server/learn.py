@@ -50,6 +50,31 @@ def _slugify(text: str) -> str:
     return t[:60] or "note"
 
 
+def _yaml_scalar(value: str) -> str:
+    """Bọc 1 giá trị thành scalar YAML AN TOÀN.
+
+    json.dumps ra chuỗi bọc nháy kép + escape đúng; YAML là superset của JSON ở tầng scalar
+    nên đọc ngược lại RA ĐÚNG chuỗi ban đầu. ensure_ascii=False để tiếng Việt giữ nguyên dấu
+    (không thành \\uXXXX).
+    """
+    return json.dumps("" if value is None else str(value), ensure_ascii=False)
+
+
+def _skill_frontmatter(name: str, desc: str, group: str, today: str) -> str:
+    """Frontmatter cho skill TỰ HỌC. Tách hàm riêng để test được hành vi thật.
+
+    name/description/group do FORK (model) sinh ⇒ coi là dữ liệu thù địch: đều có thể chứa
+    dấu hai chấm, '#', gạch nối đầu dòng, nháy, xuống dòng. Ghi TRẦN thì PyYAML ném lỗi,
+    skill_router.split_frontmatter tha lỗi trả {} ⇒ skill mất SẠCH frontmatter và im lặng
+    không route được. Description tiếng Việt có dấu hai chấm là chuyện thường ngày (2/5 skill
+    hệ thống phải bọc nháy) nên đây là đường hỏng HAY GẶP, không phải ca hiếm.
+    origin/status/created là của TA, cố định và an toàn ⇒ để trần cho dễ đọc.
+    """
+    return (f"---\nname: {_yaml_scalar(name)}\ndescription: {_yaml_scalar(desc)}\n"
+            f"group: {_yaml_scalar(group)}\n"
+            f"origin: javis-learned\nstatus: active\ncreated: {today}\n---\n")
+
+
 def _norm_name(text: str) -> str:
     """Chuẩn hoá tên để dedup rẻ (bỏ dấu tiếng Việt + lower). Chỉ là lọc tầng 1."""
     import unicodedata
@@ -392,16 +417,18 @@ class LearnFeature:
                "  2. description nêu THẲNG năng lực. KHÔNG mở đầu bằng 'Kích hoạt khi...', "
                "'Sử dụng skill này khi...' - mọi skill đều mở như vậy nên nó đốt ngân sách mà "
                "không phân biệt gì. Tốt: 'Chuyển HTML sang file Webcake .pke.'\n"
-               "  3. Ví dụ trigger đầy đủ đưa vào body, mục '## Khi nào dùng' - KHÔNG nhét "
+               "  3. description có dấu hai chấm thì phải bọc cả giá trị trong nháy kép, kẻo "
+               "YAML hiểu nhầm thành mapping.\n"
+               "  4. Ví dụ trigger đầy đủ đưa vào body, mục '## Khi nào dùng' - KHÔNG nhét "
                "vào description.\n"
-               "  4. body theo thứ tự mục: '## Khi nào dùng' / '## Chuẩn bị' / '## Cách chạy' "
+               "  5. body theo thứ tự mục: '## Khi nào dùng' / '## Chuẩn bị' / '## Cách chạy' "
                "/ '## Quy trình' / '## Bẫy' / '## Kiểm chứng'. Mục nào không có nội dung thật "
                "thì bỏ, đừng bịa.\n"
-               "  5. KHÔNG bịa flag, đường dẫn, API chưa thấy trong hội thoại. Không thấy thì "
+               "  6. KHÔNG bịa flag, đường dẫn, API chưa thấy trong hội thoại. Không thấy thì "
                "đừng viết.\n"
-               "  6. body khoảng 100 dòng cho skill đơn giản, 200 cho skill phức tạp.\n"
-               "  7. KHÔNG tạo skill kiểu router chỉ trỏ sang skill khác.\n"
-               "  8. group BẮT BUỘC, chọn nhóm sát nhất với skill đã có.\n\n"
+               "  7. body khoảng 100 dòng cho skill đơn giản, 200 cho skill phức tạp.\n"
+               "  8. KHÔNG tạo skill kiểu router chỉ trỏ sang skill khác.\n"
+               "  9. group BẮT BUỘC, chọn nhóm sát nhất với skill đã có.\n\n"
                if caps.get("skill") else "")
             + ("TASK (chống spam backlog): CHỈ đề xuất task khi hội thoại có VIỆC RÕ RÀNG chưa làm - "
                "user nhờ lặp lại, việc bỏ dở được nhắc, hoặc câu hỏi mở cần điều tra thêm. intent phải "
@@ -587,9 +614,8 @@ class LearnFeature:
                         continue
                     d = sk_root / slug   # vị trí BẬT (canonical) → mirror sang .claude ở lượt sysprompt kế
                     d.mkdir(parents=True, exist_ok=True)
-                    fm = (f"---\nname: {s.get('name', slug)}\ndescription: {desc}\n"
-                          f"group: {s.get('group') or 'Chung'}\n"
-                          f"origin: javis-learned\nstatus: active\ncreated: {today}\n---\n")
+                    fm = _skill_frontmatter(s.get("name", slug), desc,
+                                            s.get("group") or "Chung", today)
                     self.deps.atomic_write_text(d / "SKILL.md", fm + body + "\n")
                     written_paths.append(str((d / 'SKILL.md').relative_to(root)).replace("\\", "/"))
                     rep["skills"].append(slug)

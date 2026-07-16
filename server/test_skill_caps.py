@@ -221,6 +221,79 @@ check("learn.py nội suy SKILL_DESC_MAX vào prompt (không hardcode số)",
 check("learn.py ép trần description khi promote",
       "validate_description" in _learn)
 
+# ---- learn.py: frontmatter skill tự học phải AN TOÀN YAML (round-trip THẬT) ----
+# Đây là test HÀNH VI, không phải quét chuỗi: gọi CHÍNH hàm learn.py dùng để dựng
+# frontmatter rồi đọc ngược qua split_frontmatter. Vì thế nó mạnh hơn 3 check substring ở
+# trên - sửa learn.py hỏng là đỏ ngay, không cần ai nhớ cập nhật test.
+#
+# VÌ SAO IMPORT learn CHỨ KHÔNG DỰNG LẠI CHUỖI frontmatter TRONG TEST: dựng lại = test một
+# BẢN SAO. Bản sao vẫn xanh mãi mãi kể cả khi learn.py quay về ghi không bọc nháy - đúng cái
+# bug đang vá. Phải gọi mã thật thì test mới có quyền lực. learn.py import rẻ (~1s, chỉ tạo
+# APIRouter, KHÔNG dựng app FastAPI) nên không có lý do né.
+#
+# BUG ĐANG CHẶN: description tiếng Việt có dấu HAI CHẤM là chuyện thường ngày (2/5 skill hệ
+# thống phải bọc nháy). Ghi 'description: Khai thác tri thức: tổng hợp' KHÔNG bọc nháy thì
+# PyYAML NÉM LỖI -> split_frontmatter tha lỗi trả {} -> skill mất SẠCH frontmatter (không chỉ
+# description: cả name/group/origin/status bay theo) -> skill im lặng không route được.
+import learn  # noqa: E402
+
+_fm_fn = getattr(learn, "_skill_frontmatter", None)
+check("learn.py có hàm _skill_frontmatter dựng frontmatter (tách ra để test được hành vi "
+      "thật thay vì dựng lại bản sao trong test)", callable(_fm_fn))
+
+if callable(_fm_fn):
+    # Mỗi giá trị dưới đây là thứ FORK (model) kiểm soát -> phải coi là dữ liệu thù địch.
+    _rt_cases = [
+        ("dấu hai chấm (bug thật, 2/5 skill hệ thống dính)",
+         "Khai thác tri thức", "Khai thác tri thức: tổng hợp, so sánh.", "AI"),
+        ("hai chấm trong CẢ name/group (không chỉ description)",
+         "Bộ dựng: Javis", "Tạo năng lực cho Javis.", "Vận hành: nội bộ"),
+        ("ký tự # (YAML hiểu là chú thích)",
+         "Tạo ảnh", "Tạo ảnh #minhhoa theo mô tả.", "Nội dung"),
+        ("gạch nối đầu dòng (YAML hiểu là list item)",
+         "Chuyển HTML", "- Chuyển HTML sang file Webcake .pke.", "Nội dung"),
+        ("nháy kép lồng trong giá trị",
+         'Skill "đặc biệt"', 'Gọi "cái này" rồi \'cái kia\'.', "Chung"),
+        ("xuống dòng giữa description",
+         "Nhiều dòng", "Dòng một\nDòng hai", "Chung"),
+        ("tiếng Việt có dấu phải NGUYÊN VẸN (không bị \\uXXXX)",
+         "Chuyển HTML", "Chuyển HTML sang file Webcake .pke.", "Nội dung"),
+    ]
+    for _label, _name, _desc, _group in _rt_cases:
+        _fm = _fm_fn(_name, _desc, _group, "2026-07-17")
+        _meta, _ = skill_router.split_frontmatter(_fm + "thân skill\n")
+        # Phải là CHUỖI và ĐÚNG BẰNG bản gốc: không phải dict (YAML đọc thành mapping),
+        # không phải "" (frontmatter vỡ, split_frontmatter tha lỗi trả {}).
+        check(f"round-trip description - {_label}",
+              isinstance(_meta.get("description"), str)
+              and _meta.get("description") == _desc)
+        check(f"round-trip name - {_label}",
+              isinstance(_meta.get("name"), str) and _meta.get("name") == _name)
+        check(f"round-trip group - {_label}",
+              isinstance(_meta.get("group"), str) and _meta.get("group") == _group)
+    # Trường của CHÚNG TA (không do model kiểm soát) vẫn phải đúng sau khi bọc nháy.
+    _fm = _fm_fn("Tên", "Mô tả: có hai chấm.", "AI", "2026-07-17")
+    _meta, _ = skill_router.split_frontmatter(_fm + "thân\n")
+    check("frontmatter giữ origin: javis-learned", _meta.get("origin") == "javis-learned")
+    check("frontmatter giữ status: active", _meta.get("status") == "active")
+    check("frontmatter có created", bool(_meta.get("created")))
+    # Thứ tự trường phải giữ nguyên (name, description, group, origin, status, created) để
+    # diff với skill đã học từ trước còn đọc được.
+    _keys = [l.split(":", 1)[0] for l in _fm.strip().split("\n")[1:-1]]
+    check("thứ tự trường frontmatter giữ nguyên name/description/group/origin/status/created",
+          _keys == ["name", "description", "group", "origin", "status", "created"])
+
+    # CANARY: chứng minh test trên KHÔNG rỗng nghĩa. Dựng lại ĐÚNG dạng CŨ (không bọc nháy)
+    # và đòi nó PHẢI hỏng. Nếu ngày nào đó dòng này xanh (tức dạng cũ cũng an toàn) thì các
+    # check round-trip ở trên không còn chứng minh điều gì - và ta muốn biết ngay.
+    _old_fm = ("---\nname: Khai thác tri thức\n"
+               "description: Khai thác tri thức: tổng hợp, so sánh.\n"
+               "group: AI\norigin: javis-learned\nstatus: active\ncreated: 2026-07-17\n---\n")
+    _old_meta, _ = skill_router.split_frontmatter(_old_fm + "thân\n")
+    check("CANARY: dạng CŨ (không bọc nháy) thật sự làm vỡ frontmatter -> check round-trip "
+          "ở trên có quyền lực thật, không phải luôn-xanh",
+          not isinstance(_old_meta.get("description"), str))
+
 if _fails:
     print(f"\nFAIL - test_skill_caps: {len(_fails)} lỗi: {_fails}")
     sys.exit(1)
