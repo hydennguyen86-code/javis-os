@@ -16,11 +16,11 @@ Javis có thể chạy trên nhiều "engine" (nhà cung cấp AI) khác nhau. B
 | Cách gọi | Provider | Có dùng được MCP / skill / công cụ? |
 |---|---|---|
 | Qua **Claude Code** | Anthropic OAuth (Claude Code) | Có, đầy đủ MCP + skill + loop tự động |
-| Qua **Codex** | OpenAI OAuth (ChatGPT) | Có MCP (Javis tự đẩy MCP sang Codex) |
-| **Gọi API thẳng** | OpenRouter, OpenAI (API) | Chat có MCP (vòng gọi công cụ), nhưng không có skill/loop |
-| **Gọi API thẳng** | Anthropic (API) | Chat thuần, không MCP |
+| Qua **Codex** | OpenAI OAuth (ChatGPT) | Có MCP qua hub (cả kết nối local như Zalo/Webcake) + skill qua router (`javis_use_skill` / đọc file `skills/`) |
+| **Gọi API thẳng** | OpenRouter, OpenAI (API) | Có MCP qua hub + tool file trong vault + kích hoạt skill |
+| **Gọi API thẳng** | Anthropic (API) | Có MCP qua hub + tool file + skill (từ 0.9, hết "chat thuần") |
 
-Nói ngắn gọn: muốn Javis làm việc thật (đọc file, gọi công cụ, chạy skill) thì để Main Model ở **Claude Code**. Các provider API khác thiên về trò chuyện, phản hồi nhanh và tiết kiệm.
+Nói ngắn gọn: Javis xây trên **CLI dạng agent của nhà cung cấp** - **Claude Code** (gói Claude) và **Codex** (gói ChatGPT). Muốn Javis làm việc thật (đọc/ghi file, gọi công cụ, chạy skill) thì để Main Model ở một trong hai CLI này; cả hai đều tận dụng gói subscription bạn đang trả. Các provider API thẳng (OpenRouter/OpenAI/Anthropic) thiên về trò chuyện, nhanh và tiết kiệm. Agent trong Workflow cũng chọn được model Claude hoặc ChatGPT/Codex - xem [Agents & Workflows](07-agents-va-workflows.md).
 
 ## Mở ở đâu trong Javis
 
@@ -35,10 +35,10 @@ Trang **Providers** liệt kê 5 nhà cung cấp theo đúng thứ tự này:
 | Provider (nhãn trên màn hình) | Kiểu kết nối | Ghi chú |
 |---|---|---|
 | **Anthropic OAuth (Claude Code)** | Đăng nhập Claude Code, không cần key | Đầy đủ MCP/skill. Là Main Model mặc định |
-| **OpenAI OAuth (ChatGPT)** | Device code (đăng nhập gói ChatGPT) | Chạy qua Codex, tự đẩy MCP sang |
-| **OpenRouter** | Dán API key | Nhiều model 1 chỗ, chat có MCP |
-| **Anthropic (API)** | Dán API key | Chat thuần, không MCP |
-| **OpenAI (ChatGPT API)** | Dán API key | Chat có MCP (vòng gọi công cụ) |
+| **OpenAI OAuth (ChatGPT)** | Device code (đăng nhập gói ChatGPT) | Chạy qua Codex, đấu kho Kết nối qua hub + dùng skill qua router |
+| **OpenRouter** | Dán API key | Nhiều model 1 chỗ, MCP + tool file + skill qua hub |
+| **Anthropic (API)** | Dán API key | MCP + tool file + skill qua hub (từ 0.9) |
+| **OpenAI (ChatGPT API)** | Dán API key | MCP + tool file + skill qua hub |
 
 Mỗi card provider hiển thị trạng thái: **● Đã kết nối** hoặc **○ Chưa kết nối**, kèm số model khả dụng. Card nào đang là Main Model sẽ có nhãn **MAIN**.
 
@@ -134,10 +134,9 @@ Mức này áp dụng khác nhau tuỳ engine:
 
 Đây là điểm dễ nhầm nhất, cần nắm rõ:
 
-- **Main Model = Claude Code**: Javis là một trợ lý làm việc thật sự. Nó đọc/ghi file, gọi MCP (ví dụ tra đơn hàng, doanh thu), chạy skill, và tự động hoá theo vòng lặp. Đây là chế độ khai thác hết sức mạnh Javis OS.
-- **Main Model = ChatGPT OAuth (Codex)**: Javis vẫn gọi được MCP của bạn vì được đẩy sang Codex, nhưng chạy nền Codex và mang tính thử nghiệm.
-- **Main Model = OpenRouter hoặc OpenAI (API)**: Javis có thể gọi công cụ MCP qua vòng gọi tool nhiều lượt, nhưng không có skill và không chạy loop tự động như Claude Code.
-- **Main Model = Anthropic (API)**: đây là **chat thuần**, không dùng MCP. Hợp khi bạn chỉ cần hỏi đáp nhanh, không cần công cụ.
+- **Main Model = Claude Code**: mạnh nhất - đọc/ghi file native, gọi MCP, skill native, loop tự động, session resume. Chế độ khai thác hết sức mạnh Javis OS.
+- **Main Model = ChatGPT OAuth (Codex)**: gọi được toàn bộ kho Kết nối (hub tự đẩy sang Codex, gồm cả kết nối local như Zalo), có tool file của Codex, và dùng được skill qua router (Javis bơm danh sách skill vào system prompt + tool `javis_use_skill`; Codex chạy cwd=brain nên đọc thẳng `skills/<slug>/SKILL.md`).
+- **Main Model = OpenRouter / OpenAI (API) / Anthropic (API)**: từ bản 0.9 cả ba đều gọi được kho Kết nối qua vòng gọi tool, kèm tool đọc/ghi file trong vault và kích hoạt skill (`javis_use_skill`). Khác biệt còn lại so với Claude Code: không có loop nền chạy bằng engine này và không resume session CLI.
 
 Kết luận thực dụng: để Javis "làm việc", giữ Main ở **Claude Code**. Chuyển sang provider API khi bạn chỉ muốn trò chuyện hoặc muốn thử một model cụ thể của hãng khác.
 

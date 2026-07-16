@@ -28,13 +28,15 @@ Xem thêm engine và model ở [Models & engine](10-models-va-engine.md), công 
 2. Gõ `/newbot` rồi làm theo hướng dẫn: đặt tên hiển thị cho bot, rồi đặt username kết thúc bằng `bot` (vd `javis_cua_toi_bot`).
 3. BotFather trả về một chuỗi token dạng `123456789:ABCdef...`. Đây chính là **Bot token**. Giữ kín, ai có token này là điều khiển được bot.
 
-### Lấy Chat ID của bạn
+### Lấy Chat ID của bạn (và của những người dùng chung)
 
-Chat ID là số định danh tài khoản Telegram của bạn. Javis dùng nó để chỉ cho phép mình bạn dùng bot.
+Chat ID là số định danh tài khoản Telegram. Javis dùng nó làm danh sách cho phép: chỉ những ID trong danh sách mới nhắn được với bot.
 
 1. Trong Telegram tìm bot tên **@userinfobot** và mở chat, bấm Start.
 2. Nó trả về dòng `Id: 123456789`. Con số đó là **Chat ID** của bạn.
 3. Ghi lại con số này để dán vào Javis ở bước sau.
+
+Muốn cho người khác (vợ/chồng, nhân viên...) dùng chung bot: nhờ từng người làm đúng 2 bước trên để lấy Chat ID của họ, và nhớ mỗi người phải mở bot của bạn bấm **Start** một lần (Telegram chỉ cho bot nhắn với người đã Start).
 
 ## Cách dùng (từng bước)
 
@@ -43,7 +45,7 @@ Chat ID là số định danh tài khoản Telegram của bạn. Javis dùng nó
 1. Vào **Kênh** trên dashboard, tới thẻ **Telegram**.
 2. Tích ô **Bật bot Telegram**.
 3. Dán chuỗi token vào ô **Bot token**. (Nếu trước đó đã đặt token, cạnh nhãn hiện chữ "đã đặt"; để trống ô này nếu không muốn đổi token.)
-4. Dán số Chat ID vào ô **Chat ID được phép dùng**.
+4. Dán Chat ID vào ô **Chat ID được phép dùng**. Nhiều người dùng chung thì dán nhiều ID cách nhau dấu phẩy, ví dụ `123456789, 987654321`.
 5. Bấm **Lưu & bật**.
 
 Javis lưu cấu hình và tự khởi động lại bot ngay sau khi bấm Lưu (bạn không cần bấm nút riêng để restart). Dòng trạng thái dưới thẻ sẽ báo "Đã lưu, đang khởi động bot…" rồi tự cập nhật sau gần 2 giây.
@@ -89,6 +91,7 @@ Gõ dấu `/` trong chat (hoặc bấm nút Menu của bot) sẽ hiện danh sá
 | `/agents` | Liệt kê agent và cho biết có lượt nào đang chạy không |
 | `/workflows` | Liệt kê workflow |
 | `/model` | Xem hoặc đổi model. Gõ `/model` không kèm gì để mở bảng nút bấm chọn; hoặc gõ thẳng tên (vd `/model sonnet`) |
+| `/brain` | Xem hoặc đổi brain (vault) cho RIÊNG phiên của bạn. Gõ `/brain` để mở bảng nút chọn; hoặc gõ thẳng tên (vd `/brain Kim Khí`). Đổi xong hội thoại reset để nạp đúng bộ nhớ brain mới; người khác và dashboard không bị ảnh hưởng. File bạn gửi lên cũng rơi vào inbox của brain đã chọn |
 | `/retry` | Gửi lại câu hỏi gần nhất |
 | `/stop` | Dừng ngay câu đang trả lời |
 | `/reset` | Bắt đầu hội thoại mới (quên ngữ cảnh cũ) |
@@ -97,9 +100,8 @@ Gõ dấu `/` trong chat (hoặc bấm nút Menu của bot) sẽ hiện danh sá
 
 Chi tiết cách gõ `/model`:
 
-- Tên có dấu `/` bên trong (vd `openai/gpt-4o`) được hiểu là model OpenRouter.
-- Tên không có dấu `/` (vd `opus`, `sonnet`, `haiku`, `fable`) được hiểu là model Claude.
-- Bảng nút bấm khi gõ `/model` cho phép chọn nhóm Claude hoặc OpenRouter, rồi bấm chọn model. Model đang dùng có dấu ✓.
+- Bảng nút bấm khi gõ `/model`: chọn provider ĐÃ KẾT NỐI (Claude Code, ChatGPT, OpenRouter, Claude API, OpenAI API - provider đang dùng có dấu ✓ kèm số model), rồi tới lưới model 2 cột, 8 model một trang, nút ◀ ▶ lật trang. Danh sách model lấy TRỰC TIẾP từ provider (OpenRouter hiện đầy đủ vài trăm model, ChatGPT hiện model Codex), không phải danh sách cứng.
+- Gõ thẳng tên cũng được: tên có dấu `/` (vd `openai/gpt-4o`) là model OpenRouter; `gpt-...` hoặc `...-codex` là model ChatGPT (cần đã kết nối OAuth); còn lại (vd `opus`, `sonnet`, `fable`) là model Claude.
 
 ## MCP và skill qua Telegram
 
@@ -110,9 +112,10 @@ Chi tiết cách gõ `/model`:
 
 ## Giới hạn quyền: chỉ mình bạn dùng bot
 
-- Ô **Chat ID được phép dùng** chính là whitelist. Khi có Chat ID, chỉ tài khoản Telegram đó nhắn được với bot. Người lạ nhắn vào sẽ nhận: "Bạn không có quyền dùng bot Javis này."
-- Nếu để trống ô Chat ID: bất kỳ ai tìm ra bot đều dùng được. Không nên để trống, vì bot có thể chạm vào vault và số liệu của bạn. Luôn đặt Chat ID.
-- Muốn cho thêm người khác dùng chung 1 bot: hiện ô chỉ nhận 1 Chat ID. Cách an toàn là mỗi người tự dựng Javis với bot riêng.
+- Ô **Chat ID được phép dùng** chính là whitelist. Chỉ các tài khoản Telegram có ID trong danh sách mới nhắn được với bot. Người lạ nhắn vào sẽ nhận: "Bạn không có quyền dùng bot Javis này."
+- Nếu để trống ô Chat ID: bất kỳ ai tìm ra bot đều dùng được. Không nên để trống, vì bot có thể chạm vào vault và số liệu của bạn. Luôn đặt ít nhất 1 Chat ID.
+- Cho thêm người dùng chung 1 bot: thêm Chat ID của họ vào ô, cách nhau dấu phẩy, rồi **Lưu & bật**. Nút **Gửi test** sẽ gửi tin thử tới TẤT CẢ ID và báo rõ ID nào lỗi (thường do người đó chưa bấm Start bot). Thông báo nền (vd loop tự tạm dừng) cũng gửi tới tất cả ID.
+- Mỗi người có **mạch hội thoại riêng**: ngữ cảnh của từng Chat ID tách biệt, không lẫn sang người khác, và hai người có thể nhắn cùng lúc mà không phải chờ nhau. `/reset` và `/stop` chỉ tác động phiên của chính người gõ. Tuy vậy tất cả vẫn **chung một vault và cùng quyền** (ai cũng đọc/ghi được dữ liệu, số liệu, brain của bạn) - chỉ thêm ID người bạn tin tưởng. Cần tách bạch hoàn toàn cả dữ liệu thì dựng Javis + bot riêng cho mỗi người.
 
 ## Kiểm tra trạng thái bot
 

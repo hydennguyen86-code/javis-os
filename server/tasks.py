@@ -39,7 +39,7 @@ from typing import Any, Callable, List, Optional
 
 from fastapi import APIRouter, Form, Query
 
-from claude_cli import ClaudeCLI, cancel_all, _empty_mcp_file
+from claude_cli import claude_engine, cancel_all, _empty_mcp_file
 
 VALID_STATUS = {"todo", "ready", "running", "review", "done", "blocked", "archived"}
 _DONE_ISH = {"done", "archived"}
@@ -70,6 +70,7 @@ class TasksDeps:
     build_system_prompt: Callable[[str], str]
     aux_model: Callable[[], Optional[str]]
     safe_tools: List[str]
+    report: Optional[Callable] = None   # async report(owner_chat, text) - báo NGƯỜI YÊU CẦU task khi chạy xong
 
 
 class TasksFeature:
@@ -112,7 +113,7 @@ class TasksFeature:
     # ── generator API (learn/loop/user gọi để enqueue) ──
     def enqueue(self, brain: str, title: str, intent: str, route: str = "auto",
                 priority: int = 2, deps: Optional[List[str]] = None,
-                needs_approval: bool = True, created_by: str = "user") -> str:
+                needs_approval: bool = True, created_by: str = "user", chat_id: str = "") -> str:
         board = self._load(brain)
         # Dedup theo tên chuẩn hoá: đã có task CHƯA XONG trùng tên → trả id cũ, không tạo mới
         # (chống learn đề xuất lại mỗi batch; done/archived không tính → việc định kỳ lặp được).
@@ -126,7 +127,8 @@ class TasksFeature:
             "id": tid, "title": (title or intent or "Task")[:120], "intent": intent or title or "",
             "route": (route or "auto"), "priority": max(1, min(3, int(priority or 2))),
             "status": "todo", "deps": list(deps or []), "needs_approval": bool(needs_approval),
-            "block_reason": "", "created_by": created_by, "created_at": _now(), "updated_at": _now(),
+            "block_reason": "", "created_by": created_by, "chat_id": str(chat_id or ""),
+            "created_at": _now(), "updated_at": _now(),
             "result": "", "log": [],
         }
         self._log(task, f"tạo bởi {created_by}")
@@ -210,6 +212,23 @@ class TasksFeature:
                         t["status"] = "done"; self._log(t, "xong → done")
                     self._recompute_ready(board)
                     self._save(brain, board)
+            # BÁO CÁO cho NGƯỜI YÊU CẦU task khi chạy xong (mặc định của Javis). chat_id rỗng
+            # (task tạo trên web) → helper report tự gửi ID Telegram đầu tiên.
+            if t and self.deps.report:
+                st = (t or {}).get("status")
+                labels = {"review": "xong, chờ anh duyệt", "done": "đã xong",
+                          "blocked": "bị chặn, cần anh xem"}
+                head = "✅" if st in ("review", "done") else "⚠"
+                parts = [f"{head} Việc '{t.get('title', '')}' {labels.get(st, st)}."]
+                res = (t.get("result") or "").strip()
+                if res:
+                    parts.append(res[:1200])
+                if st == "blocked":
+                    parts.append("Lý do: " + ((err or t.get("block_reason", "") or "")[:300]))
+                try:
+                    asyncio.create_task(self.deps.report(t.get("chat_id", ""), "\n\n".join(parts)))
+                except Exception:
+                    pass
             return {"ok": True, "ran": tid, "status": (t or {}).get("status")}
 
     async def _execute(self, brain: str, task: dict):
@@ -239,7 +258,7 @@ class TasksFeature:
             return result, (err or None), ni
 
         # direct: 1 claude file-only
-        cli = ClaudeCLI(system_prompt=self.deps.build_system_prompt(brain),
+        cli = claude_engine(system_prompt=self.deps.build_system_prompt(brain),
                         cwd=self.deps.brain_root(brain), tag="dispatch", allowed_tools=safe)
         mcpf = _empty_mcp_file()
         if mcpf:
@@ -298,7 +317,7 @@ class TasksFeature:
         async def kanban_add(
             title: str = Form(...), intent: str = Form(""), route: str = Form("auto"),
             priority: str = Form("2"), deps: str = Form(""), needs_approval: str = Form("1"),
-            brain: str = Form("brain"),
+            chat_id: str = Form(""), brain: str = Form("brain"),
         ):
             dl = [d.strip() for d in (deps or "").split(",") if d.strip()]
             try:
@@ -306,7 +325,7 @@ class TasksFeature:
             except ValueError:
                 pr = 2
             tid = self.enqueue(brain, title, intent or title, route or "auto", pr, dl,
-                               needs_approval in ("1", "true", "True", "on"), "user")
+                               needs_approval in ("1", "true", "True", "on"), "user", chat_id)
             return {"ok": True, "id": tid}
 
         @router.post("/kanban/task/move")

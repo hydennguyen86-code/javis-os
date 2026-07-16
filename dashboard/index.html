@@ -4,10 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Javis OS</title>
-  <link rel="icon" type="image/png" href="/static/favicon.png?v=3">
-  <link rel="apple-touch-icon" href="/static/logo.png?v=3">
-  <link rel="stylesheet" href="/static/style.css?v=29">
-  <link rel="stylesheet" href="/static/console.css?v=14">
+  <!-- Favicon = logo hiện tại (/brand-logo): mặc định theo logo.png, và tự đổi theo ảnh user tải lên. -->
+  <link rel="icon" href="/brand-logo?v=5">
+  <link rel="apple-touch-icon" href="/brand-logo?v=5">
+  <link rel="stylesheet" href="/static/style.css?v=41">
+  <link rel="stylesheet" href="/static/console.css?v=15">
 </head>
 <body>
   <div class="hud">
@@ -57,20 +58,34 @@
     <!-- ===== BODY: 3 columns ===== -->
     <div class="hud-body">
 
-      <!-- LEFT: metrics -->
+      <!-- LEFT: Vault explorer (cây thư mục kiểu Obsidian + tìm note). Thay cho panel số liệu KD cũ. -->
       <aside class="hud-left">
-        <div class="panel-label">
-          SỐ LIỆU KINH DOANH
-          <button class="mini-btn" id="refreshMetrics" title="Cập nhật">⟳</button>
+        <div class="vault-head">
+          <span class="vault-title">VAULT</span>
+          <span class="vault-tools">
+            <button class="mini-btn" id="vtNewFile" title="Tạo file mới ở gốc brain">＋</button>
+            <button class="mini-btn" id="vtNewDir" title="Tạo thư mục mới ở gốc brain">📁</button>
+            <button class="mini-btn" id="vtRefresh" title="Làm mới cây">⟳</button>
+          </span>
         </div>
-        <div class="metric-cards" id="metricCards"></div>
-        <div class="metric-status" id="metricStatus"></div>
+        <div class="vault-search">
+          <span class="vs-ico">🔍</span>
+          <input id="vaultSearch" type="text" placeholder="Tìm note..." spellcheck="false" autocomplete="off">
+          <button class="vs-clear" id="vaultSearchClear" title="Xoá tìm kiếm" hidden>✕</button>
+        </div>
+        <div class="vault-modes">
+          <button class="vs-chip active" id="vsModeName" data-mode="name" title="Lọc nhanh theo tên trong cây">Tên</button>
+          <button class="vs-chip" id="vsModeContent" data-mode="content" title="Tìm sâu theo nội dung (quét toàn vault)">Nội dung</button>
+        </div>
+        <div class="vault-tree" id="vaultTree"><div class="vt-info">Đang tải…</div></div>
+        <div class="vault-results" id="vaultResults" hidden></div>
       </aside>
 
       <!-- CENTER: 3D orb -->
       <div class="hud-center">
         <canvas id="starfield"></canvas>
         <div id="graph3dContainer"></div>
+        <div id="graph2d"></div>
         <div class="concept-labels" id="conceptLabels"></div>
         <div class="orb-overlay">
           <div class="orb-state" id="orbState">SẴN SÀNG</div>
@@ -100,6 +115,22 @@
             <span class="bstat-lbl">ROUTINES</span>
           </button>
         </div>
+
+        <!-- MỨC DÙNG token: dời từ cột phải xuống góc dưới-phải khung giữa (giải phóng chỗ cho chat). -->
+        <div class="usage-float" id="usageFloat">
+          <div class="uf-label"><span>MỨC DÙNG <span class="dim" style="font-weight:400">· hôm nay</span></span><button class="uf-toggle" id="usageToggle" type="button" title="Thu nhỏ / mở rộng">▾</button></div>
+          <div id="usagePanel" class="usage-panel"><div class="mcp-item dim">Chưa có lượt nào hôm nay</div></div>
+        </div>
+
+        <!-- Popup sửa note: neo absolute BÊN TRONG .hud-center → đè lên visual não, cây trái & chat phải vẫn sống.
+             Nội dung (toolbar + thân) do console.js openNote() dựng theo loại file. -->
+        <div class="note-editor" id="noteEditor" hidden>
+          <div class="ne-bar">
+            <span class="ne-title" id="neTitle">note.md</span>
+            <span class="ne-actions" id="neActions"></span>
+          </div>
+          <div class="ne-body" id="neBody"></div>
+        </div>
       </div>
 
       <!-- RIGHT: transcript + activity -->
@@ -111,11 +142,11 @@
             <button class="mini-btn" id="chatZoomBtn" title="Phóng to khung chat (Esc để thu nhỏ)">⛶</button>
           </span>
         </div>
+        <!-- MỨC DÙNG token đã DỜI xuống góc dưới-phải khung giữa (giải phóng chỗ cho khung chat). -->
         <div class="transcript" id="chatArea"></div>
-        <div class="tool-bar" id="toolBar" style="display:none">
-          <span class="tool-spinner"></span>
-          <span id="toolBarText">Đang xử lý...</span>
-        </div>
+        <!-- Thanh #toolBar cũ ĐÃ BỎ: trạng thái "đang suy nghĩ / gọi tool" giờ hiện bằng
+             chip hoạt động NGAY TRONG #chatArea (app.js showActivity) → tự đi theo cả khi
+             phóng to chat workspace (chat-zoom chỉ dời #chatArea, trước đây toolBar bị bỏ lại). -->
         <!-- "BỘ NHỚ DÀI HẠN" + auto-reflect "sau mỗi 6 lượt" ĐÃ BỎ: engine tự học mới (learn.py)
              rewire sau MỖI lượt (có debounce, read-only, undo được). Cấu hình + xem "đã học gì" +
              hoàn tác ở trang sidebar "Tự học" (console.js renderLearn). Widget cũ vốn là UI chết,
@@ -161,13 +192,8 @@
           <div class="loop-log" id="loopLog"></div>
         </div>
 
-        <div class="panel-label" style="margin-top:10px">HỆ THỐNG</div>
-        <div class="sys-status">
-          <div class="mcp-item" id="claudeStatus">⬤ Claude Code CLI</div>
-          <div class="mcp-item" id="ttsStatus">⬤ Voice (Edge TTS)</div>
-        </div>
-        <div class="panel-label" style="margin-top:8px">MCP ĐANG DÙNG</div>
-        <div id="mcpList" class="mcp-list"><div class="mcp-item dim">Chưa có hoạt động</div></div>
+        <!-- HỆ THỐNG + MCP ĐANG DÙNG đã DỜI xuống thanh model-bar (ngang hàng ô chọn model). -->
+
 
         <!-- ===== CÀI ĐẶT NHANH: avatar + tên miền + giọng nói + tốc độ (gộp về sidebar) ===== -->
         <details class="quick-set" id="quickSet" open>
@@ -180,6 +206,9 @@
               <span>🔊 Đọc trả lời bằng giọng</span>
               <span class="toggle"><input type="checkbox" id="qsTts" checked><span></span></span>
             </label>
+
+            <!-- Nhà cung cấp giọng đọc: console.js render vào đây khi mở trang Cài đặt (gộp cùng nhóm giọng nói) -->
+            <div id="ttsProviderHost"></div>
 
             <!-- Giọng đọc + ngôn ngữ nghe + tốc độ (dời từ header xuống, giữ nguyên id/name) -->
             <div class="voice-picker-wrap">
@@ -198,8 +227,8 @@
                     </label>
                   </div>
                 </div>
-                <div class="popover-section">
-                  <div class="popover-label">GIỌNG ĐỌC</div>
+                <div class="popover-section" id="edgeVoiceSection">
+                  <div class="popover-label">GIỌNG ĐỌC <span class="dim" style="text-transform:none;letter-spacing:0">(Edge)</span></div>
                   <div class="voice-options">
                     <label class="voice-opt">
                       <input type="radio" name="voice" value="vi-VN-HoaiMyNeural" checked>
@@ -263,6 +292,29 @@
     <!-- Attachment chips -->
     <div class="attach-bar" id="attachBar"></div>
 
+    <!-- Chọn model (đa nhà cung cấp) + effort ngay trên khung chat -->
+    <div class="model-bar" id="modelBar">
+      <button class="mb-chip" id="mbOpen" title="Đổi model / nhà cung cấp / effort">
+        <span class="mb-dot"></span>
+        <span id="mbModelTxt">Model</span>
+        <span class="mb-sep">·</span>
+        <span id="mbEffortTxt" class="mb-eff">Effort</span>
+        <span class="mb-caret">▾</span>
+      </button>
+      <div class="mb-pop" id="mbPop" hidden></div>
+      <!-- HỆ THỐNG + MCP ĐANG DÙNG: dời từ cột phải xuống đây, nằm ngang bên phải ô chọn model. -->
+      <div class="sysbar" id="sysBar">
+        <span class="sysbar-label">HỆ THỐNG</span>
+        <div class="sys-status">
+          <div class="mcp-item" id="claudeStatus">⬤ Claude Code CLI</div>
+          <div class="mcp-item" id="ttsStatus">⬤ Voice (Edge TTS)</div>
+        </div>
+        <span class="sysbar-sep"></span>
+        <span class="sysbar-label">MCP</span>
+        <div id="mcpList" class="mcp-list"><div class="mcp-item dim">Chưa có hoạt động</div></div>
+      </div>
+    </div>
+
     <!-- ===== BOTTOM: voice bar ===== -->
     <div class="hud-voice" id="hudVoice">
       <button class="mic-big" id="voiceBtn" title="Bấm để nói (hoặc giữ Space)">
@@ -274,6 +326,12 @@
       <button class="attach-btn" id="attachBtn" title="Đính kèm file (ảnh, text, tài liệu) → lưu vào Sources">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+        </svg>
+      </button>
+      <button class="attach-btn tts-bar-btn" id="ttsToggleBar" type="button" title="Tắt giọng đọc">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M11 5L6 9H2v6h4l5 4V5z"/>
+          <path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"/>
         </svg>
       </button>
       <input type="file" id="fileInput" multiple style="display:none">
@@ -493,8 +551,8 @@
             <label class="toggle"><input type="checkbox" id="setTgEnabled"><span></span></label></label>
           <label>Bot token <span class="dim" id="setTgHint"></span></label>
           <input id="setTgToken" type="password" placeholder="123456:ABC... (để trống nếu không đổi)">
-          <label>Chat ID được phép dùng</label>
-          <input id="setTgChat" placeholder="vd 123456789">
+          <label>Chat ID được phép dùng <span class="dim">(nhiều ID cách nhau dấu phẩy)</span></label>
+          <input id="setTgChat" placeholder="vd 123456789, 987654321">
           <div class="set-note" id="setTgStatus">-</div>
           <div class="set-note">Nhắn Telegram ↔ Javis. Dùng đúng engine đang chọn (CLI thì có cả MCP để hỏi doanh thu/ads qua điện thoại). Có thể dùng lại token bot Morning Briefing.</div>
           <div class="set-actions">
@@ -522,19 +580,31 @@
   <!-- Holder ẩn giữ #quickSet khi KHÔNG ở trang Cài đặt (node vẫn trong DOM → handler còn sống) -->
   <div id="quickSetHolder" hidden></div>
 
-  <script src="/static/voice.js?v=12"></script>
-  <script src="https://unpkg.com/three@0.159.0/build/three.min.js"></script>
-  <script src="https://unpkg.com/3d-force-graph@1.73.4/dist/3d-force-graph.min.js"></script>
-  <script src="/static/graph3d.js?v=15"></script>
-  <script src="/static/app.js?v=49"></script>
-  <script src="/static/branding.js?v=6"></script>
-  <script src="/static/quick-settings.js?v=3"></script>
-  <script src="/static/chat-zoom.js?v=3"></script>
+  <!-- Bảng SỐ LIỆU KINH DOANH đã gỡ khỏi giao diện (thay bằng Vault explorer ở cột trái).
+       Vẫn giữ 3 id ở stub ẩn này vì app.js đọc #metricCards/#metricStatus/#refreshMetrics ngay
+       lúc nạp (getElementById + addEventListener vô điều kiện) - xoá trần sẽ ném null, hỏng dashboard.
+       Ẩn hoàn toàn: block <!-- JAVIS_METRICS --> nếu có vẫn parse vào đây nhưng không hiển thị. -->
+  <div id="metricsStub" hidden aria-hidden="true">
+    <button id="refreshMetrics" tabindex="-1"></button>
+    <div id="metricCards"></div>
+    <div id="metricStatus"></div>
+  </div>
+
+  <script src="/static/voice.js?v=14"></script>
+  <!-- three.js + 3d-force-graph KHÔNG nạp tĩnh nữa: app.js tự lazy-load qua CDN CHỈ khi chọn đồ thị 3D. -->
+  <script src="/static/graph.js?v=14"></script>
+  <script src="/static/graph3d.js?v=16"></script>
+  <script src="/static/chat-render.js?v=2"></script>
+  <script src="/static/app.js?v=66"></script>
+  <script src="/static/model-picker.js?v=1"></script>
+  <script src="/static/branding.js?v=7"></script>
+  <script src="/static/quick-settings.js?v=4"></script>
+  <script src="/static/chat-zoom.js?v=5"></script>
   <script src="/static/brains-ui.js?v=4"></script>
-  <script src="/static/sessions-ui.js?v=3"></script>
-  <script src="/static/studio.js?v=15"></script>
+  <script src="/static/sessions-ui.js?v=6"></script>
+  <script src="/static/studio.js?v=19"></script>
   <!-- Console layer: console.js đăng ký store TRƯỚC khi Alpine khởi động (defer) -->
-  <script src="/static/console.js?v=42"></script>
+  <script src="/static/console.js?v=64"></script>
   <script defer src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>
 </body>
 </html>

@@ -30,7 +30,7 @@ def _top_folder(rel_path: str) -> str:
     return parts[0] if len(parts) > 1 else "root"
 
 
-def build_graph(roots: List[str], max_files: int = 2000) -> Dict:
+def build_graph(roots: List[str], max_files: int = 2000, include_orphans: bool = False) -> Dict:
     """
     Quét nhiều thư mục root, dựng graph.
     roots: list các đường dẫn thư mục chứa .md
@@ -97,10 +97,13 @@ def build_graph(roots: List[str], max_files: int = 2000) -> Dict:
 
     orphan_count = len([n for n in nodes.values() if n["links"] == 0])
 
-    # Loại bỏ node cô đơn (links == 0), giữ tất cả node có ít nhất 1 kết nối
-    keep = {nid for nid, n in nodes.items() if n["links"] > 0}
-    if not keep:
+    # Giữ node: mặc định bỏ note cô đơn (0 kết nối); include_orphans=True thì giữ HẾT (như Obsidian).
+    if include_orphans:
         keep = set(nodes.keys())
+    else:
+        keep = {nid for nid, n in nodes.items() if n["links"] > 0}
+        if not keep:
+            keep = set(nodes.keys())
     node_list = [n for nid, n in nodes.items() if nid in keep]
     edge_list = [e for e in unique_edges if e["source"] in keep and e["target"] in keep]
 

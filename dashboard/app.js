@@ -2,11 +2,18 @@
 const WS_ORIGIN = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}`;
 const WS_URL = `${WS_ORIGIN}/ws`;
 let ws = null;
-let isProcessing = false;
-let streamingBubble = null;
-let streamingText = "";
-let cancelledTurn = false;
-let spokeStream = false;   // đã đọc đoạn trung gian nào trong lượt này chưa
+let isProcessing = false;      // = phiên ĐANG XEM có lượt chạy không (dẫn xuất từ turns[savedSessionId])
+let cancelledTurn = false;     // (giữ để tương thích - không còn dùng)
+// ĐA HỘI THOẠI SONG SONG: mỗi phiên giữ trạng thái stream RIÊNG, định tuyến theo session_id. Mở
+// "hội thoại mới" KHÔNG giết phiên đang chạy - nó chạy nền + tự lưu, vào Lịch sử bấm lại xem tiếp.
+const turns = {};              // sid -> { text, bubble, spoke, running }
+if (!window.JavisRunning) window.JavisRunning = new Set();   // sid đang generate → sidebar hiện ⏳
+function newSid() { try { return crypto.randomUUID().replace(/-/g, ""); } catch (e) { return Date.now().toString(36) + Math.random().toString(36).slice(2, 10); } }
+function setSessionRunning(sid, on) {
+  if (!sid) return;
+  if (on) window.JavisRunning.add(sid); else window.JavisRunning.delete(sid);
+  try { if (window.JavisChatSide && window.JavisChatSide.refresh) window.JavisChatSide.refresh(); } catch (e) {}
+}
 
 // Lưu & khôi phục phiên gần nhất (hội thoại + số liệu + session Claude)
 const SESSION_KEY = "javis.session.v1";
@@ -14,6 +21,7 @@ let convo = [];            // [{role:"user"|"javis", text, atts}]
 let savedSessionId = null; // session_id của Claude để resume sau khi F5
 let savedMetrics = null;   // {cards, status}
 const stopBtn = document.getElementById("stopBtn");
+let stopTag = null;        // tag phiên chat server phát qua message hello → Stop chỉ ngắt phiên MÌNH
 
 function updateStopBtn() {
   const active = isProcessing || voice.isSpeaking();
@@ -21,15 +29,24 @@ function updateStopBtn() {
   sendBtn.style.display = active ? "none" : "flex";
 }
 
-function stopCurrent() {
-  cancelledTurn = true;
-  voice.stopSpeaking();
-  fetch("/stop", { method: "POST" }).catch(() => {});
-  hideToolBar();
-  setProcessing(false);
-  streamingBubble = null; streamingText = "";
-  if (!handsFreeActive()) setOrbState("", "SẴN SÀNG");
+// Đồng bộ nút gửi/dừng + cờ isProcessing theo lượt của phiên ĐANG XEM (savedSessionId).
+function syncActiveUI() {
+  const t = savedSessionId ? turns[savedSessionId] : null;
+  isProcessing = !!(t && t.running);
+  sendBtn.disabled = isProcessing;
   updateStopBtn();
+}
+
+function stopCurrent() {
+  voice.stopSpeaking();
+  const sid = savedSessionId;
+  // Dừng ĐÚNG phiên đang xem (phiên nền khác vẫn chạy). Server huỷ lượt + gửi turn_done về.
+  if (sid && ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ action: "stop", session_id: sid }));
+  hideActivity();
+  if (sid && turns[sid]) turns[sid].running = false;
+  setSessionRunning(sid, false);
+  if (!handsFreeActive()) setOrbState("", "SẴN SÀNG");
+  syncActiveUI();
 }
 function handsFreeActive() { return typeof handsFree !== "undefined" && handsFree; }
 function currentBrainPath() {
@@ -41,8 +58,6 @@ function currentBrainPath() {
 const chatArea = document.getElementById("chatArea");
 const chatInput = document.getElementById("chatInput");
 const sendBtn = document.getElementById("sendBtn");
-const toolBar = document.getElementById("toolBar");
-const toolBarText = document.getElementById("toolBarText");
 const voiceBtn = document.getElementById("voiceBtn");
 const ttsToggle = document.getElementById("ttsToggle");
 const voiceInterim = document.getElementById("voiceInterim");
@@ -108,61 +123,67 @@ function connect() {
 }
 
 function handleMessage(data) {
-  // Đã bấm ngắt → bỏ qua mọi message của lượt bị huỷ, chỉ reset khi có message kết thúc
-  if (cancelledTurn) {
-    if (data.type === "response" || data.type === "error") {
-      cancelledTurn = false; setProcessing(false); updateStopBtn();
-    }
-    return;
-  }
+  // Server chào khi kết nối: nhận tag phiên để nút Stop chỉ ngắt phiên của mình
+  if (data.type === "hello") { stopTag = data.stop_tag || null; return; }
+
+  // Định tuyến theo session_id: sự kiện của phiên ĐANG XEM thì render trực tiếp; phiên nền thì
+  // chỉ tích luỹ vào buffer + đánh dấu "đang chạy" ở Lịch sử (server đã tự lưu vào DB).
+  const sid = data.session_id || null;
+  const isActive = !!sid && sid === savedSessionId;
+  const t = sid ? (turns[sid] || (turns[sid] = { text: "", bubble: null, spoke: false, running: true })) : null;
+
   if (data.type === "status") {
-    setOrbState("thinking", "ĐANG SUY NGHĨ");
-    showToolBar(data.content);
+    if (t) t.running = true;
+    setSessionRunning(sid, true);
+    if (isActive) { setOrbState("thinking", "ĐANG SUY NGHĨ"); showActivity(data.content); syncActiveUI(); }
   } else if (data.type === "tool_call") {
-    showToolBar(data.content);
     if (data.tool) trackMCP(data.tool);
+    if (isActive) showActivity(data.content);
   } else if (data.type === "tool_result") {
-    showToolBar("✓ Nhận data - đang phân tích...");
+    if (isActive) showActivity("✓ Nhận data - đang phân tích...");
   } else if (data.type === "stream") {
-    if (!streamingBubble) { streamingBubble = createStreamingBubble(); streamingText = ""; }
-    streamingText += (data.content || "");
-    streamingBubble.querySelector(".bubble").innerHTML = markdownToHtml(streamingText);
-    scrollBottom();
-    // Đọc NGAY đoạn trung gian này (CLI: cả câu). OpenRouter gửi tts:false (token lẻ) → chỉ hiển thị, đọc 1 lần ở cuối.
-    if (voice.ttsEnabled && data.tts !== false) {
-      setOrbState("speaking", "ĐANG NÓI");
-      // Bỏ phần metrics block khỏi TTS (không đọc JSON)
-      const safeChunk = data.content.replace(/<!--[\s\S]*/, "");
-      if (safeChunk) voice.enqueueSpeak(safeChunk);
-      spokeStream = true;
+    if (!t) return;
+    t.text += (data.content || "");
+    if (isActive) {
+      if (!t.bubble) { t.bubble = createStreamingBubble(); showActivity("✍ Đang soạn câu trả lời..."); }
+      t.bubble.querySelector(".bubble").innerHTML = markdownToHtml(t.text);
+      scrollBottom();
+      // Đọc NGAY đoạn trung gian (chỉ đọc phiên đang xem). OpenRouter gửi tts:false → đọc 1 lần ở cuối.
+      if (voice.ttsEnabled && data.tts !== false) {
+        setOrbState("speaking", "ĐANG NÓI");
+        const safeChunk = (data.content || "").replace(/<!--[\s\S]*/, "");
+        if (safeChunk) voice.enqueueSpeak(safeChunk);
+        t.spoke = true;
+      }
     }
   } else if (data.type === "response") {
-    hideToolBar();
     const { clean, cards } = extractMetrics(data.content);
-    if (cards) pushMetricsToPanel(cards);
-    // Fallback: response rỗng nhưng đã stream được → giữ phần đã stream; nếu vẫn rỗng → báo nhẹ
-    const finalText = clean || streamingText || "";
+    const finalText = clean || (t && t.text) || "";
     const shownText = finalText || "_(không có nội dung trả về - thử lại hoặc đổi model)_";
-    let bubble;
-    if (!streamingBubble) { appendJavisMessage(shownText); bubble = chatArea.lastChild; }
-    else { streamingBubble.querySelector(".bubble").innerHTML = markdownToHtml(shownText); bubble = streamingBubble; streamingBubble = null; streamingText = ""; }
-    setProcessing(false);
-    if (voice.ttsEnabled && !spokeStream && finalText) {
-      setOrbState("speaking", "ĐANG NÓI");
-      voice.speak(finalText);
-    } else if (!voice.ttsEnabled) {
-      setOrbState("", "SẴN SÀNG");
+    if (t) t.text = shownText;
+    if (isActive) {
+      hideActivity();
+      if (cards) pushMetricsToPanel(cards);
+      if (!t || !t.bubble) appendJavisMessage(shownText);
+      else t.bubble.querySelector(".bubble").innerHTML = markdownToHtml(shownText);
+      if (data.engine) setEngineBadge(data.engine, data.model);   // sự thật engine+model của lượt này
+      if (finalText.trim()) recordTurn("javis", finalText);
+      if (voice.ttsEnabled && t && !t.spoke && finalText) { setOrbState("speaking", "ĐANG NÓI"); voice.speak(finalText); }
+      else if (!voice.ttsEnabled) setOrbState("", "SẴN SÀNG");
+      maybeAutoLearn();
     }
-    spokeStream = false;
-    savedSessionId = data.session_id || savedSessionId;
-    if (data.engine) setEngineBadge(data.engine, data.model);   // sự thật engine+model của lượt này
-    if (finalText.trim()) recordTurn("javis", finalText);   // KHÔNG lưu lượt rỗng (tránh khôi phục bong bóng trống)
-    maybeAutoLearn();
+    refreshUsage();     // cập nhật panel Mức dùng sau mỗi lượt
   } else if (data.type === "error") {
-    hideToolBar(); appendJavisMessage("⚠ " + data.content); setProcessing(false);
-    setOrbState("", "SẴN SÀNG");
+    if (isActive) { hideActivity(); appendJavisMessage("⚠ " + data.content); setOrbState("", "SẴN SÀNG"); }
   } else if (data.type === "system") {
-    appendJavisMessage(data.content);
+    if (isActive) appendJavisMessage(data.content);
+  } else if (data.type === "turn_done") {
+    // Lượt của phiên này kết thúc (xong / lỗi / bị dừng): bỏ cờ chạy, dọn buffer, refresh Lịch sử.
+    if (t) t.running = false;
+    setSessionRunning(sid, false);
+    if (isActive) syncActiveUI();
+    if (sid) delete turns[sid];
+    notifySessions();
   }
 }
 
@@ -172,7 +193,10 @@ function handleMessage(data) {
 function sendMessage(text) {
   const msg = (text || chatInput.value).trim();
   const atts = pendingAttachments.filter(a => a.path);  // chỉ file đã upload xong
-  if ((!msg && atts.length === 0) || isProcessing || !ws || ws.readyState !== WebSocket.OPEN) return;
+  if ((!msg && atts.length === 0) || !ws || ws.readyState !== WebSocket.OPEN) return;
+  if (!savedSessionId) savedSessionId = newSid();        // hội thoại mới → mint id để định tuyến
+  const sid = savedSessionId;
+  if (turns[sid] && turns[sid].running) return;          // phiên này đang trả lời → chưa gửi tiếp
   voice.stopSpeaking();
   appendUserMessage(msg, atts);
   recordTurn("user", msg, atts.map(a => ({ name: a.name, kind: a.kind })));
@@ -194,13 +218,12 @@ function sendMessage(text) {
 
   chatInput.value = ""; chatInput.style.height = "auto";
   clearAttachments();
-  cancelledTurn = false;
-  spokeStream = false;
-  setProcessing(true);
-  updateStopBtn();
+  turns[sid] = { text: "", bubble: null, spoke: false, running: true };
+  setSessionRunning(sid, true);
   setOrbState("thinking", "ĐANG SUY NGHĨ");
-  // session_id: chỉ có tác dụng ở lượt đầu sau khi F5 (server resume mạch cũ)
-  ws.send(JSON.stringify({ message: outMsg, brain: currentBrainPath(), session_id: savedSessionId || undefined }));
+  showActivity("Javis đang suy nghĩ...");   // hiện NGAY trong khung chat, không đợi server báo
+  syncActiveUI();
+  ws.send(JSON.stringify({ message: outMsg, brain: currentBrainPath(), session_id: sid }));
 }
 
 // ============================================
@@ -233,7 +256,7 @@ function restoreSession() {
     if (t.role === "user") appendUserMessage(t.text, t.atts || []);
     else appendJavisMessage(t.text);
   });
-  if (convo.length) scrollBottom();
+  if (convo.length) scrollBottom(true);
   // Dựng lại số liệu kinh doanh (đánh dấu là của phiên trước)
   if (savedMetrics && (savedMetrics.cards || []).length) {
     renderMetrics(savedMetrics.cards, (savedMetrics.status || "") + " · phiên trước");
@@ -248,24 +271,42 @@ async function openStoredSession(id) {
     const sess = await (await fetch(`/sessions/${encodeURIComponent(id)}`)).json();
     if (!sess || sess.error) return;
     convo = [];
+    hideActivity();
     chatArea.innerHTML = "";
     (sess.messages || []).forEach(m => {
       if (m.role === "user") { appendUserMessage(m.content || "", []); convo.push({ role: "user", text: m.content || "", atts: [] }); }
       else if (m.role === "assistant") { appendJavisMessage(m.content || ""); convo.push({ role: "javis", text: m.content || "", atts: [] }); }
     });
     savedSessionId = id;          // lượt gửi tiếp theo → server resume đúng phiên này
+    // Phiên này đang generate NỀN → gắn bong bóng SỐNG (kèm phần đã stream) để xem tiếp trực tiếp.
+    const t = turns[id];
+    if (t && t.running) {
+      t.bubble = createStreamingBubble();
+      if (t.text) t.bubble.querySelector(".bubble").innerHTML = markdownToHtml(t.text);
+      showActivity("✍ Đang soạn câu trả lời...");
+      setOrbState("thinking", "ĐANG SUY NGHĨ");
+    }
     persistSession();
-    scrollBottom();
+    scrollBottom(true);
+    notifySessions();
+    syncActiveUI();
   } catch (e) {}
 }
 function newChat() {
-  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ action: "reset" }));
+  // KHÔNG reset server, KHÔNG đụng lượt đang chạy của phiên khác - chúng chạy nền + tự lưu; vào
+  // Lịch sử bấm lại để xem tiếp. Ở đây chỉ mở một khung trống cho hội thoại mới (mint id khi gửi).
   convo = [];
+  hideActivity();          // dọn chip + timer trước khi xoá trắng khung
   chatArea.innerHTML = "";
   savedSessionId = null;
   persistSession();
+  notifySessions();
+  syncActiveUI();
+  try { chatInput.focus(); } catch (e) {}
 }
-window.JavisSessions = { open: openStoredSession, new: newChat, brain: () => currentBrainPath() };
+window.JavisSessions = { open: openStoredSession, new: newChat, brain: () => currentBrainPath(), current: () => savedSessionId };
+// Báo các UI khác (sidebar Lịch sử trong chat workspace) biết phiên/danh sách vừa đổi
+function notifySessions() { try { window.dispatchEvent(new Event("javis:sessions-changed")); } catch (e) {} }
 
 function appendUserMessage(text, attachments) {
   const div = document.createElement("div");
@@ -278,29 +319,40 @@ function appendUserMessage(text, attachments) {
         : `<span class="file-tag">📝 ${escapeHtml(a.name)}</span>`
     ).join("") + `</div>`;
   }
-  const textHtml = text ? `<div>${escapeHtml(text)}</div>` : "";
+  // Tin dài (>10 dòng hoặc >900 ký tự) thu gọn lại, bấm "Xem thêm" để mở
+  const isLong = text && (text.split("\n").length > 10 || text.length > 900);
+  const textHtml = text
+    ? `<div class="utext${isLong ? " clamped" : ""}">${escapeHtml(text)}</div>` +
+      (isLong ? `<button class="clamp-more" type="button">Xem thêm</button>` : "")
+    : "";
   div.innerHTML = `<div class="bubble">${textHtml}${attHtml}</div>`;
-  chatArea.appendChild(div); scrollBottom();
+  chatAppend(div); scrollBottom(true);
 }
 function appendJavisMessage(text) {
   const div = document.createElement("div");
   div.className = "msg msg-javis";
-  div.innerHTML = `<div class="bubble">${markdownToHtml(text)}</div>`;
-  chatArea.appendChild(div); scrollBottom();
+  div.innerHTML = `<div class="bubble">${markdownToHtml(text)}</div>` +
+    `<button class="msg-copy" type="button" title="Copy cả tin nhắn">⧉</button>`;
+  chatAppend(div); scrollBottom();
 }
 function createStreamingBubble() {
   const div = document.createElement("div");
   div.className = "msg msg-javis";
-  div.innerHTML = `<div class="bubble"></div>`;
-  chatArea.appendChild(div); scrollBottom();
+  div.innerHTML = `<div class="bubble"></div>` +
+    `<button class="msg-copy" type="button" title="Copy cả tin nhắn">⧉</button>`;
+  chatAppend(div); scrollBottom();
   return div;
 }
 function markdownToHtml(text) {
-  const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  // Render đầy đủ (markdown + tô màu code + artifact) nằm ở chat-render.js.
+  if (typeof window.mdToHtml === "function") return window.mdToHtml(text);
+  // Fallback nếu chat-render.js chưa nạp: bộ render gọn cũ (không có artifact).
+  const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  const safeHref = (x) => /^(https?:\/\/|mailto:|\/)/i.test((x || "").trim()) ? x : "";
   // 1) Tách & giữ code block ```...``` ra placeholder để không bị xử lý nhầm
   const blocks = [];
   text = text.replace(/```(?:\w+)?\n?([\s\S]*?)```/g, (_, code) => {
-    blocks.push(`<pre class="code-block">${esc(code.replace(/\n$/, ""))}</pre>`);
+    blocks.push(`<div class="code-wrap"><button class="code-copy" type="button">⧉ Copy</button><pre class="code-block">${esc(code.replace(/\n$/, ""))}</pre></div>`);
     return ` B${blocks.length - 1} `;
   });
 
@@ -318,6 +370,14 @@ function markdownToHtml(text) {
     }
   );
 
+  // 2b) Ảnh + link: giữ qua placeholder (NUL) để URL không bị escape. Đường dẫn vault -> /files/raw.
+  const _fileUrl = (p) => `/files/raw?brain=${encodeURIComponent(currentBrainPath())}&path=${encodeURIComponent((p || "").replace(/^\.?\//, ""))}`;
+  const _resolveSrc = (s) => { s = (s || "").trim(); return /^(https?:|data:|blob:|\/)/i.test(s) ? s : _fileUrl(s); };
+  const _imgHtml = (u, alt) => { const _h = safeHref(u); const _img = `<img class="chat-img" style="max-width:min(100%,440px);border-radius:8px;display:block;margin:6px 0;cursor:zoom-in" src="${esc(u)}" alt="${esc(alt || "")}" loading="lazy">`; return _h ? `<a href="${esc(_h)}" target="_blank" rel="noopener">${_img}</a>` : _img; };
+  text = text.replace(/!\[\[([^\]|]+?)(?:\|[^\]]*)?\]\]/g, (_m, name) => ` B${blocks.push(_imgHtml(_resolveSrc(name.trim()), name.trim())) - 1} `);
+  text = text.replace(/!\[([^\]]*)\]\(([^)\s]+)[^)]*\)/g, (_m, alt, src) => ` B${blocks.push(_imgHtml(_resolveSrc(src), alt)) - 1} `);
+  text = text.replace(/\[([^\]]+)\]\(([^)\s]+)[^)]*\)/g, (_m, t, href) => { href = href.trim(); const u = /^(https?:|mailto:)/i.test(href) ? href : _resolveSrc(href); return ` B${blocks.push(`<a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a>`) - 1} `; });
+
   // 3) Phần còn lại: escape rồi áp inline + list + heading
   let html = esc(text)
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
@@ -333,11 +393,97 @@ function markdownToHtml(text) {
   html = html.replace(/ [BT](\d+) (?:<br>)?/g, (_, i) => blocks[+i]);
   return html;
 }
-function escapeHtml(t) { return t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
-function showToolBar(t) { toolBar.style.display = "flex"; toolBarText.textContent = t; }
-function hideToolBar() { toolBar.style.display = "none"; }
+function escapeHtml(t) { return t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
+// ---- Chip hoạt động trong transcript (thay #toolBar cũ nằm ngoài #chatArea nên
+//      biến mất khi phóng to chat). Chip là 1 "bong bóng" 3 chấm nhún + dòng trạng thái
+//      + đồng hồ đếm giây, luôn nằm CUỐI khung chat, đi theo cả chế độ zoom. ----
+let activityEl = null, activityT0 = 0, activityTimer = null;
+function showActivity(text) {
+  if (!activityEl) {
+    activityEl = document.createElement("div");
+    activityEl.className = "msg msg-activity";
+    activityEl.innerHTML =
+      '<div class="act-bubble"><span class="act-dots"><i></i><i></i><i></i></span>' +
+      '<span class="act-text"></span><span class="act-time"></span></div>';
+    activityT0 = Date.now();
+    activityTimer = setInterval(() => {
+      if (!activityEl) return;
+      const s = Math.floor((Date.now() - activityT0) / 1000);
+      // 3s đầu khỏi hiện số cho đỡ rối; câu chậm (CLI/MCP) thì thấy rõ đã đợi bao lâu
+      activityEl.querySelector(".act-time").textContent = s >= 3 ? s + "s" : "";
+    }, 1000);
+  }
+  activityEl.querySelector(".act-text").textContent = text || "Đang xử lý...";
+  chatAppend(activityEl);   // re-append → luôn dưới cùng (kể cả dưới bubble đang stream)
+  scrollBottom();
+}
+function hideActivity() {
+  if (activityTimer) { clearInterval(activityTimer); activityTimer = null; }
+  if (activityEl && activityEl.parentNode) activityEl.parentNode.removeChild(activityEl);
+  activityEl = null;
+}
 function setProcessing(s) { isProcessing = s; sendBtn.disabled = s; }
-function scrollBottom() { chatArea.scrollTop = chatArea.scrollHeight; }
+
+// ============================================
+// Cuộn thông minh: chỉ tự cuộn khi user đang ở đáy; đang đọc lại phía trên thì
+// KHÔNG giật xuống - hiện nút "↓ Tin mới" (sticky trong khung chat) để nhảy xuống.
+// Nút được chèn lazy khi có tin đầu tiên → .transcript:empty::after vẫn hoạt động.
+// ============================================
+let stickBottom = true;
+const newMsgBtn = document.createElement("button");
+newMsgBtn.id = "newMsgBtn"; newMsgBtn.type = "button"; newMsgBtn.textContent = "↓ Tin mới";
+newMsgBtn.addEventListener("click", () => scrollBottom(true));
+function chatAppend(el) {
+  if (newMsgBtn.parentNode !== chatArea) chatArea.appendChild(newMsgBtn);
+  chatArea.insertBefore(el, newMsgBtn);
+}
+chatArea.addEventListener("scroll", () => {
+  stickBottom = chatArea.scrollHeight - chatArea.scrollTop - chatArea.clientHeight < 90;
+  if (stickBottom) newMsgBtn.classList.remove("show");
+});
+function scrollBottom(force) {
+  if (force) stickBottom = true;
+  if (stickBottom) { chatArea.scrollTop = chatArea.scrollHeight; newMsgBtn.classList.remove("show"); }
+  else if (newMsgBtn.parentNode) newMsgBtn.classList.add("show");
+}
+
+// ============================================
+// Copy code block / copy tin nhắn / xem thêm tin dài - event delegation
+// (bubble re-render liên tục khi stream nên KHÔNG gắn handler từng nút)
+// ============================================
+function copyFallback(s) {   // HTTP LAN/VPS chưa https, hoặc clipboard API bị chặn quyền
+  return new Promise((res) => {
+    const ta = document.createElement("textarea");
+    ta.value = s; ta.style.cssText = "position:fixed;opacity:0";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); } catch (e) {}
+    ta.remove(); res();
+  });
+}
+function copyText(s) {
+  if (navigator.clipboard && window.isSecureContext)
+    return navigator.clipboard.writeText(s).catch(() => copyFallback(s));
+  return copyFallback(s);
+}
+function flashCopied(btn, label) {
+  const old = btn.textContent;
+  btn.textContent = "✓ Đã copy";
+  setTimeout(() => { btn.textContent = label || old; }, 1200);
+}
+chatArea.addEventListener("click", (e) => {
+  const t = e.target;
+  if (t.classList.contains("code-copy")) {
+    const wrap = t.closest(".code-wrap");
+    const pre = wrap && wrap.querySelector("pre");
+    if (pre) copyText(pre.innerText).then(() => flashCopied(t, "⧉ Copy"));
+  } else if (t.classList.contains("msg-copy")) {
+    const b = t.closest(".msg") && t.closest(".msg").querySelector(".bubble");
+    if (b) copyText(b.innerText).then(() => flashCopied(t, "⧉"));
+  } else if (t.classList.contains("clamp-more")) {
+    const u = t.closest(".bubble") && t.closest(".bubble").querySelector(".utext");
+    if (u) { u.classList.toggle("clamped"); t.textContent = u.classList.contains("clamped") ? "Xem thêm" : "Thu gọn"; }
+  }
+});
 function updateSysStatus(s) {
   document.getElementById("claudeStatus").className = "mcp-item " + s;
   document.getElementById("ttsStatus").className = "mcp-item " + s;
@@ -381,21 +527,165 @@ graph3dContainer.addEventListener("mousemove", (e) => {
   graphTooltip.style.top = (e.clientY + 14) + "px";
 });
 
-async function initGraph() {
-  // graph3d.js là classic script load trước app.js → class có sẵn ngay
-  if (!window.JavisGraph3D || !window.ForceGraph3D) {
-    graphStats.textContent = "⚠ Lỗi tải thư viện 3D (kiểm tra mạng)";
-    return;
+let _graphMode = "2d";                 // mặc định 2D (canvas thuần, nhẹ, đỡ lag). Đổi trong Cài đặt.
+let _libs3dPromise = null;
+function _ensure3DLibs() {              // nạp three.js + 3d-force-graph LAZY, chỉ khi cần 3D
+  if (window.ForceGraph3D) return Promise.resolve();
+  if (_libs3dPromise) return _libs3dPromise;
+  const loadScript = (src) => new Promise((res, rej) => {
+    const s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+  _libs3dPromise = loadScript("https://unpkg.com/three@0.159.0/build/three.min.js")
+    .then(() => loadScript("https://unpkg.com/3d-force-graph@1.73.4/dist/3d-force-graph.min.js"))
+    .catch(() => {});
+  return _libs3dPromise;
+}
+let _lib2dPromise = null;
+function _ensure2DLib() {               // nạp force-graph (2D, d3-force) LAZY khi cần 2D - nhẹ, không WebGL
+  if (window.ForceGraph) return Promise.resolve();
+  if (_lib2dPromise) return _lib2dPromise;
+  _lib2dPromise = new Promise((resolve) => {
+    const s = document.createElement("script");
+    s.src = "https://unpkg.com/force-graph@1.51.4/dist/force-graph.min.js";
+    s.onload = resolve; s.onerror = resolve;
+    document.head.appendChild(s);
+  });
+  return _lib2dPromise;
+}
+
+async function initGraph(forceMode) {
+  const c2d = document.getElementById("graph2d");
+  // Nguồn chọn 2D/3D: forceMode (vừa bấm) → localStorage (bền, không cần server) → /settings → mặc định 2D.
+  if (forceMode === "2d" || forceMode === "3d") {
+    _graphMode = forceMode;
+  } else {
+    const ls = localStorage.getItem("javis.graphMode");
+    if (ls === "2d" || ls === "3d") { _graphMode = ls; }
+    else {
+      try {
+        const s = await (await fetch("/settings")).json();
+        if (s && s.dashboard && s.dashboard.graph_mode) _graphMode = s.dashboard.graph_mode;
+      } catch (e) {}
+    }
   }
-  javisGraph = new JavisGraph3D(graph3dContainer, graphTooltip);
+  if (_graphMode === "3d") {
+    await _ensure3DLibs();
+    if (!window.JavisGraph3D || !window.ForceGraph3D) {
+      graphStats.textContent = "⚠ Lỗi tải thư viện 3D (kiểm tra mạng)";
+      return;
+    }
+    if (c2d) c2d.style.display = "none";
+    graph3dContainer.style.display = "";
+    javisGraph = new JavisGraph3D(graph3dContainer, graphTooltip);
+  } else {
+    graph3dContainer.style.display = "none";
+    if (c2d) c2d.style.display = "block";   // "" sẽ rơi về CSS #graph2d{display:none} → bị ẩn
+    await _ensure2DLib();
+    if (!window.ForceGraph) { graphStats.textContent = "⚠ Lỗi tải thư viện đồ thị 2D (kiểm tra mạng)"; return; }
+    javisGraph = new JavisGraph(c2d, graphTooltip);   // resize() gọi bên trong load()
+  }
   await reloadGraph();
 }
 
+// Đổi 2D/3D trong Cài đặt → dựng lại đồ thị tại chỗ (console.js gọi sau khi lưu setting).
+window.reinitGraph = async function (forceMode) {
+  try { if (javisGraph && javisGraph.pause) javisGraph.pause(); } catch (e) {}
+  javisGraph = null;
+  try { graph3dContainer.innerHTML = ""; } catch (e) {}
+  const c2d = document.getElementById("graph2d");
+  if (c2d) { try { c2d.innerHTML = ""; } catch (e) {} }   // #graph2d giờ là div force-graph gắn canvas vào
+  await initGraph(forceMode);
+  connectGraphWatch();
+};
+
 // Click node trong graph → Javis mở & thao tác note đó trong vault
 window.onGraphNodeClick = (node) => {
-  if (!node) return;
-  sendMessage(`Đọc note "${node.label}" (${node.path}) trong second brain, tóm tắt ngắn nội dung chính và đề xuất việc tiếp theo nếu có.`);
+  if (!node || !node.path) return;
+  const brainRel = (node.path || "").split("/").slice(1).join("/") || node.path;   // bỏ đoạn gốc → path tương đối brain
+  if (typeof window.JavisOpenNote === "function") window.JavisOpenNote(brainRel);   // mở editor cây (WYSIWYG + công cụ)
+  else openNodePopup(node);   // dự phòng nếu editor cây chưa sẵn
 };
+
+// ============================================
+// Popup đọc / sửa 1 node của graph 3D. Node.path = "<tên thư mục gốc>/<đường dẫn>"; bỏ đoạn gốc
+// để hợp path tương đối của /files. Đọc qua /files/read, lưu qua /files/write (như trang Tệp tin).
+// ============================================
+let _nodeModal = null;
+function _ensureNodeModal() {
+  if (_nodeModal) return _nodeModal;
+  const css = `
+    .node-modal{position:fixed;inset:0;z-index:600;display:none;align-items:center;justify-content:center;background:rgba(4,8,18,.62);backdrop-filter:blur(3px);padding:24px}
+    .node-modal.open{display:flex}
+    .node-card{width:min(820px,94vw);max-height:88vh;display:flex;flex-direction:column;background:#0d0f18;border:1px solid var(--border);border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.6);overflow:hidden}
+    .node-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border)}
+    .node-title{font-family:var(--font);font-weight:700;font-size:16px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .node-actions{display:flex;align-items:center;gap:6px;flex:none}
+    .nm-btn{background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--text2);border-radius:8px;padding:5px 11px;cursor:pointer;font-size:13px;text-decoration:none;display:inline-block;white-space:nowrap}
+    .nm-btn:hover{color:var(--accent);border-color:var(--accent)}
+    .node-path{padding:6px 14px;font-size:12px;color:var(--text3);border-bottom:1px solid var(--border);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .node-body{flex:1 1 auto;min-height:0;display:flex}
+    .node-body textarea{width:100%;min-height:56vh;flex:1;background:#070b16;color:#dce6fb;border:none;outline:none;padding:14px;font:14px/1.6 ui-monospace,Consolas,monospace;resize:none}
+    .node-msg{padding:22px;color:var(--text2);font-size:15px;line-height:1.6}`;
+  const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
+  const m = document.createElement("div");
+  m.className = "node-modal"; m.id = "nodeModal";
+  m.innerHTML =
+    '<div class="node-card">' +
+      '<div class="node-head">' +
+        '<span class="node-title" id="nodeTitle"></span>' +
+        '<span class="node-actions">' +
+          '<a class="nm-btn" id="nodeOpenTab" target="_blank" rel="noopener">↗ Tab mới</a>' +
+          '<button class="nm-btn" id="nodeSave" type="button">💾 Lưu</button>' +
+          '<button class="nm-btn" id="nodeCloseBtn" type="button">✕</button>' +
+        '</span>' +
+      '</div>' +
+      '<div class="node-path" id="nodePath"></div>' +
+      '<div class="node-body" id="nodeBody"></div>' +
+    '</div>';
+  document.body.appendChild(m);
+  m.addEventListener("click", (e) => { if (e.target === m) closeNodePopup(); });
+  m.querySelector("#nodeCloseBtn").addEventListener("click", closeNodePopup);
+  _nodeModal = m;
+  return m;
+}
+function closeNodePopup() { if (_nodeModal) _nodeModal.classList.remove("open"); }
+async function openNodePopup(node) {
+  const m = _ensureNodeModal();
+  const brain = currentBrainPath();
+  const rel = (node.path || "").split("/").slice(1).join("/") || (node.path || "");
+  m.querySelector("#nodeTitle").textContent = node.label || rel || "Note";
+  m.querySelector("#nodePath").textContent = rel;
+  const rawUrl = `/files/raw?brain=${encodeURIComponent(brain)}&path=${encodeURIComponent(rel)}`;
+  m.querySelector("#nodeOpenTab").href = rawUrl;
+  const body = m.querySelector("#nodeBody");
+  const saveBtn = m.querySelector("#nodeSave");
+  saveBtn.style.display = "none";
+  body.innerHTML = '<div class="node-msg">Đang mở…</div>';
+  m.classList.add("open");
+  let d = {};
+  try { d = await (await fetch(`/files/read?brain=${encodeURIComponent(brain)}&path=${encodeURIComponent(rel)}`)).json(); }
+  catch (e) { body.innerHTML = `<div class="node-msg">Lỗi mở file: ${escapeHtml(String((e && e.message) || e))}</div>`; return; }
+  if (!d || d.error || d.editable === false) {
+    body.innerHTML = `<div class="node-msg">${escapeHtml((d && d.error) || "File này không sửa trực tiếp được.")} · <a href="${rawUrl}" target="_blank" style="color:var(--accent)">Mở trong tab mới</a></div>`;
+    return;
+  }
+  body.innerHTML = '<textarea id="nodeText" spellcheck="false"></textarea>';
+  body.querySelector("#nodeText").value = d.content || "";
+  saveBtn.style.display = "";
+  saveBtn.textContent = "💾 Lưu";
+  saveBtn.onclick = async () => {
+    saveBtn.textContent = "Đang lưu…";
+    const fd = new FormData();
+    fd.append("brain", brain); fd.append("path", rel);
+    fd.append("content", body.querySelector("#nodeText").value);
+    let r = {};
+    try { r = await (await fetch("/files/write", { method: "POST", body: fd })).json(); } catch (e) { r = { error: (e && e.message) || "lỗi" }; }
+    saveBtn.textContent = (r && r.ok) ? "✓ Đã lưu" : "⚠ Lỗi";
+    setTimeout(() => { saveBtn.textContent = "💾 Lưu"; }, 1600);
+  };
+  setTimeout(() => { try { body.querySelector("#nodeText").focus(); } catch (e) {} }, 30);
+}
 async function reloadGraph() {
   if (!javisGraph) return;
   graphStats.textContent = "Đang tải...";
@@ -523,8 +813,23 @@ function renderConceptLabels(categories, total) {
     div.className = "concept-label";
     div.style.left = x + "%";
     div.style.top = y + "%";
+    // Tô chữ "% Vault" đúng màu node của thư mục đó (lấy từ bảng màu danh mục của đồ thị) → dễ nhận màu nào của folder nào.
+    const catKey = c.name.replace(/^\d+\s*[-_.]\s*/, "").trim().toLowerCase();
+    const catCol = (window.__javisCatMap || {})[catKey];
     div.innerHTML = `<div class="cl-name">${escapeHtml(c.name.toUpperCase())}</div>` +
-      `<div class="cl-meta">${c.count} note · <span class="cl-fire">${share}% Vault</span></div>`;
+      `<div class="cl-meta">${c.count} note · <span class="cl-fire"${catCol ? ` style="color:${catCol}"` : ""}>${share}% Vault</span></div>`;
+    // Bấm nhãn danh mục → rọi sáng đúng cụm đó trong đồ thị (chỉ đồ thị 2D hỗ trợ; 3D bỏ qua an toàn).
+    div.style.cursor = "pointer";
+    div.title = "Bấm để rọi sáng cụm " + c.name;
+    div.onclick = () => {
+      const g = window.__javisGraph;
+      if (!g || typeof g.spotlightCategory !== "function") return;
+      const key = c.name.replace(/^\d+\s*[-_.]\s*/, "").trim().toLowerCase();
+      const on = g._catFilter === key;
+      g.spotlightCategory(on ? null : c.name);
+      container.querySelectorAll(".concept-label").forEach(d => d.classList.remove("cl-active"));
+      if (!on) div.classList.add("cl-active");
+    };
     container.appendChild(div);
     setTimeout(() => div.classList.add("show"), 120 + i * 110);
   }
@@ -1095,9 +1400,11 @@ document.addEventListener("keydown", (e) => {
     e.preventDefault(); spacePressed = true; voice.startListening();
   }
   if (e.code === "Escape") {
+    // Esc chỉ thoát chế độ rảnh tay + tắt mic + đóng popup node nếu đang mở. KHÔNG còn dừng câu
+    // trả lời hay ngắt Javis đang nói (đã bỏ theo yêu cầu - đã có nút bật/tắt tiếng và nút Dừng).
     handsFree = false; voiceBtn.classList.remove("handsfree");
     voice.stopListening();
-    stopCurrent();   // ngắt lệnh đang chạy + dừng đọc
+    if (typeof closeNodePopup === "function") closeNodePopup();
   }
 });
 document.addEventListener("keyup", (e) => {
@@ -1273,6 +1580,57 @@ async function refreshEngineBadge() {
 }
 
 // ============================================
+// Mức dùng (token Javis tự đo, đa nhà cung cấp) - panel sidebar
+// ============================================
+const _PROV_LABEL = { cli: "Claude Code", codex: "ChatGPT", openrouter: "OpenRouter", openai: "OpenAI", "anthropic-api": "Anthropic" };
+function _fmtTok(n) {
+  n = +n || 0;
+  if (n >= 1e6) return (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + "M";
+  if (n >= 1e3) return (n / 1e3).toFixed(n >= 1e4 ? 0 : 1) + "k";
+  return "" + n;
+}
+function _shortModel(m) { return (m || "").split("/").pop().replace(/^(claude-|gpt-)/, "").slice(0, 22); }
+async function refreshUsage() {
+  const el = document.getElementById("usagePanel"); if (!el) return;
+  let d; try { d = await (await fetch("/usage")).json(); } catch (e) { return; }
+  // Hôm nay chưa có lượt nào → hiện TỔNG tích luỹ để không trống trơn.
+  let src = d.today, scope = "hôm nay";
+  if ((!src || !(src.items || []).length) && d.all_time && (d.all_time.items || []).length) { src = d.all_time; scope = "tổng"; }
+  const items = (src && src.items) || [];
+  const tot = (src && src.total) || { in: 0, out: 0, cost: 0 };
+  const row = (nameHtml, tok, extra) => `<div style="display:flex;justify-content:space-between;gap:6px;font-size:11px;padding:1px 0;${extra || ""}"><span style="color:#aebbd6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${nameHtml}</span><span style="color:#7aa2ff;white-space:nowrap;font-variant-numeric:tabular-nums">${tok}</span></div>`;
+  let html;
+  if (!items.length) {
+    html = `<div class="mcp-item dim">Chưa có lượt nào hôm nay</div>`;
+  } else {
+    html = items.map(i => {
+      const lbl = _PROV_LABEL[i.provider] || escapeHtml(i.provider);
+      const cost = i.cost > 0 ? ` · $${i.cost.toFixed(i.cost < 0.01 ? 4 : 2)}` : "";
+      const nm = `${escapeHtml(lbl)} <span class="dim">${escapeHtml(_shortModel(i.model))}</span>`;
+      return row(nm, `${_fmtTok(i.in)}↑ ${_fmtTok(i.out)}↓${cost}`);
+    }).join("");
+    html += row(`<b>Tổng ${scope}</b>`, `<b>${_fmtTok(tot.in)}↑ ${_fmtTok(tot.out)}↓${tot.cost > 0 ? " · $" + tot.cost.toFixed(2) : ""}</b>`, "border-top:1px solid rgba(255,255,255,.1);margin-top:2px;padding-top:3px");
+  }
+  if (d.openrouter && d.openrouter.remaining != null) {
+    html += row("OpenRouter còn", `$${(+d.openrouter.remaining).toFixed(2)}`, "margin-top:4px;color:#8fd0a0");
+  }
+  el.innerHTML = html;
+}
+
+// Nút thu nhỏ / mở to hộp MỨC DÙNG (nhớ trạng thái qua localStorage).
+(function initUsageToggle() {
+  const box = document.getElementById("usageFloat"), btn = document.getElementById("usageToggle");
+  if (!box || !btn) return;
+  const apply = (col) => { box.classList.toggle("collapsed", col); btn.textContent = col ? "▸" : "▾"; };
+  apply(localStorage.getItem("javis.usageCollapsed") === "1");
+  btn.onclick = () => {
+    const col = !box.classList.contains("collapsed");
+    apply(col);
+    try { localStorage.setItem("javis.usageCollapsed", col ? "1" : "0"); } catch (e) {}
+  };
+})();
+
+// ============================================
 // Auth (đăng nhập) + Settings
 // ============================================
 const authOverlay = document.getElementById("authOverlay");
@@ -1397,7 +1755,9 @@ if (document.getElementById("settingsBtn")) {
     const btn = e.target; btn.disabled = true; const old = btn.textContent; btn.textContent = "Đang gửi...";
     try {
       const r = await (await fetch("/telegram/test", { method: "POST" })).json();
-      btn.textContent = r.ok ? "✓ Đã gửi (xem Telegram)" : ("⚠ " + (r.error || "lỗi"));
+      btn.textContent = r.ok
+        ? (r.total > 1 ? `✓ Đã gửi ${r.sent}/${r.total} ID` + (r.error ? " (có lỗi)" : "") : "✓ Đã gửi (xem Telegram)")
+        : ("⚠ " + (r.error || "lỗi"));
     } catch (e) { btn.textContent = "⚠ lỗi mạng"; }
     setTimeout(() => { btn.textContent = old; btn.disabled = false; }, 2500);
   });
@@ -1529,6 +1889,7 @@ if (document.getElementById("wzFinish")) {
 // ============================================
 initAuthGate();
 refreshEngineBadge();
+refreshUsage();
 connect();
 initStarfield();
 initGraph().then(connectGraphWatch).catch(connectGraphWatch);

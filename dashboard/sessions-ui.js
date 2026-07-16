@@ -1,142 +1,150 @@
 // ============================================================
-// Javis - Panel "Lịch sử hội thoại" (sessions). Tự chứa, không đụng layout.
-// Gọi backend /sessions* và window.JavisSessions (app.js) để mở/tạo phiên.
+// Javis - Sidebar "Lịch sử hội thoại" TRONG chat workspace (cột trái khi phóng to chat).
+// chat-zoom.js tạo khung <aside id="chatSide"> và gọi window.JavisChatSide.mount/refresh;
+// module này render nội dung: + Hội thoại mới, tìm kiếm, danh sách nhóm theo thời gian,
+// đổi tên/xoá, highlight phiên đang mở. Mở phiên qua window.JavisSessions (app.js).
+// (Thay panel trượt bên phải cũ - nút "Lịch sử" góc phải giờ mở thẳng workspace.)
 // ============================================================
 (function () {
   "use strict";
 
-  var STYLE = `
-  #jv-sess-btn{position:fixed;top:14px;right:16px;z-index:9998;display:flex;align-items:center;gap:6px;
-    padding:7px 12px;border-radius:20px;border:1px solid rgba(120,180,255,.35);
-    background:rgba(15,22,40,.85);color:#cfe0ff;font:600 12px/1 system-ui,Segoe UI,sans-serif;
-    cursor:pointer;backdrop-filter:blur(8px);box-shadow:0 2px 12px rgba(0,0,0,.4)}
-  #jv-sess-btn:hover{border-color:rgba(120,180,255,.7);color:#fff}
-  #jv-sess-overlay{position:fixed;inset:0;z-index:9999;display:none;background:rgba(4,8,18,.55);
-    backdrop-filter:blur(3px)}
-  #jv-sess-overlay.open{display:block}
-  #jv-sess-panel{position:absolute;top:0;right:0;height:100%;width:min(420px,92vw);
-    background:#0c1220;border-left:1px solid rgba(120,180,255,.25);display:flex;flex-direction:column;
-    box-shadow:-8px 0 40px rgba(0,0,0,.5);transform:translateX(8px);font-family:system-ui,Segoe UI,sans-serif}
-  #jv-sess-head{padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;
-    align-items:center;justify-content:space-between}
-  #jv-sess-head h3{margin:0;font-size:16px;color:#e7eefc;font-weight:700}
-  #jv-sess-head .x{cursor:pointer;color:#8aa;font-size:18px;background:none;border:none}
-  #jv-sess-tools{padding:10px 14px;display:flex;gap:8px}
-  #jv-sess-search{flex:1;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.12);
-    background:#070b16;color:#dce6fb;font-size:15px;outline:none}
-  #jv-sess-new{padding:8px 10px;border-radius:8px;border:1px solid rgba(120,255,180,.35);
-    background:rgba(20,40,30,.7);color:#bdf;cursor:pointer;font-size:14px;font-weight:600;white-space:nowrap}
-  #jv-sess-list{flex:1;overflow:auto;padding:6px 10px 16px}
-  .jv-sess-item{padding:10px 12px;border-radius:10px;border:1px solid transparent;cursor:pointer;
-    margin-bottom:4px}
-  .jv-sess-item:hover{background:rgba(120,180,255,.08);border-color:rgba(120,180,255,.2)}
-  .jv-sess-title{color:#e7eefc;font-size:15px;font-weight:600;margin-bottom:3px;
-    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .jv-sess-meta{color:#7d8aa6;font-size:13px;display:flex;gap:8px;align-items:center}
-  .jv-sess-meta .act{margin-left:auto;display:flex;gap:8px;opacity:0;transition:opacity .15s}
-  .jv-sess-item:hover .act{opacity:1}
-  .jv-sess-meta .act span{cursor:pointer;color:#9ab}
-  .jv-sess-meta .act span:hover{color:#fff}
-  .jv-sess-snip{color:#9fb0cf;font-size:13px;margin-top:3px}
-  .jv-sess-snip b{color:#ffd47a;font-weight:700}
-  #jv-sess-empty{color:#6b7894;font-size:14px;text-align:center;padding:30px 10px}
-  `;
-
   function el(html) { var d = document.createElement("div"); d.innerHTML = html.trim(); return d.firstChild; }
-  function esc(s) { return (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
-  function fmtTime(ts) { try { return new Date(ts * 1000).toLocaleString(); } catch (e) { return ""; } }
+  function esc(s) { return (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;"); }
   function brain() { try { return (window.JavisSessions && window.JavisSessions.brain()) || "brain"; } catch (e) { return "brain"; } }
+  function currentId() { try { return (window.JavisSessions && window.JavisSessions.current()) || null; } catch (e) { return null; } }
 
-  var overlay, listEl, searchEl, searchTimer;
+  function fmtT(ts) {
+    try {
+      var d = new Date(ts * 1000), now = new Date();
+      if (d.toDateString() === now.toDateString())
+        return d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+      var dd = String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0");
+      return d.getFullYear() === now.getFullYear() ? dd : dd + "/" + String(d.getFullYear()).slice(2);
+    } catch (e) { return ""; }
+  }
 
-  function mount() {
-    var st = document.createElement("style"); st.textContent = STYLE; document.head.appendChild(st);
+  function groupOf(ts) {
+    var d0 = new Date(); d0.setHours(0, 0, 0, 0);
+    var start = d0.getTime() / 1000;
+    if (ts >= start) return "Hôm nay";
+    if (ts >= start - 86400) return "Hôm qua";
+    if (ts >= start - 6 * 86400) return "7 ngày qua";
+    return "Cũ hơn";
+  }
 
-    var btn = el('<div id="jv-sess-btn" title="Lịch sử hội thoại">🕘 <span>Lịch sử</span></div>');
-    btn.onclick = openPanel;
-    document.body.appendChild(btn);
+  var side = null, listEl = null, searchEl = null, searchTimer = null, refreshTimer = null;
 
-    overlay = el('<div id="jv-sess-overlay"><div id="jv-sess-panel">' +
-      '<div id="jv-sess-head"><h3>Lịch sử hội thoại</h3><button class="x" title="Đóng">✕</button></div>' +
-      '<div id="jv-sess-tools"><input id="jv-sess-search" placeholder="Tìm trong mọi hội thoại…"/>' +
-      '<button id="jv-sess-new">+ Mới</button></div>' +
-      '<div id="jv-sess-list"></div></div></div>');
-    document.body.appendChild(overlay);
-
-    listEl = overlay.querySelector("#jv-sess-list");
-    searchEl = overlay.querySelector("#jv-sess-search");
-    overlay.querySelector(".x").onclick = closePanel;
-    overlay.onclick = function (e) { if (e.target === overlay) closePanel(); };
-    overlay.querySelector("#jv-sess-new").onclick = function () {
+  function mount(container) {
+    if (!container) return;
+    side = container;
+    side.innerHTML =
+      '<button class="cside-new" type="button">＋ Hội thoại mới</button>' +
+      '<input class="cside-search" placeholder="Tìm trong mọi hội thoại…">' +
+      '<div class="cside-list"></div>';
+    listEl = side.querySelector(".cside-list");
+    searchEl = side.querySelector(".cside-search");
+    side.querySelector(".cside-new").onclick = function () {
       if (window.JavisSessions) window.JavisSessions.new();
-      closePanel();
+      closeDrawerIfNarrow();
     };
     searchEl.oninput = function () {
       clearTimeout(searchTimer);
       var q = searchEl.value.trim();
       searchTimer = setTimeout(function () { q ? doSearch(q) : loadList(); }, 280);
     };
-    document.addEventListener("keydown", function (e) { if (e.key === "Escape") closePanel(); });
+    refresh();
   }
 
-  function openPanel() { overlay.classList.add("open"); searchEl.value = ""; loadList(); }
-  function closePanel() { overlay.classList.remove("open"); }
+  function refresh() {
+    if (!side) return;
+    // debounce nhẹ: response + notifySessions có thể bắn sát nhau
+    clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(function () {
+      var q = searchEl && searchEl.value.trim();
+      q ? doSearch(q) : loadList();
+    }, 150);
+  }
+
+  function closeDrawerIfNarrow() {
+    if (window.innerWidth >= 900) return;
+    var st = document.querySelector(".chat-stage");
+    if (st) st.classList.remove("side-on");
+  }
+
+  function openSession(id) {
+    if (window.JavisSessions) window.JavisSessions.open(id);
+    closeDrawerIfNarrow();
+  }
 
   async function loadList() {
-    listEl.innerHTML = '<div id="jv-sess-empty">Đang tải…</div>';
+    if (!listEl) return;
+    listEl.innerHTML = '<div class="cside-empty">Đang tải…</div>';
     try {
-      var r = await fetch("/sessions?brain=" + encodeURIComponent(brain()) + "&limit=60");
+      var r = await fetch("/sessions?brain=" + encodeURIComponent(brain()) + "&limit=100");
       var data = await r.json();
       renderList(data.sessions || []);
-    } catch (e) { listEl.innerHTML = '<div id="jv-sess-empty">Lỗi tải danh sách.</div>'; }
+    } catch (e) { listEl.innerHTML = '<div class="cside-empty">Lỗi tải danh sách.</div>'; }
   }
 
   function renderList(items) {
-    if (!items.length) { listEl.innerHTML = '<div id="jv-sess-empty">Chưa có hội thoại nào được lưu.</div>'; return; }
+    if (!items.length) {
+      listEl.innerHTML = '<div class="cside-empty">Chưa có hội thoại nào.<br>Bấm ＋ để bắt đầu.</div>';
+      return;
+    }
     listEl.innerHTML = "";
+    var cur = currentId(), lastGroup = null;
     items.forEach(function (s) {
-      var item = el('<div class="jv-sess-item">' +
-        '<div class="jv-sess-title">' + esc(s.title || s.preview || "(chưa đặt tên)") + '</div>' +
-        '<div class="jv-sess-meta"><span>' + esc(s.engine || "") + '</span><span>' + (s.msg_count || 0) + ' tin</span>' +
-        '<span>' + fmtTime(s.updated_at) + '</span>' +
+      var g = groupOf(s.updated_at || 0);
+      if (g !== lastGroup) {
+        listEl.appendChild(el('<div class="cside-group">' + g + '</div>'));
+        lastGroup = g;
+      }
+      var eng = (s.engine || "").toString().slice(0, 10);
+      var isRun = !!(window.JavisRunning && window.JavisRunning.has(s.id));
+      var item = el('<div class="cside-item' + (s.id === cur ? " active" : "") + (isRun ? " running" : "") + '">' +
+        '<div class="ci-title">' + (isRun ? '<span class="ci-run" title="Đang trả lời">⏳</span> ' : '') + esc(s.title || s.preview || "(chưa đặt tên)") + '</div>' +
+        '<div class="ci-meta"><span>' + fmtT(s.updated_at) + '</span>' +
+        (eng ? '<span class="ci-badge">' + esc(eng) + '</span>' : '') +
+        '<span>' + (s.msg_count || 0) + ' tin</span>' +
         '<span class="act"><span class="ren" title="Đổi tên">✎</span><span class="del" title="Xoá">🗑</span></span>' +
         '</div></div>');
       item.onclick = function (e) {
-        if (e.target.classList.contains("del")) { e.stopPropagation(); delSession(s.id); return; }
+        if (e.target.classList.contains("del")) { e.stopPropagation(); delSession(s); return; }
         if (e.target.classList.contains("ren")) { e.stopPropagation(); renSession(s); return; }
-        if (window.JavisSessions) window.JavisSessions.open(s.id);
-        closePanel();
+        openSession(s.id);
       };
       listEl.appendChild(item);
     });
   }
 
   async function doSearch(q) {
-    listEl.innerHTML = '<div id="jv-sess-empty">Đang tìm…</div>';
+    if (!listEl) return;
+    listEl.innerHTML = '<div class="cside-empty">Đang tìm…</div>';
     try {
       var r = await fetch("/sessions/search?q=" + encodeURIComponent(q) + "&brain=" + encodeURIComponent(brain()) + "&limit=40");
       var data = await r.json();
       var hits = data.results || [];
-      if (!hits.length) { listEl.innerHTML = '<div id="jv-sess-empty">Không tìm thấy.</div>'; return; }
+      if (!hits.length) { listEl.innerHTML = '<div class="cside-empty">Không tìm thấy.</div>'; return; }
       listEl.innerHTML = "";
       hits.forEach(function (h) {
         var snip = esc(h.snippet || "").replace(/&gt;&gt;&gt;/g, "<b>").replace(/&lt;&lt;&lt;/g, "</b>");
-        var item = el('<div class="jv-sess-item">' +
-          '<div class="jv-sess-title">' + esc(h.title || "(chưa đặt tên)") + '</div>' +
-          '<div class="jv-sess-snip">' + snip + '</div>' +
-          '<div class="jv-sess-meta"><span>' + esc(h.role || "") + '</span><span>' + fmtTime(h.ts) + '</span></div>' +
-          '</div>');
-        item.onclick = function () { if (window.JavisSessions) window.JavisSessions.open(h.session_id); closePanel(); };
+        var item = el('<div class="cside-item">' +
+          '<div class="ci-title">' + esc(h.title || "(chưa đặt tên)") + '</div>' +
+          '<div class="ci-snip">' + snip + '</div>' +
+          '<div class="ci-meta"><span>' + fmtT(h.ts) + '</span></div></div>');
+        item.onclick = function () { openSession(h.session_id); };
         listEl.appendChild(item);
       });
-    } catch (e) { listEl.innerHTML = '<div id="jv-sess-empty">Lỗi tìm kiếm.</div>'; }
+    } catch (e) { listEl.innerHTML = '<div class="cside-empty">Lỗi tìm kiếm.</div>'; }
   }
 
-  async function delSession(id) {
-    if (!confirm("Xoá hội thoại này?")) return;
-    try { await fetch("/sessions/" + encodeURIComponent(id) + "/delete", { method: "POST" }); } catch (e) {}
-    loadList();
+  async function delSession(s) {
+    if (!confirm('Xoá hội thoại "' + (s.title || s.preview || "(chưa đặt tên)") + '"?')) return;
+    try { await fetch("/sessions/" + encodeURIComponent(s.id) + "/delete", { method: "POST" }); } catch (e) {}
+    if (s.id === currentId() && window.JavisSessions) window.JavisSessions.new();
+    refresh();
   }
+
   async function renSession(s) {
     var t = prompt("Tên mới cho hội thoại:", s.title || s.preview || "");
     if (t == null) return;
@@ -144,9 +152,24 @@
       var fd = new FormData(); fd.append("title", t);
       await fetch("/sessions/" + encodeURIComponent(s.id) + "/rename", { method: "POST", body: fd });
     } catch (e) {}
-    loadList();
+    refresh();
   }
 
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", mount);
-  else mount();
+  window.JavisChatSide = { mount: mount, refresh: refresh };
+
+  // Cập nhật khi có lượt chat mới / đổi phiên / đổi brain
+  window.addEventListener("javis:sessions-changed", refresh);
+
+  function bindGlobal() {
+    var gs = document.getElementById("graphSource");
+    if (gs) gs.addEventListener("change", refresh);
+    // Nút "Lịch sử" → mở thẳng workspace với sidebar. Đặt INLINE trong hàng nút header
+    // (.hud-actions) để không đè lên nút Cài đặt/Reset; fallback về body nếu chưa có header.
+    var btn = el('<div id="jv-sess-btn" title="Lịch sử hội thoại">🕘 <span>Lịch sử</span></div>');
+    btn.onclick = function () { if (window.JavisChatStage) window.JavisChatStage.showSide(); };
+    var host = document.querySelector(".hud-actions");
+    (host || document.body).appendChild(btn);
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", bindGlobal);
+  else bindGlobal();
 })();

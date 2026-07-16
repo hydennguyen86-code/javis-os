@@ -26,6 +26,8 @@ class JavisVoice {
     this.ttsQueue = [];
     this.speechQueue = [];   // hàng đợi đọc nối tiếp (các bước trung gian + kết quả)
     this.isPlaying = false;
+    this._resumeAfterTTS = false;  // mic đang mở khi TTS bắt đầu → đọc xong tự mở nghe lại
+    this._resumeTimer = null;
 
     // Audio analysis - cho hiệu ứng phát sáng theo âm thanh
     this.audioCtx = null;
@@ -51,7 +53,10 @@ class JavisVoice {
     try {
       const ctx = this._ensureCtx();
       if (!this.micStream) {
-        this.micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // Bật khử vọng/khử ồn: giảm việc mic nghe lại chính giọng TTS (chống tự-kích-hoạt + lồng tiếng).
+        this.micStream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+        });
       }
       const src = ctx.createMediaStreamSource(this.micStream);
       const an = ctx.createAnalyser();
@@ -107,6 +112,10 @@ class JavisVoice {
     };
 
     this.recognition.onresult = (event) => {
+      // Đang phát TTS thì BỎ mọi kết quả nhận dạng: đó là mic nghe lại chính giọng Javis
+      // (SpeechRecognition thu riêng, KHÔNG được khử vọng như luồng đo mức âm), không phải
+      // user nói. Không chặn thì giọng Javis bị chép vào khung chat rồi tự gửi đi.
+      if (this.isSpeaking()) return;
       let interim = "", final = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const transcript = event.results[i][0].transcript;
@@ -173,6 +182,9 @@ class JavisVoice {
       return;
     }
     if (this.isListening) return;
+    // Mở nghe chủ động → huỷ mọi lịch tự-mở-lại còn treo
+    this._resumeAfterTTS = false;
+    clearTimeout(this._resumeTimer);
     // Stop TTS đang đọc nếu user bấm nói
     this.synth.cancel();
     this.stopSpeaking();
@@ -186,6 +198,9 @@ class JavisVoice {
 
   stopListening() {
     clearTimeout(this._silenceTimer);
+    // User chủ động tắt nghe → không tự mở lại sau khi TTS đọc xong
+    this._resumeAfterTTS = false;
+    clearTimeout(this._resumeTimer);
     if (this.recognition && this.isListening) {
       this.userStopped = true;     // đánh dấu user chủ động dừng → không auto-restart
       this.recognition.stop();
@@ -215,11 +230,75 @@ class JavisVoice {
 
   // Lấy đoạn kế trong hàng đợi để đọc; hết hàng đợi thì dừng.
   _pumpQueue() {
-    if (!this.speechQueue || this.speechQueue.length === 0) { this.isPlaying = false; return; }
+    if (!this.speechQueue || this.speechQueue.length === 0) {
+      this.isPlaying = false;
+      this._stopBargeMonitor();
+      this._resumeRecognitionIfNeeded();             // đọc xong hết → mở nghe lại nếu trước đó mic đang mở
+      return;
+    }
     this.isPlaying = true;
+    this._muteRecognition();                         // mic đang mở → tạm ngừng NHẬN DẠNG, khỏi thu giọng TTS vào chat
+    this._startBargeMonitor();                       // cho phép ngắt lời bằng giọng khi đang đọc
     const text = this.speechQueue.shift();
     if (this.ttsBackend) this._speakBackend(text);   // Edge TTS (giọng Việt chuẩn)
     else this._speakBrowser(text);                   // fallback Web Speech
+  }
+
+  // Javis bắt đầu đọc mà mic đang nghe → tạm NGỪNG nhận dạng (abort, bỏ kết quả dở),
+  // vì SpeechRecognition sẽ chép chính giọng TTS thành tin nhắn của user. Ngắt lời bằng
+  // giọng vẫn hoạt động - barge-in đo mức âm qua luồng mic đã khử vọng, không cần nhận dạng.
+  _muteRecognition() {
+    if (!this.recognition || !this.isListening) return;
+    this._resumeAfterTTS = true;
+    this.userStopped = true;             // chặn auto-restart trong onend
+    clearTimeout(this._silenceTimer);
+    this.accumulatedTranscript = "";     // bỏ những gì lỡ nghe - không gửi
+    this.onInterim("");                  // xoá chữ đang hiện dở trên màn hình
+    try { this.recognition.abort(); } catch (e) {}
+  }
+
+  // Đọc xong (hoặc bị dừng) → mở nghe lại nếu mic từng bị tạm ngừng vì TTS.
+  // Chờ một nhịp cho đuôi âm tắt hẳn; phiên nhận dạng MỚI nên không dính giọng TTS cũ.
+  _resumeRecognitionIfNeeded() {
+    if (!this._resumeAfterTTS) return;
+    this._resumeAfterTTS = false;
+    clearTimeout(this._resumeTimer);
+    this._resumeTimer = setTimeout(() => {
+      if (!this.isPlaying && !this.isListening) this.startListening();
+    }, 400);
+  }
+
+  // ---- Ngắt lời (barge-in): đang đọc mà nghe user nói đủ to/đủ lâu → dừng đọc + mở nghe ngay ----
+  _startBargeMonitor() {
+    // Ngắt lời chỉ khi user THỰC SỰ dùng giọng (đã cấp mic). Đo BIÊN ĐỘ SÓNG (time-domain RMS) từ
+    // luồng mic ĐÃ khử vọng - đúng độ TO thật, đáng tin hơn trung bình phổ (bị pha loãng bởi dải tần
+    // cao im lặng nên giọng nói không bao giờ chạm ngưỡng). Tự HIỆU CHỈNH theo nền (echo + ồn) đo
+    // trong ~600ms đầu để hợp mọi máy/môi trường, hạn chế tự-ngắt do nghe lại chính giọng TTS.
+    if (this._bargeTimer || !this.micStream || !this.inAnalyser) return;
+    const N = this.inAnalyser.fftSize || 128;
+    if (!this._timeData || this._timeData.length !== N) this._timeData = new Uint8Array(N);
+    let hits = 0, ticks = 0, baseline = 0;
+    this._bargeTimer = setInterval(() => {
+      if (!this.isPlaying) { this._stopBargeMonitor(); return; }
+      this.inAnalyser.getByteTimeDomainData(this._timeData);
+      let s = 0;
+      for (let k = 0; k < N; k++) { const dv = this._timeData[k] - 128; s += dv * dv; }
+      const rms = Math.sqrt(s / N) / 128;   // 0..1 (im lặng ~0.005, nói thường ~0.05-0.2)
+      ticks++;
+      if (ticks <= 6) { baseline = Math.max(baseline, rms); return; }   // ~600ms đầu: đo nền/echo
+      const thresh = Math.max(0.045, baseline * 2 + 0.02);             // vượt HẲN nền mới coi là user nói
+      if (rms > thresh) { if (++hits >= 3) { this._stopBargeMonitor(); this._bargeIn(); } }   // ~300ms liên tục
+      else hits = 0;
+    }, 100);
+  }
+
+  _stopBargeMonitor() {
+    if (this._bargeTimer) { clearInterval(this._bargeTimer); this._bargeTimer = null; }
+  }
+
+  _bargeIn() {
+    this.stopSpeaking();       // dừng đọc ngay (không để chồng tiếng)
+    this.startListening();     // user muốn nói → mở nghe luôn, bắt trọn câu
   }
 
   _cleanForTTS(text) {
@@ -233,7 +312,7 @@ class JavisVoice {
       .replace(/^#{1,6}\s+/gm, "")              // heading
       .replace(/^\s*\d+[.)]\s+/gm, "")          // list số
       .replace(/^\s*[-*•]\s+/gm, "")            // list dấu đầu dòng
-      .replace(/\s*[—–]\s*/g, ", ")             // gạch ngang em/en → phẩy (hết khựng)
+      .replace(/\s*[\u2014\u2013]\s*/g, ", ")   // gạch ngang em/en (U+2014/2013) -> phẩy (hết khựng khi đọc)
       .replace(/\s*\|\s*/g, ", ")               // ô bảng markdown
       .replace(/\n{2,}/g, ". ")                 // đoạn mới → chấm
       .replace(/\n/g, ", ")                     // xuống dòng → phẩy (liền mạch, vẫn có nhịp thở)
@@ -248,19 +327,35 @@ class JavisVoice {
 
   async _speakBackend(text) {
     // KHÔNG stopSpeaking ở đây - hàng đợi (_pumpQueue) điều phối thứ tự đọc.
-    // Đoạn to (đa số câu trả lời = 1 đoạn → đọc liền 1 mạch, không khoảng trống)
-    this.ttsChunks = this._splitIntoChunks(text, 600);
+    // Chunk ĐẦU nhỏ (1 câu) để audio đầu tiên tổng hợp + tải NHANH → bớt khựng; các chunk sau to (liền mạch).
+    this.ttsChunks = this._splitForLatency(text);
     this._preloaded = null;
     this.isPlaying = true;
     this._playChunk(0);
   }
 
-  _playChunk(i) {
+  // Cắt câu ĐẦU ra riêng cho ngắn (phát nhanh), phần còn lại gộp chunk lớn cho liền mạch.
+  _splitForLatency(text) {
+    const sentences = text.match(/[^.!?]+[.!?]+|\s*[^.!?]+$/g) || [text];
+    let first = (sentences.shift() || "").trim();
+    // Câu đầu vẫn dài → cắt tại dấu phẩy đầu tiên cho audio đầu ra thật nhanh.
+    if (first.length > 160) {
+      const c = first.indexOf(",");
+      if (c > 20 && c < 160) { sentences.unshift(first.slice(c + 1)); first = first.slice(0, c + 1).trim(); }
+    }
+    const chunks = [];
+    if (first) chunks.push(first);
+    const rest = sentences.join("").trim();
+    if (rest) chunks.push(...this._splitIntoChunks(rest, 600));
+    return chunks.filter(c => c.length > 0);
+  }
+
+  _playChunk(i, retry) {
     // Hết chunk của đoạn này → chuyển sang đoạn kế trong hàng đợi (không tự dừng).
     if (!this.ttsChunks || i >= this.ttsChunks.length) { this._pumpQueue(); return; }
-    // Dùng audio đã preload nếu trùng index, không thì tạo mới
-    let audio = (this._preloaded && this._preloaded.i === i) ? this._preloaded.audio
-              : new Audio(this._chunkUrl(this.ttsChunks[i]));
+    // Dùng audio đã preload nếu trùng index, không thì tạo mới (retry = tạo mới, tránh cache lỗi).
+    let audio = (!retry && this._preloaded && this._preloaded.i === i) ? this._preloaded.audio
+              : new Audio(this._chunkUrl(this.ttsChunks[i]) + (retry ? "&retry=1" : ""));
     this._preloaded = null;
     this.currentAudio = audio;
 
@@ -287,10 +382,29 @@ class JavisVoice {
       this._preloaded = { i: i + 1, audio: na };
     }
 
-    audio.onended = () => this._playChunk(i + 1);
-    // Lỗi đoạn này → đọc bằng browser rồi đọc tiếp các chunk còn lại của đoạn.
-    audio.onerror = () => { this._speakBrowser(this.ttsChunks[i], () => this._playChunk(i + 1)); };
-    audio.play().catch(() => this._speakBrowser(this.ttsChunks[i], () => this._playChunk(i + 1)));
+    // Một audio lỗi thì Chrome bắn CẢ sự kiện 'error' LẪN play() reject → phải chống xử lý 2 lần
+    // (nếu không: 2 retry chồng nhau + audio mồ côi stopSpeaking không dừng được). Cờ handled = xử lý đúng 1 lần.
+    let handled = false;
+    const onFail = () => {
+      if (handled) return;
+      handled = true;
+      audio.onerror = null;
+      this._chunkFailed(i, retry);   // thử lại backend, vẫn hỏng mới cân nhắc trình duyệt (không rơi tiếng Anh)
+    };
+    audio.onended = () => { if (!handled) this._playChunk(i + 1); };
+    audio.onerror = onFail;
+    audio.play().catch(onFail);
+  }
+
+  // Đoạn TTS backend lỗi: thử LẠI backend 1 lần (lỗi mạng chốc lát) để GIỮ giọng Việt;
+  // vẫn hỏng thì TUYỆT ĐỐI không rơi về giọng mặc định (thường là tiếng Anh) khi đang đọc tiếng Việt -
+  // đó chính là "giọng Anh lạ chèn giữa chừng". Có giọng đúng ngôn ngữ trong máy thì đọc, không thì BỎ đoạn.
+  _chunkFailed(i, retry) {
+    if (!this.ttsChunks || i >= this.ttsChunks.length) { this._pumpQueue(); return; }
+    if (!retry) { this._playChunk(i, true); return; }
+    const okBrowserVoice = this.lang.startsWith("vi") ? !!this.vietnameseVoice : true;
+    if (okBrowserVoice) this._speakBrowser(this.ttsChunks[i], () => this._playChunk(i + 1));
+    else this._playChunk(i + 1);
   }
 
   // onDone: gọi khi đọc xong đoạn (mặc định: lấy đoạn kế trong hàng đợi).
@@ -312,6 +426,7 @@ class JavisVoice {
   }
 
   stopSpeaking() {
+    this._stopBargeMonitor();
     this.synth.cancel();
     if (this.currentAudio) {
       this.currentAudio.pause();
@@ -325,6 +440,7 @@ class JavisVoice {
     this.ttsQueue = [];
     this.speechQueue = [];
     this.isPlaying = false;
+    this._resumeRecognitionIfNeeded();   // mic từng bị tạm ngừng vì TTS → mở nghe lại
   }
 
   setVoice(voiceName) {
