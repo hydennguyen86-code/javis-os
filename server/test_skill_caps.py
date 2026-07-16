@@ -96,7 +96,25 @@ check("tìm thấy thư mục skill hệ thống", _sys_dir.is_dir())
 for _slug in sorted(system_sync.system_skill_slugs()):
     _f = _sys_dir / _slug / "SKILL.md"
     _meta, _ = skill_router.split_frontmatter(_f.read_text(encoding="utf-8"))
-    _desc = _meta.get("description", "") or ""
+    _desc = _meta.get("description", "")
+    # Bẫy dấu hai chấm làm hỏng frontmatter theo HAI đường khác nhau - phải chặn CẢ HAI
+    # TRƯỚC khi gọi validate_description:
+    #  1) 'description: {a: b}' hoặc block lồng nhau -> YAML ra DICT. validate_description làm
+    #     (desc or "").strip(); dict là truthy nên lọt qua 'or' rồi nổ AttributeError, giết
+    #     luôn vòng lặp -> các skill xếp sau KHÔNG được chấm nữa. Đúng cái kiểu hỏng mà
+    #     check()/_fails sinh ra để tránh. Chặn bằng isinstance, báo như 1 FAIL bình thường.
+    #  2) 'description: Foo: bar' (không bọc nháy) -> YAML NÉM LỖI, split_frontmatter tha lỗi
+    #     trả {} -> description RỖNG. validate_description coi rỗng là hợp lệ (POST /skills có
+    #     body-fallback lo) nên lint sẽ XANH dù skill vừa mất sạch mô tả. Với skill HỆ THỐNG
+    #     thì rỗng = hỏng thật, phải bắt riêng - không thì lint mù đúng bug nó sinh ra để canh.
+    if not isinstance(_desc, str):
+        check(f"skill hệ thống '{_slug}' description phải là chuỗi (YAML trả về "
+              f"{type(_desc).__name__} -> frontmatter vỡ, skill mất mô tả lúc chạy; "
+              "bọc cả giá trị trong nháy kép)", False)
+        continue
+    check(f"skill hệ thống '{_slug}' có description không rỗng (rỗng = frontmatter vỡ "
+          "hoặc thiếu description; skill hệ thống bắt buộc có mô tả để route được)",
+          bool(_desc.strip()))
     _err = skill_router.validate_description(_desc)
     check(f"skill hệ thống '{_slug}' description hợp lệ ({len(_desc)} ký tự)"
           + (f" → {_err}" if _err else ""), _err is None)
