@@ -11,7 +11,11 @@
 ## Global Constraints
 
 - **TUYỆT ĐỐI không dùng ký tự em dash (U+2014)** ở bất kỳ đâu: mã, chú thích, tài liệu, chuỗi hiển thị. Dùng dấu gạch nối `-` hoặc viết lại câu. Đây là luật cứng của dự án (CLAUDE.md).
-- Chú thích trong mã dashboard viết tiếng Việt KHÔNG DẤU, theo đúng lệ của `chat-render.js`. Chú thích trong mã server viết tiếng Việt CÓ DẤU, theo đúng lệ của `channel_context.py`.
+- Chú thích viết theo lệ của CHÍNH file đang sửa, đã kiểm chứng:
+  - `dashboard/chat-ask.js` (file mới): tiếng Việt **KHÔNG DẤU**, theo lệ file cùng loại `chat-render.js`.
+  - `dashboard/app.js`: tiếng Việt **CÓ DẤU**, đúng lệ đang có trong file đó.
+  - `server/*.py`: tiếng Việt **CÓ DẤU**, đúng lệ `channel_context.py`.
+  - Chuỗi HIỂN THỊ cho người dùng thì luôn có dấu, kể cả trong `chat-ask.js` (ví dụ `"Ý khác…"`).
 - Mọi text do model sinh ra là **không tin được**: phải escape trước khi nhét vào HTML.
 - File JS dashboard theo khuôn IIFE `(function () { "use strict"; ... })()`, phơi API qua `window.X`, và có nhánh `module.exports` cuối file để test bằng node. Xem `chat-render.js:484-491` làm mẫu.
 - Test là script chạy thẳng, tự in `ok`/`FAIL` và `sys.exit(1)` khi có lỗi. KHÔNG dùng pytest (CI chạy `python test_*.py` từng file).
