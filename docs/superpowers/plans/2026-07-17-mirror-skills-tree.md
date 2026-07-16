@@ -152,7 +152,12 @@ finally:
     shutil.copy2 = _orig_copy2
 check(f"không đổi gì -> KHÔNG copy lại lần nào (đếm được {len(_copies)})", len(_copies) == 0)
 
-# ---- không đổi gì -> KHÔNG đọc nội dung file nào (chứng minh tầng 1 chặn ở stat) ----
+# ---- không đổi gì -> KHÔNG còn đọc-và-băm SKILL.md như bản cũ ----
+# CHÍNH XÁC ĐIỀU NÀY CHỨNG MINH: bản cũ đọc SKILL.md qua Path.read_text để băm, mỗi skill
+# hai lần (nguồn + đích), mỗi lượt gọi - đó là 52ms. Spy này bắt đúng đường đó biến mất.
+# ĐIỀU NÓ *KHÔNG* CHỨNG MINH: "không đọc file nào cả". shutil.copy2 đọc bằng open() chứ
+# không qua Path.read_text, nên nếu copy vẫn chạy thì spy này VẪN im. Việc chứng minh không
+# copy là của check _copies ở trên. Hai check bù nhau, đừng gộp.
 _reads = []
 _orig_rt = Path.read_text
 _orig_rb = Path.read_bytes
@@ -175,7 +180,8 @@ try:
 finally:
     Path.read_text = _orig_rt
     Path.read_bytes = _orig_rb
-check(f"không đổi gì -> KHÔNG đọc nội dung file nào (đếm được {len(_reads)})", len(_reads) == 0)
+check(f"không đổi gì -> KHÔNG còn đọc-và-băm SKILL.md (đếm được {len(_reads)} lượt read_text/read_bytes)",
+      len(_reads) == 0)
 
 # ---- hai luồng đồng thời trên cùng root -> không treo ----
 _R2, _SK2, _MIR2 = _mk_brain("javis-mirrorpar-")
@@ -212,7 +218,7 @@ Expected: FAIL. Các dòng phải đỏ:
 - `mirror có scripts/chay.py` - cùng lý do.
 - `đổi references/ (SKILL.md không đổi) -> mirror nhận bản mới`
 - `đổi file phụ ngang hàng (SKILL.md không đổi) -> mirror nhận bản mới` - bug CÓ SẴN: cổng skip chỉ băm SKILL.md.
-- `không đổi gì -> KHÔNG đọc nội dung file nào` - bản hiện tại đọc SKILL.md mỗi lần.
+- `không đổi gì -> KHÔNG còn đọc-và-băm SKILL.md` - bản hiện tại đọc SKILL.md mỗi lần gọi.
 
 Các dòng phải XANH ngay từ bây giờ (chốt bất biến, không được vỡ ở Task 2): `mirror có SKILL.md`, `KHÔNG mirror skill đã tắt`, `add-only: không xoá file lạ ở mirror`, `4 luồng đồng thời -> không treo`.
 
