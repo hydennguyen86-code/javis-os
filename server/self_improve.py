@@ -264,6 +264,10 @@ class LoopFeature:
         # notify: mặc định BẬT (báo Telegram mỗi vòng cho chủ loop). Chỉ tắt khi ghi rõ false/0/no.
         notify_raw = fm.get("notify", True)
         notify = str(notify_raw).strip().lower() not in ("false", "0", "no", "off", "")
+        # ambient_mcp: OPT-IN cho loop THẤY LẠI connector của máy (claude.ai: Gmail/Drive/lịch...)
+        # như thời engine Popen cũ. MẶC ĐỊNH TẮT - bản fork sạch, không lộ kết nối của ai. Chỉ bật
+        # khi ghi rõ true. Bật = loop chạy nhánh không-gated (nạp cấu hình máy), vẫn chặn Bash/Web/Task.
+        ambient_mcp = str(fm.get("ambient_mcp", False)).strip().lower() in ("true", "1", "yes", "on")
         return {
             # identity = TÊN FILE (stem) - frontmatter slug chỉ để hiển thị, tránh lệch nhau
             "slug": stem,
@@ -277,6 +281,7 @@ class LoopFeature:
             # owner_chat = chat_id người YÊU CẦU loop (để báo về đúng người). Rỗng = web → ID đầu.
             "owner_chat": str(fm.get("owner_chat", "") or "").strip(),
             "notify": notify,
+            "ambient_mcp": ambient_mcp,
             "updated": str(fm.get("updated", "") or ""),
             "body": (body or "").strip(),
         }
@@ -329,6 +334,9 @@ class LoopFeature:
             "owner_chat": loop.get("owner_chat", ""), "notify": bool(loop.get("notify", True)),
             "updated": _today(),
         }
+        # Chỉ ghi ambient_mcp khi BẬT - giữ file loop mặc định sạch (fork không thấy cờ lạ).
+        if loop.get("ambient_mcp"):
+            fm["ambient_mcp"] = True
         y = yaml.safe_dump(fm, allow_unicode=True, sort_keys=False, default_flow_style=False, width=1000).strip()
         d = self._loops_dir(brain)
         d.mkdir(parents=True, exist_ok=True)
@@ -634,6 +642,23 @@ class LoopFeature:
                 except TypeError:
                     self.deps.apply_mcp(cli)
             # KHÔNG _isolate: full mode chủ đích mở MCP + Bash. Không có apply_mcp (test) → vẫn None allowlist.
+        elif loop.get("ambient_mcp") and not for_verify:
+            # OPT-IN (frontmatter ambient_mcp: true, mode suggest/auto): loop THẤY LẠI connector
+            # của máy (claude.ai: Gmail/Drive/lịch) như bản Popen cũ. Dùng nhánh KHÔNG gated
+            # (allowed_tools=None) → engine SDK nạp setting_sources → connector ambient xuất hiện.
+            # An toàn giữ nguyên: chặn CỨNG Bash/Web/Task; tool tiền/đơn đi qua hub vẫn khoá theo
+            # mode (suggest = chỉ đọc). Connector gọi TRỰC TIẾP (ngoài hub) dựa vào kỷ luật prompt
+            # như bản cũ - đây là đánh đổi user CHỦ ĐỘNG bật, không phải mặc định.
+            cli = claude_engine(system_prompt=sysprompt, cwd=cwd, tag="loop", allowed_tools=None)
+            if self.deps.apply_mcp:
+                hub_mode = "auto" if mode == "auto" else "suggest"
+                try:
+                    self.deps.apply_mcp(cli, mode=hub_mode)
+                except TypeError:
+                    self.deps.apply_mcp(cli)
+            base_deny = ["Bash", "WebFetch", "WebSearch", "Task"]
+            cur = list(cli.disallowed_tools or [])
+            cli.disallowed_tools = base_deny + [d for d in cur if d not in base_deny]
         else:
             base = self.deps.readonly_tools if for_verify else (
                 self.deps.safe_tools if mode in ("auto", "full") else self.deps.readonly_tools)

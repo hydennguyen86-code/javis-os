@@ -128,7 +128,7 @@
           {
             "key": "page_id",
             "label": "Page ID (trang Facebook gắn với Botcake)",
-            "placeholder": "vd 1021326246..."
+            "placeholder": "vd 1234567890..."
           },
           {
             "key": "api_key",
