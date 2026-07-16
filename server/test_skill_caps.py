@@ -128,10 +128,26 @@ for _slug in sorted(system_sync.system_skill_slugs()):
 # ---- POST /skills phải ép trần TRƯỚC khi tạo thư mục ----
 # Mốc kết thúc là /skills/delete (main.py:2241) chứ KHÔNG phải /skills/toggle: toggle nằm ở
 # dòng 2161, TRƯỚC save_skill (2214), nên dùng nó làm mốc sau sẽ ném ValueError.
+#
+# ĐÂY LÀ QUÉT MÃ NGUỒN, KHÔNG PHẢI TEST TÍCH HỢP - cố ý. Gọi save_skill thật đòi import
+# main.py tức là kéo cả app FastAPI vào bộ test (nặng + rủi ro tác dụng phụ lúc import).
+# Đổi lại, quét phải soi ĐÚNG CẤU TRÚC chốt chặn chứ không chỉ thứ tự chữ: chỉ kiểm tra
+# 'validate_description xuất hiện trước d.mkdir(' thì một regression giữ lại lời gọi mà bỏ
+# 'if desc_err: return' (hoặc đảo thành 'if not desc_err') VẪN XANH, trong khi tính chất
+# thật - request bị từ chối KHÔNG để lại folder skill rỗng trên đĩa - đã vỡ. Lint CI của
+# Task 3 chỉ phủ skill HỆ THỐNG nên không có gì khác trong bộ test bắt được lỗ này.
 _save = _region("main.py", "async def save_skill", '@app.post("/skills/delete")')
 check("POST /skills gọi validate_description", "validate_description" in _save)
 check("POST /skills ép TRƯỚC khi mkdir",
       _save.index("validate_description") < _save.index("d.mkdir("))
+# Vùng mã GIỮA lời gọi validate_description và d.mkdir( - chốt chặn bắt buộc nằm trọn ở đây.
+_guard = _save[_save.index("validate_description"):_save.index("d.mkdir(")]
+check("POST /skills có nhánh 'if desc_err' chặn giữa validate_description và mkdir "
+      "(chỉ gọi validate_description mà không rẽ nhánh = không chặn được gì)",
+      "if desc_err" in _guard)
+check("POST /skills trả 400 khi description sai, TRƯỚC khi mkdir "
+      "(rẽ nhánh mà không return 400 thì request xấu vẫn ghi xuống đĩa)",
+      "status_code=400" in _guard)
 
 if _fails:
     print(f"\nFAIL - test_skill_caps: {len(_fails)} lỗi: {_fails}")
