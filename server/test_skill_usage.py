@@ -242,6 +242,24 @@ if _list_skills is not None:
     check("dict trả về của GET /skills có key 'use_count'", _has_use_count_key)
     check("dict trả về của GET /skills có key 'last_used_at'", _has_last_used_key)
 
+# ---- sidecar là state runtime → phải bị gitignore + không lên mirror backup ----
+import git_brain  # noqa: E402
+
+check("_GITIGNORE có Javis/skill-usage.json", "Javis/skill-usage.json" in git_brain._GITIGNORE)
+check("_backup_skip bỏ qua sidecar", git_brain._backup_skip("brain/Javis/skill-usage.json") is True)
+check("_backup_skip KHÔNG bỏ nhầm skill thật",
+      git_brain._backup_skip("brain/skills/viet-email/SKILL.md") is False)
+
+# reconcile brain cũ: .gitignore có sẵn thiếu dòng mới → phải được append, KHÔNG ghi đè
+_gi_root = Path(tempfile.mkdtemp(prefix="javis-gitest-"))
+(_gi_root / ".gitignore").write_text("# cua toi\nrieng-cua-toi/\n", encoding="utf-8")
+_changed = git_brain._ensure_gitignore_lines(_gi_root)
+_txt = (_gi_root / ".gitignore").read_text(encoding="utf-8")
+check("reconcile báo có thay đổi", _changed is True)
+check("reconcile GIỮ dòng user tự thêm", "rieng-cua-toi/" in _txt)
+check("reconcile thêm dòng sidecar", "Javis/skill-usage.json" in _txt)
+check("reconcile lần 2 là no-op", git_brain._ensure_gitignore_lines(_gi_root) is False)
+
 if _fails:
     print(f"\nFAIL - test_skill_usage: {len(_fails)} lỗi: {_fails}")
     sys.exit(1)

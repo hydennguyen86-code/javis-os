@@ -66,10 +66,38 @@ _GITIGNORE = (
     "Javis/learn-staging/\n"
     "Javis/learn-log/\n"
     "Javis/loop-log/\n"
+    "Javis/skill-usage.json\n"
     "memory/conversations/\n"
     "Memory/conversations/\n"
     "*.tmp\n"
 )
+
+
+def _ensure_gitignore_lines(root) -> bool:
+    """Merge các dòng của _GITIGNORE vào <root>/.gitignore, CHỈ THÊM dòng còn thiếu.
+    Trả True nếu có thay đổi. TUYỆT ĐỐI không ghi đè: brain cũ có thể đã có dòng user tự
+    thêm. Cần thiết vì ensure_git_repo return sớm ở nhánh brain-đã-là-repo → brain cũ sẽ
+    đông cứng mãi ở template lúc nó ra đời."""
+    try:
+        gi = Path(root) / ".gitignore"
+        cur = gi.read_text(encoding="utf-8") if gi.exists() else ""
+        have = {l.strip() for l in cur.splitlines() if l.strip()}
+        missing = [l for l in _GITIGNORE.splitlines()
+                   if l.strip() and not l.strip().startswith("#") and l.strip() not in have]
+        if not missing:
+            return False
+        if cur.strip():
+            text = cur.rstrip("\n") + "\n"
+        else:
+            # File chưa có/rỗng: dựng lại đúng phần header comment của template (không phụ
+            # thuộc vị trí 1 dòng cụ thể trong _GITIGNORE - tránh vỡ nếu template đổi thứ tự).
+            comment_lines = [l for l in _GITIGNORE.splitlines() if l.strip().startswith("#")]
+            text = ("\n".join(comment_lines) + "\n") if comment_lines else ""
+        gi.write_text(text + "\n".join(missing) + "\n", encoding="utf-8")
+        return True
+    except Exception as e:
+        print(f"[gitignore] {root}: {type(e).__name__}: {e}", file=__import__('sys').stderr)
+        return False
 
 
 def ensure_git_repo(root: str) -> dict:
@@ -79,6 +107,12 @@ def ensure_git_repo(root: str) -> dict:
     if not has_git():
         return {"ok": False, "created": False, "error": "Máy chưa cài git"}
     if is_git_checkout(root):
+        # Brain ĐÃ là repo: trước đây return thẳng ở đây nên template .gitignore mới không
+        # bao giờ tới được brain cũ. Merge dòng còn thiếu rồi commit riêng bằng prefix
+        # 'chore:' - KHÔNG dùng 'learn:'/'curator:' (xem LEARN_COMMIT_PREFIXES dòng 31) để
+        # một lần vá .gitignore không bị hiện ở UI Review hay bị revert_last_learn undo.
+        if _ensure_gitignore_lines(root):
+            commit_paths(root, [".gitignore"], "chore: cập nhật .gitignore brain")
         return {"ok": True, "created": False}
     try:
         Path(root).mkdir(parents=True, exist_ok=True)
@@ -88,9 +122,7 @@ def ensure_git_repo(root: str) -> dict:
         # Cấu hình identity cục bộ (repo có thể chạy trong container không có global config)
         _git(root, "config", "user.email", "javis@localhost")
         _git(root, "config", "user.name", "Javis Learn")
-        gi = Path(root) / ".gitignore"
-        if not gi.exists():
-            gi.write_text(_GITIGNORE, encoding="utf-8")
+        _ensure_gitignore_lines(root)   # merge chứ không ghi đè (brain có thể đã có .gitignore)
         _git(root, "add", ".gitignore")
         _git(root, "add", "-A")   # commit NỀN duy nhất được phép add -A (baseline, chưa có state học)
         c = _git(root, "commit", "-m", "chore: baseline brain snapshot (bật tự học)")
@@ -265,7 +297,8 @@ def remote_reachable(repo_url: str, token: str, timeout: int = 30) -> dict:
 # hội thoại gốc/log/khoá (có thể chứa secret), file tạm.
 _BACKUP_SKIP_DIRS = {".git"}
 _BACKUP_SKIP_SUBSTR = ("/memory/conversations/", "/Memory/conversations/",
-                       "/Javis/loop-log/", "/Javis/learn-log/", "/Javis/learn-staging/")
+                       "/Javis/loop-log/", "/Javis/learn-log/", "/Javis/learn-staging/",
+                       "/Javis/skill-usage.json/")
 
 
 def _backup_skip(rel: str) -> bool:
