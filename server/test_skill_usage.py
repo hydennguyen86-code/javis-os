@@ -2,9 +2,10 @@
 
     cd server && ../.venv/Scripts/python.exe test_skill_usage.py
 
-Không cần pytest, không chạm mạng. Tự cô lập sang thư mục tạm.
-Phủ: bump tăng đúng, ghi atomic, file thiếu, file JSON hỏng, gọi song song,
-is_stale (pinned / có use_count / chưa đủ già / đủ già).
+Không cần pytest, không chạm mạng. Tự cô lập sang thư mục tạm, KHÔNG để lại rác
+ngoài thư mục tạm.
+Phủ: bump tăng đúng, ghi atomic, file thiếu, file JSON hỏng, brain root không ghi được,
+gọi song song (không mất bump), is_stale (pinned / có use_count / chưa đủ già / đủ già).
 """
 import json
 import os
@@ -63,14 +64,30 @@ try:
 except Exception as e:
     check(f"sidecar hỏng → bump không raise (raised {e!r})", False)
 
-# ---- không có quyền ghi / đường dẫn vô lý: vẫn không raise ----
+# ---- brain root KHÔNG ghi được: vẫn không raise ----
+# Mẹo: lấy một FILE thường rồi truyền vào như thể nó là brain root. _write_atomic sẽ
+# mkdir("<file>/Javis") → OS ném NotADirectoryError/FileExistsError trên MỌI nền tảng.
+# KHÔNG dùng đường dẫn kiểu "/khong/ton/tai": trên Windows "/" resolve theo ổ đĩa hiện
+# tại nên mkdir THÀNH CÔNG, nhánh except không bao giờ chạy (test rởm) và còn ghi rác ra
+# đĩa thật. CI ở đây là win32 nên đây là lỗi thật, không phải khác biệt lý thuyết.
+_fd_bogus, _bogus_file = tempfile.mkstemp(prefix="javis-usagebogus-")
+os.close(_fd_bogus)
+_BOGUS_ROOT = Path(_bogus_file)
 try:
-    skill_usage.bump(Path("/khong/ton/tai/o/dau/ca"), "x")
-    check("brain không tồn tại → bump không raise", True)
+    skill_usage.bump(_BOGUS_ROOT, "x")
+    check("brain root không ghi được → bump nuốt lỗi, không raise", True)
 except Exception as e:
-    check(f"brain không tồn tại → bump không raise (raised {e!r})", False)
+    check(f"brain root không ghi được → bump nuốt lỗi, không raise (raised {e!r})", False)
+check("brain root không ghi được → read_usage trả {}", skill_usage.read_usage(_BOGUS_ROOT) == {})
+check("brain root không ghi được → không có gì được tạo dưới file đó",
+      _BOGUS_ROOT.is_file() and not (_BOGUS_ROOT / "Javis").exists())
+os.unlink(_bogus_file)
 
-# ---- gọi song song ----
+# ---- gọi song song: _LOCK phải serialize read-modify-write, KHÔNG được mất bump nào ----
+# Khẳng định ĐÚNG BẰNG 80, không phải khoảng. bump chạy 1 process, _LOCK bọc trọn vòng
+# đọc-sửa-ghi nên kết quả duy nhất đúng là 80. Nếu để khoảng (0 < n <= 80) thì gỡ _LOCK ra
+# test vẫn xanh dù bump bị nuốt do race - tức là chỉ chứng minh "không sập", đúng thứ mà
+# test này KHÔNG có nhiệm vụ chứng minh.
 import threading  # noqa: E402
 
 _R2 = Path(tempfile.mkdtemp(prefix="javis-usagepar-"))
@@ -85,7 +102,7 @@ _ts = [threading.Thread(target=_hammer) for _ in range(4)]
 [t.start() for t in _ts]
 [t.join() for t in _ts]
 _n = skill_usage.read_usage(_R2).get("dua-xe", {}).get("use_count", 0)
-check(f"4 luồng x 20 bump → sidecar còn đọc được, use_count={_n} (>0, <=80)", 0 < _n <= 80)
+check(f"4 luồng x 20 bump → không mất bump nào, use_count={_n} (phải đúng 80)", _n == 80)
 
 # ---- is_stale ----
 _now = time.time()

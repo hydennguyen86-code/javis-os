@@ -69,7 +69,12 @@ def _write_atomic(p: Path, text: str) -> None:
 
 def bump(brain_root, slug: str, created_by: str = "") -> None:
     """Đếm 1 lần dùng skill. BEST-EFFORT: nuốt mọi lỗi, chỉ log stderr.
-    Gọi ở ĐIỂM THÀNH CÔNG của handler _skill (mcp_hub) - không gọi khi slug sai."""
+    Gọi ở ĐIỂM THÀNH CÔNG của handler _skill (mcp_hub) - không gọi khi slug sai.
+
+    ⚠ HÀM NÀY CHẶN (blocking): giữ _LOCK trong lúc đọc + ghi đĩa + os.fsync. Gọi thẳng từ
+    handler async sẽ chẹn event loop. Bên gọi async nên đẩy qua thread (vd
+    asyncio.to_thread / run_in_executor).
+    """
     slug = str(slug or "").strip()
     if not slug:
         return
