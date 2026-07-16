@@ -27,12 +27,18 @@ biết gộp về hình gì.
 
 Đây là lỗi CÓ THẬT, đang chạy, đo được, không phải suy đoán từ Hermes.
 
-Javis cắt description ở hai nơi, với hai hạn mức khác nhau:
+Javis cắt description ở **ba** nơi, với **ba** hạn mức khác nhau:
 
 - `server/mcp_hub.py:256` - `(s['description'] or '')[:60]`, `metas[:20]`
 - `server/main.py:3471` - `(s.get("description") or "")[:100]`, `metas[:15]`
+- `server/skill_router.py:90` - `[:140]`, dùng khi frontmatter thiếu `description` thì lấy
+  dòng đầu thân file làm mô tả thay thế
 
 Người viết skill không có cách nào biết mình đang bị chấm theo thước nào.
+
+Lưu ý hệ quả: `SKILL_DESC_MAX = 150` KHÔNG trùng với bất kỳ giá trị nào đang chạy. Nó đổi
+hành vi ở cả ba chỗ (60 lên 150, 100 lên 150, 140 lên 150) và đổi cap danh sách của
+`main.py` từ 15 lên 20. Đây là thay đổi hành vi có chủ đích, không phải refactor trung tính.
 
 Đo bằng chính `skill_router.list_enabled_meta` trên brain `Brain Default`, **6/6 skill
 đang bật đều bị cắt**:
@@ -131,7 +137,17 @@ file, không job nền, không scheduler.
 `stale` là **hàm thuần** tính lúc đọc từ `(created_at, last_used_at, pinned, now)`.
 
 Điều kiện cụ thể: `pinned == False` VÀ `use_count == 0` VÀ `now - created_at > SKILL_STALE_AFTER_DAYS`.
-Hằng số `SKILL_STALE_AFTER_DAYS = 30`, đặt cùng chỗ với `SKILL_DESC_MAX`.
+
+Hằng số `SKILL_STALE_AFTER_DAYS = 30` đặt trong `skill_usage.py`, KHÔNG đặt trong
+`skill_router.py`. Bản đầu của spec ghi đặt cùng `SKILL_DESC_MAX` là sai: `skill_router`
+không có một dòng logic thời gian nào (không import `datetime`, không `time`, không đọc
+`st_mtime`), và nó không thấy dữ liệu usage. Đặt hằng số ở đó thì nó nằm chết. Hàm stale
+cần cả `created_at` lẫn `use_count`, cả hai đều thuộc sidecar, nên nó thuộc về
+`skill_usage.py`.
+
+`created_at` lấy ở đâu: sidecar ghi khi lần đầu thấy skill. Với skill có sẵn từ trước khi
+tính năng này tồn tại (chưa có bản ghi sidecar), fallback là `mtime` của `SKILL.md`, bọc
+`try/except OSError`. Fallback này chỉ dùng để tính stale, không ghi ngược vào sidecar.
 
 Ngưỡng 30 ngày lấy theo luật của Hermes: skill mới tạo có thể đơn giản là chưa gặp trigger,
 nên chưa đủ già thì không được gắn nhãn gì. Skill có `use_count > 0` không bao giờ stale,
@@ -207,34 +223,94 @@ Nội dung:
 
 Cho phép `references/`, `scripts/`, `templates/` trong thư mục skill.
 
-**Ràng buộc bắt buộc đi kèm:** `system_sync.mirror_skills` hiện chỉ copy MỖI `SKILL.md`
-(xem `system_sync.py:235-257`, vòng lặp chỉ đọc `d / "SKILL.md"`). Nếu chuẩn cho phép
-`references/` mà mirror không copy, skill native sẽ trỏ vào file không tồn tại.
+**SỬA LỖI TRONG CHÍNH SPEC NÀY (bản đầu viết sai, đã kiểm chứng lại bằng cách đọc
+`system_sync.py:235-264` đầy đủ):** `mirror_skills` KHÔNG phải "chỉ copy mỗi SKILL.md".
+Dòng 258-260 copy **mọi file top-level** trong thư mục skill qua `d.iterdir()` +
+`if f.is_file()`. Thứ thực sự bị rơi là **THƯ MỤC CON**, vì `f.is_file()` false với dir và
+không có đệ quy.
 
-Phải sửa `mirror_skills` copy cả thư mục, giữ nguyên tối ưu so hash để không ghi lại khi
-trùng. **Đây là chỗ rủi ro cao nhất của cả spec**, cần test riêng.
+Nên việc cần làm là "file phẳng thành cây đệ quy", không phải "một file thành thư mục".
+
+**Bug đi kèm phải sửa cùng lúc:** cổng hash-skip (dòng 251-256) chỉ băm nội dung `SKILL.md`.
+Nếu `references/x.md` đổi mà `SKILL.md` không đổi thì hash trùng, `continue` chạy, và thay
+đổi KHÔNG BAO GIỜ tới được bản mirror. Lỗi này đã tồn tại sẵn với file asset ngang hàng, và
+sẽ nặng hơn khi có thư mục con. Skip phải trở thành tree-aware.
+
+Bẫy khi làm tree-aware: mirror là add-only, nên bản mirror có file THỪA sẽ không bao giờ
+khớp digest của nguồn, gây copy lại vô hạn mỗi lần gọi. Phải tính digest của đích **chỉ trên
+tập đường dẫn có ở nguồn**. Và không được đưa file nhị phân qua `read_text`/`skill_hash`
+(`errors="replace"` sẽ làm hỏng thầm lặng, và `_norm_text` chuẩn hoá ngày) - dùng sha256
+trên raw bytes cho file không phải text.
+
+Ràng buộc phải giữ: add/update-only, không xoá entry lạ ở `.claude`, bỏ qua `.disabled`,
+và `mirror_skills` phải KHÔNG tự lấy `_LOCK` (`sync_brain:356` gọi nó khi đang giữ lock, mà
+`threading.Lock` không reentrant nên sẽ deadlock).
+
+**Đây là chỗ rủi ro cao nhất của cả spec**, cần test riêng.
+
+**Phạm vi:** `references/`/`scripts/`/`templates/` CHỈ áp cho skill của brain (do người dùng
+hoặc learn tạo). Skill HỆ THỐNG vẫn một file `SKILL.md`, vì `_system_items` (`system_sync.py:142-160`)
+ship nội dung dưới dạng chuỗi đơn và tuple `(key, kind, slug, content)` của nó bị `sync_brain`
+lẫn CLI `--hash` tiêu thụ; nới ra sẽ phá cả hai. Không đáng, và chưa cần.
 
 ### B5. Viết lại 6 description
 
 Không mất thông tin: ví dụ trigger chuyển xuống mục "Khi nào dùng" trong thân file, nơi
 không bị cắt và chỉ được đọc khi skill đã nạp.
 
-5 skill hệ thống sửa ở NGUỒN `<project>/.claude/skills/`
-(`html-to-webcake`, `ingest-source`, `javis-builder`, `lint-wiki`, `query-wiki`),
-KHÔNG sửa bản mirror trong brain.
+Thực tế chỉ phải viết lại **5**, không phải 6. `tao-anh-minh-hoa-2d` đo lại chính xác được
+139 ký tự, tức là ĐÃ dưới 150 và không có ví dụ trigger nào trong description để dời đi.
+Không đụng vào nó.
 
-1 skill của brain (`tao-anh-minh-hoa-2d`) sửa tại brain.
+5 skill hệ thống sửa ở NGUỒN `<project>/.claude/skills/`, KHÔNG sửa bản mirror trong brain:
+
+- `html-to-webcake` 376 ký tự, dư 226 (nặng nhất, rủi ro cao nhất)
+- `javis-builder` 333, dư 183
+- `ingest-source` 266, dư 116
+- `query-wiki` 249, dư 99
+- `lint-wiki` 213, dư 63 (nhẹ nhất)
 
 Sửa luôn hai chỗ tài liệu đang dạy sai: CLAUDE.md (mục description "viết rõ trigger") và
 `javis-builder` (mục description "viết kỹ").
 
 ### B6. Lỗi lệch phát hiện trong lúc đọc
 
-`javis-builder/SKILL.md:54` đang dạy ghi skill vào `.claude/skills/<slug>/SKILL.md`, trong
-khi CLAUDE.md và `skill_router` nói canonical là `skills/<slug>/SKILL.md` còn `.claude/skills`
-chỉ là bản mirror phái sinh. Skill builder đang dạy ghi vào chỗ mirror. Sửa trong phạm vi B.
+`javis-builder` đang dạy ghi skill vào `.claude/skills/`, trong khi CLAUDE.md và `skill_router`
+nói canonical là `skills/<slug>/SKILL.md` còn `.claude/skills` chỉ là bản mirror phái sinh.
+Skill builder đang dạy ghi vào chỗ mirror.
+
+Không phải 1 chỗ mà **3 chỗ** trong cùng file, phải sửa cả ba kẻo file tự mâu thuẫn:
+
+- dòng 54: `### Skill -> \`.claude/skills/<slug>/SKILL.md\``
+- dòng 23-24: bước chống trùng bảo đọc folder `.claude/skills/`
+- dòng 38: chú thích field `skills:` bảo "chỉ gán skill đã có trong .claude/skills"
 
 ## Kiểm thử
+
+**Quy ước nhà (bắt buộc theo, đã kiểm chứng):** repo này KHÔNG dùng pytest. Không có
+conftest.py, pytest.ini, pyproject.toml hay tox.ini nào. Mọi test là script Python chạy
+thẳng, dùng helper tự viết `check(name, cond)` gom lỗi vào `_fails` rồi `sys.exit(1)` ở
+cuối (mẫu chuẩn: `server/test_loop_ambient.py:23-30` và `:117-120`).
+
+Preamble bắt buộc, thứ tự load-bearing (env TRƯỚC import, vì module state đọc
+`JAVIS_STATE_DIR` lúc import):
+
+```python
+os.environ.setdefault("JAVIS_STATE_DIR", tempfile.mkdtemp(prefix="javis-<x>test-"))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import <module>  # noqa: E402
+```
+
+KHÔNG lấy `server/test_plugins_host.py` làm mẫu: nó dùng bare assert nên dừng ở lỗi ĐẦU
+TIÊN, trong khi lint description cần liệt kê MỌI skill vi phạm trong một lần chạy. Lệnh
+chạy ghi trong docstring của file đó (`.venv/Scripts/python`) cũng sai: `server/.venv`
+không tồn tại, venv nằm ở gốc repo.
+
+Lệnh chạy đúng: `cd server && ../.venv/Scripts/python.exe test_<name>.py`
+
+CI (`.github/workflows/ci.yml:29-39`) glob `test_*.py` trong `server/` rồi chạy từng file
+bằng `python` trần. Nên test mới **chỉ cần đặt tên `server/test_*.py` là tự vào CI**, không
+phải sửa ci.yml. Ngược lại, đặt ngoài `server/` thì CI sẽ KHÔNG chạy.
 
 `test_skill_usage.py`: bump tăng đúng, ghi atomic, file thiếu, file hỏng (JSON rác), gọi
 song song, sidecar hỏng không làm gãy lời gọi skill.
@@ -268,10 +344,45 @@ brain. Đây không phải chuyện cân nhắc: `.gitignore` của brain đã n
 là "Git chỉ version TRI THỨC ĐÃ CHƯNG CẤT (facts/wiki/skills/MEMORY.md)" và đã loại sẵn
 learn-log, loop-log, conversations, lock. Telemetry rơi đúng vào nhóm bị loại.
 
-Template `.gitignore` của brain nằm ở `server/git_brain.py:63-66`, kèm một danh sách path
-song song ở `git_brain.py:268`. Phải thêm `Javis/skill-usage.json` vào CẢ HAI chỗ, và kiểm
-tra brain đã tồn tại có được cập nhật `.gitignore` hay không (nếu template chỉ ghi lúc
-`ensure_git_repo` khởi tạo thì brain cũ sẽ không nhận, cần xử lý idempotent).
+Vị trí chính xác (bản đầu ghi lệch, đã kiểm chứng lại):
+
+- Template là hằng số `_GITIGNORE` ở `server/git_brain.py:62-72` (dòng 63-64 là comment,
+  các mục ignore thật nằm ở 65-71).
+- "Danh sách path song song" KHÔNG nằm trong hàm nào. Đó là hằng số module
+  `_BACKUP_SKIP_SUBSTR` ở `git_brain.py:267-268`, do helper `_backup_skip()` (271-276) tiêu
+  thụ, dùng ở 4 chỗ: `_sync_mirror` (289), `_apply_back` (467), `_brains_has_content` (532),
+  `_sync_brains_locked` (604).
+
+Hai chỗ này ở **hai không gian đường dẫn KHÁC NHAU**, dễ sai:
+
+- `.gitignore` tương đối với gốc BRAIN, nên viết `Javis/skill-usage.json` (không slash đầu).
+- `_BACKUP_SKIP_SUBSTR` so khớp chuỗi con trên rel tương đối với thư mục CHA của brain, và
+  `_backup_skip` bọc rel trong hai dấu slash. Nên phải viết `"/Javis/skill-usage.json/"`
+  đúng dạng đó (cả slash đầu lẫn slash cuối), giống mọi mục hiện có.
+
+**Câu hỏi brain cũ đã có lời đáp dứt khoát: KHÔNG, brain cũ sẽ không bao giờ nhận template
+mới.** `ensure_git_repo` có hai chốt chặn độc lập:
+
+1. Dòng 82 `if is_git_checkout(root): return {...}` return TRƯỚC khi chạm bất cứ code
+   `.gitignore` nào. Brain đã là git repo thì không bao giờ đọc lại template.
+2. Dòng 92-93 `if not gi.exists(): gi.write_text(_GITIGNORE)` - kể cả nhánh init, `.gitignore`
+   có sẵn cũng không bị đụng.
+
+Nên `ensure_git_repo` idempotent theo nghĩa "gọi lại không hỏng", nhưng KHÔNG reconcile.
+
+Cách sửa: tách helper `_ensure_gitignore_lines(root) -> bool` đọc `.gitignore` hiện có, chỉ
+APPEND các dòng của `_GITIGNORE` chưa có (merge theo dòng, TUYỆT ĐỐI không ghi đè kẻo xoá
+mục user tự thêm), trả về có đổi hay không. Gọi ở cả hai nhánh. Nhánh brain-cũ nếu có đổi
+thì commit bằng `commit_paths` với prefix `chore:` (KHÔNG dùng `learn:`/`curator:` vì
+`LEARN_COMMIT_PREFIXES` ở dòng 31 quyết định cái gì hiện ở UI Review và cái gì
+`revert_last_learn` sẽ undo). Không thêm `add -A` mới: dòng 95 tự ghi rõ đó là chỗ DUY NHẤT
+được phép dùng `-A`.
+
+Hai điều còn lại phải xử lý: (a) brain cũ có thể ĐÃ track `Javis/skill-usage.json` do
+`add -A` baseline, mà gitignore không có tác dụng với file đã track, nên cần một lần
+`git rm --cached` khi path vừa bị ignore vừa đang được track; (b) không caller nào chạy lúc
+server khởi động (chỉ `/learn/enable` và `/reflect` gọi), nên việc reconcile chỉ xảy ra khi
+một trong hai endpoint đó được gọi.
 
 ## Ngoài phạm vi (cố ý)
 
