@@ -185,6 +185,63 @@ except Exception as e:
 shutil.rmtree(_HUB_ROOT, ignore_errors=True)
 shutil.rmtree(_HUB_ROOT2, ignore_errors=True)
 
+# ---- GET /skills lộ usage: kiểm CẤU TRÚC qua AST (không phải quét chuỗi thô) ----
+# import main.py thật để test HÀNH VI (gọi endpoint) đòi dựng cả app FastAPI - nặng + tác dụng
+# phụ lúc import, chủ đích loại khỏi bộ test này (đã chốt riêng ở brief). Hành vi THẬT của
+# read_usage/is_stale tự thân đã được test bằng behavioral test ở trên (đọc/ghi sidecar, mọi
+# nhánh is_stale). Việc còn thiếu người coi là chấp nhận được: chứng minh GET /skills THỰC SỰ
+# NỐI vào hai hàm đó, dùng AST thay vì so chuỗi - so chuỗi không phân biệt nổi code sống với
+# comment/code chết (bài học rút ra từ test_skill_caps.py, xem chú thích ở đó).
+#
+# GIỚI HẠN (nói thẳng): đây vẫn là phân tích TĨNH, không chạy endpoint. Nó chứng minh hàm
+# list_skills GỌI đúng skill_usage.read_usage/is_stale và gán is_stale(...) TRỰC TIẾP vào key
+# "stale" của dict trả về. Nó KHÔNG chứng minh HTTP response thật trả đúng giá trị lúc chạy (vd
+# lỗi ở tầng skill_router hay FastAPI serialize), và không miễn nhiễm 100% với mọi kiểu code
+# chết (vd lồng trong "if False:" ast.walk vẫn thấy) - chỉ mạnh hơn so chuỗi thô một bậc.
+import ast  # noqa: E402
+
+_main_path = Path(os.path.dirname(os.path.abspath(__file__))) / "main.py"
+_main_tree = ast.parse(_main_path.read_text(encoding="utf-8"))
+
+_list_skills = next((n for n in ast.walk(_main_tree)
+                     if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+                     and n.name == "list_skills"), None)
+check("tìm thấy hàm list_skills (handler GET /skills) trong main.py (AST)",
+      _list_skills is not None)
+
+
+def _is_call_to(node, module, attr):
+    """True nếu node là lời gọi <module>.<attr>(...) (AST Call, không phải chuỗi/comment)."""
+    return (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+            and node.func.attr == attr and isinstance(node.func.value, ast.Name)
+            and node.func.value.id == module)
+
+
+if _list_skills is not None:
+    _ru_assign = [n for n in ast.walk(_list_skills)
+                  if isinstance(n, ast.Assign) and _is_call_to(n.value, "skill_usage", "read_usage")]
+    check("GET /skills gọi skill_usage.read_usage(...) và gán vào biến (AST)", bool(_ru_assign))
+
+    _is_calls = [n for n in ast.walk(_list_skills) if _is_call_to(n, "skill_usage", "is_stale")]
+    check("GET /skills gọi skill_usage.is_stale(...) (AST)", bool(_is_calls))
+
+    _stale_wired = _has_use_count_key = _has_last_used_key = False
+    for node in ast.walk(_list_skills):
+        if isinstance(node, ast.Dict):
+            for k, v in zip(node.keys, node.values):
+                if not isinstance(k, ast.Constant):
+                    continue
+                if k.value == "stale" and _is_call_to(v, "skill_usage", "is_stale"):
+                    _stale_wired = True
+                if k.value == "use_count":
+                    _has_use_count_key = True
+                if k.value == "last_used_at":
+                    _has_last_used_key = True
+    check("key 'stale' trong dict trả về được gán TRỰC TIẾP từ skill_usage.is_stale(...) "
+          "(AST - chặn kiểu gọi rồi vứt kết quả, không nối vào response)", _stale_wired)
+    check("dict trả về của GET /skills có key 'use_count'", _has_use_count_key)
+    check("dict trả về của GET /skills có key 'last_used_at'", _has_last_used_key)
+
 if _fails:
     print(f"\nFAIL - test_skill_usage: {len(_fails)} lỗi: {_fails}")
     sys.exit(1)

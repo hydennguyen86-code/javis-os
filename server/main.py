@@ -41,6 +41,7 @@ import zalo_login
 import oauth_mcp
 import system_sync   # tầng năng lực HỆ THỐNG (skill/loop mặc định) - update theo phiên bản app
 import skill_router   # nguồn chân lý khám phá skill (canonical <brain>/skills) dùng chung mọi engine
+import skill_usage     # telemetry: đếm skill nào THẬT SỰ được dùng qua javis_use_skill (tín hiệu DƯƠNG một chiều)
 import share_bundle   # xuất/nhập gói agent/skill/workflow (.zip) để chia sẻ giữa brain/người dùng
 import usage_store   # đếm token/chi phí Javis tự đo (đa nhà cung cấp)
 from telegram_bot import TelegramBot, parse_chat_ids as tg_parse_ids
@@ -2148,7 +2149,27 @@ async def list_skills(brain: str = Query("brain")):
     # NHÓM = field `group` trong frontmatter (mặc định "Chung"). Skill TẮT = <base>/.disabled/<slug>.
     root = _brain_root(brain)
     sys_slugs = system_sync.system_skill_slugs()   # skill HỆ THỐNG (đi theo phiên bản app)
-    out = [{**s, "system": s["slug"] in sys_slugs} for s in skill_router.list_skills(root)]
+    usage = skill_usage.read_usage(root)           # telemetry (tín hiệu DƯƠNG một chiều)
+    now = time.time()
+
+    def _mtime(p):
+        try:
+            return Path(p).stat().st_mtime
+        except OSError:
+            return None
+
+    out = []
+    for s in skill_router.list_skills(root):
+        rec = usage.get(s["slug"]) or {}
+        out.append({**s,
+                    "system": s["slug"] in sys_slugs,
+                    "use_count": int(rec.get("use_count", 0) or 0),
+                    "last_used_at": rec.get("last_used_at"),
+                    "pinned": bool(rec.get("pinned", False)),
+                    # stale = "chưa thấy dùng + đủ già". CHỈ để hiển thị tham khảo: skill nạp
+                    # native qua .claude/skills không đi qua bộ đếm nên use=0 KHÔNG có nghĩa
+                    # là vô dụng. Không có gì tự tắt dựa trên cờ này.
+                    "stale": skill_usage.is_stale(rec, _mtime(s["path"]), now)})
     return {"skills": out}
 
 
