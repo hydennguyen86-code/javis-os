@@ -112,9 +112,15 @@ for _slug in sorted(system_sync.system_skill_slugs()):
               f"{type(_desc).__name__} -> frontmatter vỡ, skill mất mô tả lúc chạy; "
               "bọc cả giá trị trong nháy kép)", False)
         continue
+    # Hỏng thì DỪNG ở đây (continue), đừng chấm tiếp: validate_description coi rỗng là hợp lệ
+    # nên nó sẽ in thêm 'ok ... description hợp lệ (0 ký tự)' ngay dưới dòng FAIL - lint tự mâu
+    # thuẫn với chính mình là lint người ta học cách phớt lờ.
+    _co_desc = bool(_desc.strip())
     check(f"skill hệ thống '{_slug}' có description không rỗng (rỗng = frontmatter vỡ "
           "hoặc thiếu description; skill hệ thống bắt buộc có mô tả để route được)",
-          bool(_desc.strip()))
+          _co_desc)
+    if not _co_desc:
+        continue
     _err = skill_router.validate_description(_desc)
     check(f"skill hệ thống '{_slug}' description hợp lệ ({len(_desc)} ký tự)"
           + (f" → {_err}" if _err else ""), _err is None)
