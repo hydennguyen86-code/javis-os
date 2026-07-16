@@ -26,7 +26,7 @@ vault (brain đang chọn). Studio / trang tương ứng tự nhận file mới.
    - Việc LẶP theo chu kỳ, tự chạy nền -> **loop**.
    - Cần một TOOL native mới (làm được bằng Python, tái dùng, mọi engine gọi được) mà chưa có MCP -> **plugin**. Chỉ là hướng dẫn cách làm bằng tool sẵn -> skill. Nguồn dữ liệu ngoài có sẵn MCP -> đấu MCP.
    - Việc làm 1 lần -> KHÔNG tạo gì, cứ làm luôn hoặc đề xuất task Kanban.
-3. **Chống trùng.** TRƯỚC khi tạo, đọc folder tương ứng (agents/ workflows/ .claude/skills/
+3. **Chống trùng.** TRƯỚC khi tạo, đọc folder tương ứng (agents/ workflows/ skills/
    loops/). Nếu đã có cái gần giống -> cập nhật cái cũ, đừng đẻ bản sao.
 4. **Ghi file** đúng frontmatter (mẫu bên dưới). slug = ASCII không dấu, gạch nối. Tên hiển thị
    tiếng Việt. TUYỆT ĐỐI không dùng ký tự em dash, dùng "-".
@@ -41,7 +41,7 @@ type: agent
 name: <Tên tiếng Việt>
 slug: <ascii>
 role: <vai trò 1 câu>
-skills: [slug-skill]      # [] nếu chưa gán; chỉ gán skill đã có trong .claude/skills
+skills: [slug-skill]      # [] nếu chưa gán; chỉ gán skill đã có trong skills/
 model: ""                 # "" mặc định | sonnet|opus|haiku|fable (Claude) | gpt-5.5|gpt-5.4|gpt-5.3-codex (ChatGPT/Codex)
 updated: <YYYY-MM-DD>
 ---
@@ -57,7 +57,7 @@ updated: <YYYY-MM-DD>
 6. Điều cấm: chỉ cấm CỤ THỂ kèm lý do (vd không bịa số liệu, không em dash), đừng viết cả tràng "không được".
 Prompt tốt thường 10-25 dòng. Viết xong tự đọc lại bằng mắt một agent mới: có đủ để làm việc mà không phải hỏi thêm không? Thân skill cũng áp khung này (bỏ mục 1, thay bằng mô tả trigger).
 
-### Skill -> `.claude/skills/<slug>/SKILL.md`
+### Skill -> `skills/<slug>/SKILL.md`
 ```
 ---
 name: <Tên skill>
@@ -66,6 +66,27 @@ group: <Marketing|Bán hàng|Nội dung|Vận hành|Tài chính|AI|Năng suất|
 ---
 <hướng dẫn chi tiết cho AI khi skill kích hoạt>
 ```
+
+#### Chuẩn viết skill (bắt buộc, server sẽ CHẶN nếu vi phạm)
+
+1. `description` **TỐI ĐA 150 ký tự**. Router cắt đúng ở đó (`skill_router.SKILL_DESC_MAX`)
+   ở cả system prompt lẫn mô tả tool, nên viết dài hơn là phần đuôi MẤT IM LẶNG và skill
+   không route được. Viết xong hãy ĐẾM, đừng ước lượng. `POST /skills` trả 400 nếu vượt.
+2. `description` nêu THẲNG năng lực. KHÔNG mở đầu bằng "Kích hoạt khi...", "Sử dụng skill
+   này khi..." - mọi skill đều mở như vậy nên nó đốt 29 ký tự mà không phân biệt gì.
+   Tốt: `Chuyển HTML sang file Webcake .pke.` Xấu: `Kích hoạt khi người dùng muốn chuyển...`
+3. `description` có dấu hai chấm thì phải bọc cả giá trị trong nháy kép, kẻo YAML hiểu
+   nhầm thành mapping.
+4. Ví dụ trigger đầy đủ đưa vào THÂN file, mục `## Khi nào dùng` - nơi không bị cắt và chỉ
+   đọc khi skill đã nạp. Index để TÌM, thân file để LÀM.
+5. Thứ tự mục trong thân: `## Khi nào dùng` / `## Chuẩn bị` / `## Cách chạy` /
+   `## Quy trình` / `## Bẫy` / `## Kiểm chứng`. Mục nào không có nội dung thật thì bỏ,
+   đừng bịa cho đủ.
+6. KHÔNG bịa flag, đường dẫn, API chưa thấy trong nguồn. Không thấy thì đừng viết.
+7. Thân file khoảng 100 dòng cho skill đơn giản, 200 cho skill phức tạp. Dài hơn thì tách
+   nội dung xuống `skills/<slug>/references/<chủ-đề>.md`, script xuống
+   `skills/<slug>/scripts/`, và trỏ tới bằng đường dẫn tương đối.
+8. KHÔNG viết skill kiểu router chỉ trỏ sang skill khác.
 
 ### Workflow -> `Javis/workflows/<slug>.md`
 ```
