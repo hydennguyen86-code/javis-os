@@ -355,7 +355,9 @@ class LearnFeature:
                 '"conflict_with":"tên-trang-đã-có-hoặc-rỗng"}]')
         if caps.get("skill"):
             schema_bits.append(
-                '"skills":[{"slug":"kebab","name":"..","description":"khi nào dùng","body":"quy trình các bước",'
+                '"skills":[{"slug":"kebab","name":"..",'
+                f'"description":"năng lực, TỐI ĐA {skill_router.SKILL_DESC_MAX} ký tự",'
+                '"group":"tên nhóm","body":"markdown theo CHUẨN VIẾT SKILL bên dưới",'
                 '"self_observed":true|false,"confidence":0..3}]')
         if caps.get("task"):
             schema_bits.append(
@@ -383,6 +385,24 @@ class LearnFeature:
             "→ '(thực tế tính đến <thời điểm>)'; không chắc → '(cần xác minh)'. TUYỆT ĐỐI không biến câu tầm nhìn "
             "thành claim chắc nịch (vd 'đặt mục tiêu 13.500' ≠ 'có 13.500').\n"
             "  3. MÂU THUẪN: nếu chọi trang cũ → set conflict_with, KHÔNG ghi đè (Python sẽ ghi ## Mâu thuẫn).\n\n"
+            + (f"CHUẨN VIẾT SKILL (bắt buộc, Python sẽ CHẶN nếu vi phạm):\n"
+               f"  1. description TỐI ĐA {skill_router.SKILL_DESC_MAX} ký tự. Router cắt "
+               f"đúng ở đó nên phần dư MẤT IM LẶNG và skill không route được. VIẾT XONG HÃY "
+               "ĐẾM, đừng ước lượng.\n"
+               "  2. description nêu THẲNG năng lực. KHÔNG mở đầu bằng 'Kích hoạt khi...', "
+               "'Sử dụng skill này khi...' - mọi skill đều mở như vậy nên nó đốt ngân sách mà "
+               "không phân biệt gì. Tốt: 'Chuyển HTML sang file Webcake .pke.'\n"
+               "  3. Ví dụ trigger đầy đủ đưa vào body, mục '## Khi nào dùng' - KHÔNG nhét "
+               "vào description.\n"
+               "  4. body theo thứ tự mục: '## Khi nào dùng' / '## Chuẩn bị' / '## Cách chạy' "
+               "/ '## Quy trình' / '## Bẫy' / '## Kiểm chứng'. Mục nào không có nội dung thật "
+               "thì bỏ, đừng bịa.\n"
+               "  5. KHÔNG bịa flag, đường dẫn, API chưa thấy trong hội thoại. Không thấy thì "
+               "đừng viết.\n"
+               "  6. body khoảng 100 dòng cho skill đơn giản, 200 cho skill phức tạp.\n"
+               "  7. KHÔNG tạo skill kiểu router chỉ trỏ sang skill khác.\n"
+               "  8. group BẮT BUỘC, chọn nhóm sát nhất với skill đã có.\n\n"
+               if caps.get("skill") else "")
             + ("TASK (chống spam backlog): CHỈ đề xuất task khi hội thoại có VIỆC RÕ RÀNG chưa làm - "
                "user nhờ lặp lại, việc bỏ dở được nhắc, hoặc câu hỏi mở cần điều tra thêm. intent phải "
                "TỰ-ĐỦ (agent nền chỉ thao tác file, KHÔNG thấy hội thoại này). Đa số batch không có việc "
@@ -548,10 +568,16 @@ class LearnFeature:
                 for s in (manifest.get("skills") or []):
                     slug = _slugify(s.get("slug") or s.get("name") or "")
                     body = (s.get("body") or "").strip()
+                    desc = (s.get("description") or "").strip()
                     if not slug or not body:
                         continue
                     if secret_hits(body) or injection_in_output(body):
                         rep["blocked"].append(f"skill '{slug}': nội dung không an toàn"); continue
+                    # Ép CHUẨN VIẾT SKILL: prompt đã dặn, nhưng fork có thể phớt lờ → chặn ở
+                    # Python (người ghi tin cậy duy nhất), cùng thành ngữ với secret/injection.
+                    desc_err = skill_router.validate_description(desc)
+                    if desc_err:
+                        rep["blocked"].append(f"skill '{slug}': {desc_err}"); continue
                     # AN TOÀN: KHÔNG ghi đè skill ĐÃ CÓ (của user, bất kỳ vị trí nào) và KHÔNG hồi sinh
                     # skill user đã TẮT → tránh mất dữ liệu / bật lại thứ user cố ý tắt.
                     if (skill_router.resolve_skill_file(root, slug)
@@ -561,7 +587,8 @@ class LearnFeature:
                         continue
                     d = sk_root / slug   # vị trí BẬT (canonical) → mirror sang .claude ở lượt sysprompt kế
                     d.mkdir(parents=True, exist_ok=True)
-                    fm = (f"---\nname: {s.get('name', slug)}\ndescription: {s.get('description','')}\n"
+                    fm = (f"---\nname: {s.get('name', slug)}\ndescription: {desc}\n"
+                          f"group: {s.get('group') or 'Chung'}\n"
                           f"origin: javis-learned\nstatus: active\ncreated: {today}\n---\n")
                     self.deps.atomic_write_text(d / "SKILL.md", fm + body + "\n")
                     written_paths.append(str((d / 'SKILL.md').relative_to(root)).replace("\\", "/"))

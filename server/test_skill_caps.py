@@ -213,6 +213,14 @@ if _save_node is not None:
         check("chốt chặn nằm SAU lời gọi validate_description (rẽ nhánh trên biến đã gán)",
               min(a.lineno for a in _vd_assign) < min(g.lineno for g in _guards))
 
+# ---- learn.py: chuẩn viết skill vào prompt + ép trần lúc promote ----
+_learn = (_SRC / "learn.py").read_text(encoding="utf-8")
+check("learn.py nhúng chuẩn viết skill vào prompt", "CHUẨN VIẾT SKILL" in _learn)
+check("learn.py nội suy SKILL_DESC_MAX vào prompt (không hardcode số)",
+      "SKILL_DESC_MAX" in _learn)
+check("learn.py ép trần description khi promote",
+      "validate_description" in _learn)
+
 if _fails:
     print(f"\nFAIL - test_skill_caps: {len(_fails)} lỗi: {_fails}")
     sys.exit(1)
