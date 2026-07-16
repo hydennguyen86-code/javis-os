@@ -351,14 +351,19 @@
     <div class="rail-top">
       <div class="rail-brand"><img src="/brand-logo" alt="Javis" style="width:30px;height:30px;border-radius:8px;display:block;object-fit:cover"></div>
     </div>
-    <!-- GIỮA cuộn được - nhồi bao nhiêu tính năng cũng cuộn -->
+    <!-- GIỮA cuộn được - gom theo nhóm; nhóm foot (Hệ thống) tự ghim xuống đáy -->
     <div class="rail-nav">
-      <template x-for="it in $store.nav.items" :key="it.id">
-        <button class="rail-item" :class="{ active: $store.nav.active === it.id }"
-                @click="$store.nav.go(it.id)" :title="it.label">
-          <span class="rail-ico" x-html="it.icon"></span>
-          <span class="rail-lbl" x-text="it.label"></span>
-        </button>
+      <template x-for="g in $store.nav.groups" :key="g.label">
+        <div class="rail-group" :class="{ foot: g.foot }">
+          <div class="rail-grp-lbl" x-text="g.label"></div>
+          <template x-for="it in g.items" :key="it.id">
+            <button class="rail-item" :class="{ active: $store.nav.active === it.id }"
+                    @click="$store.nav.go(it.id)" :title="it.label">
+              <span class="rail-ico" x-html="it.icon"></span>
+              <span class="rail-lbl" x-text="it.label"></span>
+            </button>
+          </template>
+        </div>
       </template>
     </div>
     <!-- ĐÁY cố định: version + tác giả (luôn hiện) -->

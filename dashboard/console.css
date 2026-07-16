@@ -37,6 +37,16 @@ body.in-console .hud-actions { display: none; }
 }
 .rail-nav::-webkit-scrollbar { width: 0; }            /* ẩn thanh cuộn cho gọn */
 .rail-nav { scrollbar-width: none; }
+/* Nhóm rail: mỗi nhóm là 1 cột nhỏ có nhãn; nhóm .foot ghim xuống đáy */
+.rail-group { display: flex; flex-direction: column; gap: 4px; }
+.rail-group.foot { margin-top: auto; }                /* đẩy Hệ thống xuống đáy rail */
+.rail-grp-lbl {
+  font-size: 8px; font-weight: 700; letter-spacing: 0.7px; text-transform: uppercase;
+  color: var(--text3); opacity: 0.5; text-align: center;
+  padding: 8px 2px 3px; user-select: none; white-space: nowrap;
+}
+.rail-group:first-child .rail-grp-lbl { padding-top: 2px; }
+.rail-group.foot .rail-grp-lbl { border-top: 1px solid var(--glass-brd); padding-top: 9px; margin-top: 4px; }
 .rail-brand {
   height: 42px; display: flex; align-items: center; justify-content: center;
   color: var(--accent); font-size: 22px;
@@ -260,6 +270,8 @@ body.has-rail .hud { margin-left: var(--rail-w); width: calc(100% - var(--rail-w
   }
   .rail-top, .rail-foot { display: none; }            /* mobile: chỉ hiện thanh tính năng */
   .rail-nav { flex-direction: row; overflow-x: auto; overflow-y: hidden; gap: 2px; padding: 0; }
+  .rail-group { display: contents; }                  /* mobile: xoá hộp nhóm, dồn item vào 1 hàng ngang */
+  .rail-grp-lbl { display: none; }                    /* mobile: giấu nhãn nhóm cho gọn */
   .rail-item { flex: 1 0 56px; padding: 5px 0; border-radius: 9px; }
   .rail-item.active::before { left: 18%; right: 18%; top: auto; bottom: -4px; width: auto; height: 3px; }
 

@@ -4,6 +4,11 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.59] - 2026-07-16
+### Cải thiện
+- **Navbar gom nhóm cho dễ tìm công cụ**: thanh điều hướng trái trước đây xếp phẳng 18 mục thành một cột dài, tìm mỏi mắt. Nay gom theo chức năng thành 5 nhóm có nhãn nhỏ (Trợ lý, Bộ não, Năng lực, Việc & lịch, Kết nối) và ghim cụm Hệ thống (Cài đặt, Cập nhật, Tài khoản) xuống đáy rail (có đường kẻ ngăn). Sắp lại thứ tự các mục cho hợp mạch dùng. Trên mobile các nhóm tự dàn phẳng thành một hàng ngang như cũ (ẩn nhãn nhóm). Cấu trúc nhóm khai trong `RAIL_GROUPS` (console.js) - đổi thành viên/thứ tự chỉ sửa một chỗ, mục nào quên xếp nhóm sẽ tự dồn vào cụm Hệ thống nên không bao giờ mất mục.
+- **Trang Cập nhật phân trang 20 bản mỗi trang**: nhật ký dài 98 bản trước đây đổ hết ra một trang vừa nặng DOM vừa khó đọc. Nay chỉ hiện 20 bản mới nhất mỗi trang, cuối trang có thanh "‹ Mới hơn · Trang x/y · N bản · Cũ hơn ›"; đổi trang dùng lại dữ liệu đã tải (không gọi lại mạng) và tự cuộn lên đầu cho dễ theo dõi.
+
 ## [0.9.58] - 2026-07-16
 ### Sửa lỗi
 - **Đồ thị 3D chói trắng + mất hiệu ứng nhấp nháy lúc "đang suy nghĩ"**: từ v0.9.55 bản 3D được tô đa màu theo danh mục (bảng màu cầu vồng) và kéo co tròn chặt, nhưng bản 3D render bằng `AdditiveBlending` (cộng dồn ánh sáng) nên nhiều màu cộng dồn trong khối chặt dồn về TRẮNG - lõi cháy trắng, nhìn chói. Nền đã sáng sẵn nên node loé lên lúc suy nghĩ không còn nổi bật, mất cảm giác nhấp nháy (code hiệu ứng vẫn còn nguyên, chỉ bị chìm). Sửa trong `graph3d.js`: hạ lõi glow từ trắng đặc `1.0` xuống `0.7` và cho màu danh mục ra sớm (giữ đúng hue thay vì cháy trắng); hạ độ sáng nền lúc nghỉ từ `0.85` xuống `0.5`; cho node "suy nghĩ" loé dày hơn (mỗi 14 khung thay vì 22, nhiều điểm khởi phát hơn). Kết quả: nền dịu, hết chói, node loé lên nổi bật rõ trên nền tối nên nhấp nháy quay lại. Vẫn giữ đa màu.

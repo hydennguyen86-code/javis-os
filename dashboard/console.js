@@ -55,6 +55,33 @@
     { id: "account",     icon: ICON.account,     label: "Tài khoản" },
   ];
 
+  // ---- Gom rail thành nhóm theo chức năng (dễ tìm hơn danh sách phẳng 18 mục) ----
+  // Nhóm cuối (foot:true) được ghim xuống ĐÁY rail; các nhóm còn lại cuộn ở giữa.
+  // Thứ tự & thành viên đổi ở đây; RAIL_ITEMS vẫn là nguồn icon/label + tra cứu cho go().
+  const RAIL_GROUPS = [
+    { label: "Trợ lý",      ids: ["home", "chat", "overview"] },
+    { label: "Bộ não",      ids: ["files", "learn"] },
+    { label: "Năng lực",    ids: ["agents", "skills", "workflows", "selfimprove", "plugins"] },
+    { label: "Việc & lịch", ids: ["kanban", "automations"] },
+    { label: "Kết nối",     ids: ["mcp", "channels", "models"] },
+    { label: "Hệ thống",    ids: ["settings", "logs", "account"], foot: true },
+  ];
+  const RAIL_BY_ID = Object.fromEntries(RAIL_ITEMS.map(i => [i.id, i]));
+  // Trả về [{label, foot, items:[...]}], bỏ id không tồn tại. Mục nào chưa xếp nhóm → dồn vào "Khác".
+  function railGroups() {
+    const seen = new Set();
+    const groups = RAIL_GROUPS.map(g => {
+      const items = (g.ids || []).map(id => { seen.add(id); return RAIL_BY_ID[id]; }).filter(Boolean);
+      return { label: g.label, foot: !!g.foot, items };
+    }).filter(g => g.items.length);
+    const rest = RAIL_ITEMS.filter(i => !seen.has(i.id));
+    if (rest.length) {
+      const foot = groups.find(g => g.foot);
+      if (foot) foot.items.push(...rest); else groups.push({ label: "Khác", foot: false, items: rest });
+    }
+    return groups;
+  }
+
   const VIEW_META = {
     home:        { icon: "⬡", label: "Javis OS", sub: "" },
     chat:        { icon: "💬", label: "Trò chuyện", sub: "Khung chat rộng · lịch sử hội thoại" },
@@ -241,7 +268,12 @@
     .cl-sec.feat li:before{content:"✨"} .cl-sec.fix li:before{content:"🔧"}
     .cl-sec.imp li:before{content:"⚡"} .cl-sec.sec li:before{content:"🔒"}
     .cl-sec.doc li:before{content:"📖"} .cl-sec.other li:before{content:"•"}
-    .cl-empty{color:#8a97b4;font-size:15px}`;
+    .cl-empty{color:#8a97b4;font-size:15px}
+    .cl-pager{display:flex;align-items:center;justify-content:center;gap:14px;margin:24px 0 6px;padding-top:16px;border-top:1px solid rgba(255,255,255,.07)}
+    .cl-pg{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:#cdd8ee;font-size:13.5px;font-weight:600;padding:7px 15px;border-radius:9px;cursor:pointer;transition:background .15s,border-color .15s,color .15s}
+    .cl-pg:hover:not(:disabled){background:rgba(120,180,255,.14);border-color:rgba(120,180,255,.45);color:#dce8ff}
+    .cl-pg:disabled{opacity:.32;cursor:default}
+    .cl-pg-info{font-size:13px;color:#8a97b4;min-width:130px;text-align:center}`;
     const s = document.createElement("style"); s.textContent = css; document.head.appendChild(s);
   }
   function _clSecClass(title) {
@@ -253,6 +285,63 @@
     if (t.includes("tài liệu") || t.includes("doc")) return "doc";
     return "other";
   }
+  // Phân trang nhật ký: giữ dữ liệu đã fetch, render 20 bản/trang - đỡ dài, đỡ nặng DOM.
+  let _clData = null;              // cache /changelog để đổi trang không phải gọi lại mạng
+  const CL_PAGE_SIZE = 20;         // số phiên bản hiển thị mỗi trang
+
+  function _clRelHtml(rel) {
+    const cls = rel.is_current ? "cur" : (rel.installed ? "" : "new");
+    const tag = rel.is_current ? `<span class="cl-tag cur">đang dùng</span>`
+      : (!rel.installed ? `<span class="cl-tag new">bản mới</span>` : "");
+    const secs = (rel.sections || []).map(s => {
+      const items = (s.items || []).map(it => `<li>${esc(it)}</li>`).join("");
+      return `<div class="cl-sec ${_clSecClass(s.title)}"><h4>${esc(s.title)}</h4><ul>${items}</ul></div>`;
+    }).join("");
+    return `<div class="cl-rel ${cls}">
+      <div class="cl-rtop"><span class="cl-ver">v${esc(rel.version)}</span>${rel.date ? `<span class="cl-date">${esc(rel.date)}</span>` : ""}${tag}</div>
+      ${secs || '<div class="cl-empty">(không có chi tiết)</div>'}
+    </div>`;
+  }
+
+  function _clRenderPage(el, page) {
+    const d = _clData; if (!d) return;
+    const cur = d.current || "?";
+    const upBadge = d.update_available
+      ? `<span class="cl-badge up">Có bản mới: v${esc(d.latest)}</span>`
+      : `<span class="cl-badge ok">Đang ở bản mới nhất</span>`;
+    const upNote = d.update_available
+      ? `<div class="cl-note">Cập nhật ở mục <b>Tổng quan</b>: bản có Watchtower bấm "Cập nhật ngay"; bản Docker khác thì <b>Redeploy</b> (Hostinger) hoặc <code>docker compose up -d --pull always</code>; bản VPS chạy <code>./update.sh</code>.</div>`
+      : "";
+    const rels = d.releases || [];
+    const total = rels.length;
+    const pages = Math.max(1, Math.ceil(total / CL_PAGE_SIZE));
+    page = Math.min(Math.max(0, page | 0), pages - 1);
+    const start = page * CL_PAGE_SIZE;
+    const slice = rels.slice(start, start + CL_PAGE_SIZE);
+    const timeline = slice.length
+      ? slice.map(_clRelHtml).join("")
+      : `<div class="cl-empty">Chưa có nhật ký. Thêm file <code>CHANGELOG.md</code> ở gốc dự án.</div>`;
+    const pager = pages > 1 ? `<div class="cl-pager">
+      <button class="cl-pg" data-clpage="${page - 1}"${page === 0 ? " disabled" : ""}>‹ Mới hơn</button>
+      <span class="cl-pg-info">Trang ${page + 1}/${pages} · ${total} bản</span>
+      <button class="cl-pg" data-clpage="${page + 1}"${page >= pages - 1 ? " disabled" : ""}>Cũ hơn ›</button>
+    </div>` : "";
+    el.innerHTML = `<div class="cl-wrap">
+      <div class="cl-head"><span class="cl-cur">Đang cài: <b>v${esc(cur)}</b></span>${upBadge}</div>
+      ${upNote}
+      ${timeline}
+      ${pager}
+    </div>`;
+    el.querySelectorAll(".cl-pg[data-clpage]").forEach(b => {
+      if (b.disabled) return;
+      b.onclick = () => {
+        _clRenderPage(el, parseInt(b.dataset.clpage, 10) || 0);
+        let n = el; while (n && n.scrollHeight <= n.clientHeight + 1) n = n.parentElement;
+        if (n) n.scrollTop = 0;   // đổi trang → cuộn lên đầu cho dễ đọc
+      };
+    });
+  }
+
   async function renderLogs(el) {
     _injectChangelogCss();
     const myGen = _renderGen;
@@ -267,32 +356,8 @@
       return;
     }
     if (myGen !== _renderGen) return;   // đã đổi trang trong lúc chờ
-    const cur = d.current || "?";
-    const upBadge = d.update_available
-      ? `<span class="cl-badge up">Có bản mới: v${esc(d.latest)}</span>`
-      : `<span class="cl-badge ok">Đang ở bản mới nhất</span>`;
-    const upNote = d.update_available
-      ? `<div class="cl-note">Cập nhật ở mục <b>Tổng quan</b>: bản có Watchtower bấm "Cập nhật ngay"; bản Docker khác thì <b>Redeploy</b> (Hostinger) hoặc <code>docker compose up -d --pull always</code>; bản VPS chạy <code>./update.sh</code>.</div>`
-      : "";
-    const rels = d.releases || [];
-    const timeline = rels.length ? rels.map(rel => {
-      const cls = rel.is_current ? "cur" : (rel.installed ? "" : "new");
-      const tag = rel.is_current ? `<span class="cl-tag cur">đang dùng</span>`
-        : (!rel.installed ? `<span class="cl-tag new">bản mới</span>` : "");
-      const secs = (rel.sections || []).map(s => {
-        const items = (s.items || []).map(it => `<li>${esc(it)}</li>`).join("");
-        return `<div class="cl-sec ${_clSecClass(s.title)}"><h4>${esc(s.title)}</h4><ul>${items}</ul></div>`;
-      }).join("");
-      return `<div class="cl-rel ${cls}">
-        <div class="cl-rtop"><span class="cl-ver">v${esc(rel.version)}</span>${rel.date ? `<span class="cl-date">${esc(rel.date)}</span>` : ""}${tag}</div>
-        ${secs || '<div class="cl-empty">(không có chi tiết)</div>'}
-      </div>`;
-    }).join("") : `<div class="cl-empty">Chưa có nhật ký. Thêm file <code>CHANGELOG.md</code> ở gốc dự án.</div>`;
-    el.innerHTML = `<div class="cl-wrap">
-      <div class="cl-head"><span class="cl-cur">Đang cài: <b>v${esc(cur)}</b></span>${upBadge}</div>
-      ${upNote}
-      ${timeline}
-    </div>`;
+    _clData = d;
+    _clRenderPage(el, 0);
   }
 
   const fbrain = () => (window.currentBrainPath ? currentBrainPath() : "brain");
@@ -2364,6 +2429,7 @@
     Alpine.store("nav", {
       active: "home",
       items: RAIL_ITEMS,
+      get groups() { return railGroups(); },
       get meta() { return VIEW_META[this.active] || VIEW_META.home; },
       go(id) {
         const item = RAIL_ITEMS.find(i => i.id === id);
