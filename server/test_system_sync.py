@@ -5,7 +5,7 @@
 Không cần pytest, không chạm mạng. Tự dựng brain giả trong thư mục tạm.
 Phủ: copy thư mục con (references/ scripts/), file phụ ngang hàng đổi thì mirror nhận
 (bug CÓ SẴN), bỏ qua .disabled, add-only không xoá file lạ, không đổi gì thì KHÔNG copy
-lại lần nào và KHÔNG đọc nội dung file nào, hai luồng đồng thời không treo, file nhị phân
+lại lần nào và KHÔNG còn đọc-và-băm SKILL.md, hai luồng đồng thời không treo, file nhị phân
 qua nguyên vẹn.
 """
 import os
