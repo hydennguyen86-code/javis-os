@@ -6,6 +6,7 @@ Không cần pytest, không chạm mạng.
 Phủ: hằng số SKILL_DESC_MAX/SKILL_LIST_MAX, validate_description (quá dài, boilerplate,
 hợp lệ, rỗng), fallback _meta_of dùng chung trần.
 """
+import ast
 import os
 import sys
 import tempfile
@@ -126,28 +127,78 @@ for _slug in sorted(system_sync.system_skill_slugs()):
           + (f" → {_err}" if _err else ""), _err is None)
 
 # ---- POST /skills phải ép trần TRƯỚC khi tạo thư mục ----
-# Mốc kết thúc là /skills/delete (main.py:2241) chứ KHÔNG phải /skills/toggle: toggle nằm ở
-# dòng 2161, TRƯỚC save_skill (2214), nên dùng nó làm mốc sau sẽ ném ValueError.
+# Canh tính chất: request có description sai bị TỪ CHỐI và KHÔNG để lại folder skill rỗng
+# trên đĩa. Lint CI (Task 3) chỉ phủ skill HỆ THỐNG nên không có gì khác trong bộ test bắt
+# được nếu chốt chặn ở đường API rơi mất.
 #
-# ĐÂY LÀ QUÉT MÃ NGUỒN, KHÔNG PHẢI TEST TÍCH HỢP - cố ý. Gọi save_skill thật đòi import
-# main.py tức là kéo cả app FastAPI vào bộ test (nặng + rủi ro tác dụng phụ lúc import).
-# Đổi lại, quét phải soi ĐÚNG CẤU TRÚC chốt chặn chứ không chỉ thứ tự chữ: chỉ kiểm tra
-# 'validate_description xuất hiện trước d.mkdir(' thì một regression giữ lại lời gọi mà bỏ
-# 'if desc_err: return' (hoặc đảo thành 'if not desc_err') VẪN XANH, trong khi tính chất
-# thật - request bị từ chối KHÔNG để lại folder skill rỗng trên đĩa - đã vỡ. Lint CI của
-# Task 3 chỉ phủ skill HỆ THỐNG nên không có gì khác trong bộ test bắt được lỗ này.
-_save = _region("main.py", "async def save_skill", '@app.post("/skills/delete")')
-check("POST /skills gọi validate_description", "validate_description" in _save)
-check("POST /skills ép TRƯỚC khi mkdir",
-      _save.index("validate_description") < _save.index("d.mkdir("))
-# Vùng mã GIỮA lời gọi validate_description và d.mkdir( - chốt chặn bắt buộc nằm trọn ở đây.
-_guard = _save[_save.index("validate_description"):_save.index("d.mkdir(")]
-check("POST /skills có nhánh 'if desc_err' chặn giữa validate_description và mkdir "
-      "(chỉ gọi validate_description mà không rẽ nhánh = không chặn được gì)",
-      "if desc_err" in _guard)
-check("POST /skills trả 400 khi description sai, TRƯỚC khi mkdir "
-      "(rẽ nhánh mà không return 400 thì request xấu vẫn ghi xuống đĩa)",
-      "status_code=400" in _guard)
+# ĐỌC MÃ NGUỒN, KHÔNG import - cố ý: gọi save_skill thật đòi import main.py, tức kéo cả app
+# FastAPI vào bộ test (nặng + rủi ro tác dụng phụ lúc import). ast.parse đọc file dưới dạng
+# văn bản y như quét chuỗi, KHÔNG dựng app và KHÔNG chạy dòng mã nào của nó.
+#
+# VÌ SAO AST CHỨ KHÔNG PHẢI SO CHUỖI (đừng "đơn giản hoá" ngược lại): so chuỗi không phân
+# biệt nổi MÃ với CHÚ THÍCH. Chốt chặn bị comment lại vẫn còn nguyên chữ 'if desc_err' và
+# 'status_code=400' trong nguồn nên check kiểu `"if desc_err" in _guard` vẫn XANH trong khi
+# chốt đã chết - đúng bằng regression cần chặn. Thêm bao nhiêu chuỗi cũng không vá được, vì
+# lỗi nằm ở tầng: phải soi cây cú pháp. AST cũng miễn nhiễm cái bẫy `_save.index(...)` lấy
+# lần xuất hiện ĐẦU TIÊN của tên hàm (một docstring nhắc tên là vùng quét lệch ngay).
+#
+# CHỐT CHẶN ĐẢO (`if not desc_err: return ...`) bị CỐ Ý coi là HỎNG, không phải chấp nhận:
+# nó nhận description sai và từ chối cái đúng. Test đòi test của If là tham chiếu TRẦN
+# `desc_err`, nên bản đảo không khớp -> không tìm thấy chốt -> FAIL. Đó là chủ ý.
+#
+# GIỚI HẠN (nói thẳng để không ai tưởng đây là bất khả xâm phạm): đây là kiểm tra CẤU TRÚC
+# tĩnh. Nó chứng minh chốt chặn TỒN TẠI dưới dạng mã sống, rẽ nhánh trên kết quả
+# validate_description, trả 400, và đứng trước mkdir. Nó KHÔNG chạy endpoint nên không
+# chứng minh hành vi lúc chạy (vd validate_description bị mock/đổi ngữ nghĩa, hay có đường
+# ghi đĩa khác trước đó). Hành vi của chính validate_description do các check ở trên phủ.
+_main_tree = ast.parse((_SRC / "main.py").read_text(encoding="utf-8"))
+_save_node = next((n for n in ast.walk(_main_tree)
+                   if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+                   and n.name == "save_skill"), None)
+check("tìm thấy hàm save_skill trong main.py (AST)", _save_node is not None)
+
+
+def _returns_400(if_node):
+    """Thân nhánh có return JSONResponse(..., status_code=400) không."""
+    for stmt in if_node.body:
+        for n in ast.walk(stmt):
+            if not isinstance(n, ast.Return) or not isinstance(n.value, ast.Call):
+                continue
+            for kw in n.value.keywords:
+                if (kw.arg == "status_code" and isinstance(kw.value, ast.Constant)
+                        and kw.value.value == 400):
+                    return True
+    return False
+
+
+if _save_node is not None:
+    # Lời gọi validate_description phải được GÁN vào desc_err - buộc chốt chặn dưới đây
+    # đúng là đang rẽ trên kết quả kiểm tra, chứ không phải một biến trùng tên nào khác.
+    _vd_assign = [n for n in ast.walk(_save_node)
+                  if isinstance(n, ast.Assign) and isinstance(n.value, ast.Call)
+                  and isinstance(n.value.func, ast.Attribute)
+                  and n.value.func.attr == "validate_description"
+                  and any(isinstance(t, ast.Name) and t.id == "desc_err" for t in n.targets)]
+    check("POST /skills gọi validate_description và gán vào desc_err (AST, không tính "
+          "chú thích)", bool(_vd_assign))
+    # Chốt chặn: `if desc_err:` (tham chiếu TRẦN, bản đảo `if not desc_err` cố ý KHÔNG khớp)
+    # + thân có return 400.
+    _guards = [n for n in ast.walk(_save_node)
+               if isinstance(n, ast.If) and isinstance(n.test, ast.Name)
+               and n.test.id == "desc_err" and _returns_400(n)]
+    check("POST /skills có chốt chặn SỐNG 'if desc_err: return ...400' (AST - chốt bị "
+          "comment lại hoặc đảo thành 'if not desc_err' sẽ trượt check này)",
+          bool(_guards))
+    _mkdirs = [n.lineno for n in ast.walk(_save_node)
+               if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+               and n.func.attr == "mkdir"]
+    check("tìm thấy lời gọi mkdir trong save_skill (AST)", bool(_mkdirs))
+    if _guards and _mkdirs and _vd_assign:
+        check("POST /skills chặn TRƯỚC mọi mkdir (request bị từ chối không để lại folder "
+              "skill rỗng trên đĩa)",
+              min(g.lineno for g in _guards) < min(_mkdirs))
+        check("chốt chặn nằm SAU lời gọi validate_description (rẽ nhánh trên biến đã gán)",
+              min(a.lineno for a in _vd_assign) < min(g.lineno for g in _guards))
 
 if _fails:
     print(f"\nFAIL - test_skill_caps: {len(_fails)} lỗi: {_fails}")
