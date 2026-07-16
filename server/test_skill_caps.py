@@ -61,6 +61,31 @@ check("_meta_of fallback trả về skill", got is not None)
 check("fallback cắt theo SKILL_DESC_MAX chứ không phải 140",
       got is not None and len(got["description"]) == skill_router.SKILL_DESC_MAX)
 
+# ---- không còn hằng số cắt nào nằm rải rác (chống mọc lại 'thước thứ hai') ----
+_SRC = Path(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _region(path, start_marker, end_marker):
+    """Lấy đoạn mã giữa hai mốc để chỉ soi đúng vùng render router."""
+    text = (_SRC / path).read_text(encoding="utf-8")
+    i = text.index(start_marker)
+    j = text.index(end_marker, i)
+    return text[i:j]
+
+
+hub = _region("mcp_hub.py", "metas = skill_router.list_enabled_meta(vault_root)",
+              'add("javis_use_skill"')
+check("mcp_hub không còn literal [:60]", "[:60]" not in hub)
+check("mcp_hub không còn literal 20", "20" not in hub)
+check("mcp_hub dùng SKILL_DESC_MAX", "SKILL_DESC_MAX" in hub)
+check("mcp_hub dùng SKILL_LIST_MAX", "SKILL_LIST_MAX" in hub)
+
+blk = _region("main.py", "def _skill_router_block", "@app.get(\"/javis/index\")")
+check("main không còn literal [:100]", "[:100]" not in blk)
+check("main không còn literal 15", "15" not in blk)
+check("main dùng SKILL_DESC_MAX", "SKILL_DESC_MAX" in blk)
+check("main dùng SKILL_LIST_MAX", "SKILL_LIST_MAX" in blk)
+
 if _fails:
     print(f"\nFAIL - test_skill_caps: {len(_fails)} lỗi: {_fails}")
     sys.exit(1)

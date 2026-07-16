@@ -3461,17 +3461,18 @@ def _skill_router_block(brain: str, root: str) -> str:
     mô tả (trigger) + chỉ rõ 2 cách nạp: tool javis_use_skill (engine API có tool) HOẶC mở thẳng
     file SKILL.md bằng công cụ đọc file (Claude/Codex - dùng ĐƯỜNG DẪN TUYỆT ĐỐI vì cwd có thể là
     /app). Đây là thứ giúp skill chạy trên cả ChatGPT/Codex, không phụ thuộc cơ chế native của Claude.
-    Cap 15 skill để không phình context (nhiều hơn → trỏ Javis/index.md)."""
+    Cap skill_router.SKILL_LIST_MAX để không phình context (nhiều hơn → trỏ Javis/index.md)."""
     metas = skill_router.list_enabled_meta(root)
     if not metas:
         return ""
     sk_dir = skill_router.skills_base(root, canonical=True)
     lines = ["\n\n# === SKILL KHẢ DỤNG (router - dùng được trên MỌI engine) ==="]
-    for s in metas[:15]:
-        desc = (s.get("description") or "").replace("\n", " ")[:100]
+    cap = skill_router.SKILL_LIST_MAX
+    for s in metas[:cap]:
+        desc = (s.get("description") or "").replace("\n", " ")[:skill_router.SKILL_DESC_MAX]
         lines.append(f"- {s['slug']} ({s['name']}): {desc}")
-    if len(metas) > 15:
-        lines.append(f"…(+{len(metas) - 15} skill nữa - xem `Javis/index.md`)")
+    if len(metas) > cap:
+        lines.append(f"…(+{len(metas) - cap} skill nữa - xem `Javis/index.md`)")
     lines.append(
         "CÁCH DÙNG: khi yêu cầu của user KHỚP mô tả 1 skill ở trên, hãy NẠP skill đó rồi LÀM THEO - "
         "gọi tool `javis_use_skill(name=<slug>)` nếu engine có tool này; nếu không, mở file "

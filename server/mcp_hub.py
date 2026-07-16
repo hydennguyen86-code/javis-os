@@ -252,10 +252,14 @@ def _builtin_tools(mode, vault_root):
         "báo cáo, nháp. KHÔNG dùng cho hành động ra ngoài.",
         {"path": {"type": "string"}, "content": {"type": "string"}}, ["path", "content"], _write)
     # Mô tả tool = router thu nhỏ: liệt kê slug + mô tả ngắn để engine biết KHI NÀO gọi skill nào.
+    # Trần lấy từ skill_router (CHUNG với system prompt) - trước đây hub tự cắt 60, system prompt
+    # cắt 100 - người viết skill không biết mình bị chấm theo thước nào.
     metas = skill_router.list_enabled_meta(vault_root)
-    listing = "; ".join(f"{s['slug']}: {(s['description'] or '')[:60]}" for s in metas[:20])
-    if len(metas) > 20:
-        listing += f"; …(+{len(metas) - 20} skill nữa)"
+    _cap = skill_router.SKILL_LIST_MAX
+    listing = "; ".join(f"{s['slug']}: {(s['description'] or '')[:skill_router.SKILL_DESC_MAX]}"
+                        for s in metas[:_cap])
+    if len(metas) > _cap:
+        listing += f"; …(+{len(metas) - _cap} skill nữa)"
     add("javis_use_skill",
         "Nạp nội dung 1 skill (hướng dẫn chuyên sâu) rồi LÀM THEO. Truyền name=<slug>. "
         "Skill khả dụng (slug: mô tả): " + (listing or "(chưa có)"),
