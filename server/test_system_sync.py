@@ -387,6 +387,48 @@ check(f"skill hỏng vĩnh viễn: skill LÀNH không bị chép lại mỗi lư
 check(f"skill hỏng vĩnh viễn: vẫn được thử lại đều (thử {len(_hong_lai)} lần / 2 lượt)",
       len(_hong_lai) > 0)
 
+# ---- CRITICAL 1: tắt rồi bật lại một skill KHÔNG được làm mất bản mirror vĩnh viễn ----
+# Lặp lại ĐÚNG chuỗi hành động của server/main.py (endpoint /skills/toggle, cả hai nhánh):
+#   TẮT: rename skills/<slug> -> skills/.disabled/<slug>, rmtree bản mirror, rồi gọi lại
+#        mirror_skills(root) NGAY TẠI ĐÓ (dòng vừa thêm để vá CRITICAL 1).
+#   BẬT: rename ngược lại rồi gọi mirror_skills(root) (nhánh này chưa bao giờ đổi).
+# Vì sao cần dòng mirror_skills() ở nhánh TẮT: `rename` giữ NGUYÊN st_mtime_ns/st_size, nên nếu
+# nhánh tắt không tự gọi mirror_skills để cache ghi nhận chữ ký-đã-tắt, thì nhánh BẬT sau đó tính
+# ra chữ ký-cây-nguồn Y HỆT giá trị cache còn nhớ từ TRƯỚC KHI TẮT (cache đó chưa từng được cập
+# nhật ở giữa) -> tầng 1 tưởng "cây không đổi gì" -> bỏ qua -> bản mirror vừa rmtree ở nhánh tắt
+# KHÔNG BAO GIỜ được tạo lại, cho tới khi khởi động lại tiến trình. Gỡ dòng mirror_skills() ở
+# nhánh tắt bên dưới (đặt `_DISABLE_CALLS_MIRROR = False`) để xem test này RED lại đúng như trước
+# khi vá - đã kiểm bằng tay, xem báo cáo b4-final-fix-report.md.
+_DISABLE_CALLS_MIRROR = True   # main.py bản đã vá: nhánh tắt CÓ gọi lại mirror_skills
+
+_R8 = Path(tempfile.mkdtemp(prefix="javis-mirrortoggle-"))
+_slug8 = "bat-tat"
+_sk8 = _R8 / "skills" / _slug8
+_sk8.mkdir(parents=True)
+(_sk8 / "SKILL.md").write_text("---\nname: Bật tắt\ndescription: Test toggle.\n---\nthân\n",
+                               encoding="utf-8")
+_dis8 = _R8 / "skills" / ".disabled" / _slug8
+_mir8 = _R8 / ".claude" / "skills" / _slug8 / "SKILL.md"
+
+system_sync.mirror_skills(_R8)   # lượt mirror đầu tiên, y hệt build_system_prompt lượt chat đầu
+check("toggle: sau mirror đầu tiên -> có mirror", _mir8.is_file())
+
+# TẮT - y hệt main.py: rename sang .disabled rồi rmtree bản mirror.
+_dis8.parent.mkdir(parents=True, exist_ok=True)
+_sk8.rename(_dis8)
+if _mir8.parent.is_dir():
+    shutil.rmtree(_mir8.parent)
+if _DISABLE_CALLS_MIRROR:
+    system_sync.mirror_skills(_R8)   # dòng main.py vá CRITICAL 1 ở nhánh tắt
+check("toggle: sau TẮT -> mirror đã gỡ", not _mir8.is_file())
+
+# BẬT lại - y hệt main.py: rename ngược lại rồi gọi mirror_skills (nhánh này không đổi).
+_dis8.rename(_sk8)
+system_sync.mirror_skills(_R8)
+check("toggle: TẮT rồi BẬT lại -> mirror PHẢI được tạo lại (CRITICAL 1)", _mir8.is_file())
+
+shutil.rmtree(_R8, ignore_errors=True)
+
 # ---- dọn ----
 for _d in (_ROOT, _R2, _R3, _R4, _R5, _R6, _R7):
     shutil.rmtree(_d, ignore_errors=True)

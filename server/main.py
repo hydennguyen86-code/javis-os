@@ -181,7 +181,8 @@ def build_system_prompt(brain: str = "brain") -> str:
     system_sync.ensure_synced(root)   # brain nào cũng có đủ năng lực hệ thống (1 lần/process, rẻ)
     try:
         # Mirror skills/ → .claude/skills để fork Claude cwd=brain (workflow/loop/learn/lint) nạp
-        # native được skill viết giữa phiên (rẻ: bỏ qua nếu trùng hash).
+        # native được skill viết giữa phiên (rẻ: cổng chữ ký stat-only bỏ qua nếu cây nguồn
+        # không đổi, xem system_sync._mirror_signature - KHÔNG còn so hash nội dung nữa).
         system_sync.mirror_skills(root)
     except Exception:
         pass
@@ -2188,7 +2189,9 @@ def _skills_dir(brain):
 @app.post("/skills/toggle")
 async def skill_toggle(slug: str = Form(...), enabled: str = Form(...), brain: str = Form("brain")):
     """Bật/tắt skill = di chuyển folder giữa <brain>/skills/<slug> và <brain>/skills/.disabled/<slug>.
-    Đồng bộ bản mirror .claude/skills (bật→copy, tắt→gỡ) để Claude native cwd=brain khớp trạng thái."""
+    Đồng bộ bản mirror .claude/skills (bật→copy, tắt→gỡ) để Claude native cwd=brain khớp trạng thái.
+    CẢ HAI nhánh đều gọi lại mirror_skills (không chỉ nhánh bật) - xem lý do ở comment trong nhánh
+    tắt bên dưới, đây là chỗ vá CRITICAL 1 của bản 0.9.64 (tắt rồi bật lại làm mất mirror vĩnh viễn)."""
     want = enabled in ("1", "true", "True", "on")
     if not skill_router.valid_slug(slug):   # chống traversal: slug 1 đoạn, dùng cho rmtree/rename bên dưới
         return JSONResponse({"error": "slug không hợp lệ"}, status_code=400)
@@ -2211,8 +2214,18 @@ async def skill_toggle(slug: str = Form(...), enabled: str = Form(...), brain: s
         mirror_slug = Path(root) / ".claude" / "skills" / slug
         if want:
             system_sync.mirror_skills(root)      # bật → tạo/cập nhật bản mirror cho Claude native
-        elif mirror_slug.is_dir():
-            shutil.rmtree(mirror_slug)           # tắt → gỡ mirror để native không còn nạp
+        else:
+            if mirror_slug.is_dir():
+                shutil.rmtree(mirror_slug)       # tắt → gỡ mirror để native không còn nạp
+            # Gọi lại mirror_skills NGAY ở đây, không chỉ chờ lượt gọi tự nhiên kế tiếp (CRITICAL 1
+            # đã vá): rename ở trên vừa đổi cây <root>/skills nên chữ ký của nó đã đổi, và lệnh này
+            # ép cache ghi nhận đúng chữ ký-đã-tắt NGAY LẬP TỨC. Thiếu dòng này: `rename` giữ nguyên
+            # st_mtime_ns/st_size, nên BẬT lại sau đó (rename ngược) làm chữ ký quay về Y HỆT giá
+            # trị cache còn nhớ từ TRƯỚC KHI TẮT (vì tắt chưa từng gọi mirror_skills để cache thấy
+            # trạng thái tắt ở giữa) → tầng 1 tưởng "cây không đổi gì" → bỏ qua → bản mirror vừa
+            # rmtree ở trên KHÔNG BAO GIỜ được tạo lại, cho tới khi khởi động lại tiến trình. Xem
+            # test_system_sync.py (chuỗi tắt->bật) và CHANGELOG 0.9.64.
+            system_sync.mirror_skills(root)
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
     return {"ok": True}

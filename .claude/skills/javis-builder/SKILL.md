@@ -91,10 +91,12 @@ skill cứ thế hỏng âm thầm lúc chạy. Bạn là lớp phòng thủ duy
 6. KHÔNG bịa flag, đường dẫn, API chưa thấy trong nguồn. Không thấy thì đừng viết.
 7. Thân file khoảng 100 dòng cho skill đơn giản, 200 cho skill phức tạp. Dài hơn thì tách
    nội dung xuống `skills/<slug>/references/<chủ-đề>.md`, script xuống
-   `skills/<slug>/scripts/`, và trỏ tới bằng đường dẫn tương đối. Giới hạn đã biết: bản mirror
-   sang `.claude/skills` (đường Claude Code nạp NATIVE) hiện chỉ copy file top-level, KHÔNG
-   copy thư mục con - `references/`/`scripts/` tới được đường router nhưng có thể không tới
-   được đường native.
+   `skills/<slug>/scripts/`, và trỏ tới bằng đường dẫn tương đối. Từ bản 0.9.64: bản mirror
+   sang `.claude/skills` (đường Claude Code nạp NATIVE) copy ĐỆ QUY cả cây, nên với skill
+   trong brain, `references/`/`scripts/` tới được CẢ đường router lẫn đường native. Ngoại lệ
+   còn lại: skill HỆ THỐNG (bundled sẵn theo app, cài vào brain qua system sync) vẫn chỉ ship
+   mỗi `SKILL.md` - cây con của chúng (vd `tools/`/`examples/` của `html-to-webcake`) CHƯA tới
+   brain nào, đây là lỗ ở tầng cài đặt khác, chưa được vá.
 8. KHÔNG viết skill kiểu router chỉ trỏ sang skill khác.
 
 ### Workflow -> `Javis/workflows/<slug>.md`

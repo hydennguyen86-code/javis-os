@@ -242,14 +242,21 @@ def mirror_skills(root) -> None:
     Đây là bản phái sinh - hỏng cũng không phá router chính.
 
     ĐƯỜNG NÓNG: gọi mỗi lượt chat qua build_system_prompt. Tầng 1 là cổng chữ ký stat-only
-    (~6ms) - 99% lượt thoát ở đây. Tầng 2 (copy thật) chỉ chạy khi cây nguồn ĐỔI, hoặc khi
-    còn nợ skill copy lỗi lượt trước - lúc đó CHỈ chép lại đúng mấy skill nợ đó (_MIRROR_RETRY),
-    nên một skill hỏng vĩnh viễn chỉ tốn rglob của RIÊNG nó chứ không phạt cả brain mỗi lượt.
+    (đo thật nguyên hàm trên 3 brain đang chạy: còn khoảng 2-8ms tuỳ brain, không phải một
+    con số cố định - xem CHANGELOG 0.9.64) - 99% lượt thoát ở đây. Tầng 2 (copy thật) chỉ
+    chạy khi cây nguồn ĐỔI, hoặc khi còn nợ skill copy lỗi lượt trước - lúc đó CHỈ chép lại
+    đúng mấy skill nợ đó (_MIRROR_RETRY), nên một skill hỏng vĩnh viễn chỉ tốn rglob của
+    RIÊNG nó chứ không phạt cả brain mỗi lượt.
 
     BIẾT TRƯỚC: chữ ký tính trên NGUỒN và cache nằm trong bộ nhớ, nên bản mirror bị phá từ
     BÊN NGOÀI mà nguồn không đổi sẽ không tự lành cho tới khi khởi động lại tiến trình. Đánh
-    đổi có chủ đích (xem spec 2026-07-17-mirror-skills-tree-design.md). Tắt skill thì nguồn
-    dời sang .disabled nên chữ ký đổi -> vẫn phủ."""
+    đổi có chủ đích (xem spec 2026-07-17-mirror-skills-tree-design.md). Tắt/bật skill THÌ TỰ
+    LÀNH: nhánh tắt trong /skills/toggle (main.py) vừa dời nguồn sang .disabled vừa GỌI LẠI
+    hàm này ngay tại đó, nên cache ghi nhận đúng chữ ký-đã-tắt NGAY LẬP TỨC - bật lại sau đó
+    chắc chắn tính ra chữ ký khác cache và copy lại toàn bộ. (Bản đầu của B4 chỉ dời nguồn mà
+    KHÔNG gọi lại hàm này ở nhánh tắt: do `rename` giữ nguyên st_mtime_ns/st_size, bật lại sẽ
+    quay về ĐÚNG chữ ký cache còn nhớ từ trước khi tắt, và mirror vừa rmtree không bao giờ
+    được tạo lại cho tới khi restart - CRITICAL đã vá, xem test_system_sync.py.)"""
     root = Path(root)
     canonical = root / "skills"
     mirror = root / ".claude" / "skills"
@@ -282,12 +289,13 @@ def mirror_skills(root) -> None:
                 return
             # Cây KHÔNG đổi mà vẫn vào tới đây => chỉ còn nợ mấy skill lỗi lượt trước: chép ĐÚNG
             # mấy slug đó thôi. Cây ĐỔI thì `only = None` = chép tất (nợ cũ nằm trong đó rồi).
-            # Đây là thứ giữ đường nóng ~6ms khi có 1 skill hỏng VĨNH VIỄN: nếu cứ "có lỗi thì
-            # không cache" thì mọi lượt chat lại full rglob + copy2 CẢ BRAIN - đo thật trên brain
-            # 27 skill/135 file là 161ms/lượt so với 18ms khi tầng 1 ăn, tức còn TỆ HƠN cả bản
-            # ~52ms mà task này sinh ra để giết. Lỗi vĩnh viễn (MAX_PATH trên cây references/ sâu
-            # dưới đường brain dài, file bị process khác giữ, file vướng ACL) là có thật và không
-            # tự khỏi, nên không được phép biến thành thuế mỗi lượt.
+            # Đây là thứ giữ đường nóng khoảng 2-8ms (tuỳ brain) khi có 1 skill hỏng VĨNH VIỄN:
+            # nếu cứ "có lỗi thì không cache" thì mọi lượt chat lại full rglob + copy2 CẢ BRAIN -
+            # đo thật trên brain GIẢ LẬP dựng riêng để đo (27 skill/135 file, không phải hình
+            # dạng của brain thật nào) là 161ms/lượt so với 18ms khi tầng 1 ăn, tức còn TỆ HƠN cả
+            # bản ~52ms mà task này sinh ra để giết. Lỗi vĩnh viễn (MAX_PATH trên cây references/
+            # sâu dưới đường brain dài, file bị process khác giữ, file vướng ACL) là có thật và
+            # không tự khỏi, nên không được phép biến thành thuế mỗi lượt.
             only = pending if (sig and _MIRROR_SIG.get(key) == sig) else None
             failed = set()
             for d in sorted(p for p in canonical.iterdir()
@@ -351,7 +359,9 @@ def _merge_loop_update(new_content: str, cur_text: str) -> str:
 # dashboard, mỗi tin Telegram, mỗi task Kanban, mỗi vòng loop, mỗi nhắc hẹn, mỗi lần spawn
 # learn. Bản cũ đọc + băm SKILL.md hai lần cho MỖI skill mỗi lần gọi: đo thật trên brain
 # 27 skill là ~52ms MỖI LƯỢT, chặn thẳng event loop. Chữ ký chỉ dùng stat (không đọc byte
-# nào) nên ~6ms, rẻ hơn 9 lần, và tiện thể phủ luôn thư mục con.
+# nào) nên còn khoảng 2-8ms tuỳ brain (đo thật nguyên hàm, không phải suy luận - xem
+# CHANGELOG 0.9.64), rẻ hơn khoảng 5 đến 7 lần tuỳ brain chứ không phải một con số cố định,
+# và tiện thể phủ luôn thư mục con.
 _MIRROR_SIG: dict = {}                    # root đã resolve -> chữ ký lần mirror gần nhất
 _MIRROR_RETRY: dict = {}                  # root đã resolve -> set slug copy LỖI, cần thử lại
 _MIRROR_LOCKS: dict = {}                  # root đã resolve -> Lock riêng cho mirror
