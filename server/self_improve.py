@@ -61,6 +61,7 @@ import yaml
 from fastapi import APIRouter, Form, Query
 
 from claude_cli import claude_engine, cancel_all, _empty_mcp_file
+import channel_context   # bóc khối JAVIS_* trước khi báo Telegram - kênh chữ, không phải web
 
 LEGACY_SLUG = "vong-lap-goc"
 GOALS = ("business", "brain", "product", "custom")
@@ -744,7 +745,12 @@ class LoopFeature:
                 if paused_now:
                     parts.append("⚠ " + patch["auto_paused_reason"] + " - bật lại hoặc bấm Chạy ngay để tiếp tục.")
                 try:
-                    asyncio.create_task(self.deps.report(loop.get("owner_chat", ""), "\n\n".join(parts)))
+                    # Telegram là kênh chữ thuần: lọc khối JAVIS_METRICS/JAVIS_ASK trước khi báo,
+                    # kẻo lộ nguyên cụm "<!-- JAVIS_...: ... -->" (system prompt loop dùng chung
+                    # CLAUDE.md nên có thể sinh các khối này).
+                    asyncio.create_task(self.deps.report(
+                        loop.get("owner_chat", ""),
+                        channel_context.strip_control_blocks("\n\n".join(parts))))
                     report_sent = True
                 except Exception:
                     pass

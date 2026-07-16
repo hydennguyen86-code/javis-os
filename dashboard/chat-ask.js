@@ -15,6 +15,7 @@
 
   var ASK_RE = /<!--\s*JAVIS_ASK:\s*([\s\S]*?)\s*-->/;
   var MAX_OPTS = 4;
+  var MAX_LABEL = 40;
 
   function esc(s) {
     return String(s == null ? "" : s)
@@ -22,8 +23,22 @@
       .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
 
+  // Cat nhan con MAX_LABEL ky tu. Chi them "…" khi THUC SU cat bot noi dung
+  // (nhan dai dung bang tran thi giu nguyen, khong them dau thua).
+  function cut(s) {
+    s = String(s || "");
+    return s.length > MAX_LABEL ? s.slice(0, MAX_LABEL - 1) + "…" : s;
+  }
+
   // Boc khoi JAVIS_ASK khoi text. LUON tra clean da bo khoi (ke ca khi JSON hong) -
   // mot khoi sai cu phap KHONG duoc phep nuot mat cau tra loi cua Javis.
+  //
+  // Cat nhan (cut) NGAY O DAY - tang du lieu - chu khong cat luc ve (render). Ly do:
+  // nut ve ra thu nguoi dung DOC roi moi bam, dung la lop xac nhan cuoi truoc khi noi
+  // dung duoc gui di nhu tin nhan cua ho. Neu ve thi cat con click lai gui ban goc chua
+  // cat, nhan dai qua tran se hien mot dang nhung gui di mot dang khac - noi dung an
+  // (vd do source bi chen lenh sinh ra) co the lot qua duoi danh nghia nguoi dung ma ho
+  // chua bao gio thay het. Cat o day dam bao thu hien va thu gui LUON BANG NHAU.
   function extract(text) {
     if (typeof text !== "string") return { clean: "", ask: null };
     var m = text.match(ASK_RE);
@@ -36,7 +51,7 @@
         .filter(function (x) { return x && typeof x.label === "string" && x.label.trim(); })
         .slice(0, MAX_OPTS)
         .map(function (x) {
-          return { label: String(x.label).trim(), desc: String(x.desc == null ? "" : x.desc).trim() };
+          return { label: cut(String(x.label).trim()), desc: String(x.desc == null ? "" : x.desc).trim() };
         });
       var q = (o && typeof o.question === "string") ? o.question.trim() : "";
       if (q && opts.length) {
@@ -44,12 +59,6 @@
       }
     } catch (e) {}
     return { clean: clean, ask: ask };
-  }
-
-  var MAX_LABEL = 40;
-  function cut(s) {
-    s = String(s || "");
-    return s.length > MAX_LABEL ? s.slice(0, MAX_LABEL - 1) + "…" : s;
   }
 
   // Ve hang chip vao cuoi .bubble cua thu tin nhan Javis.
@@ -63,15 +72,17 @@
     box.className = "jv-ask" + (live ? "" : " jv-ask-done");
     var tag = ask.header ? '<span class="jv-ask-tag">' + esc(ask.header) + "</span>" : "";
     var chips = ask.options.map(function (o, i) {
+      // label da duoc cut() trong extract() - thu ve va thu gui LUON la cung mot chuoi,
+      // khong cat lai o day nua.
       return '<button class="jv-ask-chip" type="button" data-i="' + i + '" title="' +
-        esc(o.desc || o.label) + '">' + esc(cut(o.label)) + "</button>";
+        esc(o.desc || o.label) + '">' + esc(o.label) + "</button>";
     }).join("");
     box.innerHTML =
       '<div class="jv-ask-q">' + tag + esc(ask.question) + "</div>" +
       '<div class="jv-ask-row">' + chips +
         '<button class="jv-ask-chip jv-ask-other" type="button" data-other="1">Ý khác…</button>' +
       "</div>";
-    box._ask = ask;              // giu ban goc de doc lai nhan that (khong phai nhan da cat)
+    box._ask = ask;              // giu lai de doc nhan luc bam chip (nhan trong day da bi cut())
     host.appendChild(box);
     return box;
   }

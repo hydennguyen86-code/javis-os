@@ -41,6 +41,7 @@ from typing import Any, Callable, List, Optional
 from fastapi import APIRouter, Body, Form, Query
 
 import cron_util
+import channel_context   # bóc khối JAVIS_* trước khi gửi Telegram - kênh chữ, không phải web
 from claude_cli import claude_engine, _empty_mcp_file
 
 VN_TZ = timezone(timedelta(hours=7))
@@ -371,7 +372,11 @@ class RemindersFeature:
         ok, send_err = True, ""
         if deliver:
             try:
-                ok, send_err = await self.deps.send_telegram(rem.get("chat_id", ""), msg)
+                # Telegram là kênh chữ thuần: mode "task" chạy chung system prompt/CLAUDE.md với
+                # chat nên body có thể mang khối JAVIS_METRICS/JAVIS_ASK - lọc trước khi gửi, kẻo
+                # lộ nguyên cụm "<!-- JAVIS_...: ... -->".
+                ok, send_err = await self.deps.send_telegram(
+                    rem.get("chat_id", ""), channel_context.strip_control_blocks(msg))
             except Exception as e:
                 ok, send_err = False, f"{type(e).__name__}: {e}"
 

@@ -40,6 +40,7 @@ from typing import Any, Callable, List, Optional
 from fastapi import APIRouter, Form, Query
 
 from claude_cli import claude_engine, cancel_all, _empty_mcp_file
+import channel_context   # bóc khối JAVIS_* trước khi báo Telegram - kênh chữ, không phải web
 
 VALID_STATUS = {"todo", "ready", "running", "review", "done", "blocked", "archived"}
 _DONE_ISH = {"done", "archived"}
@@ -226,7 +227,12 @@ class TasksFeature:
                 if st == "blocked":
                     parts.append("Lý do: " + ((err or t.get("block_reason", "") or "")[:300]))
                 try:
-                    asyncio.create_task(self.deps.report(t.get("chat_id", ""), "\n\n".join(parts)))
+                    # Telegram là kênh chữ thuần: lọc khối JAVIS_METRICS/JAVIS_ASK trước khi báo,
+                    # kẻo lộ nguyên cụm "<!-- JAVIS_...: ... -->" (kết quả task có thể mang theo
+                    # khối này vì agent chạy chung system prompt/CLAUDE.md với chat).
+                    asyncio.create_task(self.deps.report(
+                        t.get("chat_id", ""),
+                        channel_context.strip_control_blocks("\n\n".join(parts))))
                 except Exception:
                     pass
             return {"ok": True, "ran": tid, "status": (t or {}).get("status")}

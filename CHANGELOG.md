@@ -7,9 +7,10 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 ## [0.9.61] - 2026-07-16
 ### Thêm mới
 - **Khối hỏi-lại có lựa chọn trong khung chat**: Javis hỏi lại được bằng nút bấm ngay trong chat, kiểu Claude Code: nhúng khối ẩn `JAVIS_ASK` ở cuối câu trả lời, dashboard vẽ thành hàng chip dưới bong bóng. Bấm một nút là gửi đi như gõ tay, cùng phiên. Chỉ tin nhắn cuối mới bấm được; cuộn lên lịch sử thì chip đã đông cứng.
-- Chạy trên MỌI engine (Claude Agent SDK, Codex CLI, các engine API) vì chỉ dựa vào system prompt, không đụng MCP hub.
+- **Chạy trên mọi engine**: Claude Agent SDK, Codex CLI, các engine API đều dùng được vì chỉ dựa vào system prompt, không đụng MCP hub.
 ### Sửa lỗi
-- **Khối điều khiển không còn lọt sang Telegram**: khối `JAVIS_METRICS` trước đây lọt nguyên xi sang Telegram. Nay mọi khối điều khiển đều bị bóc trước khi ra kênh chữ; riêng `JAVIS_ASK` hạ xuống danh sách đánh số để nhắn lại "1" là chọn.
+- **Khối điều khiển không còn lọt sang Telegram**: khối `JAVIS_METRICS` trước đây lọt nguyên xi sang Telegram. Nay mọi khối điều khiển đều bị bóc trước khi ra kênh chữ ở cả 4 đường trả lời Telegram (chat, báo cáo Loop, báo cáo Việc Kanban, nhắc hẹn kiểu task); riêng `JAVIS_ASK` hạ xuống danh sách đánh số để nhắn lại "1" là chọn.
+- **Chip hỏi-lại: nhãn hiện và nhãn gửi lệch nhau khi dài quá 40 ký tự**: nút chip trước đây cắt gọn LÚC VẼ nhưng vẫn gửi nguyên nhãn gốc khi bấm, nên nhãn dài (ẩn cả trong nội dung do connector ngoài chèn vào) có thể gửi đi phần người dùng chưa từng đọc hết. Nay cắt ngay ở bước bóc dữ liệu (`extract()`), thứ hiện và thứ gửi luôn giống nhau.
 
 ## [0.9.60] - 2026-07-16
 ### Sửa lỗi

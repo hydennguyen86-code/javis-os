@@ -58,6 +58,31 @@ check("song chung metrics: KHONG dung vao khoi metrics", r.clean.indexOf("JAVIS_
 r = extract(null);
 check("dau vao null: khong no", r.ask === null && r.clean === "");
 
+// ---- 9. Nhan dai hon tran: extract() phai CAT SAN - thu hien = thu gui ----
+// (hoi quy cho loi chip hien mot dang, gui mot dang khi nhan qua 40 ky tu)
+const longLabel = "a".repeat(300);
+const longBlock = '<!-- JAVIS_ASK: {"question":"Chon?","options":[{"label":"' + longLabel + '"}]} -->';
+r = extract(longBlock);
+check("nhan dai: da bi cat con <= 40 ky tu", r.ask && r.ask.options[0].label.length <= 40);
+check("nhan dai: cat dung con 39 + dau …", r.ask && r.ask.options[0].label === "a".repeat(39) + "…");
+check("nhan dai: KHONG con nguyen 300 ky tu (thu gui phai bang thu hien)",
+  r.ask && r.ask.options[0].label !== longLabel);
+
+// ---- 10. Nhan ngan (<= 40 ky tu): giu nguyen, KHONG them "…" ----
+const shortLabel = "Tuan nay";
+const shortBlock = '<!-- JAVIS_ASK: {"question":"Chon?","options":[{"label":"' + shortLabel + '"}]} -->';
+r = extract(shortBlock);
+check("nhan ngan: giu nguyen khong doi", r.ask && r.ask.options[0].label === shortLabel);
+check("nhan ngan: khong bi them dau …", r.ask && r.ask.options[0].label.indexOf("…") === -1);
+
+// ---- 11. Nhan dai DUNG BANG tran (40 ky tu): giu nguyen, khong thua "…" ----
+// (hoi quy: cut() truoc day cat ca khi chi du 1 ky tu vi dung ">" thay vi ">=")
+const exactLabel = "b".repeat(40);
+const exactBlock = '<!-- JAVIS_ASK: {"question":"Chon?","options":[{"label":"' + exactLabel + '"}]} -->';
+r = extract(exactBlock);
+check("nhan dung tran 40: giu nguyen", r.ask && r.ask.options[0].label === exactLabel);
+check("nhan dung tran 40: khong thua dau …", r.ask && r.ask.options[0].label.indexOf("…") === -1);
+
 if (fails.length) {
   console.log("\nFAIL - " + fails.length + " test: " + fails.join(", "));
   process.exit(1);
