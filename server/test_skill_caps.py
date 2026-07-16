@@ -125,6 +125,14 @@ for _slug in sorted(system_sync.system_skill_slugs()):
     check(f"skill hệ thống '{_slug}' description hợp lệ ({len(_desc)} ký tự)"
           + (f" → {_err}" if _err else ""), _err is None)
 
+# ---- POST /skills phải ép trần TRƯỚC khi tạo thư mục ----
+# Mốc kết thúc là /skills/delete (main.py:2241) chứ KHÔNG phải /skills/toggle: toggle nằm ở
+# dòng 2161, TRƯỚC save_skill (2214), nên dùng nó làm mốc sau sẽ ném ValueError.
+_save = _region("main.py", "async def save_skill", '@app.post("/skills/delete")')
+check("POST /skills gọi validate_description", "validate_description" in _save)
+check("POST /skills ép TRƯỚC khi mkdir",
+      _save.index("validate_description") < _save.index("d.mkdir("))
+
 if _fails:
     print(f"\nFAIL - test_skill_caps: {len(_fails)} lỗi: {_fails}")
     sys.exit(1)

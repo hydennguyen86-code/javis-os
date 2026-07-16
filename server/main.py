@@ -2218,6 +2218,12 @@ async def save_skill(name: str = Form(...), description: str = Form(""), group: 
     slug = (slug or _ascii_slug(name)).strip()
     if not skill_router.valid_slug(slug):
         return JSONResponse({"error": "Tên skill không hợp lệ"}, status_code=400)
+    # Ép trần description NGAY, trước khi tạo bất cứ thư mục nào -> request bị từ chối không
+    # để lại folder skill rỗng trên đĩa. Router cắt ở SKILL_DESC_MAX nên vượt trần = mất chữ
+    # im lặng; chặn ở đây tốt hơn là ghi bừa rồi để runtime cắt.
+    desc_err = skill_router.validate_description(description)
+    if desc_err:
+        return JSONResponse({"error": desc_err}, status_code=400)
     root = _brain_root(brain)
     try:
         system_sync.migrate_brain(root)   # brain cũ: chuẩn hoá về skills/ trước khi ghi
