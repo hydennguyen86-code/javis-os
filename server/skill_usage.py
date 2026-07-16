@@ -86,7 +86,13 @@ def bump(brain_root, slug: str, created_by: str = "") -> None:
             if not isinstance(rec, dict):
                 rec = {"use_count": 0, "created_at": now, "created_by": created_by,
                        "first_used_at": None, "last_used_at": None, "pinned": False}
-            rec["use_count"] = int(rec.get("use_count", 0) or 0) + 1
+            try:
+                cur_count = int(rec.get("use_count", 0) or 0)
+            except (TypeError, ValueError):
+                # use_count hỏng (vd chuỗi "abc") -> coi như 0 và GHI ĐÈ ngay dưới đây, tự lành
+                # bản ghi hỏng ở lần bump kế tiếp thay vì hỏng vĩnh viễn.
+                cur_count = 0
+            rec["use_count"] = cur_count + 1
             rec["last_used_at"] = now
             if not rec.get("first_used_at"):
                 rec["first_used_at"] = now
@@ -113,7 +119,13 @@ def is_stale(rec: dict, skill_md_mtime: Optional[float], now: Optional[float] = 
     rec = rec if isinstance(rec, dict) else {}
     if rec.get("pinned"):
         return False
-    if int(rec.get("use_count", 0) or 0) > 0:
+    try:
+        use_count = int(rec.get("use_count", 0) or 0)
+    except (TypeError, ValueError):
+        # use_count hỏng (vd chuỗi "abc") -> không đủ căn cứ coi là "có dùng", nhưng cũng
+        # không sập: coi như 0 rồi đi tiếp xét theo tuổi bản ghi.
+        use_count = 0
+    if use_count > 0:
         return False
     born = rec.get("created_at") or skill_md_mtime
     if not born:

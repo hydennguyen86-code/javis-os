@@ -2160,10 +2160,16 @@ async def list_skills(brain: str = Query("brain")):
 
     out = []
     for s in skill_router.list_skills(root):
-        rec = usage.get(s["slug"]) or {}
+        rec = usage.get(s["slug"])
+        if not isinstance(rec, dict):   # sidecar tay-sửa hỏng dạng: {"slug": "khong-phai-dict"}
+            rec = {}
+        try:
+            use_count = int(rec.get("use_count", 0) or 0)
+        except (TypeError, ValueError):  # vd use_count: "abc" - coi như chưa đếm được, không sập trang
+            use_count = 0
         out.append({**s,
                     "system": s["slug"] in sys_slugs,
-                    "use_count": int(rec.get("use_count", 0) or 0),
+                    "use_count": use_count,
                     "last_used_at": rec.get("last_used_at"),
                     "pinned": bool(rec.get("pinned", False)),
                     # stale = "chưa thấy dùng + đủ già". CHỈ để hiển thị tham khảo: skill nạp

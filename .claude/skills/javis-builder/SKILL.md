@@ -61,7 +61,7 @@ Prompt tốt thường 10-25 dòng. Viết xong tự đọc lại bằng mắt m
 ```
 ---
 name: <Tên skill>
-description: <mô tả NGẮN nêu rõ KHI NÀO kích hoạt - đây là trigger, viết kỹ>
+description: <nêu THẲNG năng lực, TỐI ĐA 150 ký tự - vd "Chuyển HTML sang file Webcake .pke.">
 group: <Marketing|Bán hàng|Nội dung|Vận hành|Tài chính|AI|Năng suất|Cá nhân>
 ---
 <hướng dẫn chi tiết cho AI khi skill kích hoạt>
@@ -91,7 +91,10 @@ skill cứ thế hỏng âm thầm lúc chạy. Bạn là lớp phòng thủ duy
 6. KHÔNG bịa flag, đường dẫn, API chưa thấy trong nguồn. Không thấy thì đừng viết.
 7. Thân file khoảng 100 dòng cho skill đơn giản, 200 cho skill phức tạp. Dài hơn thì tách
    nội dung xuống `skills/<slug>/references/<chủ-đề>.md`, script xuống
-   `skills/<slug>/scripts/`, và trỏ tới bằng đường dẫn tương đối.
+   `skills/<slug>/scripts/`, và trỏ tới bằng đường dẫn tương đối. Giới hạn đã biết: bản mirror
+   sang `.claude/skills` (đường Claude Code nạp NATIVE) hiện chỉ copy file top-level, KHÔNG
+   copy thư mục con - `references/`/`scripts/` tới được đường router nhưng có thể không tới
+   được đường native.
 8. KHÔNG viết skill kiểu router chỉ trỏ sang skill khác.
 
 ### Workflow -> `Javis/workflows/<slug>.md`
@@ -161,8 +164,9 @@ ctx có `ctx.vault_root`, `ctx.data_dir` (state riêng plugin, không đụng va
 - KHÔNG bao giờ để một loop/automation tự tạo hoặc tự bật loop khác (chống phình vô hạn) - chỉ ĐỀ XUẤT.
 - Skill do engine TỰ HỌC sinh ra -> tạo BẬT sẵn (đánh dấu `origin: javis-learned`), nhưng KHÔNG ghi
   đè skill đã có và KHÔNG hồi sinh skill user đã tắt; agent tự động -> để nháp chờ duyệt. Skill do
-  user yêu cầu trực tiếp -> tạo bật luôn nhưng phải kiểm trùng + `description` trigger rõ (skill rác
-  làm Javis chọn skill sai). Đừng tạo skill trùng chức năng skill đã có.
+  user yêu cầu trực tiếp -> tạo bật luôn nhưng phải kiểm trùng + `description` nêu rõ năng lực,
+  phân biệt được với skill khác (mô tả mơ hồ làm Javis chọn skill sai). Đừng tạo skill trùng
+  chức năng skill đã có.
 - Plugin user (toàn cục lẫn vault) chạy CODE PYTHON THẬT trong tiến trình server -> tạo `enabled: false`,
   `min_mode: readonly`, và NÓI RÕ với user: plugin chỉ chạy khi họ đặt env `JAVIS_ENABLE_USER_PLUGINS=true`
   rồi khởi động lại (rào chống chạy code lạ). KHÔNG viết plugin làm hành động tiền/đơn/gửi tin; việc đó để MCP + mức quyền lo.

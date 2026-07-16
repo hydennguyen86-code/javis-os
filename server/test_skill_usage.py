@@ -124,6 +124,59 @@ check("không có bản ghi + mtime mới → chưa stale",
 check("không có bản ghi + không có mtime → không stale (không đủ căn cứ)",
       skill_usage.is_stale({}, None, _now) is False)
 
+# ---- sidecar bị TAY SỬA HỎNG: is_stale/bump phải KHÔNG raise, không sập trang Studio ----
+# (review cuối trước release: main.py:2166 và skill_usage.py từng int(...) trần không có
+# type guard - {"slug": "hello"} hoặc {"slug": {"use_count": "abc"}} sẽ raise, 500 GET /skills,
+# và bump từng nuốt lỗi rồi để bản ghi hỏng nằm mãi mãi, không tự lành)
+
+# ca A: bản ghi của SLUG là CHUỖI thay vì dict (vd '{"demo": "hello"}')
+check("is_stale: bản ghi là CHUỖI thay vì dict -> không raise, coi như chưa đủ căn cứ",
+      skill_usage.is_stale("hello", None, _now) is False)
+check("is_stale: bản ghi là CHUỖI + có mtime cũ -> fallback tính theo mtime, không sập",
+      skill_usage.is_stale("hello", _old, _now) is True)
+
+# ca B: bản ghi là dict nhưng use_count là CHUỖI KHÔNG PHẢI SỐ (vd '{"use_count": "abc"}')
+check("is_stale: use_count là chuỗi không-phải-số -> không raise, coi như 0 rồi xét tuổi",
+      skill_usage.is_stale({"use_count": "abc", "created_at": _old, "pinned": False},
+                            None, _now) is True)
+check("is_stale: use_count là chuỗi không-phải-số + bản ghi mới tạo -> không raise, chưa stale",
+      skill_usage.is_stale({"use_count": "abc", "created_at": _new, "pinned": False},
+                            None, _now) is False)
+
+# ---- bump: bản ghi hỏng phải TỰ LÀNH ở lần bump kế tiếp, không kẹt mãi mãi ----
+_R3 = Path(tempfile.mkdtemp(prefix="javis-usagecorrupt-"))
+_p3 = skill_usage.usage_path(_R3)
+_p3.parent.mkdir(parents=True, exist_ok=True)
+
+# ca A: bump(slug="demo") khi bản ghi của "demo" là CHUỖI thay vì dict
+_p3.write_text(json.dumps({"demo": "hello"}, ensure_ascii=False), encoding="utf-8")
+try:
+    skill_usage.bump(_R3, "demo")
+    check("bump: bản ghi slug là CHUỖI thay vì dict -> không raise", True)
+except Exception as e:
+    check(f"bump: bản ghi slug là CHUỖI thay vì dict -> không raise (raised {e!r})", False)
+_u3a = skill_usage.read_usage(_R3)
+check("bump: bản ghi chuỗi hỏng -> tự lành thành dict, use_count=1",
+      isinstance(_u3a.get("demo"), dict) and _u3a.get("demo", {}).get("use_count") == 1)
+
+# ca B: bump(slug="demo") khi bản ghi là dict nhưng use_count là CHUỖI KHÔNG PHẢI SỐ
+_p3.write_text(json.dumps({"demo": {"use_count": "abc"}}, ensure_ascii=False), encoding="utf-8")
+try:
+    skill_usage.bump(_R3, "demo")
+    check("bump: use_count là chuỗi không-phải-số -> không raise", True)
+except Exception as e:
+    check(f"bump: use_count là chuỗi không-phải-số -> không raise (raised {e!r})", False)
+_u3b = skill_usage.read_usage(_R3)
+check("bump: use_count hỏng -> tự lành thành 1 (coi hỏng như 0 rồi +1), KHÔNG kẹt mãi mãi",
+      _u3b.get("demo", {}).get("use_count") == 1)
+
+# gọi bump thêm 1 lần: bản ghi đã lành THẬT SỰ (không chỉ né lỗi 1 lần rồi hỏng lại) nên
+# lần sau phải cộng dồn bình thường, không tự-lành-lại-mỗi-lần (nếu vậy sẽ luôn kẹt ở 1)
+skill_usage.bump(_R3, "demo")
+_u3c = skill_usage.read_usage(_R3)
+check("bump: sau khi lành, lần bump tiếp theo cộng dồn bình thường (use_count=2)",
+      _u3c.get("demo", {}).get("use_count") == 2)
+
 # ---- javis_use_skill (mcp_hub): bump đúng tại điểm nghẽn duy nhất ----
 # Test HÀNH VI THẬT qua handler (gọi thẳng route["javis_use_skill"]["call"]), KHÔNG quét
 # source text - quét chuỗi không phân biệt được code sống với comment/code chết.
