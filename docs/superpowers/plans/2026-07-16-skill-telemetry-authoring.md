@@ -1413,12 +1413,30 @@ check("đổi references/ (SKILL.md không đổi) → mirror nhận bản mới
 system_sync.mirror_skills(_ROOT)
 check("add-only: không xoá file lạ ở mirror", (_mir / "nguoi-dung-them.md").is_file())
 
-# không đổi gì → không ghi lại (chống copy lại vô hạn dù mirror có file thừa)
-_before = (_mir / "SKILL.md").stat().st_mtime_ns
-system_sync.mirror_skills(_ROOT)
-system_sync.mirror_skills(_ROOT)
-check("không đổi gì → không ghi lại (mtime giữ nguyên)",
-      (_mir / "SKILL.md").stat().st_mtime_ns == _before)
+# không đổi gì → KHÔNG copy lại (chống copy lại vô hạn dù mirror có file thừa)
+# KHÔNG kiểm bằng mtime: shutil.copy2 giữ nguyên mtime của NGUỒN, nên đích luôn có cùng
+# mtime dù có copy lại hay không → test kiểu đó xanh kể cả khi code sai. Phải ĐẾM số lần
+# copy2 thật sự được gọi. Ở thời điểm này mirror đang có file thừa (nguoi-dung-them.md), nên
+# đây đồng thời là test cho bẫy digest-tập-con: digest đích phải tính CHỈ trên rel của nguồn.
+import shutil as _sh  # noqa: E402
+
+_copies = []
+_orig_copy2 = _sh.copy2
+
+
+def _spy_copy2(src, dst, *a, **kw):
+    _copies.append(str(dst))
+    return _orig_copy2(src, dst, *a, **kw)
+
+
+_sh.copy2 = _spy_copy2
+try:
+    system_sync.mirror_skills(_ROOT)
+    system_sync.mirror_skills(_ROOT)
+finally:
+    _sh.copy2 = _orig_copy2
+check(f"không đổi gì → KHÔNG copy lại lần nào (đếm được {len(_copies)} lượt copy)",
+      len(_copies) == 0)
 
 if _fails:
     print(f"\nFAIL - test_mirror_tree: {len(_fails)} lỗi: {_fails}")
@@ -1430,6 +1448,8 @@ print("\nOK - test_mirror_tree: tất cả pass")
 
 Run: `cd server && ../.venv/Scripts/python.exe test_mirror_tree.py`
 Expected: FAIL với `mirror có references/chi-tiet.md`, `mirror có scripts/chay.py`, và `đổi references/ ... → mirror nhận bản mới`.
+
+Dòng `không đổi gì → KHÔNG copy lại lần nào` có thể XANH ngay ở bước này dù code chưa sửa (bản cũ skip theo hash SKILL.md nên cũng không copy). Đó là bình thường: dòng đó không phải để bắt lỗi hiện tại, nó là lưới chặn regression cho bản đệ quy ở Step 4, nơi digest sai sẽ gây copy lại vô hạn trên 7 hot path.
 
 - [ ] **Step 3: Thêm `skill_tree_hash`**
 
