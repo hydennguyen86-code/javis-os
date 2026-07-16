@@ -132,7 +132,16 @@ def ensure_git_repo(root: str) -> dict:
         changed = _ensure_gitignore_lines(root)
         dirty = bool((_git(root, "status", "--porcelain", "--", ".gitignore").stdout or "").strip())
         if changed or dirty:
-            with BrainLock(root) as lk:
+            # timeout=1.0 (KHÔNG phải mặc định 30s): ensure_git_repo bị gọi THẲNG, không qua
+            # asyncio.to_thread, từ 2 handler async (learn.py /learn/enable + main.py /reflect),
+            # mà BrainLock.acquire() chờ bằng time.sleep(0.25) CHẶN. Chờ 30s ở đây = đóng băng
+            # CẢ event loop 30s (mọi chat, Telegram poller, scheduler, reminders, mọi brain) -
+            # đúng lúc đang tranh chấp, tức đúng lúc hệ đang bận nhất. Chờ lâu cũng vô nghĩa vì
+            # nhánh `dirty` ở trên đã tự lành: không giành được thì lần bấm /learn/enable hay
+            # /reflect kế tiếp commit nốt. Fail nhanh cho cùng một đảm bảo với giá rẻ hơn nhiều.
+            # (Cách khác là bọc asyncio.to_thread như learn.py:764 làm với _promote_sync, nhưng
+            # đó là thay đổi lớn hơn và không cần khi thời gian chờ đã bị chặn ~1s.)
+            with BrainLock(root, timeout=1.0) as lk:
                 if getattr(lk, "acquired", False):
                     commit_paths(root, [".gitignore"], "chore: cập nhật .gitignore brain")
         return {"ok": True, "created": False}

@@ -304,10 +304,12 @@ else:
 
     _held = git_brain.BrainLock(str(_lk_root), timeout=1)
     check("dựng được cảnh: giành BrainLock trước (giả lập learn đang ghi)", _held.acquire() is True)
+    _t0 = time.time()
     try:
         _r_locked = git_brain.ensure_git_repo(str(_lk_root))
     finally:
         _held.release()
+    _stall = time.time() - _t0
     _n_after = len(_git_q(_lk_root, "log", "--oneline").stdout.strip().splitlines())
     _txt_locked = (_lk_root / ".gitignore").read_text(encoding="utf-8")
 
@@ -317,6 +319,13 @@ else:
           _n_after == _n_before)
     check("kẹt khoá → .gitignore trên đĩa VẪN được vá (git đọc ignore từ working tree)",
           "Javis/skill-usage.json" in _txt_locked)
+    # ensure_git_repo bị gọi THẲNG (không qua asyncio.to_thread) từ 2 handler async, mà
+    # BrainLock.acquire() chờ bằng time.sleep CHẶN → chờ lâu = đóng băng CẢ event loop. Phải
+    # fail nhanh (timeout=1.0), không dùng mặc định 30s. Ngưỡng 10s rộng rãi để không nhạy với
+    # máy CI chậm, nhưng vẫn bắt được nếu ai đó trả về mặc định 30s. Đo lại chính lời gọi kẹt
+    # khoá ở trên nên không tốn thêm thời gian chạy.
+    check(f"kẹt khoá → fail nhanh, không treo event loop (chặn {_stall:.2f}s, phải < 10s)",
+          _stall < 10)
 
     # thả khoá ra → lần gọi sau commit được bình thường, prefix chore:
     _r_free = git_brain.ensure_git_repo(str(_lk_root))
