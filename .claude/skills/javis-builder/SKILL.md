@@ -1,10 +1,16 @@
 ---
 name: Javis Builder
-description: Kích hoạt khi người dùng muốn TẠO hoặc SỬA một năng lực của Javis - agent, skill, workflow, loop, hoặc plugin (vd "tạo agent chuyên X", "thêm kỹ năng Y", "dựng workflow nghiên cứu rồi viết", "tạo loop mỗi 2 tiếng làm Z", "viết tool/plugin tính ...", "làm cho Javis biết làm ..."). Đây là hướng dẫn cách ghi đúng file chuẩn của Javis.
+description: "Tạo hoặc sửa năng lực của Javis: agent, skill, workflow, loop, plugin. Kèm mẫu file chuẩn và luật chống trùng."
 group: AI
 ---
 
 # Javis Builder - tạo agent / skill / workflow / loop
+
+## Khi nào dùng
+
+Kích hoạt khi người dùng nói những câu như: "tạo agent chuyên X", "thêm kỹ năng Y",
+"dựng workflow nghiên cứu rồi viết", "tạo loop mỗi 2 tiếng làm Z", "viết tool/plugin
+tính ...", "làm cho Javis biết làm ...".
 
 Khi người dùng muốn Javis có thêm một năng lực, bạn TỰ GHI FILE .md đúng chuẩn dưới đây vào
 vault (brain đang chọn). Studio / trang tương ứng tự nhận file mới. Luôn báo cáo ngắn sau khi tạo.

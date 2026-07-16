@@ -15,6 +15,7 @@ os.environ.setdefault("JAVIS_STATE_DIR", tempfile.mkdtemp(prefix="javis-capstest
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import skill_router  # noqa: E402
+import system_sync  # noqa: E402
 
 _fails = []
 
@@ -85,6 +86,20 @@ check("main không còn literal [:100]", "[:100]" not in blk)
 check("main không còn literal 15", "15" not in blk)
 check("main dùng SKILL_DESC_MAX", "SKILL_DESC_MAX" in blk)
 check("main dùng SKILL_LIST_MAX", "SKILL_LIST_MAX" in blk)
+
+# ---- LINT: mọi skill HỆ THỐNG phải lọt trần + sạch boilerplate ----
+# Đây là rào chặn tái phát: bug cắt cụt description không được quay lại qua skill ship kèm app.
+# Dùng system_sync.SYSTEM_SKILLS_DIR chứ không hardcode đường dẫn; và KHÔNG rglob toàn repo
+# (sẽ dính bản mirror trong brains/ và .claude/worktrees/).
+_sys_dir = system_sync.SYSTEM_SKILLS_DIR
+check("tìm thấy thư mục skill hệ thống", _sys_dir.is_dir())
+for _slug in sorted(system_sync.system_skill_slugs()):
+    _f = _sys_dir / _slug / "SKILL.md"
+    _meta, _ = skill_router.split_frontmatter(_f.read_text(encoding="utf-8"))
+    _desc = _meta.get("description", "") or ""
+    _err = skill_router.validate_description(_desc)
+    check(f"skill hệ thống '{_slug}' description hợp lệ ({len(_desc)} ký tự)"
+          + (f" → {_err}" if _err else ""), _err is None)
 
 if _fails:
     print(f"\nFAIL - test_skill_caps: {len(_fails)} lỗi: {_fails}")
