@@ -124,6 +124,67 @@ check("không có bản ghi + mtime mới → chưa stale",
 check("không có bản ghi + không có mtime → không stale (không đủ căn cứ)",
       skill_usage.is_stale({}, None, _now) is False)
 
+# ---- javis_use_skill (mcp_hub): bump đúng tại điểm nghẽn duy nhất ----
+# Test HÀNH VI THẬT qua handler (gọi thẳng route["javis_use_skill"]["call"]), KHÔNG quét
+# source text - quét chuỗi không phân biệt được code sống với comment/code chết.
+import asyncio  # noqa: E402
+import shutil  # noqa: E402
+
+import mcp_hub  # noqa: E402
+
+_HUB_ROOT = Path(tempfile.mkdtemp(prefix="javis-hubtest-"))
+_HUB_SLUG = "skill-that-ban-dung-thu"
+_HUB_SKILL_DIR = _HUB_ROOT / "skills" / _HUB_SLUG
+_HUB_SKILL_DIR.mkdir(parents=True)
+_HUB_CONTENT = ("---\nname: Demo\ndescription: skill demo cho test hub\ngroup: Test\n---\n"
+                "Noi dung that cua skill, dung de doi chieu return value.")
+(_HUB_SKILL_DIR / "SKILL.md").write_text(_HUB_CONTENT, encoding="utf-8")
+
+_hub_tools, _hub_route = mcp_hub._builtin_tools("auto", str(_HUB_ROOT))
+check("_builtin_tools đăng ký javis_use_skill khi có vault_root thật",
+      "javis_use_skill" in _hub_route)
+_hub_handler = _hub_route["javis_use_skill"]["call"]
+
+_out1 = asyncio.run(_hub_handler({"name": _HUB_SLUG}))
+check("handler trả đúng nội dung SKILL.md thật (bump không nuốt/đổi kết quả trả về)",
+      _out1 == _HUB_CONTENT)
+_u = skill_usage.read_usage(_HUB_ROOT)
+check("gọi javis_use_skill lần 1 → use_count = 1", _u.get(_HUB_SLUG, {}).get("use_count") == 1)
+
+asyncio.run(_hub_handler({"name": _HUB_SLUG}))
+_u = skill_usage.read_usage(_HUB_ROOT)
+check("gọi javis_use_skill lần 2 → use_count = 2", _u.get(_HUB_SLUG, {}).get("use_count") == 2)
+
+# slug sai (gõ nhầm): KHÔNG được đếm, KHÔNG được tạo bản ghi rác
+_out_bad = asyncio.run(_hub_handler({"name": "slug-khong-ton-tai"}))
+check("slug sai → trả lỗi rõ ràng (bắt đầu bằng ERROR)", _out_bad.startswith("ERROR"))
+_u = skill_usage.read_usage(_HUB_ROOT)
+check("slug sai → KHÔNG tạo bản ghi rác cho slug đó", "slug-khong-ton-tai" not in _u)
+check("slug sai → không đếm nhầm sang skill khác (use_count không đổi)",
+      _u.get(_HUB_SLUG, {}).get("use_count") == 2)
+
+# sidecar hỏng (Javis/ bị 1 FILE THƯỜNG chiếm chỗ → mkdir thất bại khi bump ghi) → việc nạp
+# skill KHÔNG ĐƯỢC gãy theo. Đây là hợp đồng chịu lỗi cốt lõi của skill_usage.bump.
+_HUB_ROOT2 = Path(tempfile.mkdtemp(prefix="javis-hubtest-broken-"))
+_HUB_SLUG2 = "skill-sidecar-hong"
+_HUB_SKILL_DIR2 = _HUB_ROOT2 / "skills" / _HUB_SLUG2
+_HUB_SKILL_DIR2.mkdir(parents=True)
+_HUB_CONTENT2 = "---\nname: Demo2\ndescription: skill sidecar hong\ngroup: Test\n---\nNoi dung 2."
+(_HUB_SKILL_DIR2 / "SKILL.md").write_text(_HUB_CONTENT2, encoding="utf-8")
+(_HUB_ROOT2 / "Javis").write_text("chiem cho, khong phai thu muc", encoding="utf-8")
+
+_hub_tools2, _hub_route2 = mcp_hub._builtin_tools("auto", str(_HUB_ROOT2))
+_hub_handler2 = _hub_route2["javis_use_skill"]["call"]
+try:
+    _out2 = asyncio.run(_hub_handler2({"name": _HUB_SLUG2}))
+    check("sidecar hỏng (Javis/ bị file chiếm chỗ) → handler vẫn trả nội dung thật, không raise",
+          _out2 == _HUB_CONTENT2)
+except Exception as e:
+    check(f"sidecar hỏng → handler không raise (raised {e!r})", False)
+
+shutil.rmtree(_HUB_ROOT, ignore_errors=True)
+shutil.rmtree(_HUB_ROOT2, ignore_errors=True)
+
 if _fails:
     print(f"\nFAIL - test_skill_usage: {len(_fails)} lỗi: {_fails}")
     sys.exit(1)
