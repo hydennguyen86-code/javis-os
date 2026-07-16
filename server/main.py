@@ -4656,7 +4656,9 @@ async def _tg_answer(text, meta=None, progress=None):
         # nên dùng compact_mem - bản in-memory của cơ chế nén dashboard: phần cũ vào tóm tắt
         # thay vì bị trim cứng bỏ mất, hết mất trí nhớ khi phiên dài / đổi từ Claude sang API.
         sess["or"] = await compaction.compact_mem(sess["or"], prov, api_key, api_model, _api_stream)
-        return out   # engine API không có tool ghi file → không có gì để đính kèm
+        # Telegram là kênh chữ thuần: hạ khối điều khiển xuống chữ, đừng để lọt cụm thô.
+        # Lọc lúc TRẢ, không lọc trước khi append vào sess["or"]: lịch sử của model giữ nguyên bản gốc.
+        return channel_context.strip_control_blocks(out)   # engine API không có tool ghi file → không có gì để đính kèm
     else:
         if sess["cli"] is None:
             # tag riêng theo chat → /stop chỉ giết đúng subprocess của chat này, không đụng người khác
@@ -4690,7 +4692,8 @@ async def _tg_answer(text, meta=None, progress=None):
         # File sinh ra trong lượt → bot gửi đính kèm SAU câu trả lời (xem telegram_bot._handle_turn)
         files = channel_context.collect_turn_files(out, written, t0,
                                                    cwd=CLAUDE_CWD, exclude=sess["sent"])
-        return {"text": out, "files": files}
+        # Lọc SAU collect_turn_files: hàm đó dò đường dẫn file trong text gốc, lọc trước là mất dấu.
+        return {"text": channel_context.strip_control_blocks(out), "files": files}
 
 
 async def _tg_help_text(brain):

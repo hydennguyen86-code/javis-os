@@ -11,6 +11,7 @@ options). Module này làm đúng việc đó cho Javis:
 2. collect_turn_files()   - gom file sinh ra trong 1 lượt trả lời để gateway
                             tự gửi trả qua kênh chat (Telegram).
 """
+import json
 import os
 import re
 from pathlib import Path
@@ -184,3 +185,53 @@ def collect_turn_files(reply_text: str, written_paths: list, t0: float,
         except Exception:
             continue
     return out
+
+
+# ============================================================
+# Hạ khối điều khiển xuống chữ cho kênh không phải web
+# ============================================================
+# Javis nhúng khối điều khiển dạng HTML comment ở cuối câu trả lời cho dashboard
+# đọc (JAVIS_METRICS bơm panel trái, JAVIS_ASK vẽ nút lựa chọn). Kênh chữ thuần
+# như Telegram không hiểu mấy khối này, mà md_to_mdv2 chỉ escape chứ không bóc,
+# nên không lọc là người dùng nhìn thấy nguyên cụm "<\!\-\- JAVIS\_METRICS: ...".
+_CTRL_RE = re.compile(r"<!--\s*JAVIS_([A-Z_]+):\s*([\s\S]*?)\s*-->")
+_MAX_ASK_OPTS = 4
+
+
+def _ask_to_text(payload: str) -> str:
+    """JSON của khối JAVIS_ASK -> câu hỏi + danh sách đánh số. JSON hỏng -> chuỗi rỗng.
+
+    Người dùng Telegram nhắn lại "1" là xong: Javis đọc "1" trong ngữ cảnh câu hỏi
+    vừa hỏi thì tự hiểu, không cần lưu state.
+    """
+    try:
+        o = json.loads(payload)
+    except Exception:
+        return ""
+    if not isinstance(o, dict):
+        return ""
+    q = str(o.get("question") or "").strip()
+    opts = [x for x in (o.get("options") or [])
+            if isinstance(x, dict) and str(x.get("label") or "").strip()]
+    if not q or not opts:
+        return ""
+    lines = [q]
+    for i, x in enumerate(opts[:_MAX_ASK_OPTS], 1):
+        lines.append(f"{i}. {str(x['label']).strip()}")
+    return "\n".join(lines)
+
+
+def strip_control_blocks(text: str) -> str:
+    """Bóc mọi khối <!-- JAVIS_*: ... --> khỏi text.
+
+    JAVIS_ASK -> thay bằng câu hỏi + danh sách đánh số. Khối khác -> bỏ hẳn.
+    Khối sai cú pháp cũng bị bỏ: một khối hỏng KHÔNG được phép nuốt mất câu trả lời.
+    """
+    def _sub(m):
+        if m.group(1) == "ASK":
+            t = _ask_to_text(m.group(2))
+            return ("\n\n" + t) if t else ""
+        return ""
+
+    out = _CTRL_RE.sub(_sub, text or "")
+    return re.sub(r"\n{3,}", "\n\n", out).strip()
