@@ -46,8 +46,66 @@
     return { clean: clean, ask: ask };
   }
 
+  var MAX_LABEL = 40;
+  function cut(s) {
+    s = String(s || "");
+    return s.length > MAX_LABEL ? s.slice(0, MAX_LABEL - 1) + "…" : s;
+  }
+
+  // Ve hang chip vao cuoi .bubble cua thu tin nhan Javis.
+  // live=false -> ve san o trang thai dong cung (dung khi khoi phuc lich su).
+  function render(msgEl, ask, live) {
+    if (!msgEl || !ask || !ask.options || !ask.options.length) return null;
+    var host = msgEl.querySelector(".bubble") || msgEl;
+    var old = host.querySelector(".jv-ask");
+    if (old) old.parentNode.removeChild(old);   // re-render thi thay, khong chong len nhau
+    var box = document.createElement("div");
+    box.className = "jv-ask" + (live ? "" : " jv-ask-done");
+    var tag = ask.header ? '<span class="jv-ask-tag">' + esc(ask.header) + "</span>" : "";
+    var chips = ask.options.map(function (o, i) {
+      return '<button class="jv-ask-chip" type="button" data-i="' + i + '" title="' +
+        esc(o.desc || o.label) + '">' + esc(cut(o.label)) + "</button>";
+    }).join("");
+    box.innerHTML =
+      '<div class="jv-ask-q">' + tag + esc(ask.question) + "</div>" +
+      '<div class="jv-ask-row">' + chips +
+        '<button class="jv-ask-chip jv-ask-other" type="button" data-other="1">Ý khác…</button>' +
+      "</div>";
+    box._ask = ask;              // giu ban goc de doc lai nhan that (khong phai nhan da cat)
+    host.appendChild(box);
+    return box;
+  }
+
+  // Dong cung moi hang chip dang song. Goi khi co tin nhan moi (bam chip hoac go tay):
+  // cuon nguoc len lich su ma bam duoc cau hoi cu se lam roi mach hoi thoai.
+  function freezeAll() {
+    if (typeof document === "undefined") return;
+    var boxes = document.querySelectorAll(".jv-ask:not(.jv-ask-done)");
+    Array.prototype.forEach.call(boxes, function (b) { b.classList.add("jv-ask-done"); });
+  }
+
+  if (typeof document !== "undefined") {
+    document.addEventListener("click", function (e) {
+      var chip = e.target.closest ? e.target.closest(".jv-ask-chip") : null;
+      if (!chip) return;
+      var box = chip.closest(".jv-ask");
+      if (!box || box.classList.contains("jv-ask-done")) return;   // lich su: bam khong an gi
+      e.preventDefault();
+      if (chip.dataset.other) {                                     // "Y khac" = tu go, khong gui gi
+        var inp = document.getElementById("chatInput");
+        if (inp) inp.focus();
+        return;
+      }
+      var ask = box._ask;
+      var opt = ask && ask.options[+chip.dataset.i];
+      if (!opt) return;
+      chip.classList.add("jv-ask-picked");   // danh dau TRUOC khi gui: JavisSend se freeze ca hang
+      if (typeof window.JavisSend === "function") window.JavisSend(opt.label);
+    });
+  }
+
   if (typeof window !== "undefined") {
-    window.JavisAsk = { extract: extract };
+    window.JavisAsk = { extract: extract, render: render, freezeAll: freezeAll };
   }
   if (typeof module !== "undefined" && module.exports) {
     module.exports = { extract: extract };

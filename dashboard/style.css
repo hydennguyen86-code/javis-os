@@ -1118,3 +1118,29 @@ body.chat-zoomed #jv-sess-btn { display: none; }
 .ne-prev hr { border: none; border-top: 1px solid var(--border); margin: 1em 0; }
 .ne-prev table { border-collapse: collapse; margin: .5em 0; }
 .ne-prev th, .ne-prev td { border: 1px solid var(--border); padding: 5px 9px; }
+
+/* Khoi hoi-lai co lua chon (chat-ask.js) */
+.jv-ask { margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--border); }
+.jv-ask-q { font-size: 13px; color: var(--text2); margin-bottom: 7px; }
+.jv-ask-tag {
+  display: inline-block; margin-right: 6px; padding: 1px 6px; border-radius: 5px;
+  background: var(--bg3); border: 1px solid var(--border);
+  color: var(--text3); font-size: 11px; text-transform: uppercase; letter-spacing: .4px;
+}
+.jv-ask-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.jv-ask-chip {
+  background: var(--bg3); border: 1px solid var(--border); color: var(--text);
+  border-radius: 999px; padding: 5px 12px; font-family: var(--font); font-size: 13px;
+  cursor: pointer; transition: border-color .15s, color .15s, background .15s;
+}
+.jv-ask-chip:hover { border-color: var(--accent); color: var(--accent); }
+.jv-ask-other { color: var(--text3); border-style: dashed; }
+
+/* Da tra loi: cung lai, chi con doc duoc */
+.jv-ask-done .jv-ask-chip { cursor: default; opacity: .45; }
+.jv-ask-done .jv-ask-chip:hover { border-color: var(--border); color: var(--text); }
+.jv-ask-done .jv-ask-other { display: none; }
+.jv-ask-done .jv-ask-chip.jv-ask-picked {
+  opacity: 1; border-color: var(--accent); color: var(--accent); background: rgba(255,122,60,.12);
+}
+.jv-ask-done .jv-ask-chip.jv-ask-picked::before { content: "✓ "; }
