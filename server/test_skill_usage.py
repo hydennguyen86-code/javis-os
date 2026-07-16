@@ -260,6 +260,78 @@ check("reconcile GIỮ dòng user tự thêm", "rieng-cua-toi/" in _txt)
 check("reconcile thêm dòng sidecar", "Javis/skill-usage.json" in _txt)
 check("reconcile lần 2 là no-op", git_brain._ensure_gitignore_lines(_gi_root) is False)
 
+# Byte trên đĩa phải là LF: write_text không có newline="\n" sẽ dịch \n -> os.linesep (CRLF
+# trên Windows). Hiện chỉ vô hại nhờ core.autocrlf=true; deploy chạy autocrlf=false thì merge
+# lên .gitignore đã commit dạng LF sẽ đẻ diff đổi line-ending TOÀN FILE. Đọc BINARY, không
+# đọc text (read_text dịch ngược CRLF->\n nên sẽ không bao giờ thấy lỗi này).
+check("reconcile ghi LF thuần, không CRLF (đọc nhị phân)",
+      b"\r\n" not in (_gi_root / ".gitignore").read_bytes())
+
+_gi_fresh = Path(tempfile.mkdtemp(prefix="javis-gifresh-"))
+git_brain._ensure_gitignore_lines(_gi_fresh)
+check("file .gitignore dựng mới cũng LF thuần",
+      b"\r\n" not in (_gi_fresh / ".gitignore").read_bytes())
+
+# ---- commit vá .gitignore PHẢI giành BrainLock ----
+# Vì sao quan trọng: commit_paths chạy `git commit` = commit CẢ INDEX. Một learn/curator chạy
+# song song vừa `git add` file của nó thì commit 'chore:' sẽ cuốn tri thức đó vào commit KHÔNG
+# hiện ở Review UI + revert_last_learn KHÔNG undo được. Test HÀNH VI: giữ sẵn BrainLock (giả
+# lập learn đang ghi) rồi gọi ensure_git_repo -> KHÔNG được sinh commit mới.
+# Toàn bộ chạy trong thư mục tạm, KHÔNG đụng repo thật / brains thật.
+import subprocess  # noqa: E402
+
+
+def _git_q(root, *args):
+    return subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True,
+                          encoding="utf-8", errors="replace")
+
+
+if not git_brain.has_git():
+    # Cố tình BÁO LỖI chứ không "skip" im lặng: test bị bỏ qua âm thầm = test luôn-xanh, đúng
+    # cái bẫy file này đã dính 1 lần (xem chú thích khẳng-định-80 ở trên). git là phụ thuộc
+    # cứng của chính tính năng đang test - không có git thì git_brain vô nghĩa.
+    check("máy không có git → KHÔNG kiểm được khoá lúc commit (cần git dựng repo tạm)", False)
+else:
+    _lk_root = Path(tempfile.mkdtemp(prefix="javis-gilock-"))
+    # brain CŨ: đã là repo, .gitignore cũ thiếu dòng sidecar (đúng ca brains/Brain Default)
+    (_lk_root / ".gitignore").write_text("Javis/learn-log/\n", encoding="utf-8", newline="\n")
+    _git_q(_lk_root, "init")
+    _git_q(_lk_root, "config", "user.email", "test@localhost")
+    _git_q(_lk_root, "config", "user.name", "Test")
+    _git_q(_lk_root, "add", ".gitignore")
+    _git_q(_lk_root, "commit", "-m", "chore: baseline")
+    _n_before = len(_git_q(_lk_root, "log", "--oneline").stdout.strip().splitlines())
+
+    _held = git_brain.BrainLock(str(_lk_root), timeout=1)
+    check("dựng được cảnh: giành BrainLock trước (giả lập learn đang ghi)", _held.acquire() is True)
+    try:
+        _r_locked = git_brain.ensure_git_repo(str(_lk_root))
+    finally:
+        _held.release()
+    _n_after = len(_git_q(_lk_root, "log", "--oneline").stdout.strip().splitlines())
+    _txt_locked = (_lk_root / ".gitignore").read_text(encoding="utf-8")
+
+    check("kẹt khoá → ensure_git_repo vẫn trả ok (không gãy luồng bật học)",
+          _r_locked.get("ok") is True and _r_locked.get("created") is False)
+    check("kẹt khoá → KHÔNG sinh commit nào (không cuốn index của learn đang chạy)",
+          _n_after == _n_before)
+    check("kẹt khoá → .gitignore trên đĩa VẪN được vá (git đọc ignore từ working tree)",
+          "Javis/skill-usage.json" in _txt_locked)
+
+    # thả khoá ra → lần gọi sau commit được bình thường, prefix chore:
+    _r_free = git_brain.ensure_git_repo(str(_lk_root))
+    _log_free = _git_q(_lk_root, "log", "--oneline").stdout
+    _n_free = len(_log_free.strip().splitlines())
+    check("thả khoá → lần gọi sau commit được đúng 1 commit vá .gitignore",
+          _n_free == _n_before + 1)
+    check("commit vá .gitignore mang prefix 'chore:' (không lọt Review UI / không bị undo)",
+          "chore: cập nhật .gitignore brain" in _log_free)
+    check("commit vá .gitignore KHÔNG khớp LEARN_COMMIT_PREFIXES",
+          not any("chore: cập nhật .gitignore brain".startswith(p)
+                  for p in git_brain.LEARN_COMMIT_PREFIXES))
+    check("sau khi commit xong, working tree sạch (.gitignore không còn dirty)",
+          not git_brain.working_tree_dirty(str(_lk_root)))
+
 if _fails:
     print(f"\nFAIL - test_skill_usage: {len(_fails)} lỗi: {_fails}")
     sys.exit(1)

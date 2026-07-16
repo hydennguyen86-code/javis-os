@@ -93,7 +93,10 @@ def _ensure_gitignore_lines(root) -> bool:
             # thuộc vị trí 1 dòng cụ thể trong _GITIGNORE - tránh vỡ nếu template đổi thứ tự).
             comment_lines = [l for l in _GITIGNORE.splitlines() if l.strip().startswith("#")]
             text = ("\n".join(comment_lines) + "\n") if comment_lines else ""
-        gi.write_text(text + "\n".join(missing) + "\n", encoding="utf-8")
+        # newline="\n": KHÔNG để Python dịch \n -> os.linesep (CRLF trên Windows). Hiện chỉ vô
+        # hại nhờ core.autocrlf=true của máy; nếu deploy chạy autocrlf=false thì merge lên một
+        # .gitignore đã commit dạng LF sẽ đẻ diff đổi line-ending TOÀN FILE thay vì thêm 1 dòng.
+        gi.write_text(text + "\n".join(missing) + "\n", encoding="utf-8", newline="\n")
         return True
     except Exception as e:
         print(f"[gitignore] {root}: {type(e).__name__}: {e}", file=__import__('sys').stderr)
@@ -111,8 +114,27 @@ def ensure_git_repo(root: str) -> dict:
         # bao giờ tới được brain cũ. Merge dòng còn thiếu rồi commit riêng bằng prefix
         # 'chore:' - KHÔNG dùng 'learn:'/'curator:' (xem LEARN_COMMIT_PREFIXES dòng 31) để
         # một lần vá .gitignore không bị hiện ở UI Review hay bị revert_last_learn undo.
-        if _ensure_gitignore_lines(root):
-            commit_paths(root, [".gitignore"], "chore: cập nhật .gitignore brain")
+        #
+        # BrainLock CHỈ bọc lúc COMMIT, không bọc lúc merge file:
+        #  - commit_paths chạy `git commit` = commit CẢ INDEX, không riêng path nó add. Nếu một
+        #    learn/curator đang chạy vừa `git add` file của nó thì commit 'chore:' này sẽ cuốn
+        #    luôn tri thức đó vào một commit KHÔNG hiện ở Review và revert_last_learn KHÔNG
+        #    undo được - đúng thứ LEARN_COMMIT_PREFIXES sinh ra để chặn. Phải giữ khoá.
+        #  - Ngược lại việc GHI .gitignore là vô hại + idempotent, nên cố tình để NGOÀI khoá:
+        #    git đọc luật ignore từ WORKING TREE, nên chỉ cần file trên đĩa đúng là sidecar bị
+        #    ignore NGAY - mục tiêu task đạt được kể cả khi không giành nổi khoá.
+        # Không lấy được khoá -> bỏ qua COMMIT (đúng khuôn learn.py:864-867), KHÔNG bỏ merge.
+        # Điều kiện commit vì thế KHÔNG chỉ là "merge vừa đổi": còn commit khi .gitignore đang
+        # dirty. Nếu chỉ xét giá trị trả về của _ensure_gitignore_lines thì một lần kẹt khoá sẽ
+        # để .gitignore vá trên đĩa mà VĨNH VIỄN không được commit (lần sau merge trả False ->
+        # không ai commit nữa), vì ensure_git_repo chỉ chạy lúc bật học / bấm /reflect chứ
+        # không chạy mỗi tick. Xét thêm dirty -> lần bấm sau tự lành.
+        changed = _ensure_gitignore_lines(root)
+        dirty = bool((_git(root, "status", "--porcelain", "--", ".gitignore").stdout or "").strip())
+        if changed or dirty:
+            with BrainLock(root) as lk:
+                if getattr(lk, "acquired", False):
+                    commit_paths(root, [".gitignore"], "chore: cập nhật .gitignore brain")
         return {"ok": True, "created": False}
     try:
         Path(root).mkdir(parents=True, exist_ok=True)
