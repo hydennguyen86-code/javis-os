@@ -4,6 +4,13 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.61] - 2026-07-16
+### Thêm mới
+- **Khối hỏi-lại có lựa chọn trong khung chat**: Javis hỏi lại được bằng nút bấm ngay trong chat, kiểu Claude Code: nhúng khối ẩn `JAVIS_ASK` ở cuối câu trả lời, dashboard vẽ thành hàng chip dưới bong bóng. Bấm một nút là gửi đi như gõ tay, cùng phiên. Chỉ tin nhắn cuối mới bấm được; cuộn lên lịch sử thì chip đã đông cứng.
+- Chạy trên MỌI engine (Claude Agent SDK, Codex CLI, các engine API) vì chỉ dựa vào system prompt, không đụng MCP hub.
+### Sửa lỗi
+- **Khối điều khiển không còn lọt sang Telegram**: khối `JAVIS_METRICS` trước đây lọt nguyên xi sang Telegram. Nay mọi khối điều khiển đều bị bóc trước khi ra kênh chữ; riêng `JAVIS_ASK` hạ xuống danh sách đánh số để nhắn lại "1" là chọn.
+
 ## [0.9.60] - 2026-07-16
 ### Sửa lỗi
 - **Loop nền thấy lại connector claude.ai (Gmail/Drive/lịch) qua cờ opt-in `ambient_mcp`**: từ bản chuyển engine sang Agent SDK (quãng v0.9.35-0.9.37), loop tự chạy không còn "nhìn thấy" các connector claude.ai như Gmail, Google Drive, Google Calendar, nên loop kiểu "chiều đọc Gmail tóm tắt" ngưng chạy dù trước đó chạy được. Nguyên nhân: loop chạy ở nhánh fork nền có khoá quyền (duyệt từng tool, mặc định từ chối mọi tool ngoài whitelist), và ở nhánh này engine SDK cố tình KHÔNG nạp cấu hình máy (`setting_sources`) để allow-rule trong settings không che được lớp gate. Hệ quả phụ là connector claude.ai (vốn chỉ xuất hiện khi nạp cấu hình máy, như `claude -p` vẫn làm) biến mất khỏi loop. Nhánh Popen cũ trước đó chạy `--dangerously-skip-permissions` cộng `--mcp-config` không kèm `--strict` nên connector luôn được gộp vào, đó là lý do loop cũ đọc được Gmail. Chat (web và Telegram) KHÔNG dính vì chạy nhánh không-khoá-quyền đã được nạp lại `setting_sources`. Cách sửa: thêm cờ frontmatter `ambient_mcp: true` cho từng loop. Bật thì loop đó chạy nhánh không-gated (nạp cấu hình máy nên connector claude.ai xuất hiện lại), vẫn chặn cứng Bash/WebFetch/WebSearch/Task và tool tiền/đơn qua hub vẫn khoá theo mode. MẶC ĐỊNH TẮT để bản fork về sạch, không loop nào tự chạm Gmail/Drive của ai; chỉ bật khi user yêu cầu rõ. Bước kiểm chứng luôn giữ khoá chặt dù cờ bật. Kèm test hành vi trong `test_loop_ambient.py`.

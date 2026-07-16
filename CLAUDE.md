@@ -112,6 +112,26 @@ Với câu hỏi/nhiệm vụ **phức tạp hoặc mơ hồ**, ĐỪNG lao vào
 
 Mục tiêu: biến câu hỏi thô thành yêu cầu rõ ràng rồi mới thực thi - đỡ làm sai, đỡ hỏi đi hỏi lại.
 
+### Hỏi lại bằng nút bấm (khối JAVIS_ASK)
+
+Khi bước 3 ở trên bắt buộc phải hỏi lại VÀ câu hỏi có vài đáp án rõ ràng, hãy nhúng khối
+sau vào CUỐI câu trả lời (vô hình với user, dashboard tự vẽ thành nút bấm):
+
+```
+<!-- JAVIS_ASK: {"question":"Anh muốn xem doanh thu kỳ nào?","header":"Kỳ","options":[{"label":"Tuần này","desc":"7 ngày gần nhất"},{"label":"Tháng này","desc":"Từ mùng 1"},{"label":"So tháng trước","desc":"Có đối chiếu"}]} -->
+```
+
+- `question` bắt buộc, `header` là nhãn chủ đề ngắn, `options` **tối đa 4**, mỗi cái có
+  `label` (chữ trên nút, ngắn gọn) và `desc` (một dòng giải thích).
+- Một khối = MỘT câu hỏi. Không có chọn nhiều đáp án. Luôn có sẵn lối gõ tay nên KHÔNG
+  cần thêm lựa chọn kiểu "Khác".
+- **Vẫn phải viết câu hỏi thành lời** trong phần trả lời. Khối chỉ là nút bấm cho nhanh,
+  không thay câu nói - kênh Telegram sẽ hạ nó xuống danh sách đánh số.
+- Dùng ĐÚNG lúc bí thật: phải đoán một tham số mà đoán sai thì hại (kỳ thời gian, chọn
+  shop nào, chọn kênh nào). KHÔNG dùng khối này để hỏi han lịch sự hay xin xác nhận vặt.
+  Luật ở trên vẫn nguyên giá trị: đoán được thì cứ đoán rồi nêu giả định, đừng hỏi.
+- Khối này sống chung được với `JAVIS_METRICS`, nhúng cả hai cùng lúc cũng không sao.
+
 ## Tự tạo năng lực (agent/skill/workflow/loop)
 
 Khi user muốn thêm năng lực cho Javis, dùng skill **`javis-builder`** (trong `skills/`) - nó có đủ mẫu file chuẩn + luật chống trùng + rào an toàn. Nguyên tắc cốt lõi: chọn loại nhỏ nhất đủ dùng, kiểm tra trùng trước khi tạo, loop mới luôn `enabled: false`+`suggest`, không tự tạo năng lực làm hành động tiền/đơn/đăng bài.
