@@ -9,8 +9,9 @@ lại lần nào và KHÔNG còn đọc-và-băm SKILL.md, hai luồng đồng t
 qua nguyên vẹn. Phần đồng thời (ép bằng Event, KHÔNG sleep) tách bạch hai thứ khác nhau:
 re-check bên trong khoá (luồng tới sau khi luồng trước đã xong thì không copy lặp) và BẢN
 THÂN cái khoá (2 luồng không copy đè nhau cùng lúc - check này tắt khi gỡ khoá). Cuối cùng
-phủ 2 bẫy của cache chữ ký: nguồn đổi GIỮA CHỪNG lượt copy không được mất cập nhật, và skill
-copy lỗi không được cache thành công (lượt sau phải thử lại).
+phủ 3 bẫy của cache chữ ký: nguồn đổi GIỮA CHỪNG lượt copy không được mất cập nhật, skill copy
+lỗi phải được thử lại lượt sau, và skill hỏng VĨNH VIỄN chỉ được tốn rglob của riêng nó chứ
+không kéo cả brain vào full copy mỗi lượt chat.
 """
 import os
 import shutil
@@ -249,13 +250,21 @@ def _spy_copy2_lock(src, dst, *a, **kw):
     return _orig_copy2_lock(src, dst, *a, **kw)
 
 
+_b_ran_through = []
+
+
+def _b_target():
+    system_sync.mirror_skills(_R4)
+    _b_ran_through.append(1)      # chỉ append khi mirror_skills TRẢ VỀ thật sự
+
+
 shutil.copy2 = _spy_copy2_lock
 try:
     _ta = threading.Thread(target=lambda: system_sync.mirror_skills(_R4), name="A")
     _ta.start()
     _a_reached = _a_inside_copy.wait(timeout=10)
 
-    _tb = threading.Thread(target=lambda: system_sync.mirror_skills(_R4), name="B")
+    _tb = threading.Thread(target=_b_target, name="B")
     _tb.start()
     _tb.join(timeout=10)     # B chạy trọn vẹn TRONG LÚC A vẫn đang kẹt giữa vòng copy
     _b_finished.set()
@@ -264,6 +273,9 @@ finally:
     shutil.copy2 = _orig_copy2_lock
 
 check("A đã kẹt trong vòng copy (khe hở được ép thật)", _a_reached)
+# ĐỐI XỨNG với guard của T2: "B copy 0 lần" cũng XANH khi B không chạy gì cả (vd target rỗng,
+# hoặc join hết giờ) - lúc đó check dưới chẳng chứng minh gì. Phải khẳng định B ĐÃ chạy hết.
+check("B đã chạy trọn vẹn (khe hở được ép thật)", len(_b_ran_through) == 1)
 check(f"khoá: B KHÔNG copy đè khi A đang copy dở (B copy {_lock_copies['B']} lần)",
       _lock_copies["B"] == 0)
 
@@ -335,8 +347,48 @@ system_sync.mirror_skills(_R6)         # lượt 2: lỗi đã hết -> PHẢI t
 check("skill copy lỗi -> lượt sau THỬ LẠI (không bị cache là đã xong)",
       (_mir6 / "skill-a" / "SKILL.md").is_file())
 
+# ---- skill hỏng VĨNH VIỄN -> lượt sau CHỈ chép lại nó, KHÔNG phạt skill lành ----
+# Lỗi vĩnh viễn (MAX_PATH trên cây references/ sâu, file vướng ACL, file bị process khác giữ)
+# KHÔNG tự khỏi. Nếu "có lỗi thì không cache chữ ký" thì mỗi lượt chat lại full rglob + copy2
+# CẢ BRAIN: đo thật trên brain 27 skill/135 file là 161ms/lượt (so 18ms khi tầng 1 ăn) - tệ hơn
+# cả bản ~52ms mà task này sinh ra để giết, tức là làm hỏng đúng mục đích của chính mình.
+# Đúng phải là: vẫn cache chữ ký, nhưng nhớ RIÊNG slug nào lỗi và lượt sau chỉ thử lại nó.
+_R7 = Path(tempfile.mkdtemp(prefix="javis-mirrorperm-"))
+for _n in ("skill-hong", "skill-lanh"):
+    _d7 = _R7 / "skills" / _n
+    (_d7 / "references").mkdir(parents=True)
+    (_d7 / "SKILL.md").write_text(f"nội dung {_n}", encoding="utf-8")
+    (_d7 / "references" / "phu.md").write_text(f"phụ {_n}", encoding="utf-8")
+
+_orig_copy2_perm = shutil.copy2
+_perm_copies = []
+
+
+def _spy_copy2_perm(src, dst, *a, **kw):
+    _perm_copies.append(str(src))
+    if "skill-hong" in str(src):
+        raise PermissionError("hỏng VĨNH VIỄN, không bao giờ tự khỏi")
+    return _orig_copy2_perm(src, dst, *a, **kw)
+
+
+shutil.copy2 = _spy_copy2_perm
+try:
+    system_sync.mirror_skills(_R7)     # lượt 1: chép tất, skill-hong lỗi
+    _perm_copies.clear()               # chỉ quan tâm CÁC LƯỢT SAU
+    system_sync.mirror_skills(_R7)
+    system_sync.mirror_skills(_R7)
+finally:
+    shutil.copy2 = _orig_copy2_perm
+
+_lanh_lai = [c for c in _perm_copies if "skill-lanh" in c]
+_hong_lai = [c for c in _perm_copies if "skill-hong" in c]
+check(f"skill hỏng vĩnh viễn: skill LÀNH không bị chép lại mỗi lượt (chép lại {len(_lanh_lai)} lần)",
+      len(_lanh_lai) == 0)
+check(f"skill hỏng vĩnh viễn: vẫn được thử lại đều (thử {len(_hong_lai)} lần / 2 lượt)",
+      len(_hong_lai) > 0)
+
 # ---- dọn ----
-for _d in (_ROOT, _R2, _R3, _R4, _R5, _R6):
+for _d in (_ROOT, _R2, _R3, _R4, _R5, _R6, _R7):
     shutil.rmtree(_d, ignore_errors=True)
 
 if _fails:

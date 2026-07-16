@@ -242,7 +242,9 @@ def mirror_skills(root) -> None:
     Đây là bản phái sinh - hỏng cũng không phá router chính.
 
     ĐƯỜNG NÓNG: gọi mỗi lượt chat qua build_system_prompt. Tầng 1 là cổng chữ ký stat-only
-    (~6ms) - 99% lượt thoát ở đây. Tầng 2 (copy thật) chỉ chạy khi cây nguồn ĐỔI.
+    (~6ms) - 99% lượt thoát ở đây. Tầng 2 (copy thật) chỉ chạy khi cây nguồn ĐỔI, hoặc khi
+    còn nợ skill copy lỗi lượt trước - lúc đó CHỈ chép lại đúng mấy skill nợ đó (_MIRROR_RETRY),
+    nên một skill hỏng vĩnh viễn chỉ tốn rglob của RIÊNG nó chứ không phạt cả brain mỗi lượt.
 
     BIẾT TRƯỚC: chữ ký tính trên NGUỒN và cache nằm trong bộ nhớ, nên bản mirror bị phá từ
     BÊN NGOÀI mà nguồn không đổi sẽ không tự lành cho tới khi khởi động lại tiến trình. Đánh
@@ -259,8 +261,8 @@ def mirror_skills(root) -> None:
         key = str(root)
     try:
         sig = _mirror_signature(canonical)
-        if sig and _MIRROR_SIG.get(key) == sig:
-            return   # TẦNG 1: cây nguồn không đổi -> khỏi làm gì (đường 99% lượt chat)
+        if sig and _MIRROR_SIG.get(key) == sig and not _MIRROR_RETRY.get(key):
+            return   # TẦNG 1: cây nguồn không đổi + không nợ skill nào -> khỏi làm gì (99% lượt)
         lk = _mirror_lock(key)
         if not lk.acquire(blocking=False):
             return   # luồng khác đang mirror đúng root này -> nó làm rồi, khỏi xếp hàng
@@ -275,11 +277,23 @@ def mirror_skills(root) -> None:
             # này dựa vào, và chính việc so đúng ảnh chụp đó với cache mới làm re-check ĐÚNG.
             # (Đừng "sửa" thành _mirror_signature(canonical) - nguồn CÓ THỂ đổi giữa chừng do
             # POST /skills ghi xen, tính lại sẽ so nhầm ảnh chụp khác với việc mình sắp làm.)
-            if sig and _MIRROR_SIG.get(key) == sig:
+            pending = _MIRROR_RETRY.get(key)
+            if sig and _MIRROR_SIG.get(key) == sig and not pending:
                 return
-            had_error = False
+            # Cây KHÔNG đổi mà vẫn vào tới đây => chỉ còn nợ mấy skill lỗi lượt trước: chép ĐÚNG
+            # mấy slug đó thôi. Cây ĐỔI thì `only = None` = chép tất (nợ cũ nằm trong đó rồi).
+            # Đây là thứ giữ đường nóng ~6ms khi có 1 skill hỏng VĨNH VIỄN: nếu cứ "có lỗi thì
+            # không cache" thì mọi lượt chat lại full rglob + copy2 CẢ BRAIN - đo thật trên brain
+            # 27 skill/135 file là 161ms/lượt so với 18ms khi tầng 1 ăn, tức còn TỆ HƠN cả bản
+            # ~52ms mà task này sinh ra để giết. Lỗi vĩnh viễn (MAX_PATH trên cây references/ sâu
+            # dưới đường brain dài, file bị process khác giữ, file vướng ACL) là có thật và không
+            # tự khỏi, nên không được phép biến thành thuế mỗi lượt.
+            only = pending if (sig and _MIRROR_SIG.get(key) == sig) else None
+            failed = set()
             for d in sorted(p for p in canonical.iterdir()
-                            if p.is_dir() and p.name != ".disabled" and (p / "SKILL.md").is_file()):
+                            if p.is_dir() and p.name != ".disabled"
+                            and (only is None or p.name in only)
+                            and (p / "SKILL.md").is_file()):
                 try:
                     dst_dir = mirror / d.name
                     rels = sorted(p.relative_to(d).as_posix()
@@ -289,9 +303,9 @@ def mirror_skills(root) -> None:
                         dst_f.parent.mkdir(parents=True, exist_ok=True)
                         shutil.copy2(str(d / rel), str(dst_f))
                 except Exception as e:
-                    # 1 skill hỏng KHÔNG chặn các skill còn lại, nhưng phải nhớ là lượt này
-                    # KHÔNG trọn vẹn (xem chỗ ghi cache bên dưới).
-                    had_error = True
+                    # 1 skill hỏng KHÔNG chặn các skill còn lại; nhớ TÊN nó để lượt sau thử lại
+                    # RIÊNG nó (rglob của đúng 1 skill), thay vì phạt cả brain mỗi lượt.
+                    failed.add(d.name)
                     print(f"[skill mirror] {d.name}: {type(e).__name__}: {e}", file=sys.stderr)
             # Ghi cache chữ ký của ẢNH CHỤP mà lượt copy này THỰC SỰ dựa vào (`sig` đọc ở tầng
             # 1), KHÔNG phải chữ ký tính lại lúc này. Nguồn KHÔNG đứng yên suốt lượt copy: POST
@@ -302,10 +316,16 @@ def mirror_skills(root) -> None:
             # ở lần gọi sau (an toàn). Đây CŨNG là thứ làm acquire(blocking=False) ở trên hợp
             # lệ: luồng trượt khoá bỏ về vì tin "luồng kia đang làm việc của mình" - niềm tin
             # đó chỉ đúng khi cache ghi lại đúng ảnh chụp mà lượt đó dựa vào.
-            # CÓ LỖI thì KHÔNG cache: skill lỗi tạm thời (AV quét/handle đang mở trên Windows)
-            # phải được thử lại ở lượt sau, chứ không im lặng vắng mặt khỏi đường nạp native
-            # cho tới khi restart tiến trình (bản cũ so nguồn-vs-đích mỗi lượt nên tự retry).
-            if not had_error:
+            # Skill lỗi KHÔNG chặn việc cache nữa (xem trên) - nó được nhớ RIÊNG trong
+            # _MIRROR_RETRY nên vẫn được thử lại đều, không cần hy sinh cache của skill lành.
+            # GHI _MIRROR_RETRY TRƯỚC _MIRROR_SIG: tầng 1 đọc 2 dict này bằng 2 lệnh riêng
+            # (không nguyên tử với nhau). Ghi theo thứ tự này thì luồng nào đã thấy `sig` MỚI
+            # chắc chắn cũng thấy danh sách nợ MỚI -> không bỏ sót lượt thử lại.
+            if failed:
+                _MIRROR_RETRY[key] = failed
+            else:
+                _MIRROR_RETRY.pop(key, None)
+            if sig:
                 _MIRROR_SIG[key] = sig
         finally:
             lk.release()
@@ -333,8 +353,13 @@ def _merge_loop_update(new_content: str, cur_text: str) -> str:
 # 27 skill là ~52ms MỖI LƯỢT, chặn thẳng event loop. Chữ ký chỉ dùng stat (không đọc byte
 # nào) nên ~6ms, rẻ hơn 9 lần, và tiện thể phủ luôn thư mục con.
 _MIRROR_SIG: dict = {}                    # root đã resolve -> chữ ký lần mirror gần nhất
+_MIRROR_RETRY: dict = {}                  # root đã resolve -> set slug copy LỖI, cần thử lại
 _MIRROR_LOCKS: dict = {}                  # root đã resolve -> Lock riêng cho mirror
 _MIRROR_LOCKS_GUARD = threading.Lock()    # chỉ bảo vệ việc TẠO lock trong _MIRROR_LOCKS
+# _MIRROR_SIG và _MIRROR_RETRY KHÔNG cần guard riêng (khác _MIRROR_LOCKS - cái đó phải guard vì
+# get-rồi-tạo phải nguyên tử, nếu không 2 luồng đẻ ra 2 Lock khác nhau cho cùng root là hỏng
+# hẳn tác dụng khoá). Ở đây mỗi thao tác chỉ là MỘT lệnh dict (get/set/pop) - nguyên tử dưới
+# GIL - và mọi lệnh GHI đều nằm trong khoá riêng của root nên không có 2 luồng cùng ghi 1 key.
 
 
 def _mirror_lock(key: str) -> threading.Lock:
