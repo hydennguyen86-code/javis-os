@@ -67,11 +67,17 @@ group: <Marketing|Bán hàng|Nội dung|Vận hành|Tài chính|AI|Năng suất|
 <hướng dẫn chi tiết cho AI khi skill kích hoạt>
 ```
 
-#### Chuẩn viết skill (bắt buộc, server sẽ CHẶN nếu vi phạm)
+#### Chuẩn viết skill (bắt buộc - KHÔNG có ai gác, tự bạn phải giữ)
 
-1. `description` **TỐI ĐA 150 ký tự**. Router cắt đúng ở đó (`skill_router.SKILL_DESC_MAX`)
-   ở cả system prompt lẫn mô tả tool, nên viết dài hơn là phần đuôi MẤT IM LẶNG và skill
-   không route được. Viết xong hãy ĐẾM, đừng ước lượng. `POST /skills` trả 400 nếu vượt.
+**Không có lưới an toàn.** Skill viết theo tài liệu này là GHI THẲNG RA ĐĨA: không qua
+`POST /skills` nên không có kiểm tra phía server, và lint CI chỉ soi skill HỆ THỐNG, không
+soi skill trong `skills/` của brain. Vi phạm chuẩn dưới đây sẽ KHÔNG có thông báo lỗi nào -
+skill cứ thế hỏng âm thầm lúc chạy. Bạn là lớp phòng thủ duy nhất.
+
+1. `description` **TỐI ĐA 150 ký tự**. **Viết xong hãy ĐẾM, đừng ước lượng** - đây là việc
+   bắt buộc, không phải lời khuyên. Router cắt đúng ở đó (`skill_router.SKILL_DESC_MAX`) ở
+   cả system prompt lẫn mô tả tool, nên viết dài hơn là phần đuôi MẤT IM LẶNG và skill không
+   route được. Không ai cảnh báo bạn: không đếm là hỏng mà không biết.
 2. `description` nêu THẲNG năng lực. KHÔNG mở đầu bằng "Kích hoạt khi...", "Sử dụng skill
    này khi..." - mọi skill đều mở như vậy nên nó đốt 29 ký tự mà không phân biệt gì.
    Tốt: `Chuyển HTML sang file Webcake .pke.` Xấu: `Kích hoạt khi người dùng muốn chuyển...`
