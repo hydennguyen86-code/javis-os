@@ -158,16 +158,19 @@ function handleMessage(data) {
     }
   } else if (data.type === "response") {
     const { clean, cards } = extractMetrics(data.content);
-    const finalText = clean || (t && t.text) || "";
+    const { clean: askClean, ask } = window.JavisAsk.extract(clean);
+    const finalText = askClean || (t && t.text) || "";
     const shownText = finalText || "_(không có nội dung trả về - thử lại hoặc đổi model)_";
     if (t) t.text = shownText;
     if (isActive) {
       hideActivity();
       if (cards) pushMetricsToPanel(cards);
-      if (!t || !t.bubble) appendJavisMessage(shownText);
-      else t.bubble.querySelector(".bubble").innerHTML = markdownToHtml(shownText);
+      let msgEl = t && t.bubble;
+      if (!msgEl) msgEl = appendJavisMessage(shownText);
+      else msgEl.querySelector(".bubble").innerHTML = markdownToHtml(shownText);
+      if (ask) window.JavisAsk.render(msgEl, ask, true);   // chip chỉ mọc khi lượt xong
       if (data.engine) setEngineBadge(data.engine, data.model);   // sự thật engine+model của lượt này
-      if (finalText.trim()) recordTurn("javis", finalText);
+      if (finalText.trim()) recordTurn("javis", finalText, null, ask);
       if (voice.ttsEnabled && t && !t.spoke && finalText) { setOrbState("speaking", "ĐANG NÓI"); voice.speak(finalText); }
       else if (!voice.ttsEnabled) setOrbState("", "SẴN SÀNG");
       maybeAutoLearn();
@@ -198,6 +201,7 @@ function sendMessage(text) {
   const sid = savedSessionId;
   if (turns[sid] && turns[sid].running) return;          // phiên này đang trả lời → chưa gửi tiếp
   voice.stopSpeaking();
+  window.JavisAsk.freezeAll();   // trả lời rồi thì chip của lượt trước hết bấm được
   appendUserMessage(msg, atts);
   recordTurn("user", msg, atts.map(a => ({ name: a.name, kind: a.kind })));
 
@@ -225,6 +229,8 @@ function sendMessage(text) {
   syncActiveUI();
   ws.send(JSON.stringify({ message: outMsg, brain: currentBrainPath(), session_id: sid }));
 }
+// Chip lựa chọn (chat-ask.js) gửi đáp án qua đây: bấm chip = y như người dùng gõ tay nhãn đó.
+window.JavisSend = sendMessage;
 
 // ============================================
 // Lưu / khôi phục phiên
@@ -239,8 +245,8 @@ function persistSession() {
     }));
   } catch (e) {}
 }
-function recordTurn(role, text, atts) {
-  convo.push({ role, text: text || "", atts: atts || [] });
+function recordTurn(role, text, atts, ask) {
+  convo.push({ role, text: text || "", atts: atts || [], ask: ask || null });
   if (convo.length > 200) convo = convo.slice(-200);
   persistSession();
 }
@@ -252,9 +258,11 @@ function restoreSession() {
   savedSessionId = s.sessionId || null;
   savedMetrics = s.metrics || null;
   // Dựng lại bong bóng hội thoại
-  convo.forEach(t => {
-    if (t.role === "user") appendUserMessage(t.text, t.atts || []);
-    else appendJavisMessage(t.text);
+  convo.forEach((t, i) => {
+    if (t.role === "user") { appendUserMessage(t.text, t.atts || []); return; }
+    const el = appendJavisMessage(t.text);
+    // Chip chỉ sống lại ở tin CUỐI: có tin sau nó nghĩa là câu hỏi đã được trả lời rồi.
+    if (t.ask) window.JavisAsk.render(el, t.ask, i === convo.length - 1);
   });
   if (convo.length) scrollBottom(true);
   // Dựng lại số liệu kinh doanh (đánh dấu là của phiên trước)
@@ -334,6 +342,7 @@ function appendJavisMessage(text) {
   div.innerHTML = `<div class="bubble">${markdownToHtml(text)}</div>` +
     `<button class="msg-copy" type="button" title="Copy cả tin nhắn">⧉</button>`;
   chatAppend(div); scrollBottom();
+  return div;
 }
 function createStreamingBubble() {
   const div = document.createElement("div");
