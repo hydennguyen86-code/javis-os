@@ -4,6 +4,17 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.62] - 2026-07-16
+### Sửa lỗi
+- **Mô tả skill bị cắt cụt âm thầm nên skill không route được**: Javis cắt `description` của skill ở BA nơi với BA hạn mức khác nhau mà không ai biết: 60 ký tự ở mô tả tool `javis_use_skill`, 100 ký tự ở khối router trong system prompt, 140 ký tự ở đường dự phòng khi frontmatter thiếu `description`. Người viết skill không có cách nào biết mình đang bị chấm theo thước nào. Đo bằng chính `skill_router` trên brain đang chạy: **6/6 skill đang bật đều bị cắt**, mất từ 79 tới 316 ký tự mỗi cái, và phần bị vứt đúng là các ví dụ trigger, tức là thứ khiến routing hoạt động. Nay gom cả ba về một hằng số duy nhất `skill_router.SKILL_DESC_MAX = 150`, và gộp luôn hai hạn mức số-skill-liệt-kê (15 ở system prompt, 20 ở hub) về `SKILL_LIST_MAX = 20`.
+- **Tài liệu đang dạy viết sai**: `CLAUDE.md` bảo `description` phải "viết rõ trigger" và `javis-builder` bảo "viết kỹ", trong khi runtime cắt cụt. Nay cả hai nêu rõ trần 150 KÈM LÝ DO (viết dài hơn là mất im lặng, skill không route được, viết xong phải tự đếm) và chỉ rõ ví dụ trigger đầy đủ thuộc về mục `## Khi nào dùng` trong thân file, nơi không bị cắt. Kiến trúc: index để TÌM, thân file để LÀM.
+- **`javis-builder` trỏ sai chỗ ghi skill**: skill builder dạy ghi vào `.claude/skills/<slug>/SKILL.md` ở ba chỗ khác nhau, nhưng đó là bản MIRROR phái sinh. Canonical là `skills/<slug>/SKILL.md`. Đã sửa cả ba.
+### Thêm mới
+- **Viết lại mô tả 5 skill hệ thống cho lọt trần**: `html-to-webcake` (376 ký tự), `javis-builder` (333), `ingest-source` (266), `query-wiki` (249), `lint-wiki` (213) rút còn 69 tới 110 ký tự. Không mất thông tin: mọi ví dụ trigger chuyển xuống mục `## Khi nào dùng` trong thân file. Bỏ luôn cụm mở đầu sáo rỗng "Kích hoạt khi người dùng muốn" (29 ký tự giống hệt nhau ở mọi skill, đốt gần nửa ngân sách mà không phân biệt được gì).
+- **Lint CI chặn lỗi tái phát**: `server/test_skill_caps.py` quét mọi skill hệ thống, fail nếu có mô tả vượt trần, dính boilerplate, rỗng, hoặc frontmatter vỡ. Liệt kê MỌI skill vi phạm trong một lần chạy chứ không dừng ở cái đầu.
+- **`POST /skills` từ chối mô tả sai ngay lúc ghi**: trước đây endpoint chỉ kiểm slug, mô tả 400 ký tự vẫn lưu được rồi bị cắt âm thầm. Nay trả 400 kèm lý do, và kiểm TRƯỚC khi tạo thư mục nên request bị từ chối không để lại folder rỗng trên đĩa.
+- **Chuẩn viết skill nhúng vào `javis-builder`**: 8 điểm bắt buộc (trần 150, cấm boilerplate, bọc nháy kép khi mô tả có dấu hai chấm, thứ tự mục thân file, cấm bịa flag/path, trần độ dài thân, cấm skill kiểu router). Nói thẳng rằng skill do chat ghi thẳng ra đĩa KHÔNG qua lớp chặn nào và lint CI chỉ soi skill hệ thống, nên tự đếm là phòng tuyến duy nhất.
+
 ## [0.9.61] - 2026-07-16
 ### Thêm mới
 - **Khối hỏi-lại có lựa chọn trong khung chat**: Javis hỏi lại được bằng nút bấm ngay trong chat, kiểu Claude Code: nhúng khối ẩn `JAVIS_ASK` ở cuối câu trả lời, dashboard vẽ thành hàng chip dưới bong bóng. Bấm một nút là gửi đi như gõ tay, cùng phiên. Chỉ tin nhắn cuối mới bấm được; cuộn lên lịch sử thì chip đã đông cứng.
