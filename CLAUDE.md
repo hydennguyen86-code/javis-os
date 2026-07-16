@@ -246,11 +246,18 @@ updated: <YYYY-MM-DD>
 ```yaml
 ---
 name: <Tên skill>
-description: <mô tả NGẮN, quyết định KHI NÀO skill được kích hoạt - viết rõ trigger>
+description: <nêu THẲNG năng lực, TỐI ĐA 150 ký tự - vd "Chuyển HTML sang file Webcake .pke.">
 group: <Tên nhóm>      # BẮT BUỘC - để Studio gom nhóm
 ---
 <nội dung skill: hướng dẫn chi tiết cho AI khi skill kích hoạt>
 ```
+- **`description` TỐI ĐA 150 ký tự - đây KHÔNG phải chuyện thẩm mỹ.** Router cắt đúng ở 150
+  (`skill_router.SKILL_DESC_MAX`) ở cả system prompt lẫn mô tả tool, nên viết dài hơn là phần
+  đuôi MẤT IM LẶNG và skill không route được. Viết xong hãy ĐẾM. Nêu thẳng năng lực, KHÔNG mở
+  đầu bằng cụm sáo rỗng kiểu "Kích hoạt khi người dùng muốn..." (mọi skill đều mở như vậy nên
+  nó đốt 29 ký tự mà không phân biệt gì). Ví dụ trigger đầy đủ đưa xuống mục `## Khi nào dùng`
+  trong THÂN file, nơi không bị cắt và chỉ được đọc khi skill đã nạp. Index để TÌM, thân file
+  để LÀM.
 - **Tự phân nhóm (group) khi tạo skill mới:** TRƯỚC khi đặt, đọc các skill hiện có (`skills/*/SKILL.md` → field `group`) để biết các nhóm ĐANG dùng, rồi chọn nhóm SÁT nhất. Chỉ tạo nhóm mới khi không nhóm nào hợp; đặt tên nhóm ngắn gọn theo lĩnh vực (vd Marketing, Bán hàng, Nội dung, Vận hành, Tài chính, AI, Năng suất, Cá nhân). **TUYỆT ĐỐI không để trống `group`** (sẽ rơi vào "Chung").
 - `slug` thư mục skill = **ASCII không dấu** (vd "Viết email" → `viet-email`). Có thể tạo/sửa qua endpoint `POST /skills` hoặc ghi file trực tiếp.
 
