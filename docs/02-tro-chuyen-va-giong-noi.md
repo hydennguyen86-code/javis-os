@@ -118,12 +118,19 @@ Khi Javis đang suy nghĩ hoặc đang đọc, nút gửi ở thanh nhập biế
 
 Cả hai đều ngắt lệnh đang chạy và dừng đọc ngay lập tức, trả trạng thái về SẴN SÀNG. Riêng phím Esc còn tắt luôn chế độ rảnh tay nếu đang bật.
 
-### Phóng to / thu nhỏ khung chat
+### Phóng to khung chat thành không gian làm việc (chat workspace)
 
-Khi câu trả lời dài và bạn muốn đọc thoải mái:
+Khi làm việc lâu trong chat, hãy phóng to nó thành một không gian làm việc thật sự:
 
-1. Bấm nút **⛶** ở góc mục HỘI THOẠI (gợi ý khi rê chuột: "Phóng to khung chat (Esc để thu nhỏ)"). Khung chat nổi lên thành lớp lớn đè trước quả cầu, ô nhập cũng cao hơn để gõ dài dễ hơn.
+1. Bấm nút **⛶** ở góc mục HỘI THOẠI (hoặc nút **🕘 Lịch sử** góc trên phải màn hình). Khung chat mở rộng gần hết màn hình: cột trái là **lịch sử hội thoại** (mở lại/tìm/đổi tên/xoá phiên cũ - xem [Phiên hội thoại](04-phien-hoi-thoai.md)), cột phải là nội dung chat căn giữa cho dễ đọc, ô nhập cao hơn để gõ dài.
 2. Thu nhỏ lại: bấm nút **✕ Thu nhỏ (Esc)** ở đầu lớp nổi, hoặc nhấn phím **Esc**.
+
+Vài tiện ích trong khung chat (cả khi phóng to lẫn thu nhỏ):
+
+- Rê chuột vào câu trả lời của Javis sẽ thấy nút **⧉** để copy cả tin nhắn; mỗi khối code cũng có nút **⧉ Copy** riêng ở góc.
+- Tin nhắn dài của bạn được thu gọn sau 10 dòng, bấm **Xem thêm** để mở.
+- Khi bạn đang cuộn lên đọc lại mà Javis trả lời tiếp, khung chat KHÔNG giật xuống; một nút **↓ Tin mới** hiện ở đáy để bấm nhảy xuống khi sẵn sàng.
+- Gõ nhiều dòng bằng **Shift+Enter** (Enter để gửi); dán ảnh từ clipboard hoặc kéo thả file vào bất cứ đâu trong khung chat để đính kèm.
 
 ## Panel số liệu bên trái cập nhật thế nào
 

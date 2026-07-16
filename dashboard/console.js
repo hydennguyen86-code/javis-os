@@ -15,6 +15,7 @@
   const _svg = (p) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
   const ICON = {
     home:        _svg('<path d="M12 2l8.66 5v10L12 22 3.34 17V7L12 2z"/>'),
+    chat:        _svg('<path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8A8.5 8.5 0 1 1 21 11.5z"/>'),
     overview:    _svg('<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>'),
     workflows:   _svg('<path d="M13 2L4.5 13.5H11l-1 8.5L19.5 10H13l0-8z"/>'),
     agents:      _svg('<rect x="5" y="7" width="14" height="13" rx="2"/><path d="M12 7V3M8 3h8"/><circle cx="9.2" cy="13" r="1.1"/><circle cx="14.8" cy="13" r="1.1"/>'),
@@ -27,6 +28,7 @@
     account:     _svg('<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6.5 8-6.5s8 2.5 8 6.5"/>'),
     files:       _svg('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>'),
     selfimprove: _svg('<path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/>'),
+    plugins:     _svg('<path d="M14 4a2 2 0 1 0-4 0v2H6a1 1 0 0 0-1 1v3H4a2 2 0 1 0 0 4h1v3a1 1 0 0 0 1 1h3v-1a2 2 0 1 1 4 0v1h3a1 1 0 0 0 1-1v-4h1a2 2 0 1 0 0-4h-1V7a1 1 0 0 0-1-1h-3V4z"/>'),
     learn:       _svg('<path d="M12 3v18"/><path d="M5 7h14"/><path d="M4 12h16"/><circle cx="12" cy="12" r="9"/>'),
     kanban:      _svg('<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="10" rx="1"/><rect x="17" y="4" width="4" height="13" rx="1"/>'),
     settings:    _svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>'),
@@ -34,6 +36,7 @@
 
   const RAIL_ITEMS = [
     { id: "home",        icon: ICON.home,        label: "Javis" },
+    { id: "chat",        icon: ICON.chat,        label: "Trò chuyện" },
     { id: "overview",    icon: ICON.overview,    label: "Tổng quan" },
     { id: "settings",    icon: ICON.settings,    label: "Cài đặt" },
     { id: "workflows",   icon: ICON.workflows,   label: "Workflows" },
@@ -46,15 +49,17 @@
     { id: "automations", icon: ICON.automations, label: "Lịch" },
     { id: "models",      icon: ICON.models,      label: "Models" },
     { id: "channels",    icon: ICON.channels,    label: "Kênh" },
-    { id: "mcp",         icon: ICON.mcp,         label: "MCP" },
+    { id: "mcp",         icon: ICON.mcp,         label: "Kết nối" },
+    { id: "plugins",     icon: ICON.plugins,     label: "Plugins" },
     { id: "logs",        icon: ICON.logs,        label: "Cập nhật" },
     { id: "account",     icon: ICON.account,     label: "Tài khoản" },
   ];
 
   const VIEW_META = {
     home:        { icon: "⬡", label: "Javis OS", sub: "" },
+    chat:        { icon: "💬", label: "Trò chuyện", sub: "Khung chat rộng · lịch sử hội thoại" },
     overview:    { icon: "◎", label: "Tổng quan", sub: "Trạng thái hệ thống" },
-    settings:    { icon: "⚙", label: "Cài đặt", sub: "Giọng nói · giao diện · avatar · tên miền" },
+    settings:    { icon: "⚙", label: "Cài đặt", sub: "Giọng nói · avatar · tên miền" },
     workflows:   { icon: "⚡", label: "Workflows", sub: "Chuỗi agent tự động" },
     agents:      { icon: "🤖", label: "Agents", sub: "Trợ lý chuyên biệt" },
     skills:      { icon: "🧩", label: "Skills", sub: "Kỹ năng khả dụng" },
@@ -65,7 +70,8 @@
     automations: { icon: "⏰", label: "Lịch tự động", sub: "Cron · trigger · routine" },
     models:      { icon: "◈", label: "Models", sub: "Main model & providers" },
     channels:    { icon: "✉", label: "Kênh kết nối", sub: "Telegram & hơn nữa" },
-    mcp:         { icon: "🔌", label: "MCP", sub: "Công cụ ngoài" },
+    mcp:         { icon: "🔌", label: "Kết nối", sub: "Nguồn dữ liệu & công cụ" },
+    plugins:     { icon: "🧰", label: "Plugins", sub: "Tool/hook native cho mọi engine" },
     logs:        { icon: "🗒", label: "Nhật ký cập nhật", sub: "Phiên bản & tính năng mới" },
     account:     { icon: "⚙", label: "Tài khoản", sub: "Đăng nhập & workspace" },
   };
@@ -75,11 +81,14 @@
 
   let _settings = null;
   let _renderGen = 0;         // token chống race: mỗi lần đổi trang tăng 1; render async cũ tự bỏ
+  let _fmPending = null;       // { dir, file } - vị trí mở sẵn cho trang Tệp tin (khi bấm link file/thư mục trong chat)
   let graphEnabled = true;
   const isNarrow = () => window.matchMedia("(max-width: 860px)").matches;
   const liteMode = () => !graphEnabled || isNarrow();
 
-  const esc = (s) => (s || "").toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const esc = (s) => (s || "").toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  // Chỉ cho link http(s) (chặn javascript:/data: XSS); dùng kèm esc() khi nhúng vào href.
+  const safeHref = (u) => /^https?:\/\//i.test((u || "").toString().trim()) ? u : "#";
   const _shield = (on) => on
     ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V5l8-3z"/><path d="M9 12l2 2 4-4"/></svg>'
     : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V5l8-3z"/></svg>';
@@ -101,9 +110,15 @@
   }
 
   // ---- Chuyển trang (có View Transition cho mượt) ----
+  // Hook "rời trang": trang nào mượn DOM dùng chung (vd tab Trò chuyện mượn khung chat của
+  // cockpit) đặt _pageLeave để TRẢ node về chỗ cũ TRƯỚC khi cviewBody bị ghi đè / cview bị ẩn.
+  let _pageLeave = null;
   function navigateTo(id) {
     const store = Alpine.store("nav");
+    if (store.active === id) return;   // đang ở trang này → khỏi đổi (tránh nháy + mượn/trả node thừa)
     const swap = () => {
+      const leave = _pageLeave; _pageLeave = null;
+      if (leave) { try { leave(); } catch (e) {} }   // dọn trang cũ trước khi thay nội dung
       store.active = id;
       // Nút điều khiển cockpit (⚙🔊↻) chỉ hiện ở trang Javis, không hiện navbar trang quản lý
       document.body.classList.toggle("in-console", id !== "home");
@@ -112,22 +127,59 @@
       if (id !== "home") renderPage(id);
       recomputeGraph();
     };
-    if (document.startViewTransition) document.startViewTransition(swap);
+    // Dính tab Trò chuyện thì BỎ View Transition: nó chụp snapshot cảnh 3D nặng của home rồi
+    // cross-fade → loé orb ~1s (bitmap chụp trước cả khi ẩn graph). Swap thẳng cho sạch, tức thì.
+    const skipVT = (id === "chat" || store.active === "chat");
+    if (document.startViewTransition && !skipVT) document.startViewTransition(swap);
     else swap();
   }
+
+  // Mở trang Tệp tin ĐÚNG vị trí một file/thư mục (gọi từ link trong chat qua window.JavisOpenFiles,
+  // hoặc từ deep-link #open=<đường-dẫn> khi mở ở tab trình duyệt mới). fullPath tương đối GỐC BRAIN
+  // (đúng quy ước AI ghi trong chat); trang Tệp tin sẽ tự ghép tiền tố brain để ra path tương đối trần.
+  function openFilesAt(fullPath) {
+    const raw = String(fullPath == null ? "" : fullPath);
+    const clean = raw.replace(/^\.?\//, "").replace(/\/+$/, "");
+    const i = clean.lastIndexOf("/");
+    const base = i >= 0 ? clean.slice(i + 1) : clean;
+    const parent = i >= 0 ? clean.slice(0, i) : "";
+    const isDir = /\/$/.test(raw) || (base !== "" && base.indexOf(".") < 0);   // gạch chéo cuối hoặc không có đuôi → thư mục
+    _fmPending = isDir ? { dir: clean, file: "" } : { dir: parent, file: base };
+    // Chat mở dạng overlay phóng to (chat-stage) sẽ che trang Tệp tin → thu lại trước cho thấy kết quả.
+    try { if (window.JavisChatStage && window.JavisChatStage.isOpen()) window.JavisChatStage.collapse(); } catch (e) {}
+    const active = window.Alpine ? Alpine.store("nav").active : "";
+    if (active === "files") renderPage("files");   // đã ở trang Tệp tin → nạp lại để nhảy tới vị trí mới
+    else navigateTo("files");
+  }
+  if (typeof window !== "undefined") window.JavisOpenFiles = openFilesAt;
+  // Mở note trong editor cây (dùng cho click node đồ thị) từ đường dẫn TƯƠNG ĐỐI GỐC BRAIN (như openNodePopup).
+  if (typeof window !== "undefined") window.JavisOpenNote = function (brainRel) {
+    if (!brainRel) return;
+    const ceilingRel = _vtHome ? _vtHome + "/" + brainRel : brainRel;   // ghép tiền tố trần như cây
+    const name = brainRel.split("/").pop();
+    const ext = name.includes(".") ? "." + name.split(".").pop().toLowerCase() : ".md";
+    openNote(ceilingRel, { name: name, ext: ext, type: "file" });
+  };
 
   // ============================================
   // Render từng trang vào #cviewBody
   // ============================================
   async function renderPage(id) {
-    const el = body();
+    let el = body();
     if (!el) return;
-    _renderGen++;   // đổi trang → vô hiệu mọi render async đang dở
+    // Thay #cviewBody bằng node MỚI mỗi lần đổi trang: renderer async của trang CŨ (đang await
+    // fetch) nếu ghi trễ (el.innerHTML=...) sẽ ghi vào node cũ ĐÃ THÁO RỜI → vô hại, không phá
+    // nội dung/nút của trang mới. Đặc biệt bảo vệ các node chat mà tab Trò chuyện mượn vào
+    // cviewBody (trước đây bị 1 render async trễ xoá mất → chat vỡ). Cũng hết nháy nội dung cũ.
+    const fresh = el.cloneNode(false); el.parentNode.replaceChild(fresh, el); el = fresh;
+    _renderGen++;   // đổi trang → vô hiệu mọi render async đang dở (guard bổ sung cho renderer đã có)
+    if (id === "chat")     return renderChat(el);
     if (STUDIO_PAGES.includes(id)) return renderStudioPage(el, id);
     if (id === "overview") return renderOverview(el);
     if (id === "settings") return renderSettings(el);
     if (id === "models")   return renderModels(el);
-    if (id === "mcp")      return renderMcp(el);
+    if (id === "mcp")      return renderConnect(el);
+    if (id === "plugins")  return renderPlugins(el);
     if (id === "channels") return renderChannels(el);
     if (id === "account")  return renderAccount(el);
     if (id === "files")    return renderFiles(el);
@@ -220,7 +272,7 @@
       ? `<span class="cl-badge up">Có bản mới: v${esc(d.latest)}</span>`
       : `<span class="cl-badge ok">Đang ở bản mới nhất</span>`;
     const upNote = d.update_available
-      ? `<div class="cl-note">Cập nhật ở mục <b>Tổng quan</b> (nút "Cập nhật ngay"), hoặc chạy <code>./update.sh</code> trên VPS.</div>`
+      ? `<div class="cl-note">Cập nhật ở mục <b>Tổng quan</b>: bản có Watchtower bấm "Cập nhật ngay"; bản Docker khác thì <b>Redeploy</b> (Hostinger) hoặc <code>docker compose up -d --pull always</code>; bản VPS chạy <code>./update.sh</code>.</div>`
       : "";
     const rels = d.releases || [];
     const timeline = rels.length ? rels.map(rel => {
@@ -272,6 +324,8 @@
     .fm-row:last-child{border-bottom:none} .fm-row:hover{background:rgba(120,180,255,.06)}
     .fm-ico{flex:none} .fm-name{flex:1;color:#e7eefc;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .fm-row.is-dir .fm-ico,.fm-row.is-dir .fm-name{cursor:pointer}
+    .fm-row.fm-target{box-shadow:inset 3px 0 0 #7fb0ff;background:rgba(120,180,255,.10);animation:fmFlash 1.7s ease}
+    @keyframes fmFlash{0%,45%{background:rgba(120,180,255,.42)}100%{background:rgba(120,180,255,.10)}}
     .fm-size{color:#7d8aa6;font-size:13px;min-width:60px;text-align:right}
     .fm-row-act{display:flex;gap:5px;opacity:0;transition:.15s} .fm-row:hover .fm-row-act{opacity:1}
     .fm-row-act button{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);color:#aebbd6;cursor:pointer;font-size:13px;padding:3px 9px;border-radius:6px;white-space:nowrap} .fm-row-act button:hover{color:#fff;border-color:rgba(120,180,255,.5)}
@@ -305,6 +359,7 @@
         <div class="fm-crumb" id="fmCrumb"></div>
         <div class="fm-actions">
           <button class="s-btn-ghost" id="fmUp">↑ Lên</button>
+          <button class="s-btn-ghost" id="fmHome" title="Về thư mục brain">⌂ Brain</button>
           <button class="s-btn-ghost" id="fmNewDir">+ Thư mục</button>
           <button class="s-btn-ghost" id="fmNewFile">+ File</button>
           <label class="s-btn-ghost fm-uplabel">⤓ Tải lên<input type="file" id="fmUpload" hidden multiple></label>
@@ -319,11 +374,18 @@
     const closeModal = () => modal.classList.remove("open");
     modal.onclick = (e) => { if (e.target === modal) closeModal(); };
     const TEXT_EDIT_EXTS = [".md", ".txt", ".json", ".yaml", ".yml", ".csv", ".js", ".ts", ".py", ".html", ".css", ".toml", ".ini", ".log", ".sh", ".bat", ".xml", ".svg", ".env"];
+    const IMG_EXTS = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico"];   // .svg = sửa text
+    // URL tĩnh phục vụ file inline (ảnh hiện, pdf mở tab). dl=1 → ép tải về.
+    const rawUrl = (rel, dl) => `/files/raw?brain=${encodeURIComponent(fbrain())}&path=${encodeURIComponent(rel)}${dl ? "&dl=1" : ""}`;
 
+    // upTarget: đường dẫn nút "Lên" sẽ tới (null = đã ở trần → ẩn nút). Do server tính (parent).
+    let upTarget = null;
     async function load(path) {
-      cur = path || ""; listEl.innerHTML = "Đang tải...";
+      // path === undefined → điểm vào mặc định (brain); "" = trần (ổ đĩa); chuỗi = tương đối trần
+      listEl.innerHTML = "Đang tải...";
+      const qp = (path === undefined || path === null) ? "" : `&path=${encodeURIComponent(path)}`;
       let resp, d;
-      try { resp = await fetch(`/files/list?brain=${encodeURIComponent(fbrain())}&path=${encodeURIComponent(cur)}`); d = await resp.json().catch(() => ({})); }
+      try { resp = await fetch(`/files/list?brain=${encodeURIComponent(fbrain())}${qp}`); d = await resp.json().catch(() => ({})); }
       catch (e) { listEl.innerHTML = `<div class="empty" style="padding:20px;color:#d98">Lỗi kết nối: ${esc(e.message)}</div>`; return; }
       if (!resp.ok || d.error) {
         const msg = d.error || (resp.status === 404
@@ -332,7 +394,9 @@
           : "Lỗi máy chủ (" + resp.status + ").");
         listEl.innerHTML = `<div class="empty" style="padding:20px;color:#d98">⚠ ${esc(msg)}</div>`; return;
       }
-      cur = d.path || ""; crumb(d.root);
+      cur = d.path || ""; upTarget = d.parent;
+      const upBtn = el.querySelector("#fmUp"); if (upBtn) upBtn.style.display = (upTarget === null || upTarget === undefined) ? "none" : "";
+      crumb(d.root);
       const items = d.items || [];
       if (!items.length) { listEl.innerHTML = `<div class="empty" style="padding:20px;text-align:center;color:#6b7894">Thư mục trống.</div>`; return; }
       listEl.innerHTML = ""; items.forEach(it => listEl.appendChild(row(it)));
@@ -348,8 +412,11 @@
       const div = document.createElement("div"); div.className = "fm-row" + (it.type === "dir" ? " is-dir" : "");
       const rel = cur ? cur + "/" + it.name : it.name;
       const editable = it.type === "file" && TEXT_EDIT_EXTS.includes(it.ext);
+      const viewable = it.type === "file" && (IMG_EXTS.includes(it.ext) || it.ext === ".pdf");
       let acts = "";
       if (editable) acts += '<button data-act="edit" title="Sửa nội dung">Sửa</button>';
+      else if (viewable) acts += '<button data-act="view" title="Xem trước">Xem</button>';
+      else if (it.type === "file") acts += '<button data-act="open" title="Mở trong tab mới">Mở</button>';
       acts += '<button data-act="ren" title="Đổi tên">Đổi tên</button>';
       if (it.type === "file") acts += '<button data-act="dl" title="Tải về">Tải</button>';
       acts += '<button data-act="del" class="danger" title="Xoá">Xoá</button>';
@@ -357,12 +424,16 @@
         <span class="fm-name">${esc(it.name)}</span>
         <span class="fm-size">${it.type === "dir" ? "" : _humanSize(it.size)}</span>
         <span class="fm-row-act">${acts}</span>`;
-      // Click TÊN: thư mục → mở vào; file → KHÔNG tự mở (dùng nút "Sửa").
-      if (it.type === "dir") { const go = () => load(rel); div.querySelector(".fm-name").onclick = go; div.querySelector(".fm-ico").onclick = go; }
+      // Click TÊN: thư mục → mở vào; ảnh/pdf/text → xem trước; file khác → mở tab mới.
+      const nameGo = it.type === "dir" ? () => load(rel)
+        : (editable || viewable) ? () => openFile(rel, it)
+        : () => window.open(rawUrl(rel), "_blank");
+      div.querySelector(".fm-name").onclick = nameGo; div.querySelector(".fm-ico").onclick = nameGo;
       div.querySelectorAll("[data-act]").forEach(b => b.onclick = (e) => {
         e.stopPropagation(); const a = b.dataset.act;
-        if (a === "edit") openFile(rel, it);
-        else if (a === "dl") window.open(`/files/download?brain=${encodeURIComponent(fbrain())}&path=${encodeURIComponent(rel)}`, "_blank");
+        if (a === "edit" || a === "view") openFile(rel, it);
+        else if (a === "open") window.open(rawUrl(rel), "_blank");
+        else if (a === "dl") window.open(rawUrl(rel, 1), "_blank");
         else if (a === "ren") doRename(rel, it.name);
         else if (a === "del") doDelete(rel, it.name);
       });
@@ -370,6 +441,17 @@
     }
     async function openFile(rel, it) {
       modal.classList.add("open");
+      const _raw = rawUrl(rel), _ext = it.ext || "";
+      const _vhead = `<div class="fm-vhead"><b>${esc(it.name)}</b><span><a href="${_raw}" target="_blank"><button>↗ Tab mới</button></a> <a href="${rawUrl(rel, 1)}"><button>⤓ Tải</button></a> <button id="fmVClose">✕</button></span></div>`;
+      // Ảnh / PDF: xem trước ngay qua /files/raw (không cần đọc dạng text).
+      if (IMG_EXTS.includes(_ext)) {
+        card.innerHTML = _vhead + `<div class="fm-readbox" style="text-align:center;overflow:auto"><img src="${_raw}" alt="${esc(it.name)}" style="max-width:100%;height:auto;border-radius:8px"></div>`;
+        card.querySelector("#fmVClose").onclick = closeModal; return;
+      }
+      if (_ext === ".pdf") {
+        card.innerHTML = _vhead + `<iframe src="${_raw}" style="width:100%;height:72vh;border:0;background:#fff"></iframe>`;
+        card.querySelector("#fmVClose").onclick = closeModal; return;
+      }
       card.innerHTML = `<div class="fm-vhead"><b>${esc(it.name)}</b><button id="fmVClose">✕</button></div><div class="fm-readbox">Đang mở...</div>`;
       card.querySelector("#fmVClose").onclick = closeModal;
       let resp, d;
@@ -379,7 +461,7 @@
       if (!resp.ok || d.error) {
         const m = d.error || (resp.status === 404 ? "Server chưa có chức năng Tệp tin - khởi động lại server Javis."
           : resp.status === 401 ? "Hết phiên đăng nhập - tải lại trang." : "Lỗi (" + resp.status + ")");
-        card.querySelector(".fm-readbox").innerHTML = `<span>${esc(m)} - <a href="${dlUrl}" target="_blank" style="color:#bcd2ff">Tải về</a></span>`;
+        card.querySelector(".fm-readbox").innerHTML = `<span>${esc(m)} - <a href="${_raw}" target="_blank" style="color:#bcd2ff">Mở trong tab mới</a> · <a href="${rawUrl(rel, 1)}" style="color:#bcd2ff">Tải về</a></span>`;
         return;
       }
       const head = `<div class="fm-vhead"><b>${esc(d.name)}</b><span>${d.editable ? '<button id="fmSave">💾 Lưu</button>' : '<a href="' + dlUrl + '" target="_blank"><button>⤓ Tải</button></a>'}<button id="fmVClose">✕</button></span></div>`;
@@ -405,7 +487,8 @@
       const fd = new FormData(); fd.append("brain", fbrain()); fd.append("path", rel);
       await fetch("/files/delete", { method: "POST", body: fd }); load(cur);
     }
-    el.querySelector("#fmUp").onclick = () => { const p = cur.split("/"); p.pop(); load(p.join("/")); };
+    el.querySelector("#fmUp").onclick = () => { if (upTarget !== null && upTarget !== undefined) load(upTarget); };
+    el.querySelector("#fmHome").onclick = () => load(undefined);   // undefined = về brain (điểm vào mặc định)
     el.querySelector("#fmRefresh").onclick = () => load(cur);
     el.querySelector("#fmNewDir").onclick = async () => {
       const n = prompt("Tên thư mục mới:"); if (!n) return;
@@ -424,12 +507,105 @@
       }
       load(cur);
     };
-    load("");
+    // Sau khi nạp thư mục: cuộn tới đúng file mục tiêu + tô sáng để "tìm thấy vị trí" ngay.
+    function revealFile(name) {
+      let hit = null;
+      listEl.querySelectorAll(".fm-row").forEach(r => {
+        r.classList.remove("fm-target");
+        const nm = r.querySelector(".fm-name");
+        if (nm && nm.textContent === name) hit = r;
+      });
+      if (!hit) return;
+      hit.classList.add("fm-target");
+      try { hit.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (e) {}
+    }
+    // Mở đúng vị trí một mục tiêu từ chat: path trong chat tương đối GỐC BRAIN, còn load() tính theo
+    // TRẦN duyệt → cần ghép tiền tố brain (home) mà /files/list trả về.
+    async function openVaultTarget(brainRelDir, fileName) {
+      let home = "";
+      try { const d = await (await fetch(`/files/list?brain=${encodeURIComponent(fbrain())}`)).json(); home = d.home || ""; }
+      catch (e) {}
+      const full = brainRelDir ? (home ? home + "/" + brainRelDir : brainRelDir) : (home || undefined);
+      await load(full);
+      if (fileName) revealFile(fileName);
+    }
+    const pend = _fmPending; _fmPending = null;
+    if (pend) openVaultTarget(pend.dir, pend.file);
+    else load();   // undefined → điểm vào mặc định = brain (dù trần duyệt có thể là cả ổ đĩa)
   }
 
   // ============================================
   // Trang Tự cải thiện (Nhiệm vụ tự động chạy nền)
   // ============================================
+  // ============================================
+  // Trang PLUGINS - tool/hook native cho mọi engine (bundled / toàn cục / brain)
+  // ============================================
+  async function renderPlugins(el) {
+    _injectExtraCss();
+    const myGen = _renderGen;   // chống race: đổi trang → load dở tự bỏ
+    el.innerHTML = `<div class="cview-section"><div class="empty">Đang tải...</div></div>`;
+
+    const SRC = { bundled: ["Có sẵn", "#3fdc86"], user: ["Toàn cục", "#6ea8ff"], vault: ["Brain này", "#e0a04a"] };
+    const srcBadge = (s) => {
+      const [t, c] = SRC[s] || [s, "#9fb0cf"];
+      return `<span style="font-size:11px;padding:2px 7px;border-radius:99px;border:1px solid ${c}55;color:${c}">${esc(t)}</span>`;
+    };
+    const chip = (t) => `<span style="font-size:11px;padding:2px 7px;border-radius:6px;background:rgba(255,255,255,.06);color:#b9c6e2;margin:0 4px 4px 0;display:inline-block">${esc(t)}</span>`;
+    const MM = { readonly: "chỉ đọc", safe: "ghi (safe)", full: "toàn quyền" };
+
+    function card(p) {
+      const status = p.error ? `<span style="color:#e0664a">⚠ lỗi</span>`
+        : p.gated ? `<span style="color:#e0a04a">⚠ chờ bật env</span>`
+        : p.loaded ? `<span style="color:#3fdc86">● đang chạy</span>`
+        : p.enabled ? `<span style="color:#e0a04a">● bật (chưa nạp)</span>`
+        : `<span style="color:#6b7894">○ tắt</span>`;
+      const meta = [MM[p.min_mode] ? `quyền tối thiểu: ${MM[p.min_mode]}` : "",
+                    p.version ? `v${esc(p.version)}` : "", p.author ? esc(p.author) : ""].filter(Boolean).join(" · ");
+      const chips = (p.tools || []).map(t => chip("🔧 " + t)).join("") + (p.hooks || []).map(h => chip("🪝 " + h)).join("");
+      const div = document.createElement("div");
+      div.className = "wf-card" + (p.loaded ? "" : " off");
+      div.innerHTML = `
+        <div class="wf-top">
+          <div class="wf-name">🧩 ${esc(p.name)} <span class="dim" style="font-size:12px">${esc(p.slug)}</span> ${srcBadge(p.source)}</div>
+          <div>${status}</div>
+        </div>
+        <div class="wf-desc">${esc(p.description || "")}</div>
+        <div class="wf-steps">${meta}${chips ? `<div style="margin-top:8px">${chips}</div>` : ""}${p.error ? `<div style="margin-top:6px;color:#e0664a">${esc(p.error)}</div>` : ""}</div>
+        <div class="wf-actions"><button class="s-btn-ghost tgl">${p.enabled ? "Tắt" : "Bật"}</button></div>`;
+      div.querySelector(".tgl").onclick = async () => {
+        const fd = new FormData();
+        fd.append("slug", p.slug); fd.append("enabled", p.enabled ? "0" : "1"); fd.append("brain", fbrain());
+        let r = {}; try { r = await (await fetch("/plugins/toggle", { method: "POST", body: fd })).json(); } catch (e) { r = { error: e.message }; }
+        if (r && r.error) alert("⚠ " + r.error);
+        else if (r && r.note) alert(r.note);
+        load();
+      };
+      return div;
+    }
+
+    async function load() {
+      if (myGen !== _renderGen) return;
+      let d = { plugins: [] };
+      try { d = await (await fetch(`/plugins?brain=${encodeURIComponent(fbrain())}`)).json(); } catch (e) {}
+      if (myGen !== _renderGen) return;
+      const intro = `<p style="color:#9fb0cf;font-size:15px;max-width:720px;margin:0 0 12px">Plugin thêm <b>tool</b> (công cụ engine gọi được) và <b>hook</b> native cho Javis mà không sửa lõi - dùng được ở MỌI engine (Claude Code, Codex, API) qua hub, tôn trọng 3 mức quyền như tool khác.</p>`;
+      const gateBanner = (!d.user_gate) ? `<div style="margin-bottom:14px;padding:11px 13px;border:1px solid rgba(224,160,74,.5);border-radius:10px;background:rgba(224,160,74,.08);color:#ffd9a0;font-size:13px;line-height:1.55"><b>⚠ Plugin do bạn cài đang bị chặn.</b> Plugin toàn cục/brain chạy code Python thật trong server nên mặc định TẮT. Để bật: đặt biến môi trường <code>JAVIS_ENABLE_USER_PLUGINS=true</code> rồi khởi động lại Javis. Plugin có sẵn (bundled) vẫn chạy bình thường.</div>` : "";
+      const dirHint = `<p style="color:#6b7894;font-size:12.5px;margin:0 0 14px">Thả plugin TOÀN CỤC (dùng cho MỌI brain) vào <code>${esc(d.global_dir || "")}</code> · mỗi plugin gồm <code>plugin.yaml</code> + <code>plugin.py</code>. Hoặc bảo Javis trong khung chat: "tạo plugin ...".</p>`;
+      const plugins = (d.plugins || []).slice();
+      const order = { bundled: 0, user: 1, vault: 2 };
+      plugins.sort((a, b) => (order[a.source] ?? 9) - (order[b.source] ?? 9) || (a.name || "").localeCompare(b.name || ""));
+      const wrap = document.createElement("div");
+      wrap.className = "cview-section";
+      wrap.innerHTML = intro + gateBanner + dirHint + `<div id="plCards"></div>`;
+      const host = wrap.querySelector("#plCards");
+      if (!plugins.length) host.innerHTML = `<div class="empty">Chưa có plugin nào. Thả một thư mục plugin vào ${esc(d.global_dir || "thư mục plugins toàn cục")} rồi tải lại.</div>`;
+      else plugins.forEach(p => host.appendChild(card(p)));
+      el.innerHTML = "";
+      el.appendChild(wrap);
+    }
+    load();
+  }
+
   async function renderSelfImprove(el) {
     _injectExtraCss();
     const myGen = _renderGen;   // chống race: đổi trang → mọi loadLoops/loadLog dở tự bỏ
@@ -643,24 +819,24 @@
       <div class="si-status" id="lnMetrics"></div>
 
       <div class="si-log" id="lnBackupBox">
-        <h3 style="font-size:15px;color:#cdd8ee">☁ Sao lưu brain lên GitHub</h3>
-        <p style="color:#9fb0cf;font-size:14px;max-width:680px;margin:2px 0 10px">Đồng bộ toàn bộ brain (ghi chú, Wiki, ký ức) lên 1 repo GitHub <b>riêng tư</b> để không mất dữ liệu khi hỏng máy/VPS. Xem hướng dẫn chi tiết: <a href="https://github.com/blogminhquy/javis-os/blob/main/docs/18-sao-luu-github.md" target="_blank" style="color:#7fb0ff">docs/18-sao-luu-github.md</a>.</p>
+        <h3 style="font-size:15px;color:#cdd8ee">⇅ Đồng bộ brain với GitHub (2 chiều)</h3>
+        <p style="color:#9fb0cf;font-size:14px;max-width:680px;margin:2px 0 10px">Đồng bộ <b>TẤT CẢ brain trong thư mục brains</b> (mọi bộ não, ghi chú, Wiki, ký ức) với 1 repo GitHub <b>riêng tư</b>: vừa đẩy thay đổi của máy này lên, vừa kéo thay đổi từ máy khác về (dùng chung cho máy nhà + VPS, các máy tự khớp nhau). Sửa trùng 1 file ở 2 nơi thì bản mới hơn thắng, bản kia được giữ thành file <code>.conflict-*</code> ngay cạnh. Máy mới cấu hình repo rồi bấm đồng bộ là khôi phục được toàn bộ. Hướng dẫn: <a href="https://github.com/blogminhquy/javis-os/blob/main/docs/18-sao-luu-github.md" target="_blank" style="color:#7fb0ff">docs/18-sao-luu-github.md</a>.</p>
         <ol style="color:#9fb0cf;font-size:13.5px;line-height:1.7;max-width:680px;margin:0 0 12px;padding-left:20px">
           <li>Tạo repo GitHub <b>Private</b> (trống, KHÔNG thêm README) - vd <code>javis-brain-backup</code>.</li>
           <li>Tạo token: GitHub → Settings → Developer settings → <b>Fine-grained tokens</b> → chọn đúng repo đó → quyền <b>Contents: Read and write</b> → tạo và copy token (dạng <code>github_pat_...</code>).</li>
-          <li>Dán URL repo + token vào đây, bấm <b>Kiểm tra</b>, rồi <b>Sao lưu ngay</b>. Bật tự động nếu muốn định kỳ đẩy.</li>
+          <li>Dán URL repo + token vào đây, bấm <b>Kiểm tra</b>, rồi <b>Đồng bộ ngay</b>. Bật tự động để định kỳ tự khớp giữa các máy.</li>
         </ol>
         <div class="si-grid">
           <div class="si-field"><label>URL repo (https)</label><input id="bkRepo" placeholder="https://github.com/blogminhquy/javis-brain-backup"></div>
           <div class="si-field"><label>GitHub token (fine-grained, quyền Contents)</label><input id="bkToken" type="password" placeholder="github_pat_..."></div>
           <div class="si-row" style="gap:14px;flex-wrap:wrap">
             <div class="si-field"><label>Nhánh</label><input id="bkBranch" value="main" style="max-width:120px"></div>
-            <div class="si-field"><label>Tự sao lưu mỗi (giờ)</label><input type="number" id="bkInterval" min="1" value="6" style="max-width:120px"></div>
+            <div class="si-field"><label>Tự đồng bộ mỗi (giờ)</label><input type="number" id="bkInterval" min="1" value="6" style="max-width:120px"></div>
             <div class="si-field"><label>Tự động</label><button class="si-chip" id="bkAuto">○ Tắt</button></div>
           </div>
           <div class="si-actions">
             <button class="s-btn-ghost" id="bkTest">🔌 Kiểm tra kết nối</button>
-            <button class="s-btn" id="bkNow">☁ Sao lưu ngay</button>
+            <button class="s-btn" id="bkNow">⇅ Đồng bộ ngay</button>
             <button class="s-btn-ghost" id="bkSave">💾 Lưu cấu hình</button>
           </div>
           <div class="dim" id="bkStatus" style="font-size:13px;color:#7d8aa6"></div>
@@ -777,11 +953,21 @@
       el.querySelector("#bkStatus").innerHTML = r.ok ? `<span style="color:#3fdc86">✓ Kết nối OK - token + repo hợp lệ.</span>` : `<span style="color:#e0664a">✗ ${esc(r.error || "không kết nối được")}</span>`;
     };
     el.querySelector("#bkNow").onclick = async () => {
-      const b = el.querySelector("#bkNow"); b.disabled = true; b.textContent = "Đang đồng bộ..."; await bkSaveCfg();
+      const b = el.querySelector("#bkNow"); b.disabled = true; b.textContent = "Đang đồng bộ 2 chiều..."; await bkSaveCfg();
       let r = {}; try { r = await (await fetch("/backup/now", { method: "POST", body: brainForm() })).json(); } catch (e) { r = { error: e.message }; }
-      b.disabled = false; b.textContent = "☁ Sao lưu ngay";
-      el.querySelector("#bkStatus").innerHTML = r.ok ? `<span style="color:#3fdc86">✓ Đã đồng bộ brain lên GitHub.</span>` : `<span style="color:#e0664a">✗ ${esc(r.error || "lỗi")}</span>`;
-      loadBackup();
+      b.disabled = false; b.textContent = "⇅ Đồng bộ ngay";
+      if (r.ok) {
+        const bits = [];
+        if (r.applied) bits.push(`nhận về ${r.applied} file`);
+        if (r.deleted) bits.push(`xoá ${r.deleted} file (máy khác đã xoá)`);
+        if (r.pushed) bits.push("đã đẩy lên GitHub");
+        if (r.restored) bits.push("khôi phục từ backup");
+        const cf = (r.conflicts || []).length
+          ? ` · <span style="color:#e0a04a">⚠ ${r.conflicts.length} file sửa trùng 2 nơi - bản mới hơn thắng, bản kia lưu thành .conflict-* (xem: ${esc(r.conflicts.slice(0, 3).map(c => c.path).join(", "))}${r.conflicts.length > 3 ? "..." : ""})</span>` : "";
+        el.querySelector("#bkStatus").innerHTML = `<span style="color:#3fdc86">✓ Đồng bộ xong${bits.length ? " - " + bits.join(", ") : " - hai bên đã khớp nhau"}.</span>${cf}`;
+      } else {
+        el.querySelector("#bkStatus").innerHTML = `<span style="color:#e0664a">✗ ${esc(r.error || "lỗi")}</span>`;
+      }
     };
     async function loadBackup() {
       let s = {}; try { s = await (await fetch(`/backup/status?brain=${encodeURIComponent(fbrain())}`)).json(); } catch (e) { return; }
@@ -790,9 +976,10 @@
       el.querySelector("#bkInterval").value = s.interval_hours || 6;
       if (s.token_set && !el.querySelector("#bkToken").value) el.querySelector("#bkToken").placeholder = "•••• (đã lưu, để trống nếu giữ nguyên)";
       bkAutoOn = !!s.enabled; bkAutoBtn.classList.toggle("sel", bkAutoOn); bkAutoBtn.textContent = bkAutoOn ? "● Bật" : "○ Tắt";
-      const when = s.last_backup ? new Date(s.last_backup * 1000).toLocaleString() : "chưa sao lưu";
-      const gitNote = s.has_git ? "" : " · ⚠ máy chưa cài git (cần git để backup)";
-      el.querySelector("#bkStatus").innerHTML = `Lần cuối: ${esc(when)}${s.last_status ? " · " + esc(s.last_status) : ""}${gitNote}`;
+      const when = s.last_backup ? new Date(s.last_backup * 1000).toLocaleString() : "chưa đồng bộ";
+      const gitNote = s.has_git ? "" : " · ⚠ máy chưa cài git (cần git để đồng bộ)";
+      const brainsNote = s.brains_count != null ? ` · ${s.brains_count} brain trong thư mục brains` : "";
+      el.querySelector("#bkStatus").innerHTML = `Lần cuối: ${esc(when)}${s.last_status ? " · " + esc(s.last_status) : ""}${brainsNote}${gitNote}`;
     }
 
     function loadAll() { loadMetrics(); loadReview(); loadLog(); loadBackup(); }
@@ -888,7 +1075,7 @@
       const board = el.querySelector("#knBoard");
       board.innerHTML = _KCOLS.map(([s, label, color]) => {
         const arr = (d.columns && d.columns[s]) || [];
-        const cards = arr.length ? arr.map(cardHtml).join("") : `<div class="dim" style="font-size:12px;color:#556;text-align:center;padding:14px 0">— trống —</div>`;
+        const cards = arr.length ? arr.map(cardHtml).join("") : `<div class="dim" style="font-size:12px;color:#556;text-align:center;padding:14px 0">- trống -</div>`;
         return `<div style="min-width:210px;max-width:240px;flex:1;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:10px">
           <div style="font-size:13px;font-weight:600;color:${color};margin-bottom:8px;display:flex;justify-content:space-between"><span>● ${label}</span><span>${arr.length}</span></div>
           ${cards}</div>`;
@@ -927,6 +1114,7 @@
     const tg = s.telegram || {};
     const dash = s.dashboard || {};
     const gOn = dash.graph_enabled !== false;
+    const gMode = (((typeof localStorage !== "undefined" && localStorage.getItem("javis.graphMode")) || dash.graph_mode || "2d") === "3d") ? "3d" : "2d";
     el.innerHTML = `
       <div class="cview-section">
         <h3>Phiên bản</h3>
@@ -953,9 +1141,24 @@
         <h3>Hiệu năng</h3>
         <div class="cgrid">
           <div class="gcard">
-            <div class="gcard-top"><span class="gcard-name">Graph 3D</span><span class="gcard-tag">${gOn ? "bật" : "tắt"}</span></div>
-            <div class="gcard-meta">Tắt để nhẹ máy/VPS. ${isNarrow() ? "Màn hình hẹp đang tự ép lite-mode." : ""}</div>
-            <button class="gcard-btn" id="ovGraphToggle">${gOn ? "Tắt graph 3D" : "Bật graph 3D"}</button>
+            <div class="gcard-top"><span class="gcard-name">Đồ thị não</span><span class="gcard-tag">${gOn ? (gMode === "3d" ? "3D" : "2D") : "tắt"}</span></div>
+            <div class="gcard-meta">2D là canvas thuần, nhẹ và đỡ lag; 3D đẹp hơn nhưng nặng máy (render trên máy anh, không phải VPS). Tắt hẳn để nhẹ nhất. ${isNarrow() ? "Màn hình hẹp đang tự ép lite-mode." : ""}</div>
+            <div class="js-actions">
+              <button class="gcard-btn ${gOn && gMode === "2d" ? "" : "ghost"}" id="ovGraph2d">2D</button>
+              <button class="gcard-btn ${gOn && gMode === "3d" ? "" : "ghost"}" id="ovGraph3d">3D</button>
+              <button class="gcard-btn ghost" id="ovGraphToggle">${gOn ? "Tắt hẳn" : "Bật lại"}</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="cview-section" id="ovAutostartSec" style="display:none">
+        <h3>Khởi động cùng máy</h3>
+        <div class="cgrid">
+          <div class="gcard">
+            <div class="gcard-top"><span class="gcard-name">Tự bật Javis khi mở máy</span><span class="gcard-tag" id="ovAutoTag">…</span></div>
+            <div class="gcard-meta" id="ovAutoMeta">Đang kiểm tra…</div>
+            <button class="gcard-btn" id="ovAutoToggle" style="display:none"></button>
+            <div class="gcard-meta" id="ovAutoStatus" style="margin-top:8px"></div>
           </div>
         </div>
       </div>
@@ -984,8 +1187,15 @@
       tag.textContent = "v" + (j.current || "?");
       const ml = MODE_LBL[j.mode] || j.mode || "";
       if (j.update_available) {
-        meta.innerHTML = "🆕 Có bản mới <b>v" + esc(j.latest) + "</b> (đang chạy v" + esc(j.current) + ") · " + esc(ml);
-        upd.style.display = "";
+        const base = "🆕 Có bản mới <b>v" + esc(j.latest) + "</b> (đang chạy v" + esc(j.current) + ") · " + esc(ml);
+        if (j.can_self_update) {
+          meta.innerHTML = base;
+          upd.style.display = "";
+        } else {
+          // Docker không có Watchtower: cập nhật bằng REDEPLOY (kéo lại image mới nhất).
+          meta.innerHTML = base + '<div style="margin-top:8px;line-height:1.55">↻ Cập nhật bằng cách <b>Redeploy</b>: trên Hostinger bấm nút <b>Redeploy</b> trong Docker Manager; trên VPS chạy <code>docker compose up -d --pull always</code>.</div>';
+          upd.style.display = "none";
+        }
       } else if (j.latest) {
         meta.innerHTML = "✅ Đang dùng bản mới nhất (v" + esc(j.current) + ") · " + esc(ml);
         upd.style.display = "none";
@@ -1033,6 +1243,40 @@
     };
     ovLoadVersion();
 
+    // ---- Tự khởi động cùng máy (chỉ Windows) ----
+    async function ovLoadAutostart() {
+      const sec = document.getElementById("ovAutostartSec");
+      if (!sec) return;
+      let j = {};
+      try { j = await (await fetch("/autostart", { cache: "no-store" })).json(); }
+      catch (e) { sec.style.display = "none"; return; }
+      if (!j.supported) { sec.style.display = "none"; return; }   // Docker/Linux: ẩn hẳn
+      sec.style.display = "";
+      const on = !!j.enabled;
+      document.getElementById("ovAutoTag").textContent = on ? "bật" : "tắt";
+      const meta = document.getElementById("ovAutoMeta");
+      meta.innerHTML = on
+        ? "Javis tự chạy nền mỗi khi anh đăng nhập Windows - không cần bật tay. Chạy ẩn, mở <code>localhost:7777</code> để dùng."
+        : "Bật để Javis tự khởi động mỗi khi mở máy. Chạy ẩn ở nền, không hiện cửa sổ.";
+      if (j.stale) meta.innerHTML += '<br><span class="dim">⚠ Đường dẫn cài đặt đã đổi - bấm bật lại để cập nhật.</span>';
+      const btn = document.getElementById("ovAutoToggle");
+      btn.style.display = "";
+      btn.disabled = false;
+      btn.textContent = on ? "Tắt tự khởi động" : "Bật tự khởi động";
+      btn.onclick = async () => {
+        btn.disabled = true;
+        const st = document.getElementById("ovAutoStatus");
+        st.textContent = "Đang lưu…";
+        const fd = new FormData(); fd.append("enabled", on ? "0" : "1");
+        let r = {};
+        try { r = await (await fetch("/autostart", { method: "POST", body: fd })).json(); }
+        catch (e) { r = { ok: false, error: e.message }; }
+        if (r.ok) { st.textContent = ""; ovLoadAutostart(); }
+        else { st.textContent = "⚠ " + esc(r.error || "Lỗi"); btn.disabled = false; }
+      };
+    }
+    ovLoadAutostart();
+
     const btn = document.getElementById("ovGraphToggle");
     if (btn) btn.onclick = async () => {
       btn.disabled = true;
@@ -1042,6 +1286,19 @@
       recomputeGraph();
       renderOverview(el);
     };
+    // Đổi 2D/3D: lưu localStorage (bền ngay, không cần restart server) + lưu server (bền lâu) + dựng lại đồ thị.
+    const setGraphMode = async (mode) => {
+      try { localStorage.setItem("javis.graphMode", mode); } catch (e) {}
+      graphEnabled = true;
+      try { await saveSetting("dashboard", { graph_mode: mode, graph_enabled: true }); } catch (e) {}
+      if (window.reinitGraph) { try { await window.reinitGraph(mode); } catch (e) {} }
+      recomputeGraph();
+      renderOverview(el);
+    };
+    const b2d = document.getElementById("ovGraph2d");
+    if (b2d) b2d.onclick = () => setGraphMode("2d");
+    const b3d = document.getElementById("ovGraph3d");
+    if (b3d) b3d.onclick = () => setGraphMode("3d");
     const mig = document.getElementById("ovMigrate");
     if (mig) mig.onclick = async () => {
       const brain = (window.currentBrainPath ? currentBrainPath() : "brain");
@@ -1073,7 +1330,7 @@
     const reasonChips = [["off", "Tắt"], ["low", "Thấp"], ["medium", "Vừa"], ["high", "Cao"]]
       .map(([v, l]) => `<button class="aux-chip ${reasoning === v ? "sel" : ""}" data-reason="${v}">${l}</button>`).join("");
 
-    const KEYFIELD = { "openrouter": "openrouter_key", "anthropic-api": "anthropic_api_key", "openai": "openai_api_key" };
+    const KEYFIELD = { "openrouter": "openrouter_key", "anthropic-api": "anthropic_api_key", "openai": "openai_api_key", "gemini": "gemini_api_key" };
     const provHead = (p, on, kindLabel, statusText) => `
         <div class="prov-head">
           <span class="prov-shield ${on ? "on" : ""}">${_shield(on)}</span>
@@ -1144,7 +1401,7 @@
       <div class="cview-section">
         <h3>◆ Suy nghĩ <span style="opacity:.5">độ sâu reasoning khi trả lời</span></h3>
         <div class="gcard" style="max-width:540px">
-          <div class="gcard-meta">Bật để model suy nghĩ kỹ hơn trước khi trả lời - chính xác hơn nhưng chậm & tốn token hơn. Claude API/OpenRouter dùng adaptive thinking + effort; OpenAI chỉ áp cho model o-series; Claude Code chèn gợi ý think/ultrathink.</div>
+          <div class="gcard-meta">Bật để model suy nghĩ kỹ hơn trước khi trả lời - chính xác hơn nhưng chậm & tốn token hơn. Claude API/OpenRouter dùng adaptive thinking + effort; OpenAI chỉ áp cho model o-series; Gemini áp cho model 2.5 trở lên; Claude Code chèn gợi ý think/ultrathink.</div>
           <div class="aux-chips">${reasonChips}</div>
         </div>
       </div>`;
@@ -1231,7 +1488,7 @@
     if (act) act.innerHTML = `
       <div class="prov-note" style="line-height:1.7">
         <b>1)</b> Mở link này để đăng nhập claude.ai:<br>
-        <a href="${esc(r.url)}" target="_blank" rel="noopener" style="color:#7aa2ff;word-break:break-all">${esc(r.url || "(không có link)")}</a><br>
+        <a href="${esc(safeHref(r.url))}" target="_blank" rel="noopener" style="color:#7aa2ff;word-break:break-all">${esc(r.url || "(không có link)")}</a><br>
         <b>2)</b> Đăng nhập xong, nếu trang hiện <b>một mã code</b> thì dán vào đây:
         <div style="margin-top:6px;display:flex;gap:8px;max-width:520px">
           <input class="js-input" id="cliCode" placeholder="dán code (nếu có)" style="flex:1">
@@ -1272,7 +1529,7 @@
     catch (e) { if (msg) msg.textContent = "Lỗi kết nối server."; return; }
     if (d.error) { if (msg) msg.textContent = "Lỗi: " + d.error; return; }
     try { window.open(d.verification_uri, "_blank"); } catch (e) {}
-    if (msg) msg.innerHTML = `Mở <a href="${esc(d.verification_uri)}" target="_blank">${esc(d.verification_uri)}</a> · nhập mã <b style="font-size:1.15em;letter-spacing:1px">${esc(d.user_code)}</b> <span style="opacity:.6">- đang chờ…</span>`;
+    if (msg) msg.innerHTML = `Mở <a href="${esc(safeHref(d.verification_uri))}" target="_blank">${esc(d.verification_uri)}</a> · nhập mã <b style="font-size:1.15em;letter-spacing:1px">${esc(d.user_code)}</b> <span style="opacity:.6">- đang chờ…</span>`;
     const iv = Math.max(2, (d.interval || 5)) * 1000;
     const t0 = Date.now();
     const poll = async () => {
@@ -1385,24 +1642,259 @@
     });
     return o;
   }
-  function mcpCard(s) {
-    const on = s.enabled;
-    const keys = (s.header_keys || []).concat(s.env_keys || []);
-    return `<div class="prov-card">
-      <div class="prov-head">
-        <span class="prov-shield ${on ? "on" : ""}">${_shield(on)}</span>
-        <div class="prov-info">
-          <div class="prov-name">${esc(s.name)} <span class="prov-kind">${esc(s.transport)}</span>${s.perm === "readonly" ? ' <span class="prov-kind">chỉ đọc</span>' : ""}</div>
-          <div class="prov-status ${on ? "on" : ""}">${on ? "● Bật" : "○ Tắt"}${s.url ? " · " + esc(s.url) : ""}${keys.length ? " · key: " + esc(keys.join(", ")) : ""}${(s.deny_tools || []).length ? " · chặn " + s.deny_tools.length + " tool" : ""}</div>
-        </div>
-      </div>
-      <div class="prov-action">
-        <button class="gcard-btn" data-mcp-toggle="${s.id}" style="background:transparent">${on ? "Tắt" : "Bật"}</button>
-        <button class="gcard-btn" data-mcp-edit="${s.id}" style="background:transparent;opacity:.85">Sửa</button>
-        <button class="gcard-btn" data-mcp-deny="${s.id}" style="background:transparent;opacity:.8">Chặn tool</button>
-        <button class="gcard-btn" data-mcp-del="${s.id}" style="background:transparent;opacity:.65">Xoá</button>
-      </div>
-    </div>`;
+  // ==== Trang Kết nối: kho connector + đa tài khoản (qua MCP hub) ====
+  const PERM_META = {
+    readonly: { label: "Chỉ đọc", color: "#4da3ff" },
+    safe: { label: "Ghi nháp", color: "#d9a521" },
+    full: { label: "Toàn quyền", color: "#e06c5a" },
+  };
+  const AUTH_BADGE = { apikey: "API key", qr: "QR Zalo", oauth: "OAuth", none: "Tự do" };
+  let _connPoll = null;
+
+  function closeConnModal() {
+    const m = document.getElementById("connectModal");
+    if (m) m.classList.remove("open");
+    if (_connPoll) { clearInterval(_connPoll); _connPoll = null; }
+  }
+  function connModal(html, maxw) {
+    let m = document.getElementById("connectModal");
+    if (!m) { m = document.createElement("div"); m.id = "connectModal"; m.className = "mp-overlay"; document.body.appendChild(m); }
+    m.innerHTML = '<div class="mp-box" style="max-width:' + (maxw || 520) + 'px">' + html + '</div>';
+    m.classList.add("open");
+    m.querySelectorAll('[data-act="close"]').forEach(b => b.onclick = closeConnModal);
+    return m;
+  }
+  function mHead(title) {
+    return '<div class="mp-head"><div class="mp-title">' + title + '</div><button class="mp-x" data-act="close">✕</button></div>';
+  }
+  function permChip(p) {
+    const m = PERM_META[p] || PERM_META.full;
+    return '<span class="perm-chip" style="color:' + m.color + ';border-color:' + m.color + '55">' + m.label + '</span>';
+  }
+  function iconInner(con) {
+    // icon là URL/đường dẫn ảnh (logo hãng) → render <img>; còn lại là emoji → in thẳng.
+    const ic = (con && con.icon) || "🔌";
+    return /^(https?:|\/)/.test(ic) ? '<img class="ico-img" src="' + esc(ic) + '" alt="" loading="lazy">' : ic;
+  }
+  function connChip(c) {
+    return '<button class="conn-chip' + (c.enabled ? "" : " off") + '" data-conn="' + c.id + '">'
+      + '<span class="cdot' + (c.enabled ? " on" : "") + '">●</span> ' + esc(c.label || c.name || "?")
+      + (c.is_default ? ' <span class="cstar">★</span>' : "") + " " + permChip(c.perm) + '</button>';
+  }
+  function connectorCard(con, conns) {
+    const chips = conns.map(connChip).join("")
+      + '<button class="conn-chip add" data-addacc="' + esc(con.id) + '">＋ Thêm tài khoản</button>';
+    return '<div class="prov-card conn-card">'
+      + '<div class="prov-head"><span class="conn-ico">' + iconInner(con) + '</span>'
+      + '<div class="prov-info"><div class="prov-name">' + esc(con.name || con.id) + '</div>'
+      + '<div class="prov-status">' + esc(con.description || "") + '</div></div></div>'
+      + '<div class="conn-accounts">' + chips + '</div></div>';
+  }
+  function catalogCard(con) {
+    const soon = con.status === "soon";
+    const badge = '<span class="prov-kind">' + (AUTH_BADGE[con.auth_type] || con.auth_type || "") + '</span>'
+      + (con.status === "beta" ? ' <span class="prov-kind" style="color:#d9a521">beta</span>' : "")
+      + (soon ? ' <span class="prov-kind">sắp có</span>' : "");
+    return '<div class="cat-card' + (soon ? " soon" : "") + '" data-cat="' + esc(con.category || "Khác") + '">'
+      + '<div class="cat-ico">' + iconInner(con) + '</div>'
+      + '<div class="cat-name">' + esc(con.name) + ' ' + badge + '</div>'
+      + '<div class="cat-desc">' + esc(con.description || "") + '</div>'
+      + (soon
+        ? '<button class="gcard-btn" disabled style="opacity:.5">Sắp có</button>'
+          + (con.guide_url ? ' <a class="cat-doc" href="' + esc(con.guide_url) + '" target="_blank">docs ↗</a>' : "")
+        : '<button class="gcard-btn" data-connect="' + esc(con.id) + '">Kết nối</button>')
+      + '</div>';
+  }
+
+  function openAddFlow(el, con, isFirst) {
+    if (!con) return;
+    if (con.id === "custom") return openMcpForm(el);
+    if (con.auth_type === "qr") return openQrFlow(el, con, isFirst);
+    if (con.auth_type === "oauth") return openOauthFlow(el, con);
+    openApikeyFlow(el, con, isFirst);
+  }
+
+  function openApikeyFlow(el, con, isFirst) {
+    const fields = (con.fields || []).map(f =>
+      '<label class="mcp-lb">' + esc(f.label || f.key)
+      + (f.multiline
+        ? '<textarea class="js-input" data-f="' + esc(f.key) + '" rows="5" placeholder="' + esc(f.placeholder || "") + '"></textarea>'
+        : '<input class="js-input" data-f="' + esc(f.key) + '" placeholder="' + esc(f.placeholder || "") + '">')
+      + '</label>').join("");
+    const m = connModal(mHead("KẾT NỐI " + esc((con.name || "").toUpperCase()))
+      + '<div class="conn-form">'
+      + (con.guide ? '<div class="conn-guide">' + esc(con.guide) + (con.guide_url ? ' <a href="' + esc(con.guide_url) + '" target="_blank">Hướng dẫn ↗</a>' : "") + '</div>' : "")
+      + fields
+      + '<label class="mcp-lb">Tên gợi nhớ (tuỳ chọn - bỏ trống sẽ tự lấy tên tài khoản/shop)<input class="js-input" id="cLabel"></label>'
+      + '</div>'
+      + '<div class="mp-foot"><span class="mp-note" id="cErr"></span><div><button class="mp-btn" data-act="close">Huỷ</button><button class="mp-btn primary" id="cGo">Kết nối</button></div></div>');
+    m.querySelector("#cGo").onclick = async () => {
+      const fieldsVal = {};
+      let missing = "";
+      m.querySelectorAll("[data-f]").forEach(inp => {
+        const k = inp.dataset.f, v = inp.value.trim();
+        fieldsVal[k] = v;
+        const fd = (con.fields || []).find(x => x.key === k) || {};
+        if (!v && !fd.optional) missing = fd.label || k;
+      });
+      const err = m.querySelector("#cErr"), go = m.querySelector("#cGo");
+      if (missing) { err.textContent = "Thiếu: " + missing; return; }
+      go.disabled = true; go.textContent = "Đang kiểm tra key…"; err.textContent = "";
+      const r = await postJson("/connect/add", { connector_id: con.id, fields: fieldsVal, label: m.querySelector("#cLabel").value.trim() });
+      if (!r.ok) { err.textContent = r.error || "Lỗi"; go.disabled = false; go.textContent = "Kết nối"; return; }
+      m.querySelector(".conn-form").innerHTML = '<div class="conn-ok">✓ Đã kết nối: <b>' + esc(r.label || con.name) + '</b> (' + (r.tools || 0) + ' công cụ)'
+        + (isFirst ? '<div class="conn-hint">Sang trang Javis hỏi thử: "Hôm nay bán được bao nhiêu?"</div>' : "") + '</div>';
+      go.style.display = "none";
+      setTimeout(() => { closeConnModal(); renderConnect(el); }, 1600);
+    };
+  }
+
+  function openQrFlow(el, con, isFirst) {
+    const risk = con.risk ? '<div class="conn-risk">⚠ ' + esc(con.risk) + '</div>' : "";
+    const m = connModal(mHead("KẾT NỐI " + esc((con.name || "").toUpperCase()))
+      + '<div class="conn-form">' + risk
+      + '<label class="mcp-lb">Tên gợi nhớ (tuỳ chọn)<input class="js-input" id="qLabel"></label>'
+      + '<button class="mp-btn primary" id="qGo">' + (con.risk ? "Tôi hiểu rủi ro, hiện mã QR" : "Hiện mã QR") + '</button>'
+      + '<div id="qrZone"></div></div>'
+      + '<div class="mp-foot"><span class="mp-note" id="qErr"></span><button class="mp-btn" data-act="close">Đóng</button></div>');
+    m.querySelector("#qGo").onclick = async () => {
+      const err = m.querySelector("#qErr");
+      err.textContent = "";
+      const r = await postJson("/connect/zalo/start", { label: m.querySelector("#qLabel").value.trim() });
+      if (!r.ok) { err.textContent = r.error || "Lỗi"; return; }
+      m.querySelector("#qGo").style.display = "none";
+      const zone = m.querySelector("#qrZone");
+      zone.innerHTML = '<div class="mp-note" style="margin-top:8px">Đang khởi động… (lần đầu hơi lâu do phải tải công cụ)</div>';
+      _connPoll = setInterval(async () => {
+        let st;
+        try { st = await (await fetch("/connect/zalo/status?sid=" + encodeURIComponent(r.sid))).json(); } catch (e) { return; }
+        if (st.state === "qr" && st.qr) {
+          zone.innerHTML = '<img class="qr-img" src="' + st.qr + '"><div class="mp-note">Mở Zalo trên điện thoại > biểu tượng QR góc trên > quét mã này</div>';
+        } else if (st.state === "done") {
+          clearInterval(_connPoll); _connPoll = null;
+          zone.innerHTML = '<div class="conn-ok">✓ Đã đăng nhập: <b>' + esc(st.label || "Zalo") + '</b>'
+            + (isFirst ? '<div class="conn-hint">Sang trang Javis nhắn thử: "Đọc tin nhắn Zalo mới nhất"</div>' : "") + '</div>';
+          setTimeout(() => { closeConnModal(); renderConnect(el); }, 1800);
+        } else if (st.state === "error") {
+          clearInterval(_connPoll); _connPoll = null;
+          zone.innerHTML = "";
+          err.textContent = st.error || "Lỗi đăng nhập";
+          m.querySelector("#qGo").style.display = "";
+        }
+      }, 1500);
+    };
+  }
+
+  function openOauthFlow(el, con) {
+    // Provider không tự đăng ký client (vd Google) khai sẵn fields client_id/secret user tự tạo.
+    const fields = (con.fields || []).map(f =>
+      '<label class="mcp-lb">' + esc(f.label || f.key)
+      + '<input class="js-input" data-f="' + esc(f.key) + '" placeholder="' + esc(f.placeholder || "") + '"></label>').join("");
+    const m = connModal(mHead("KẾT NỐI " + esc((con.name || "").toUpperCase()))
+      + '<div class="conn-form"><div class="conn-guide">' + esc(con.guide || "Đăng nhập bằng tài khoản của nhà cung cấp.")
+      + (con.guide_url ? ' <a href="' + esc(con.guide_url) + '" target="_blank">Hướng dẫn ↗</a>' : "") + '</div>'
+      + fields
+      + '<button class="mp-btn primary" id="oGo">' + (fields ? "Lưu & mở trang đăng nhập" : "Mở trang đăng nhập") + '</button></div>'
+      + '<div class="mp-foot"><span class="mp-note" id="oErr"></span><button class="mp-btn" data-act="close">Đóng</button></div>');
+    m.querySelector("#oGo").onclick = async () => {
+      const err = m.querySelector("#oErr"), go = m.querySelector("#oGo");
+      const fieldsVal = {};
+      let missing = "";
+      m.querySelectorAll("[data-f]").forEach(inp => {
+        const k = inp.dataset.f, v = inp.value.trim();
+        fieldsVal[k] = v;
+        const fd = (con.fields || []).find(x => x.key === k) || {};
+        if (!v && !fd.optional) missing = fd.label || k;
+      });
+      if (missing) { err.textContent = "Thiếu: " + missing; return; }
+      go.disabled = true; err.textContent = "";
+      const r = await postJson("/connect/oauth/start", { connector_id: con.id, fields: fieldsVal });
+      go.disabled = false;
+      if (!r.ok) { err.textContent = r.error || "Lỗi"; return; }
+      window.open(r.url, "_blank");
+      err.textContent = "Hoàn tất đăng nhập ở tab mới, xong quay lại bấm Làm mới trang này.";
+    };
+  }
+
+  function openPermPicker(el, c, con) {
+    const DESC = { readonly: "chỉ xem số liệu, không đụng dữ liệu thật", safe: "được ghi nháp, CHẶN hành động tiền/đơn/gửi tin", full: "thao tác THẬT: tạo đơn, gửi tin, publish…" };
+    const opts = ["readonly", "safe", "full"].map(p =>
+      '<button class="conn-menu-btn" data-p="' + p + '">' + permChip(p) + ' <span class="mp-note">' + DESC[p] + '</span></button>').join("");
+    const m = connModal(mHead("QUYỀN: " + esc(c.label || "")) + '<div class="conn-menu">' + opts + '</div>'
+      + '<div class="mp-foot"><button class="mp-btn" data-act="close">Huỷ</button></div>');
+    m.querySelectorAll("[data-p]").forEach(b => b.onclick = async () => {
+      const p = b.dataset.p;
+      if (p === "full") return openFullAck(el, c, con);
+      await postJson("/connect/update", { id: c.id, perm: p });
+      closeConnModal(); renderConnect(el);
+    });
+  }
+  function openFullAck(el, c, con) {
+    const text = (con && con.risk) ? con.risk
+      : "Mức này cho phép Javis thao tác THẬT ra ngoài qua kết nối này: tạo đơn, gửi tin, chạy quảng cáo, publish… Hành động có thể KHÔNG hoàn tác được.";
+    const m = connModal(mHead("⚠ BẬT TOÀN QUYỀN")
+      + '<div class="conn-form"><div class="conn-risk">' + esc(text) + '</div>'
+      + '<label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-size:14px"><input type="checkbox" id="ackChk"> Tôi hiểu rủi ro và tự chịu trách nhiệm</label></div>'
+      + '<div class="mp-foot"><button class="mp-btn" data-act="close">Huỷ</button><button class="mp-btn primary" id="ackGo" disabled>Bật Toàn quyền</button></div>');
+    m.querySelector("#ackChk").onchange = (e) => { m.querySelector("#ackGo").disabled = !e.target.checked; };
+    m.querySelector("#ackGo").onclick = async () => {
+      await postJson("/connect/update", { id: c.id, perm: "full" });
+      closeConnModal(); renderConnect(el);
+    };
+  }
+
+  function openAccountMenu(el, c, con) {
+    const m = connModal(mHead(esc(c.label || "Tài khoản"))
+      + '<div class="conn-menu">'
+      + '<button class="conn-menu-btn" data-m="test">🔄 Test kết nối</button>'
+      + '<button class="conn-menu-btn" data-m="default"' + (c.is_default ? " disabled" : "") + '>★ Đặt làm mặc định</button>'
+      + '<button class="conn-menu-btn" data-m="rename">✏ Đổi tên</button>'
+      + '<button class="conn-menu-btn" data-m="perm">🛡 Đổi quyền (' + ((PERM_META[c.perm] || {}).label || c.perm) + ')</button>'
+      + '<button class="conn-menu-btn" data-m="deny">⛔ Chặn tool cụ thể' + ((c.deny_tools || []).length ? " (" + c.deny_tools.length + ")" : "") + '</button>'
+      + '<button class="conn-menu-btn" data-m="audit">📜 Nhật ký gọi tool</button>'
+      + '<button class="conn-menu-btn" data-m="toggle">' + (c.enabled ? "○ Tắt tạm" : "● Bật lại") + '</button>'
+      + '<button class="conn-menu-btn danger" data-m="del">🗑 Xoá kết nối</button>'
+      + '</div><div class="mp-foot"><span class="mp-note" id="cmNote"></span><button class="mp-btn" data-act="close">Đóng</button></div>');
+    const note = m.querySelector("#cmNote");
+    m.querySelectorAll("[data-m]").forEach(b => b.onclick = async () => {
+      const act = b.dataset.m;
+      if (act === "test") {
+        note.textContent = "Đang test…";
+        const r = await postJson("/connect/test", { id: c.id });
+        note.textContent = r.ok ? "✓ OK - " + (r.tools || 0) + " công cụ" + (r.label ? " (" + r.label + ")" : "") : "⚠ " + (r.error || "lỗi");
+      } else if (act === "default") {
+        await postJson("/connect/default", { id: c.id }); closeConnModal(); renderConnect(el);
+      } else if (act === "rename") {
+        const v = prompt("Tên mới:", c.label || ""); if (v === null) return;
+        await postJson("/connect/update", { id: c.id, label: v.trim() }); closeConnModal(); renderConnect(el);
+      } else if (act === "perm") {
+        openPermPicker(el, c, con);
+      } else if (act === "deny") {
+        const v = prompt("Tên tool cần CHẶN riêng cho kết nối này, cách nhau dấu phẩy.\nVD: pos_order, pos_transaction\n(Để trống = bỏ chặn)", (c.deny_tools || []).join(", "));
+        if (v === null) return;
+        await postJson("/connect/update", { id: c.id, deny_tools: v.split(",").map(x => x.trim()).filter(Boolean) });
+        closeConnModal(); renderConnect(el);
+      } else if (act === "audit") {
+        openAuditModal(c);
+      } else if (act === "toggle") {
+        await postJson("/connect/toggle", { id: c.id }); closeConnModal(); renderConnect(el);
+      } else if (act === "del") {
+        if (!confirm('Xoá kết nối "' + (c.label || "") + '"?')) return;
+        await postJson("/connect/delete", { id: c.id }); closeConnModal(); renderConnect(el);
+      }
+    });
+  }
+
+  async function openAuditModal(c) {
+    const m = connModal(mHead("NHẬT KÝ: " + esc(c.label || "")) + '<div class="conn-audit" id="audBody">Đang tải…</div>'
+      + '<div class="mp-foot"><button class="mp-btn" data-act="close">Đóng</button></div>', 640);
+    let d;
+    try { d = await (await fetch("/connect/audit?limit=80&id=" + encodeURIComponent(c.id))).json(); } catch (e) { d = { entries: [] }; }
+    const rows = (d.entries || []).map(e =>
+      '<div class="aud-row' + (e.ok ? "" : " bad") + '"><span class="aud-ts">' + esc((e.ts || "").replace("T", " ")) + '</span> '
+      + esc(e.tool || "") + ' <span class="mp-note">' + esc(e.mode || "") + "/" + esc(e.cls || "") + " · " + (e.ms || 0) + "ms</span>"
+      + (e.ok ? "" : '<div class="aud-err">' + esc(e.err || "") + '</div>') + '</div>').join("");
+    m.querySelector("#audBody").innerHTML = rows || '<div class="mp-note">Chưa có lượt gọi nào.</div>';
   }
   function ambientCard(s) {   // MCP sẵn trong Claude Code - chỉ hiển thị
     const ok = s.connected;
@@ -1416,55 +1908,69 @@
       </div>
     </div>`;
   }
-  async function renderMcp(el) {
+  async function renderConnect(el) {
     el.innerHTML = `<div class="cview-placeholder"><div class="ph-ico">🔌</div><div>Đang tải...</div></div>`;
     let d;
-    try { d = await (await fetch("/mcp/list")).json(); } catch (e) { el.innerHTML = placeholder("mcp", "Không tải được."); return; }
-    const servers = d.servers || [];
+    try { d = await (await fetch("/connect/catalog")).json(); } catch (e) { el.innerHTML = placeholder("mcp", "Không tải được."); return; }
+    const cat = d.catalog || [];
+    const conns = d.connections || [];
+    const byId = {};
+    cat.forEach(c => byId[c.id] = c);
+    byId.custom = { id: "custom", name: "Tự thêm (nâng cao)", icon: "🧩", category: "Khác",
+                    description: "Server MCP tự khai URL/lệnh/header - dành cho người rành kỹ thuật.", auth_type: "apikey" };
     const st = await freshSettings();
     const main = (st.model && st.model.main) || {};
     const provs = (st.model && st.model.providers) || [];
-    const MCP_PROVIDERS = ["anthropic-cli", "openrouter", "openai"];
-    const mainHasMcp = MCP_PROVIDERS.includes(main.provider);
+    const MCP_PROVIDERS = ["anthropic-cli", "openrouter", "openai", "anthropic-api"];
     const mainLabel = (provs.find(p => p.id === main.provider) || {}).label || main.provider || "-";
     let warn = "";
-    if (!mainHasMcp) {
-      const oauth = main.provider === "openai-oauth";
-      if (oauth) {
-        warn = `<div class="gcard" style="border:1px solid #2c7a4b;background:rgba(44,122,75,.10);max-width:740px;margin-bottom:14px"><div class="gcard-meta" style="opacity:1">✓ <b>ChatGPT (gói subscription)</b> chạy qua <b>Codex CLI</b> - Javis tự đẩy MCP của bạn (các server bên dưới) sang Codex, nên <b>dùng được MCP của Javis</b> luôn. Lần đầu mỗi tin nhắn kết nối MCP nên hơi chậm.</div></div>`;
-      } else {
-        warn = `<div class="gcard" style="border:1px solid #b9821f;background:rgba(185,130,31,.10);max-width:740px;margin-bottom:14px"><div class="gcard-meta" style="opacity:1">⚠ Main Model đang là <b>${esc(mainLabel)}</b> - <b>chưa hỗ trợ MCP</b>. Dùng MCP qua <b>Claude Code</b>, <b>OpenRouter</b> hoặc <b>OpenAI</b>. Đổi ở trang <b>Models</b>.</div></div>`;
-      }
+    if (main.provider === "openai-oauth") {
+      warn = `<div class="gcard" style="border:1px solid #2c7a4b;background:rgba(44,122,75,.10);max-width:740px;margin-bottom:14px"><div class="gcard-meta" style="opacity:1">✓ <b>ChatGPT (gói subscription)</b> chạy qua <b>Codex CLI</b> - Javis tự đẩy kho Kết nối sang Codex qua hub, nên vẫn dùng được đầy đủ.</div></div>`;
+    } else if (!MCP_PROVIDERS.includes(main.provider)) {
+      warn = `<div class="gcard" style="border:1px solid #b9821f;background:rgba(185,130,31,.10);max-width:740px;margin-bottom:14px"><div class="gcard-meta" style="opacity:1">⚠ Main Model đang là <b>${esc(mainLabel)}</b> - chưa hỗ trợ gọi công cụ. Đổi ở trang <b>Models</b>.</div></div>`;
     } else if (main.provider !== "anthropic-cli") {
-      warn = `<div class="gcard" style="border:1px solid #2c7a4b;background:rgba(44,122,75,.10);max-width:740px;margin-bottom:14px"><div class="gcard-meta" style="opacity:1">✓ <b>${esc(mainLabel)}</b> dùng được MCP của Javis (qua vòng gọi tool). Mỗi tin nhắn kết nối MCP nên hơi chậm hơn.</div></div>`;
+      warn = `<div class="gcard" style="border:1px solid #2c7a4b;background:rgba(44,122,75,.10);max-width:740px;margin-bottom:14px"><div class="gcard-meta" style="opacity:1">✓ <b>${esc(mainLabel)}</b> dùng được kho Kết nối (qua vòng gọi tool + hub), kèm cả tool file và skill.</div></div>`;
     }
-    el.innerHTML = `
-      ${warn}
-      <div class="cview-section">
-        <h3>◆ MCP của Javis <span style="opacity:.5">Claude Code · OpenRouter · OpenAI dùng được</span>
-          <button class="gcard-btn" id="mcpAdd" style="float:right">+ Thêm server</button></h3>
-        <div class="gcard-meta" style="max-width:740px">Nhiều shop chung 1 link, khác key → thêm nhiều server cùng URL khác token. Bật/tắt từng cái.
-          <label style="margin-left:8px;cursor:pointer"><input type="checkbox" id="mcpStrict" ${d.strict ? "checked" : ""}> Chỉ dùng MCP của Javis (bỏ MCP sẵn của máy)</label></div>
-        <div class="prov-list" style="margin-top:12px">${servers.length ? servers.map(mcpCard).join("") : '<div class="mp-empty">Chưa có server. Bấm "+ Thêm server".</div>'}</div>
-      </div>
-      <div class="cview-section">
-        <h3>◆ MCP từ Claude Code <span style="opacity:.5">tài khoản - chỉ hiển thị</span></h3>
-        <div class="gcard-meta" style="max-width:740px">Các MCP anh đã kết nối sẵn trong Claude Code (đồng bộ từ claude.ai). Engine Claude Code tự dùng các cái "Connected". Đăng nhập/quản lý các cái này trong app Claude, không sửa ở đây.</div>
-        <div class="prov-list" id="mcpAmbient" style="margin-top:12px"><div class="mp-empty">Đang tải… (kiểm tra sức khoẻ MCP, hơi lâu)</div></div>
-      </div>`;
-    document.getElementById("mcpAdd").onclick = () => openMcpForm(el);
+    const groups = {};
+    conns.forEach(c => { const k = c.connector_id || "custom"; (groups[k] = groups[k] || []).push(c); });
+    const connectedHtml = Object.keys(groups).map(cid =>
+      connectorCard(byId[cid] || { id: cid, name: cid, icon: "🔌" }, groups[cid])).join("");
+    const cats = Array.from(new Set(cat.map(c => c.category || "Khác")));
+    el.innerHTML = warn
+      + '<div class="cview-section"><h3>◆ Đã kết nối <span style="opacity:.5">' + conns.length + ' tài khoản</span></h3>'
+      + '<div class="gcard-meta" style="max-width:740px">Một dịch vụ nối được NHIỀU tài khoản (nhiều shop, nhiều số Zalo…). Mọi bộ não - Claude Code, ChatGPT/Codex, OpenRouter, API - dùng chung kho này qua MCP hub, kèm phân quyền và nhật ký.'
+      + '<label style="margin-left:8px;cursor:pointer"><input type="checkbox" id="mcpStrict" ' + (d.strict ? "checked" : "") + '> Chỉ dùng kết nối của Javis (bỏ MCP sẵn của máy)</label></div>'
+      + '<div class="prov-list" style="margin-top:12px">' + (connectedHtml || '<div class="mp-empty">Chưa đấu nguồn nào - chọn một dịch vụ trong Kho bên dưới để bắt đầu.</div>') + '</div></div>'
+      + '<div class="cview-section"><h3>◆ Kho kết nối</h3>'
+      + '<div class="cat-tools"><input class="js-input" id="catQ" placeholder="Tìm dịch vụ…" style="max-width:220px">'
+      + '<span class="cat-filter"><button class="cat-chip on" data-catf="">Tất cả</button>' + cats.map(x => '<button class="cat-chip" data-catf="' + esc(x) + '">' + esc(x) + '</button>').join("") + '</span></div>'
+      + '<div class="cat-grid" id="catGrid">' + cat.map(catalogCard).join("") + catalogCard(byId.custom) + '</div></div>'
+      + '<div class="cview-section"><h3>◆ MCP từ Claude Code <span style="opacity:.5">tài khoản - chỉ hiển thị</span></h3>'
+      + '<div class="gcard-meta" style="max-width:740px">Các MCP anh đã kết nối sẵn trong Claude Code (đồng bộ từ claude.ai). Engine Claude Code tự dùng các cái "Connected". Đăng nhập/quản lý trong app Claude, không sửa ở đây.</div>'
+      + '<div class="prov-list" id="mcpAmbient" style="margin-top:12px"><div class="mp-empty">Đang tải… (kiểm tra sức khoẻ MCP, hơi lâu)</div></div></div>';
     document.getElementById("mcpStrict").onchange = (e) => postJson("/mcp/strict", { strict: e.target.checked });
-    el.querySelectorAll("[data-mcp-toggle]").forEach(b => b.onclick = async () => { await postJson("/mcp/toggle", { id: b.dataset.mcpToggle }); renderMcp(el); });
-    el.querySelectorAll("[data-mcp-edit]").forEach(b => b.onclick = () => { const s = servers.find(x => x.id === b.dataset.mcpEdit); if (s) openMcpForm(el, s); });
-    el.querySelectorAll("[data-mcp-del]").forEach(b => b.onclick = async () => { if (!confirm("Xoá server này?")) return; await postJson("/mcp/delete", { id: b.dataset.mcpDel }); renderMcp(el); });
-    el.querySelectorAll("[data-mcp-deny]").forEach(b => b.onclick = async () => {
-      const s = servers.find(x => x.id === b.dataset.mcpDeny) || {};
-      const cur = (s.deny_tools || []).join(", ");
-      const v = prompt("Tên các tool CẦN CHẶN (server này), cách nhau dấu phẩy.\nVD: pos_order, pos_purchase, pos_transaction\n(Để trống = không chặn gì)", cur);
-      if (v === null) return;
-      const deny = v.split(",").map(x => x.trim()).filter(Boolean);
-      await postJson("/mcp/update", { id: s.id, deny_tools: deny, perm: deny.length ? "readonly" : "full" });
-      renderMcp(el);
+    const isFirst = conns.length === 0;
+    el.querySelectorAll("[data-connect]").forEach(b => b.onclick = () => openAddFlow(el, byId[b.dataset.connect], isFirst));
+    el.querySelectorAll("[data-addacc]").forEach(b => b.onclick = () => openAddFlow(el, byId[b.dataset.addacc], false));
+    el.querySelectorAll("[data-conn]").forEach(b => b.onclick = () => {
+      const c = conns.find(x => x.id === b.dataset.conn);
+      if (c) openAccountMenu(el, c, byId[c.connector_id]);
+    });
+    const applyFilter = () => {
+      const q = (document.getElementById("catQ").value || "").toLowerCase();
+      const onChip = el.querySelector(".cat-chip.on");
+      const cf = onChip ? (onChip.dataset.catf || "") : "";
+      el.querySelectorAll("#catGrid .cat-card").forEach(card => {
+        const okQ = !q || card.textContent.toLowerCase().includes(q);
+        const okC = !cf || card.dataset.cat === cf;
+        card.style.display = (okQ && okC) ? "" : "none";
+      });
+    };
+    document.getElementById("catQ").oninput = applyFilter;
+    el.querySelectorAll(".cat-chip").forEach(ch => ch.onclick = () => {
+      el.querySelectorAll(".cat-chip").forEach(x => x.classList.remove("on"));
+      ch.classList.add("on");
+      applyFilter();
     });
     fetch("/mcp/ambient").then(r => r.json()).then(a => {
       const box = document.getElementById("mcpAmbient"); if (!box) return;
@@ -1520,7 +2026,7 @@
       else r = await postJson("/mcp/add", body);
       if (!r.ok) { $("#mErr").textContent = r.error || "Lỗi"; $("#mSave").disabled = false; $("#mSave").textContent = edit ? "Lưu" : "Thêm"; return; }
       modal.classList.remove("open");
-      renderMcp(el);
+      renderConnect(el);
     };
     modal.classList.add("open");
   }
@@ -1537,8 +2043,8 @@
           <label class="js-row"><span>Bật bot Telegram</span><input type="checkbox" id="tgEnabled" ${tg.enabled ? "checked" : ""}></label>
           <label class="js-lbl">Bot token ${tg.token_set ? '<span class="dim">(đã đặt)</span>' : ""}</label>
           <input class="js-input" id="tgToken" type="password" placeholder="${tg.token_set ? "để trống nếu không đổi" : "123456:ABC..."}">
-          <label class="js-lbl">Chat ID được phép dùng</label>
-          <input class="js-input" id="tgChat" value="${esc(tg.chat_id || "")}" placeholder="vd 123456789">
+          <label class="js-lbl">Chat ID được phép dùng <span class="dim">(nhiều ID cách nhau dấu phẩy - mỗi người /start bot rồi thêm ID vào đây)</span></label>
+          <input class="js-input" id="tgChat" value="${esc(tg.chat_id || "")}" placeholder="vd 123456789, 987654321">
           <div class="js-actions"><button class="gcard-btn" id="tgSave">Lưu & bật</button><button class="gcard-btn ghost" id="tgTest">Gửi test</button></div>
           <div class="gcard-meta" id="tgStatus"></div>
         </div>
@@ -1550,7 +2056,10 @@
       let line;
       if (!d.enabled) line = "⚪ Bot CHƯA bật - tích 'Bật bot Telegram' rồi Lưu (test gửi được KHÔNG có nghĩa bot đang nhận tin).";
       else if (!d.token_set) line = "⚪ Chưa có bot token.";
-      else if (d.status === "polling") line = "🟢 Bot đang nhận tin - nhắn cho bot là Javis trả lời.";
+      else if (d.status === "polling") {
+        const n = (d.chat_ids || []).length;
+        line = `🟢 Bot đang nhận tin - ${n ? n + " chat ID được phép" : "MỌI NGƯỜI nhắn được (chưa giới hạn ID)"} - nhắn cho bot là Javis trả lời.`;
+      }
       else if (d.status === "conflict") line = "🔴 409: " + (d.last_error || "token bị poll nơi khác hoặc còn webhook") + " - bot tự xoá webhook khi khởi động; nếu vẫn lỗi thì có nơi khác đang poll cùng token.";
       else if (d.status === "error") line = "⚠ Lỗi bot: " + (d.last_error || "");
       else if (d.status === "starting") line = "⏳ Đang khởi động bot…";
@@ -1569,7 +2078,12 @@
     };
     document.getElementById("tgTest").onclick = async () => {
       st.textContent = "Đang gửi test...";
-      try { const r = await (await fetch("/telegram/test", { method: "POST" })).json(); st.textContent = r.ok ? "✅ Đã gửi tin test." : "⚠ " + (r.error || "Chưa cấu hình bot."); }
+      try {
+        const r = await (await fetch("/telegram/test", { method: "POST" })).json();
+        st.textContent = r.ok
+          ? (r.total > 1 ? `✅ Đã gửi tin test tới ${r.sent}/${r.total} ID.` + (r.error ? " Lỗi: " + r.error : "") : "✅ Đã gửi tin test.")
+          : "⚠ " + (r.error || "Chưa cấu hình bot.");
+      }
       catch (e) { st.textContent = "⚠ Lỗi mạng."; }
     };
   }
@@ -1656,76 +2170,191 @@
     const elSet = !!v.elevenlabs_key_set;
     const opt = (val, label, cur) => `<option value="${esc(val)}"${val === cur ? " selected" : ""}>${esc(label)}</option>`;
     const oaVoices = ["alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse"];
+    // Nhà cung cấp giọng đọc - gộp NGAY trong nhóm giọng nói (render vào #ttsProviderHost), không tách section riêng.
+    const provHtml = `
+      <div class="qs-block">
+        <div class="popover-label">NHÀ CUNG CẤP GIỌNG ĐỌC</div>
+        <select class="js-input" id="vpProvider">
+          ${opt("edge", "Edge TTS - miễn phí (mặc định)", prov)}
+          ${opt("openai", "OpenAI - mượt, đa ngôn ngữ", prov)}
+          ${opt("elevenlabs", "ElevenLabs - tự nhiên nhất", prov)}
+        </select>
+        <div id="vpOpenai" style="display:none">
+          <label class="js-lbl">OpenAI API key ${oaSet ? '<span class="dim">(đã có - để trống nếu không đổi)</span>' : ""}</label>
+          <input class="js-input" id="vpOaKey" type="password" placeholder="sk-...">
+          <label class="js-lbl">Giọng OpenAI</label>
+          <select class="js-input" id="vpOaVoice">${oaVoices.map(x => opt(x, x, v.openai_tts_voice || "alloy")).join("")}</select>
+        </div>
+        <div id="vpEleven" style="display:none">
+          <label class="js-lbl">ElevenLabs API key ${elSet ? '<span class="dim">(đã có - để trống nếu không đổi)</span>' : ""}</label>
+          <input class="js-input" id="vpElKey" type="password" placeholder="dán API key ElevenLabs">
+          <label class="js-lbl">Voice ID <span class="dim">(lấy ở ElevenLabs → Voices)</span></label>
+          <input class="js-input" id="vpElVoice" value="${esc(v.elevenlabs_voice || "")}" placeholder="21m00Tcm4TlvDq8ikWAM (Rachel)">
+        </div>
+        <div class="js-actions"><button class="gcard-btn" id="vpSave">Lưu nhà cung cấp</button></div>
+        <div class="gcard-meta" id="vpStatus">Đang dùng: <b>${esc(prov)}</b>. Provider trả phí lỗi sẽ tự về Edge. Bấm ▶ Nghe thử ở dưới để nghe.</div>
+      </div>`;
     el.innerHTML = `
       <div class="cview-section">
-        <h3>Giao diện · Avatar · Giọng nói · Tên miền</h3>
+        <h3>Giọng nói, ảnh đại diện &amp; tên miền</h3>
         <div class="cs-host"></div>
-      </div>
-      <div class="cview-section">
-        <h3>Nhà cung cấp giọng đọc</h3>
-        <div class="gcard" style="max-width:560px">
-          <label class="js-lbl">Chọn nhà cung cấp</label>
-          <select class="js-input" id="vpProvider">
-            ${opt("edge", "Edge TTS - miễn phí (mặc định)", prov)}
-            ${opt("openai", "OpenAI - mượt, đa ngôn ngữ", prov)}
-            ${opt("elevenlabs", "ElevenLabs - tự nhiên nhất", prov)}
-          </select>
-          <div id="vpOpenai" style="display:none">
-            <label class="js-lbl">OpenAI API key ${oaSet ? '<span class="dim">(đã có - để trống nếu không đổi)</span>' : ""}</label>
-            <input class="js-input" id="vpOaKey" type="password" placeholder="sk-...">
-            <label class="js-lbl">Giọng OpenAI</label>
-            <select class="js-input" id="vpOaVoice">${oaVoices.map(x => opt(x, x, v.openai_tts_voice || "alloy")).join("")}</select>
-          </div>
-          <div id="vpEleven" style="display:none">
-            <label class="js-lbl">ElevenLabs API key ${elSet ? '<span class="dim">(đã có - để trống nếu không đổi)</span>' : ""}</label>
-            <input class="js-input" id="vpElKey" type="password" placeholder="dán API key ElevenLabs">
-            <label class="js-lbl">Voice ID <span class="dim">(lấy ở ElevenLabs → Voices)</span></label>
-            <input class="js-input" id="vpElVoice" value="${esc(v.elevenlabs_voice || "")}" placeholder="21m00Tcm4TlvDq8ikWAM (Rachel)">
-          </div>
-          <div class="js-actions">
-            <button class="gcard-btn" id="vpSave">Lưu</button>
-            <button class="gcard-btn ghost" id="vpTest">▶ Nghe thử</button>
-          </div>
-          <div class="gcard-meta" id="vpStatus">Đang dùng: <b>${esc(prov)}</b>. Provider trả phí lỗi sẽ tự về Edge (miễn phí).</div>
-        </div>
       </div>`;
     const host = el.querySelector(".cs-host");
     const qs = document.getElementById("quickSet");
     if (qs && host) host.appendChild(qs);         // nhúng bộ điều khiển cũ vào trang (giữ handler)
     if (window.__javisRefreshExtras) { try { window.__javisRefreshExtras(); } catch (e) {} }  // nạp lại avatar/tên miền
+    const provHost = document.getElementById("ttsProviderHost");   // điểm neo trong nhóm giọng nói (index.html)
+    if (provHost) provHost.innerHTML = provHtml;
 
     const provSel = document.getElementById("vpProvider");
-    const showFields = () => {
-      document.getElementById("vpOpenai").style.display = provSel.value === "openai" ? "block" : "none";
-      document.getElementById("vpEleven").style.display = provSel.value === "elevenlabs" ? "block" : "none";
-    };
-    provSel.onchange = showFields; showFields();
-
-    const st = document.getElementById("vpStatus");
-    document.getElementById("vpSave").onclick = async () => {
-      st.textContent = "Đang lưu...";
-      const data = {
-        tts_provider: provSel.value,
-        openai_tts_voice: document.getElementById("vpOaVoice").value,
-        elevenlabs_voice: document.getElementById("vpElVoice").value.trim(),
+    if (provSel) {   // guard: thiếu điểm neo (vd cache index.html cũ) thì avatar/tên miền vẫn chạy, không sập trang
+      const showFields = () => {
+        const p = provSel.value;
+        document.getElementById("vpOpenai").style.display = p === "openai" ? "block" : "none";
+        document.getElementById("vpEleven").style.display = p === "elevenlabs" ? "block" : "none";
+        // Giọng HoaiMy/NamMinh chỉ áp dụng cho Edge. Provider khác chọn giọng ngay trong khối trên
+        // (vpOaVoice / vpElVoice) nên ẩn khối này cho gọn. Radio vẫn nằm trong DOM + giữ 'checked'
+        // để app.js đọc input[name=voice] không lỗi; server dùng provider đã lưu nên giá trị này vô hại.
+        const edgeVoice = document.getElementById("edgeVoiceSection");
+        if (edgeVoice) edgeVoice.style.display = p === "edge" ? "" : "none";
       };
-      const elKey = document.getElementById("vpElKey").value.trim();
-      if (elKey) data.elevenlabs_key = elKey;
-      const r = await saveSetting("voice", data);
-      const oaKey = document.getElementById("vpOaKey").value.trim();
-      if (oaKey) await saveSetting("model", { openai_api_key: oaKey });   // key OpenAI dùng chung với chat
-      _settings = null;
-      st.innerHTML = r.ok
-        ? "✅ Đã lưu. Đang dùng: <b>" + esc(provSel.value) + "</b>. Bấm ▶ Nghe thử."
-        : "⚠ Lỗi lưu.";
-    };
-    document.getElementById("vpTest").onclick = () => {
-      st.textContent = "Đang phát thử... (dùng cấu hình ĐÃ lưu)";
-      const a = new Audio("/tts?text=" + encodeURIComponent("Xin chào, đây là giọng đọc mới của Javis.") + "&t=" + Date.now());
-      a.onended = () => { st.textContent = "Nghe ổn chứ? Nếu chưa, đổi provider/giọng rồi Lưu lại."; };
-      a.onerror = () => { st.textContent = "⚠ Không phát được - kiểm tra API key / provider (Lưu trước khi thử)."; };
-      a.play().catch(() => { st.textContent = "⚠ Trình duyệt chặn phát - bấm ▶ lần nữa."; });
-    };
+      provSel.onchange = showFields; showFields();
+
+      const st = document.getElementById("vpStatus");
+      document.getElementById("vpSave").onclick = async () => {
+        st.textContent = "Đang lưu...";
+        const data = {
+          tts_provider: provSel.value,
+          openai_tts_voice: document.getElementById("vpOaVoice").value,
+          elevenlabs_voice: document.getElementById("vpElVoice").value.trim(),
+        };
+        const elKey = document.getElementById("vpElKey").value.trim();
+        if (elKey) data.elevenlabs_key = elKey;
+        const r = await saveSetting("voice", data);
+        const oaKey = document.getElementById("vpOaKey").value.trim();
+        if (oaKey) await saveSetting("model", { openai_api_key: oaKey });   // key OpenAI dùng chung với chat
+        _settings = null;
+        st.innerHTML = r.ok
+          ? "✅ Đã lưu. Đang dùng: <b>" + esc(provSel.value) + "</b>. Bấm ▶ Nghe thử."
+          : "⚠ Lỗi lưu.";
+      };
+    }
+  }
+
+  // ============================================
+  // Trang TRÒ CHUYỆN - khung chat toàn khung (mượn node chat của cockpit + sidebar lịch sử)
+  // Không nhân đôi bộ máy chat: relocate chính #chatArea/#attachBar/#modelBar/#hudVoice
+  // (giữ nguyên mọi handler + WebSocket + streaming đã gắn trong app.js) rồi TRẢ về HUD khi
+  // rời trang. Cùng một cuộc trò chuyện hiển thị ở cả màn 3D lẫn tab này.
+  // ============================================
+  const CHAT_NODE_IDS = ["chatArea", "attachBar", "modelBar", "hudVoice"];
+  let _chatSlots = [];        // vị trí gốc từng node để trả về đúng chỗ trong HUD
+  let _chatEngObs = null;     // theo dõi engineBadge gốc để phản chiếu badge trong tab
+
+  function _injectChatCss() {
+    if (document.getElementById("cp-css")) return;
+    const css = `
+    body.on-chat .cview-head{ display:none; }
+    body.on-chat .cview-body{ padding:0; overflow:hidden; }
+    /* Ẩn hẳn THÂN HUD (metrics/orb 3D/panels) khi ở tab chat. cview fade-in 200ms của Alpine
+       + canvas WebGL bị đẩy lớp compositing có thể để lộ HUD phía sau (loé orb) lúc mở tab. Giữ
+       .hud-top (thanh trên toàn cục) hiển thị. Rời tab (bỏ .on-chat) HUD tự hiện lại + graph thức. */
+    body.on-chat .hud-body{ visibility:hidden; }
+    .chatpage{ display:flex; height:100%; min-height:0; position:relative; }
+    .chatpage-side{ width:280px; flex:none; display:flex; flex-direction:column; gap:10px;
+      min-height:0; padding:14px 12px; border-right:1px solid var(--glass-brd); background:rgba(255,255,255,.015); }
+    .chatpage-main{ flex:1 1 auto; min-width:0; display:flex; flex-direction:column; min-height:0; padding:14px 20px 16px; }
+    .chatpage-bar{ display:flex; align-items:center; gap:10px; padding:0 4px 10px; flex:none; }
+    .cp-title{ font-family:var(--font); font-weight:700; letter-spacing:.5px; color:var(--text); }
+    .cp-engine{ margin-left:auto; font-size:12px; color:var(--text2); font-family:var(--font); white-space:nowrap; }
+    .cp-ico-btn{ background:none; border:1px solid var(--border); color:var(--text2); border-radius:8px;
+      padding:4px 10px; cursor:pointer; font-size:14px; line-height:1; }
+    .cp-ico-btn:hover{ color:var(--accent); border-color:var(--accent); }
+    .cp-side-toggle{ display:none; }
+    .chatpage-slot{ flex:1 1 auto; min-height:0; display:flex; flex-direction:column; gap:10px; }
+    .chatpage-slot > *{ width:100%; max-width:900px; margin-left:auto; margin-right:auto; }
+    .chatpage-slot .transcript{ flex:1 1 auto; min-height:0; max-height:none; background:transparent; }
+    .chatpage-slot .hud-voice{ background:rgba(24,24,34,.6); border:1px solid var(--border); border-radius:12px; }
+    .chatpage-slot .attach-bar{ flex:none; }
+    @media (max-width:860px){
+      .cp-side-toggle{ display:inline-block; }
+      .chatpage-side{ position:absolute; left:0; top:0; bottom:0; z-index:6; width:min(84vw,300px);
+        transform:translateX(-105%); transition:transform .2s ease; box-shadow:10px 0 40px rgba(0,0,0,.5); background:var(--bg); }
+      .chatpage.side-open .chatpage-side{ transform:none; }
+      .chatpage-main{ padding:10px 12px 12px; }
+    }`;
+    const st = document.createElement("style"); st.id = "cp-css"; st.textContent = css; document.head.appendChild(st);
+  }
+
+  function _borrowChatNodes(into) {
+    _chatSlots = [];
+    CHAT_NODE_IDS.forEach(id => {
+      const n = document.getElementById(id);
+      if (!n) return;
+      _chatSlots.push({ node: n, parent: n.parentNode, next: n.nextSibling });
+      into.appendChild(n);
+    });
+  }
+  function _returnChatNodes() {
+    if (_chatEngObs) { try { _chatEngObs.disconnect(); } catch (e) {} _chatEngObs = null; }
+    for (let i = _chatSlots.length - 1; i >= 0; i--) {
+      const s = _chatSlots[i];
+      if (!s.parent) continue;
+      if (s.next && s.next.parentNode === s.parent) s.parent.insertBefore(s.node, s.next);
+      else s.parent.appendChild(s.node);
+    }
+    _chatSlots = [];
+    document.body.classList.remove("on-chat");
+  }
+
+  function renderChat(el) {
+    _injectChatCss();
+    // Vào lại trang này (vd đổi brain gọi thẳng renderPage) trong khi node đang mượn ở cviewBody
+    // cũ → TRẢ về HUD trước, nếu không el.innerHTML bên dưới sẽ xoá luôn #chatArea đang nằm trong đó.
+    if (_chatSlots.length) _returnChatNodes();
+    // chat-zoom overlay cũng mượn cùng các node → thu lại trước cho khỏi giành
+    try { if (window.JavisChatStage && window.JavisChatStage.isOpen()) window.JavisChatStage.collapse(); } catch (e) {}
+    document.body.classList.add("on-chat");
+    el.innerHTML =
+      '<div class="chatpage" id="chatPage">' +
+        '<aside class="chatpage-side" id="chatPageSide"></aside>' +
+        '<div class="chatpage-main">' +
+          '<div class="chatpage-bar">' +
+            '<button class="cp-ico-btn cp-side-toggle" type="button" title="Ẩn/hiện lịch sử">🕘</button>' +
+            '<span class="cp-title">Trò chuyện với Javis</span>' +
+            '<span class="cp-engine" id="cpEngine"></span>' +
+          '</div>' +
+          '<div class="chatpage-slot" id="chatPageSlot"></div>' +
+        '</div>' +
+      '</div>';
+    const page = el.querySelector("#chatPage");
+    const slot = el.querySelector("#chatPageSlot");
+    _borrowChatNodes(slot);
+
+    // Sidebar lịch sử hội thoại (dùng lại module chung của chat workspace)
+    try { if (window.JavisChatSide) window.JavisChatSide.mount(el.querySelector("#chatPageSide")); } catch (e) {}
+
+    // Badge engine: phản chiếu từ badge gốc trong HUD (không mượn node để khỏi phá HUD)
+    const eb = document.getElementById("engineBadge"), cpe = el.querySelector("#cpEngine");
+    if (eb && cpe) {
+      const sync = () => { cpe.textContent = (eb.textContent || "").trim(); };
+      sync();
+      try { _chatEngObs = new MutationObserver(sync); _chatEngObs.observe(eb, { childList: true, characterData: true, subtree: true }); } catch (e) {}
+    }
+
+    // Mobile: nút 🕘 mở/đóng drawer lịch sử; bấm vào vùng chat thì đóng drawer
+    const isNar = () => window.matchMedia("(max-width: 860px)").matches;
+    el.querySelector(".cp-side-toggle").onclick = () => page.classList.toggle("side-open");
+    slot.addEventListener("click", () => { if (isNar() && page.classList.contains("side-open")) page.classList.remove("side-open"); });
+    el.querySelector("#chatPageSide").addEventListener("click", (e) => {
+      if (isNar() && e.target.closest(".cside-item")) page.classList.remove("side-open");
+    });
+
+    // Cuộn xuống đáy + focus ô nhập cho tiện gõ ngay
+    const ca = document.getElementById("chatArea"); if (ca) ca.scrollTop = ca.scrollHeight;
+    const ci = document.getElementById("chatInput"); if (ci) { try { ci.focus(); } catch (e) {} }
+
+    _pageLeave = _returnChatNodes;   // rời tab → trả node về HUD trước khi cviewBody bị ghi đè
   }
 
   // ============================================
@@ -1743,6 +2372,468 @@
       },
     });
   });
+
+  // ============================================================
+  // VAULT EXPLORER (cột trái) - cây lazy + tìm note + editor overlay đè lên não
+  // Tái dùng thẳng esc / _fileIcon / fbrain / recomputeGraph (đều trong IIFE này).
+  // KHÔNG đụng renderFiles/openVaultTarget (deep-link chat) - openNote là luồng riêng, additive.
+  // ============================================================
+  const VT_IMG_EXTS = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico"];
+  const VT_TEXT_EXTS = [".md", ".txt", ".json", ".yaml", ".yml", ".csv", ".js", ".ts", ".py",
+    ".html", ".css", ".toml", ".ini", ".log", ".sh", ".bat", ".xml", ".svg", ".env"];
+  let _vtHome = "";            // đường dẫn (theo trần duyệt) của gốc brain
+  let _vtCache = new Map();    // key -> items[] (cache con thư mục đã nạp)
+  let _vtActivePath = null;    // file .md đang mở (để tô sáng trong cây)
+  let _vtWired = false;        // đã gắn handler search/toolbar chưa
+  let _vtIndex = null;         // chỉ mục file toàn vault (crawl client) - cho tìm theo Tên không cần server restart
+  let _neSaveFn = null;        // hàm lưu của editor đang mở (cho Ctrl+S)
+  const _vtRaw = (rel, dl) => `/files/raw?brain=${encodeURIComponent(fbrain())}&path=${encodeURIComponent(rel)}${dl ? "&dl=1" : ""}`;
+  const _vtNoAccent = (s) => (s || "").toString().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[đĐ]/g, "d").toLowerCase();
+
+  async function _vtList(path) {
+    const key = (path == null) ? " home" : path;
+    if (_vtCache.has(key)) return _vtCache.get(key);
+    const qp = (path == null) ? "" : `&path=${encodeURIComponent(path)}`;
+    let items = [];
+    try {
+      const d = await (await fetch(`/files/list?brain=${encodeURIComponent(fbrain())}${qp}`)).json();
+      if (d && !d.error) { items = d.items || []; if (path == null && d.home != null) _vtHome = d.home; }
+    } catch (e) {}
+    _vtCache.set(key, items);
+    return items;
+  }
+
+  // Dựng lại cây nhưng GIỮ NGUYÊN các thư mục đang mở (thêm/sửa/xoá không làm sập cây).
+  // revealDir (tuỳ chọn) = thư mục cần mở thêm để thấy file vừa tạo.
+  async function _vtRebuildReExpand(revealDir) {
+    const tree = document.getElementById("vaultTree"); if (!tree) return;
+    const escSel = (s) => (window.CSS && CSS.escape) ? CSS.escape(s) : s.replace(/"/g, '\\"');
+    // 1. Ghi lại các thư mục đang mở (childBox không ẩn).
+    const wanted = new Set();
+    tree.querySelectorAll(".vt-branch > .vt-children:not(.vt-hidden)").forEach(box => {
+      const node = box.previousElementSibling;
+      if (node && node.dataset && node.dataset.rel) wanted.add(node.dataset.rel);
+    });
+    // 2. Thêm chuỗi thư mục cha của revealDir (để thấy file mới dù thư mục đó đang đóng).
+    if (revealDir != null && revealDir !== "") {
+      let inner;
+      if (_vtHome && revealDir.indexOf(_vtHome + "/") === 0) inner = revealDir.slice(_vtHome.length + 1);
+      else if (!_vtHome) inner = revealDir;
+      else inner = (revealDir === _vtHome ? "" : revealDir);
+      const segs = inner ? inner.split("/") : [];
+      let acc = _vtHome || "";
+      for (const seg of segs) { acc = acc ? acc + "/" + seg : seg; wanted.add(acc); }
+    }
+    // 3. Dựng lại (tươi) rồi mở lại từ NÔNG tới SÂU (cha trước con).
+    _vtCache.clear(); _vtIndex = null;
+    await renderVaultTree();
+    const list = [...wanted].sort((a, b) => a.split("/").length - b.split("/").length);
+    for (const rel of list) {
+      const node = tree.querySelector(`.vt-node[data-rel="${escSel(rel)}"]`);
+      if (!node) continue;
+      const box = node.parentElement && node.parentElement.querySelector(":scope > .vt-children");
+      if (box && box.classList.contains("vt-hidden")) {
+        node.click();
+        for (let i = 0; i < 25 && (box.classList.contains("vt-hidden") || !box.children.length); i++) await new Promise(r => setTimeout(r, 30));
+      }
+    }
+  }
+
+  async function _vtAddFile(rel, isDir) {
+    // Bấm ở thư mục → tạo file BÊN TRONG; bấm ở file → tạo CÙNG thư mục (thư mục cha của file).
+    const dir = isDir ? rel : (rel.includes("/") ? rel.slice(0, rel.lastIndexOf("/")) : "");
+    let n = prompt("Tên file mới (vd ghi-chu):");
+    if (!n) return;
+    if (!/\.[a-z0-9]+$/i.test(n)) n += ".md";   // mặc định file markdown
+    const path = dir ? dir + "/" + n : n;
+    const fd = new FormData(); fd.append("brain", fbrain()); fd.append("path", path); fd.append("content", "");
+    try { await fetch("/files/write", { method: "POST", body: fd }); } catch (e) {}
+    await _vtRebuildReExpand(dir);               // giữ thư mục đang mở + bung tới thư mục vừa tạo
+    const ext = "." + n.split(".").pop().toLowerCase();
+    openNote(path, { name: n, ext: ext, type: "file" });
+  }
+
+  async function _vtRename(rel, oldname) {
+    const nn = prompt("Tên mới:", oldname);
+    if (!nn || nn === oldname) return;
+    const fd = new FormData(); fd.append("brain", fbrain()); fd.append("path", rel); fd.append("newname", nn);
+    try { await fetch("/files/rename", { method: "POST", body: fd }); } catch (e) {}
+    await _vtRebuildReExpand(null);   // giữ nguyên các thư mục đang mở
+  }
+  async function _vtDelete(rel, name, isDir) {
+    if (!confirm(`Xoá "${name}"${isDir ? " và toàn bộ bên trong" : ""}? Không hoàn tác được.`)) return;
+    const fd = new FormData(); fd.append("brain", fbrain()); fd.append("path", rel);
+    try { await fetch("/files/delete", { method: "POST", body: fd }); } catch (e) {}
+    if (_vtActivePath === rel) closeNote();
+    await _vtRebuildReExpand(null);   // giữ nguyên các thư mục đang mở
+  }
+
+  function _vtRowEl(it, parentPath, depth) {
+    const rel = parentPath ? parentPath + "/" + it.name : it.name;
+    const isDir = it.type === "dir";
+    const wrap = document.createElement("div"); wrap.className = "vt-branch";
+    const node = document.createElement("div");
+    node.className = "vt-node"; node.dataset.rel = rel; node.dataset.name = it.name;
+    node.style.paddingLeft = (6 + depth * 13) + "px";
+    node.innerHTML = `<span class="vt-chev ${isDir ? "" : "leaf"}">▸</span>`
+      + `<span class="vt-ico">${isDir ? "📁" : _fileIcon(it.ext)}</span>`
+      + `<span class="vt-name">${esc(it.name)}</span>`
+      + `<span class="vt-act"><button data-a="add" title="Thêm file ${isDir ? "trong thư mục này" : "cùng thư mục"}">＋</button><button data-a="ren" title="Đổi tên">✎</button><button data-a="del" title="Xoá">🗑</button></span>`;
+    if (!isDir && rel === _vtActivePath) node.classList.add("active");
+    node.querySelectorAll(".vt-act button").forEach(b => b.onclick = (e) => {
+      e.stopPropagation();
+      const a = b.dataset.a;
+      if (a === "add") _vtAddFile(rel, isDir);
+      else if (a === "ren") _vtRename(rel, it.name);
+      else _vtDelete(rel, it.name, isDir);
+    });
+    wrap.appendChild(node);
+    if (isDir) {
+      const childBox = document.createElement("div"); childBox.className = "vt-children vt-hidden";
+      wrap.appendChild(childBox);
+      let loaded = false;
+      node.onclick = async () => {
+        const chev = node.querySelector(".vt-chev");
+        const willOpen = childBox.classList.contains("vt-hidden");
+        childBox.classList.toggle("vt-hidden", !willOpen);
+        chev.classList.toggle("open", willOpen);
+        if (willOpen && !loaded) {
+          loaded = true;
+          const kids = await _vtList(rel);
+          if (!kids.length) childBox.innerHTML = `<div class="vt-info" style="padding-left:${18 + depth * 13}px">trống</div>`;
+          else kids.forEach(k => childBox.appendChild(_vtRowEl(k, rel, depth + 1)));
+        }
+      };
+    } else {
+      node.onclick = () => openNote(rel, it);
+    }
+    return wrap;
+  }
+
+  // Crawl toàn vault qua /files/list (đã sống) → chỉ mục file để tìm theo TÊN không cần server restart.
+  // Bám trong gốc brain (bắt đầu từ home), có trần chống treo trên vault lớn. Cache lại sau lần đầu.
+  async function _vtBuildIndex() {
+    if (_vtIndex) return _vtIndex;
+    const SKIP = new Set([".git", "node_modules", "__pycache__", ".obsidian", ".trash", ".venv"]);
+    if (!_vtHome && !_vtCache.has(" home")) await _vtList(null);
+    const out = []; const queue = [_vtHome || ""]; let guard = 0;
+    while (queue.length && out.length < 3000 && guard < 600) {
+      guard++;
+      const dir = queue.shift();
+      const items = await _vtList(dir);
+      for (const it of items) {
+        const rel = dir ? dir + "/" + it.name : it.name;
+        if (it.type === "dir") { if (!it.name.startsWith(".") && !SKIP.has(it.name)) queue.push(rel); }
+        else out.push({ name: it.name, ext: it.ext, path: rel, dir: dir });
+      }
+    }
+    _vtIndex = out;
+    return out;
+  }
+
+  function _vtRelHome(dir) {
+    if (!dir) return "";
+    if (_vtHome && dir === _vtHome) return "";
+    if (_vtHome && dir.indexOf(_vtHome + "/") === 0) return dir.slice(_vtHome.length + 1);
+    return dir;
+  }
+
+  function _vtRenderResults(box, list, withSnippet) {
+    box.innerHTML = "";
+    list.forEach(it => {
+      const el = document.createElement("div"); el.className = "vr-item";
+      const sub = withSnippet ? (it.snippet || "") : _vtRelHome(it.dir);
+      el.innerHTML = `<div class="vr-name"><span class="vt-ico">${_fileIcon(it.ext)}</span>${esc(it.name)}</div>`
+        + (sub ? `<div class="vr-snip">${esc(sub)}</div>` : "");
+      el.onclick = () => openNote(it.path, { name: it.name, ext: it.ext, type: "file" });
+      box.appendChild(el);
+    });
+  }
+
+  async function _vtNameSearch(q) {
+    const box = document.getElementById("vaultResults"); if (!box) return;
+    box.innerHTML = `<div class="vr-empty">Đang tìm…</div>`;
+    const idx = await _vtBuildIndex();
+    const nq = _vtNoAccent(q);
+    const hits = idx.filter(f => _vtNoAccent(f.name).includes(nq)).slice(0, 120);
+    if (!hits.length) { box.innerHTML = `<div class="vr-empty">Không thấy note nào tên khớp "${esc(q)}".</div>`; return; }
+    _vtRenderResults(box, hits, false);
+  }
+
+  async function _vtSearchContent(q) {
+    const box = document.getElementById("vaultResults"); if (!box) return;
+    box.innerHTML = `<div class="vr-empty">Đang tìm…</div>`;
+    let resp, d = {};
+    try { resp = await fetch(`/files/search?brain=${encodeURIComponent(fbrain())}&q=${encodeURIComponent(q)}&limit=60`); d = await resp.json().catch(() => ({})); }
+    catch (e) { resp = null; }
+    if (!resp || resp.status === 404) {
+      box.innerHTML = `<div class="vr-empty">Tìm theo <b>nội dung</b> cần khởi động lại Javis một lần (chạy start-javis.bat) để bật. Tạm thời hãy tìm theo <b>Tên</b>.</div>`;
+      return;
+    }
+    if (!resp.ok) { box.innerHTML = `<div class="vr-empty">Lỗi tìm kiếm (${resp.status}).</div>`; return; }
+    const items = (d && d.items) || [];
+    if (!items.length) { box.innerHTML = `<div class="vr-empty">Không thấy note nào chứa "${esc(q)}".</div>`; return; }
+    _vtRenderResults(box, items, true);
+  }
+
+  function _vtWire() {
+    if (_vtWired) return; _vtWired = true;
+    const input = document.getElementById("vaultSearch");
+    const clearBtn = document.getElementById("vaultSearchClear");
+    const chipName = document.getElementById("vsModeName");
+    const chipContent = document.getElementById("vsModeContent");
+    const tree = document.getElementById("vaultTree");
+    const results = document.getElementById("vaultResults");
+    if (!input || !tree) return;
+    let mode = "name", t = null;
+    const apply = () => {
+      const q = input.value.trim();
+      if (clearBtn) clearBtn.hidden = !q;
+      if (!q) { results.hidden = true; tree.hidden = false; return; }   // rỗng → về cây
+      tree.hidden = true; results.hidden = false;
+      if (mode === "name") _vtNameSearch(q); else _vtSearchContent(q);
+    };
+    const deb = () => { clearTimeout(t); t = setTimeout(apply, mode === "name" ? 150 : 280); };
+    input.addEventListener("input", deb);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { clearTimeout(t); apply(); }
+      else if (e.key === "Escape") { input.value = ""; apply(); }
+    });
+    if (clearBtn) clearBtn.onclick = () => { input.value = ""; apply(); input.focus(); };
+    const setMode = (m) => { mode = m; chipName.classList.toggle("active", m === "name"); chipContent.classList.toggle("active", m === "content"); apply(); };
+    chipName.onclick = () => setMode("name");
+    chipContent.onclick = () => setMode("content");
+    const nf = document.getElementById("vtNewFile"), nd = document.getElementById("vtNewDir"), rf = document.getElementById("vtRefresh");
+    if (rf) rf.onclick = () => { _vtCache.clear(); _vtIndex = null; renderVaultTree(); };
+    if (nf) nf.onclick = async () => {
+      let n = prompt("Tên file mới (vd ghi-chu):"); if (!n) return;
+      if (!/\.[a-z0-9]+$/i.test(n)) n += ".md";   // mặc định file markdown
+      const rel = _vtHome ? _vtHome + "/" + n : n;
+      const fd = new FormData(); fd.append("brain", fbrain()); fd.append("path", rel); fd.append("content", "");
+      await fetch("/files/write", { method: "POST", body: fd });
+      await _vtRebuildReExpand(_vtHome || "");   // giữ thư mục đang mở
+      const ext = "." + n.split(".").pop().toLowerCase();
+      openNote(rel, { name: n, ext: ext, type: "file" });
+    };
+    if (nd) nd.onclick = async () => {
+      const n = prompt("Tên thư mục mới:"); if (!n) return;
+      const fd = new FormData(); fd.append("brain", fbrain()); fd.append("path", _vtHome || ""); fd.append("name", n);
+      await fetch("/files/mkdir", { method: "POST", body: fd }); _vtCache.clear(); renderVaultTree();
+    };
+  }
+
+  async function renderVaultTree() {
+    const tree = document.getElementById("vaultTree"); if (!tree) return;
+    _vtWire();
+    tree.hidden = false;
+    const results = document.getElementById("vaultResults"); if (results) results.hidden = true;
+    tree.innerHTML = `<div class="vt-info">Đang tải…</div>`;
+    const items = await _vtList(null);
+    tree.innerHTML = "";
+    if (!items.length) { tree.innerHTML = `<div class="vt-info">Vault trống.</div>`; return; }
+    items.forEach(it => tree.appendChild(_vtRowEl(it, _vtHome || "", 0)));
+  }
+
+  function _vtMarkActive(rel) {
+    _vtActivePath = rel;
+    const tree = document.getElementById("vaultTree"); if (!tree) return;
+    tree.querySelectorAll(".vt-node.active").forEach(n => n.classList.remove("active"));
+    if (rel) {
+      const sel = (window.CSS && CSS.escape) ? CSS.escape(rel) : rel.replace(/"/g, '\\"');
+      const n = tree.querySelector(`.vt-node[data-rel="${sel}"]`); if (n) n.classList.add("active");
+    }
+  }
+
+  function _neKeyHandler(e) {
+    const ed = document.getElementById("noteEditor"); if (!ed || ed.hidden) return;
+    if ((e.ctrlKey || e.metaKey) && (e.key === "s" || e.key === "S")) { e.preventDefault(); if (_neSaveFn) _neSaveFn(); }
+    else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closeNote(); }
+  }
+  function closeNote() {
+    const ed = document.getElementById("noteEditor"); if (!ed) return;
+    ed.hidden = true; ed.classList.remove("ne-full");
+    document.getElementById("neBody").innerHTML = ""; document.getElementById("neActions").innerHTML = "";
+    _neSaveFn = null;
+    document.removeEventListener("keydown", _neKeyHandler, true);
+    _vtMarkActive(null);
+    try { recomputeGraph(); } catch (e) {}   // chạy lại não (đã gate active===home + không lite + studio đóng)
+  }
+  // Đổi tên file đang mở: lưu nội dung hiện tại trước (giữ chữ đã gõ), đổi tên, rồi mở lại ở tên mới.
+  async function _neRenameCur(rel, it) {
+    const oldname = (it && it.name) || rel.split("/").pop();
+    const nn = prompt("Tên mới:", oldname);
+    if (!nn || nn === oldname) return;
+    if (_neSaveFn) { try { await _neSaveFn(); } catch (e) {} }
+    const fd = new FormData(); fd.append("brain", fbrain()); fd.append("path", rel); fd.append("newname", nn);
+    try { await fetch("/files/rename", { method: "POST", body: fd }); } catch (e) {}
+    await _vtRebuildReExpand(null);
+    const dir = rel.includes("/") ? rel.slice(0, rel.lastIndexOf("/")) : "";
+    const newRel = dir ? dir + "/" + nn : nn;
+    const ext = nn.includes(".") ? "." + nn.split(".").pop().toLowerCase() : ".md";
+    openNote(newRel, { name: nn, ext: ext, type: "file" });
+  }
+  async function _neDeleteCur(rel, it) {
+    const name = (it && it.name) || rel.split("/").pop();
+    if (!confirm(`Xoá "${name}"? Không hoàn tác được.`)) return;
+    const fd = new FormData(); fd.append("brain", fbrain()); fd.append("path", rel);
+    try { await fetch("/files/delete", { method: "POST", body: fd }); } catch (e) {}
+    closeNote();
+    await _vtRebuildReExpand(null);
+  }
+  function _neCommonBtns(actions, rel, it) {
+    const mk = (label, title, fn) => { const b = document.createElement("button"); b.textContent = label; if (title) b.title = title; b.onclick = fn; return b; };
+    const ed = document.getElementById("noteEditor");
+    actions.appendChild(mk("✎", "Đổi tên file", () => _neRenameCur(rel, it)));
+    actions.appendChild(mk("🗑", "Xoá file", () => _neDeleteCur(rel, it)));
+    actions.appendChild(mk("↗", "Mở tab mới", () => window.open(_vtRaw(rel), "_blank")));
+    actions.appendChild(mk("⤓", "Tải về", () => window.open(_vtRaw(rel, 1), "_blank")));
+    actions.appendChild(mk("⛶", "Phóng to / thu nhỏ", () => ed.classList.toggle("ne-full")));
+    actions.appendChild(mk("✕", "Đóng (Esc)", closeNote));
+  }
+  function _neRenderDownload(body, actions, rel, it) {
+    body.className = "ne-body";
+    body.innerHTML = `<div class="ne-dl"><div class="ne-dl-ico">${_fileIcon(it.ext)}</div>`
+      + `<div>Loại file này không xem trực tiếp - hãy tải về.<br><b>${esc(it.name)}</b></div>`
+      + `<div><a href="${_vtRaw(rel, 1)}">⤓ Tải về</a> &nbsp;·&nbsp; <a href="${_vtRaw(rel)}" target="_blank">↗ Mở tab mới</a></div></div>`;
+    _neCommonBtns(actions, rel, it);
+  }
+
+  // Nạp turndown (HTML→markdown) LAZY, chỉ khi cần lưu bản WYSIWYG. + plugin GFM (bảng).
+  let _tdPromise = null, _td = null;
+  function _ensureTurndown() {
+    if (window.TurndownService) return Promise.resolve();
+    if (_tdPromise) return _tdPromise;
+    const load = (src) => new Promise((res) => { const s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = res; document.head.appendChild(s); });
+    _tdPromise = load("https://unpkg.com/turndown@7.2.0/dist/turndown.js")
+      .then(() => load("https://unpkg.com/turndown-plugin-gfm@1.0.2/dist/turndown-plugin-gfm.js"));
+    return _tdPromise;
+  }
+  // HTML (bản render đang sửa) → markdown. GIỮ [[wikilink]] và ![[ảnh]] qua luật riêng theo data-vault-path.
+  function _mdFromHtml(html) {
+    if (!window.TurndownService) return null;
+    if (!_td) {
+      _td = new window.TurndownService({ headingStyle: "atx", bulletListMarker: "-", codeBlockStyle: "fenced", emDelimiter: "*" });
+      try { if (window.turndownPluginGfm) _td.use(window.turndownPluginGfm.gfm); } catch (e) {}
+      _td.addRule("wikilink", { filter: (n) => n.nodeName === "A" && n.getAttribute("data-vault-path") != null,
+        replacement: (c, n) => "[[" + n.getAttribute("data-vault-path") + "]]" });
+      _td.addRule("wikiimg", { filter: (n) => n.nodeName === "IMG" && n.getAttribute("data-vault-path") != null,
+        replacement: (c, n) => "![[" + n.getAttribute("data-vault-path") + "]]" });
+    }
+    try { return _td.turndown(html); } catch (e) { return null; }
+  }
+
+  // Thanh công cụ markdown - hoạt động CẢ trên bản render (WYSIWYG, execCommand) LẪN nguồn thô (chèn cú pháp).
+  function _neBuildToolbar(host, ctx) {
+    if (!host) return;
+    const ta = ctx.ta, wys = ctx.wys, isWys = () => ctx.mode() === "wys";
+    const exec = (cmd, val) => { try { wys.focus(); document.execCommand(cmd, false, val || null); } catch (e) {} };
+    const wrapTa = (b, a, ph) => {
+      const s = ta.selectionStart, e = ta.selectionEnd, sel = ta.value.slice(s, e) || ph || "";
+      ta.value = ta.value.slice(0, s) + b + sel + a + ta.value.slice(e);
+      ta.selectionStart = s + b.length; ta.selectionEnd = s + b.length + sel.length; ta.focus();
+    };
+    const lineTa = (prefix) => {
+      const s = ta.selectionStart, e = ta.selectionEnd, v = ta.value, ls = v.lastIndexOf("\n", s - 1) + 1;
+      const block = v.slice(ls, e).split("\n").map((ln, i) => prefix.replace("{n}", i + 1) + ln).join("\n");
+      ta.value = v.slice(0, ls) + block + v.slice(e); ta.focus();
+    };
+    const insTa = (t) => { const s = ta.selectionStart; ta.value = ta.value.slice(0, s) + t + ta.value.slice(s); ta.selectionStart = ta.selectionEnd = s + t.length; ta.focus(); };
+    const B = (fn) => () => { fn(); };
+    const BTNS = [
+      ["B", "Đậm", () => isWys() ? exec("bold") : wrapTa("**", "**", "chữ đậm"), "font-weight:700"],
+      ["I", "Nghiêng", () => isWys() ? exec("italic") : wrapTa("*", "*", "chữ nghiêng"), "font-style:italic"],
+      ["H1", "Tiêu đề 1", () => isWys() ? exec("formatBlock", "H1") : lineTa("# ")],
+      ["H2", "Tiêu đề 2", () => isWys() ? exec("formatBlock", "H2") : lineTa("## ")],
+      ["H3", "Tiêu đề 3", () => isWys() ? exec("formatBlock", "H3") : lineTa("### ")],
+      ["•", "Gạch đầu dòng", () => isWys() ? exec("insertUnorderedList") : lineTa("- ")],
+      ["1.", "Danh sách số", () => isWys() ? exec("insertOrderedList") : lineTa("{n}. ")],
+      ["❝", "Trích dẫn", () => isWys() ? exec("formatBlock", "BLOCKQUOTE") : lineTa("> ")],
+      ["</>", "Code", () => isWys() ? exec("insertHTML", "<code>code</code>") : wrapTa("`", "`", "code")],
+      ["🔗", "Link", () => { const u = prompt("URL:", "https://"); if (!u) return; isWys() ? exec("createLink", u) : wrapTa("[", "](" + u + ")", "chữ"); }],
+      ["―", "Kẻ ngang", () => isWys() ? exec("insertHorizontalRule") : insTa("\n---\n")],
+    ];
+    host.innerHTML = "";
+    BTNS.forEach(([label, title, fn, style]) => {
+      const b = document.createElement("button"); b.type = "button"; b.textContent = label; b.title = title;
+      if (style) b.style.cssText += style;
+      b.onmousedown = (e) => e.preventDefault();
+      b.onclick = fn;
+      host.appendChild(b);
+    });
+  }
+
+  async function openNote(rel, it) {
+    const ed = document.getElementById("noteEditor"); if (!ed) return;
+    it = it || {}; const ext = (it.ext || "").toLowerCase();
+    ed.hidden = false; ed.classList.remove("ne-full");
+    document.removeEventListener("keydown", _neKeyHandler, true);
+    document.addEventListener("keydown", _neKeyHandler, true);
+    try { if (window.__javisGraph && window.__javisGraph.pause) window.__javisGraph.pause(); } catch (e) {}
+    document.getElementById("neTitle").innerHTML = `<span class="vt-ico">${_fileIcon(ext)}</span>${esc(it.name || rel)}`;
+    const actions = document.getElementById("neActions"); const body = document.getElementById("neBody");
+    actions.innerHTML = ""; body.innerHTML = ""; body.className = "ne-body"; _neSaveFn = null;
+
+    if (VT_IMG_EXTS.includes(ext)) {
+      body.innerHTML = `<div class="ne-img"><img src="${_vtRaw(rel)}" alt="${esc(it.name || "")}"></div>`;
+      _neCommonBtns(actions, rel, it); _vtMarkActive(null); return;
+    }
+    if (VT_TEXT_EXTS.includes(ext)) {
+      body.innerHTML = `<div class="vt-info" style="padding:16px">Đang mở…</div>`;
+      let resp, d = {};
+      try { resp = await fetch(`/files/read?brain=${encodeURIComponent(fbrain())}&path=${encodeURIComponent(rel)}`); d = await resp.json().catch(() => ({})); }
+      catch (e) { _neRenderDownload(body, actions, rel, it); return; }
+      if (!resp.ok || d.error || d.content == null) { _neRenderDownload(body, actions, rel, it); return; }
+      const isMd = ext === ".md";
+      if (isMd) { try { await _ensureTurndown(); } catch (e) {} }   // để lưu bản render (WYSIWYG) → markdown
+      const wysOk = isMd && !!window.TurndownService;
+      body.className = "ne-body" + (isMd ? (wysOk ? " ne-md mode-wys" : " ne-md mode-source") : " mode-source");
+      body.innerHTML = isMd
+        ? `<div class="ne-fmt"></div><div class="ne-panes"><div class="ne-prev ne-wys" id="neWys" contenteditable="true" spellcheck="false"></div><div class="ne-src"><textarea id="neText" spellcheck="false"></textarea></div></div>`
+        : `<div class="ne-src"><textarea id="neText" spellcheck="false"></textarea></div>`;
+      const ta = document.getElementById("neText"); ta.value = d.content || "";
+      let mdGetter = null;
+      if (isMd) {
+        const wys = document.getElementById("neWys");
+        wys.innerHTML = window.mdToHtml ? window.mdToHtml(ta.value) : esc(ta.value);
+        let curMode = wysOk ? "wys" : "source";
+        const wysToSrc = () => { const md = _mdFromHtml(wys.innerHTML); if (md != null) ta.value = md; };
+        const srcToWys = () => { wys.innerHTML = window.mdToHtml ? window.mdToHtml(ta.value) : esc(ta.value); };
+        _neBuildToolbar(body.querySelector(".ne-fmt"), { mode: () => curMode, ta, wys });   // thanh công cụ chạy cả 2 chế độ
+        mdGetter = () => (curMode === "wys" ? (_mdFromHtml(wys.innerHTML) != null ? _mdFromHtml(wys.innerHTML) : ta.value) : ta.value);
+        const seg = document.createElement("span"); seg.className = "ne-seg";
+        [["Sửa", "mode-wys"], ["Nguồn", "mode-source"]].forEach(([lbl, cls]) => {
+          const b = document.createElement("button"); b.textContent = lbl; b.classList.toggle("active", cls === (curMode === "wys" ? "mode-wys" : "mode-source"));
+          b.onclick = () => {
+            const toSrc = cls === "mode-source";
+            if (toSrc && curMode === "wys") wysToSrc();
+            else if (!toSrc && curMode === "source") srcToWys();
+            curMode = toSrc ? "source" : "wys";
+            body.className = "ne-body ne-md " + cls;
+            seg.querySelectorAll("button").forEach(x => x.classList.remove("active")); b.classList.add("active");
+          };
+          seg.appendChild(b);
+        });
+        actions.appendChild(seg);
+      }
+      const saveBtn = document.createElement("button"); saveBtn.textContent = "💾 Lưu"; saveBtn.title = "Lưu (Ctrl+S)";
+      _neSaveFn = async () => {
+        const content = mdGetter ? mdGetter() : ta.value;
+        const fd = new FormData(); fd.append("brain", fbrain()); fd.append("path", rel); fd.append("content", content);
+        try {
+          const r = await (await fetch("/files/write", { method: "POST", body: fd })).json();
+          if (r.ok) { saveBtn.textContent = "✓ Đã lưu"; saveBtn.classList.add("ne-saved"); setTimeout(() => { saveBtn.textContent = "💾 Lưu"; saveBtn.classList.remove("ne-saved"); }, 1400); }
+          else saveBtn.textContent = "⚠ Lỗi";
+        } catch (e) { saveBtn.textContent = "⚠ Lỗi"; }
+      };
+      saveBtn.onclick = _neSaveFn;
+      actions.appendChild(saveBtn);
+      _neCommonBtns(actions, rel, it);
+      _vtMarkActive(isMd ? rel : null);
+      ta.focus();
+      return;
+    }
+    _neRenderDownload(body, actions, rel, it); _vtMarkActive(null);
+  }
 
   function boot() {
     document.body.classList.add("has-rail");
@@ -1764,13 +2855,23 @@
     if (gs) gs.addEventListener("change", () => {
       const active = Alpine.store("nav").active;
       if (active !== "home") renderPage(active);
+      // Cây vault ở cột trái sống ngoài hệ cview → tự làm mới theo brain mới
+      _vtCache.clear(); _vtIndex = null; _vtActivePath = null; renderVaultTree();
     });
+
+    // Cột trái = Vault explorer (luôn có trong DOM ở màn home) → nạp cây ngay khi khởi động
+    renderVaultTree();
 
     freshSettings().then(s => {
       graphEnabled = !(s.dashboard && s.dashboard.graph_enabled === false);
       // Lite-mode (cờ tắt hoặc màn hẹp) → vào thẳng Tổng quan, không hiện graph
       if (liteMode()) navigateTo("overview");
       recomputeGraph();
+      // Deep-link mở tab mới từ link file trong chat: #open=<đường-dẫn-vault> → mở thẳng Tệp tin đúng vị trí
+      try {
+        const m = /^#open=(.+)$/.exec(location.hash || "");
+        if (m) openFilesAt(decodeURIComponent(m[1]));
+      } catch (e) {}
     });
   }
 

@@ -128,6 +128,51 @@ def _apply_anthropic_cache(payload: dict, cache_ttl: str = "5m") -> None:
                 last["cache_control"] = marker
 
 
+def _anthropic_mark_last(conv):
+    """Copy conv + đánh cache_control lên block cuối của message cuối - cho vòng tool MCP.
+    KHÔNG mutate conv gốc nên marker không tích luỹ qua các vòng tool (trần Anthropic
+    4 breakpoint/request; ở đây tối đa 3: tools + system + message cuối). Message cuối
+    lúc gửi luôn là user (câu hỏi hoặc tool_result) - hai loại block đều nhận cache_control."""
+    if not conv:
+        return conv
+    marker = {"type": "ephemeral"}
+    out = list(conv)
+    last = dict(out[-1])
+    c = last.get("content")
+    if isinstance(c, str) and c:
+        last["content"] = [{"type": "text", "text": c, "cache_control": marker}]
+    elif isinstance(c, list) and c:
+        blocks = list(c)
+        if isinstance(blocks[-1], dict):
+            lb = dict(blocks[-1])
+            lb["cache_control"] = marker
+            blocks[-1] = lb
+        last["content"] = blocks
+    out[-1] = last
+    return out
+
+
+def _is_claude_model(model):
+    """Model OpenRouter thuộc họ Claude? (cache_control chỉ pass-through cho Anthropic)."""
+    m = (model or "").lower()
+    return "claude" in m or m.startswith("anthropic/")
+
+
+def _or_mark_system(messages):
+    """Copy messages, đánh cache_control lên system message ĐẦU (định dạng OpenAI-style của
+    OpenRouter). System của Javis ~26k ký tự và bất biến trong phiên - cache được là lãi nhất.
+    KHÔNG mutate list gốc: or_messages sống qua nhiều lượt, mutate là marker dính vĩnh viễn."""
+    out = []
+    marked = False
+    for m in messages:
+        if not marked and m.get("role") == "system" and isinstance(m.get("content"), str) and m["content"]:
+            m = dict(m)
+            m["content"] = [{"type": "text", "text": m["content"], "cache_control": {"type": "ephemeral"}}]
+            marked = True
+        out.append(m)
+    return out
+
+
 # Một số model OpenRouter (qwen, deepseek-r1, minimax...) nhét reasoning INLINE vào
 # content dưới dạng <think>...</think> thay vì field "reasoning" riêng → nếu yield
 # thẳng thì tag lậu lên chat, bẩn conversation log và phá parse JAVIS_METRICS.
@@ -194,6 +239,9 @@ class _ThinkScrubber:
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
+# Google Gemini qua endpoint TƯƠNG THÍCH OpenAI → dùng lại nguyên logic Chat Completions
+# (stream, usage, tool-calling) như OpenAI, chỉ khác base URL + auth Bearer bằng Gemini API key.
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 
 # Model Anthropic hỗ trợ adaptive thinking + output_config.effort (khỏi budget_tokens).
 _ADAPTIVE_THINKING = ("opus-4-8", "opus-4-7", "opus-4-6", "opus-4-5", "sonnet-4-6", "fable-5", "mythos-5")
@@ -222,21 +270,31 @@ def _openai_is_reasoning(model):
     return m.startswith(("o1", "o3", "o4")) or "gpt-5" in m
 
 
-async def openai_stream(api_key, model, messages, reasoning="off"):
-    """OpenAI Chat Completions (provider 'openai') - chat thuần, định dạng giống OpenRouter."""
+def _gemini_is_reasoning(model):
+    """Gemini: model 'thinking' (2.5 trở lên) nhận reasoning_effort qua endpoint OpenAI-compat.
+    Model cũ (1.5 / 2.0-flash không thinking) → KHÔNG gửi để tránh 400."""
+    m = (model or "").lower()
+    return "2.5" in m or "gemini-3" in m or "thinking" in m
+
+
+async def _openai_compat_stream(url, label, api_key, model, messages, reasoning, send_reasoning):
+    """Chat Completions dạng OpenAI (dùng chung cho OpenAI + Gemini qua endpoint tương thích).
+    Stream token-by-token + usage token ở chunk cuối. label chỉ dùng cho thông báo lỗi."""
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    payload = {"model": model or "gpt-4o-mini", "messages": messages, "stream": True}
-    if reasoning not in (None, "", "off") and _openai_is_reasoning(model):
+    payload = {"model": model, "messages": messages, "stream": True,
+               "stream_options": {"include_usage": True}}   # → chunk cuối kèm usage token
+    if reasoning not in (None, "", "off") and send_reasoning:
         payload["reasoning_effort"] = reasoning
     try:
         timeout = httpx.Timeout(120.0, connect=15.0)
         async with httpx.AsyncClient(timeout=timeout) as client:
-            async with client.stream("POST", OPENAI_URL, headers=headers, json=payload) as r:
+            async with client.stream("POST", url, headers=headers, json=payload) as r:
                 if r.status_code != 200:
                     body = await r.aread()
-                    yield {"type": "error", "content": f"OpenAI {r.status_code}: {body.decode('utf-8', 'replace')[:300]}"}
+                    yield {"type": "error", "content": f"{label} {r.status_code}: {body.decode('utf-8', 'replace')[:300]}"}
                     return
                 got = False
+                usage = None
                 async for line in r.aiter_lines():
                     line = (line or "").strip()
                     if not line.startswith("data:"):
@@ -248,14 +306,32 @@ async def openai_stream(api_key, model, messages, reasoning="off"):
                         obj = json.loads(data)
                     except json.JSONDecodeError:
                         continue
+                    if obj.get("usage"):
+                        usage = obj["usage"]
                     c = ((obj.get("choices") or [{}])[0].get("delta") or {}).get("content")
                     if c:
                         got = True
                         yield {"type": "text", "content": c}
+                if usage:
+                    yield {"type": "usage", "input": usage.get("prompt_tokens", 0), "output": usage.get("completion_tokens", 0)}
                 if not got:
-                    yield {"type": "error", "content": "OpenAI trả về rỗng. Thử model khác."}
+                    yield {"type": "error", "content": f"{label} trả về rỗng. Thử model khác."}
     except Exception as e:
-        yield {"type": "error", "content": f"OpenAI lỗi: {_describe_exc(e)}"}
+        yield {"type": "error", "content": f"{label} lỗi: {_describe_exc(e)}"}
+
+
+async def openai_stream(api_key, model, messages, reasoning="off"):
+    """OpenAI Chat Completions (provider 'openai') - chat thuần, định dạng giống OpenRouter."""
+    async for ev in _openai_compat_stream(OPENAI_URL, "OpenAI", api_key, model or "gpt-4o-mini",
+                                          messages, reasoning, _openai_is_reasoning(model)):
+        yield ev
+
+
+async def gemini_stream(api_key, model, messages, reasoning="off"):
+    """Google Gemini qua endpoint OpenAI-compatible (provider 'gemini') - chat thuần, cùng định dạng."""
+    async for ev in _openai_compat_stream(GEMINI_URL, "Gemini", api_key, model or "gemini-2.5-flash",
+                                          messages, reasoning, _gemini_is_reasoning(model)):
+        yield ev
 
 
 async def anthropic_stream(api_key, model, messages, reasoning="off"):
@@ -282,6 +358,7 @@ async def anthropic_stream(api_key, model, messages, reasoning="off"):
                 yield {"type": "meta", "model": model}
                 got = False
                 stop_reason = None
+                usage_in = usage_out = 0
                 async for line in r.aiter_lines():
                     line = (line or "").strip()
                     if not line.startswith("data:"):
@@ -294,7 +371,11 @@ async def anthropic_stream(api_key, model, messages, reasoning="off"):
                     except json.JSONDecodeError:
                         continue
                     t = obj.get("type")
-                    if t == "content_block_delta":
+                    if t == "message_start":
+                        u = (obj.get("message") or {}).get("usage") or {}
+                        usage_in = ((u.get("input_tokens") or 0) + (u.get("cache_read_input_tokens") or 0)
+                                    + (u.get("cache_creation_input_tokens") or 0))
+                    elif t == "content_block_delta":
                         txt = (obj.get("delta") or {}).get("text") or ""
                         if txt:
                             got = True
@@ -303,9 +384,13 @@ async def anthropic_stream(api_key, model, messages, reasoning="off"):
                         sr = (obj.get("delta") or {}).get("stop_reason")
                         if sr:
                             stop_reason = sr
+                        if (obj.get("usage") or {}).get("output_tokens"):
+                            usage_out = obj["usage"]["output_tokens"]
                     elif t == "error":
                         yield {"type": "error", "content": f"Anthropic: {(obj.get('error') or {}).get('message', 'lỗi')}"}
                         return
+                if usage_in or usage_out:
+                    yield {"type": "usage", "input": usage_in, "output": usage_out}
                 if not got:
                     yield {"type": "error", "content": f"Anthropic trả về rỗng (stop_reason={stop_reason}). Thử model khác trong Models."}
                     return
@@ -327,7 +412,10 @@ async def openrouter_stream(api_key, model, messages, reasoning="off"):
         "HTTP-Referer": "http://localhost:7777",
         "X-Title": "Javis OS",
     }
-    payload = {"model": model or "openai/gpt-4o-mini", "messages": messages, "stream": True}
+    if _is_claude_model(model):
+        messages = _or_mark_system(messages)   # cache system ~26k cho model Claude qua OpenRouter
+    payload = {"model": model or "openai/gpt-4o-mini", "messages": messages, "stream": True,
+               "stream_options": {"include_usage": True}}   # → chunk cuối kèm usage token
     if reasoning not in (None, "", "off"):
         payload["reasoning"] = {"effort": reasoning}   # OpenRouter chuẩn hoá effort cho mọi model reasoning
     # Jittered retry - CHỈ cho transient (429/5xx hoặc network exception) và CHỈ khi chưa yield text.
@@ -350,6 +438,7 @@ async def openrouter_stream(api_key, model, messages, reasoning="off"):
                     sent_model = False
                     reasoning = ""
                     finish = None
+                    usage = None
                     async for line in r.aiter_lines():
                         line = (line or "").strip()
                         if not line.startswith("data:"):
@@ -364,6 +453,8 @@ async def openrouter_stream(api_key, model, messages, reasoning="off"):
                         if not sent_model and obj.get("model"):
                             sent_model = True
                             yield {"type": "meta", "model": obj["model"]}   # model THẬT OpenRouter tính tiền
+                        if obj.get("usage"):
+                            usage = obj["usage"]
                         ch = (obj.get("choices") or [{}])[0]
                         if ch.get("finish_reason"):
                             finish = ch["finish_reason"]
@@ -397,6 +488,8 @@ async def openrouter_stream(api_key, model, messages, reasoning="off"):
                             "content_filter": "⚠️ Phản hồi bị lọc do bộ lọc nội dung.",
                         }
                         yield {"type": "text", "content": "\n\n" + notes.get(finish, f"⚠️ Stream kết thúc bất thường (finish_reason={finish}).")}
+                    if usage:
+                        yield {"type": "usage", "input": usage.get("prompt_tokens", 0), "output": usage.get("completion_tokens", 0)}
                     return  # success → thoát vòng retry
         except _RetryStream as rs:
             # Honor Retry-After provider gửi (429/503) - chính xác hơn đoán mò; thiếu thì jittered backoff
@@ -464,6 +557,7 @@ async def openai_responses_stream(access_token, account_id, model, messages, rea
                     return
                 yield {"type": "meta", "model": model or "gpt-5-codex"}
                 got = False
+                usage = None
                 async for line in r.aiter_lines():
                     line = (line or "").strip()
                     if not line.startswith("data:"):
@@ -483,11 +577,15 @@ async def openai_responses_stream(access_token, account_id, model, messages, rea
                         if d:
                             got = True
                             yield {"type": "text", "content": d}
+                    elif et == "response.completed":
+                        usage = ((obj.get("response") or {}).get("usage")) or usage
                     elif et in ("response.failed", "error", "response.error"):
                         err = (obj.get("response") or {}).get("error") or obj.get("error") or {}
                         msg = err.get("message") if isinstance(err, dict) else str(err)
                         yield {"type": "error", "content": "ChatGPT: " + (msg or "lỗi")}
                         return
+                if usage:
+                    yield {"type": "usage", "input": usage.get("input_tokens", 0), "output": usage.get("output_tokens", 0)}
                 if not got:
                     yield {"type": "error", "content": "ChatGPT trả về rỗng. Kiểm tra gói Plus/Pro hoặc thử lại."}
     except Exception as e:
@@ -521,11 +619,15 @@ def _mcp_to_openai_tools(mcp_tools):
     }} for t in mcp_tools]
 
 
-async def _cc_tool_loop(url, headers, model, messages, mcp_tools, mcp_route, reasoning_extra, label):
-    """Vòng Chat Completions + tool (OpenAI/OpenRouter). Non-stream từng vòng; yield tool_call + text cuối."""
+async def _cc_tool_loop(url, headers, model, messages, mcp_tools, mcp_route, reasoning_extra, label,
+                        cache_system=False):
+    """Vòng Chat Completions + tool (OpenAI/OpenRouter). Non-stream từng vòng; yield tool_call + text cuối.
+    cache_system=True (OpenRouter + model Claude): đánh cache_control lên system - OpenAI/Gemini
+    tự cache nên không cần."""
     import mcp_client
     tools = _mcp_to_openai_tools(mcp_tools)
-    msgs = list(messages)
+    msgs = _or_mark_system(messages) if cache_system else list(messages)
+    usage_in = usage_out = 0
     for _ in range(8):
         payload = {"model": model, "messages": msgs, "tools": tools, "stream": False}
         payload.update(reasoning_extra or {})
@@ -539,6 +641,9 @@ async def _cc_tool_loop(url, headers, model, messages, mcp_tools, mcp_route, rea
         except Exception as e:
             yield {"type": "error", "content": f"{label} lỗi: {_describe_exc(e)}"}
             return
+        u = data.get("usage") or {}   # cộng dồn token mọi vòng (kể cả vòng gọi tool)
+        usage_in += u.get("prompt_tokens", 0) or 0
+        usage_out += u.get("completion_tokens", 0) or 0
         msg = ((data.get("choices") or [{}])[0]).get("message") or {}
         tcs = msg.get("tool_calls") or []
         if tcs:
@@ -554,6 +659,8 @@ async def _cc_tool_loop(url, headers, model, messages, mcp_tools, mcp_route, rea
                 msgs.append({"role": "tool", "tool_call_id": tc.get("id"), "content": _clip_tool_result(result)})
             continue
         content = msg.get("content") or ""
+        if usage_in or usage_out:
+            yield {"type": "usage", "input": usage_in, "output": usage_out}
         if content:
             yield {"type": "text", "content": content}
         else:
@@ -572,6 +679,18 @@ async def openai_chat_with_mcp(api_key, model, messages, reasoning, mcp_tools, m
         yield ev
 
 
+async def gemini_chat_with_mcp(api_key, model, messages, reasoning, mcp_tools, mcp_route):
+    """Google Gemini (endpoint OpenAI-compat) + vòng tool-calling MCP - Gemini cũng thành
+    agent dùng MCP của Javis, y như OpenAI. Non-stream từng vòng (dùng _cc_tool_loop chung)."""
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    extra = {}
+    if reasoning not in (None, "", "off") and _gemini_is_reasoning(model):
+        extra["reasoning_effort"] = reasoning
+    yield {"type": "meta", "model": model}
+    async for ev in _cc_tool_loop(GEMINI_URL, headers, model or "gemini-2.5-flash", messages, mcp_tools, mcp_route, extra, "Gemini"):
+        yield ev
+
+
 async def openrouter_chat_with_mcp(api_key, model, messages, reasoning, mcp_tools, mcp_route):
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json",
                "HTTP-Referer": "http://localhost:7777", "X-Title": "Javis OS"}
@@ -579,7 +698,8 @@ async def openrouter_chat_with_mcp(api_key, model, messages, reasoning, mcp_tool
     if reasoning not in (None, "", "off"):
         extra["reasoning"] = {"effort": reasoning}
     yield {"type": "meta", "model": model}
-    async for ev in _cc_tool_loop(OPENROUTER_URL, headers, model or "openai/gpt-4o-mini", messages, mcp_tools, mcp_route, extra, "OpenRouter"):
+    async for ev in _cc_tool_loop(OPENROUTER_URL, headers, model or "openai/gpt-4o-mini", messages, mcp_tools, mcp_route, extra, "OpenRouter",
+                                  cache_system=_is_claude_model(model)):
         yield ev
 
 
@@ -603,6 +723,7 @@ async def responses_with_mcp(access_token, account_id, model, messages, reasonin
     yield {"type": "meta", "model": model}
     timeout = httpx.Timeout(180, connect=15)
     async with httpx.AsyncClient(timeout=timeout) as client:
+        usage_in = usage_out = 0
         for _ in range(8):
             # Backend Codex BẮT BUỘC stream=True → đọc SSE, lấy response.completed.output để chạy vòng tool
             payload = {"model": model, "instructions": instructions, "input": items,
@@ -631,7 +752,11 @@ async def responses_with_mcp(access_token, account_id, model, messages, reasonin
                         if et == "response.output_text.delta":
                             round_text += obj.get("delta") or ""
                         elif et == "response.completed":
-                            output = ((obj.get("response") or {}).get("output")) or []
+                            _resp = obj.get("response") or {}
+                            output = (_resp.get("output")) or []
+                            _u = _resp.get("usage") or {}
+                            usage_in += _u.get("input_tokens", 0) or 0
+                            usage_out += _u.get("output_tokens", 0) or 0
                         elif et in ("response.failed", "error", "response.error"):
                             err = (obj.get("response") or {}).get("error") or obj.get("error") or {}
                             msg = err.get("message") if isinstance(err, dict) else str(err)
@@ -661,9 +786,81 @@ async def responses_with_mcp(access_token, account_id, model, messages, reasonin
                         if c.get("type") in ("output_text", "text"):
                             text += c.get("text", "")
             text = text or round_text
+            if usage_in or usage_out:
+                yield {"type": "usage", "input": usage_in, "output": usage_out}
             if text:
                 yield {"type": "text", "content": text}
             else:
                 yield {"type": "error", "content": "ChatGPT trả về rỗng (backend Codex có thể chưa hỗ trợ tool)."}
+            return
+        yield {"type": "text", "content": "\n\n⚠ Đã đạt giới hạn 8 vòng gọi tool MCP."}
+
+
+async def anthropic_chat_with_mcp(api_key, model, messages, reasoning, mcp_tools, mcp_route):
+    """Anthropic Messages API + vòng tool-calling MCP - gỡ hạn chế 'anthropic-api = chat thuần'.
+    Non-stream từng vòng (như _cc_tool_loop); yield meta/tool_call/text/error thống nhất."""
+    import mcp_client
+    sys_txt = "\n\n".join(m.get("content", "") for m in messages if m.get("role") == "system")
+    conv = [{"role": m["role"], "content": m.get("content", "")}
+            for m in messages if m.get("role") in ("user", "assistant")]
+    headers = {"x-api-key": api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"}
+    tools = [{"name": t["fn"], "description": (t.get("description") or t["fn"])[:1024],
+              "input_schema": t.get("schema") or {"type": "object", "properties": {}}} for t in mcp_tools]
+    if tools:
+        tools[-1]["cache_control"] = {"type": "ephemeral"}   # tools = prefix ổn định, cache 1 lần đủ
+    yield {"type": "meta", "model": model}
+    extras = _anthropic_reasoning(model, reasoning)
+    timeout = httpx.Timeout(180, connect=15)
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        usage_in = usage_out = 0
+        for _ in range(8):
+            # Cache theo lối không-mutate (system dựng mới mỗi vòng, conv copy-khi-đánh-dấu)
+            # → marker KHÔNG tích luỹ qua vòng tool, tối đa 3 breakpoint/request (trần API là 4).
+            # Vòng tool là nơi cache lãi nhất: mỗi vòng 1 request chở lại nguyên system+tools+conv.
+            payload = {"model": model or "claude-sonnet-4-6", "max_tokens": 4096,
+                       "messages": _anthropic_mark_last(conv), "tools": tools, "stream": False}
+            payload.update(extras or {})
+            if sys_txt:
+                payload["system"] = [{"type": "text", "text": sys_txt, "cache_control": {"type": "ephemeral"}}]
+            try:
+                r = await client.post(ANTHROPIC_URL, headers=headers, json=payload)
+            except Exception as e:
+                yield {"type": "error", "content": f"Anthropic lỗi: {_describe_exc(e)}"}
+                return
+            if r.status_code == 400 and extras and "thinking" in (r.text or "").lower():
+                extras = {}   # thinking không tương thích payload/tool này → bỏ thinking, thử lại
+                continue
+            if r.status_code != 200:
+                yield {"type": "error", "content": f"Anthropic {r.status_code}: {(r.text or '')[:300]}"}
+                return
+            try:
+                data = r.json()
+            except Exception:
+                yield {"type": "error", "content": "Anthropic trả về không phải JSON."}
+                return
+            _u = data.get("usage") or {}   # cộng dồn token mọi vòng tool
+            usage_in += ((_u.get("input_tokens") or 0) + (_u.get("cache_read_input_tokens") or 0)
+                         + (_u.get("cache_creation_input_tokens") or 0))
+            usage_out += _u.get("output_tokens") or 0
+            blocks = data.get("content") or []
+            tool_uses = [b for b in blocks if b.get("type") == "tool_use"]
+            if tool_uses and data.get("stop_reason") == "tool_use":
+                # Giữ NGUYÊN blocks (kể cả thinking) - API yêu cầu khi tiếp tục sau tool_use
+                conv.append({"role": "assistant", "content": blocks})
+                results = []
+                for tu in tool_uses:
+                    yield {"type": "tool_call", "name": tu.get("name")}
+                    res = await mcp_client.call_route(mcp_route, tu.get("name"), tu.get("input") or {})
+                    results.append({"type": "tool_result", "tool_use_id": tu.get("id"),
+                                    "content": _clip_tool_result(res)})
+                conv.append({"role": "user", "content": results})
+                continue
+            text = "".join(b.get("text", "") for b in blocks if b.get("type") == "text")
+            if usage_in or usage_out:
+                yield {"type": "usage", "input": usage_in, "output": usage_out}
+            if text:
+                yield {"type": "text", "content": text}
+            else:
+                yield {"type": "error", "content": "Anthropic trả về rỗng. Thử model khác trong Models."}
             return
         yield {"type": "text", "content": "\n\n⚠ Đã đạt giới hạn 8 vòng gọi tool MCP."}

@@ -9,21 +9,22 @@ import os
 import json
 import asyncio
 import glob
+import uuid
 from pathlib import Path
 import re
 import shutil
 import time
 import yaml
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, UploadFile, File, Form, Request
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, UploadFile, File, Form, Request, Body
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, FileResponse
+from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, FileResponse, Response
 import edge_tts
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent.parent / ".env")
 
-from claude_cli import ClaudeCLI, CodexCLI, find_claude_cli, find_codex_cli, cancel_all, _empty_mcp_file, auth_status as claude_auth_status, auth_login as claude_auth_login, auth_logout as claude_auth_logout, auth_login_ui_start, auth_login_ui_code, mcp_native_add, mcp_native_remove, mcp_native_status, mcp_open_auth_terminal, mcp_native_list
+from claude_cli import CodexCLI, claude_engine, find_claude_cli, find_codex_cli, cancel_all, _empty_mcp_file, auth_status as claude_auth_status, auth_login as claude_auth_login, auth_logout as claude_auth_logout, auth_login_ui_start, auth_login_ui_code, mcp_native_add, mcp_native_remove, mcp_native_status, mcp_open_auth_terminal, mcp_native_list
 from graph_builder import build_graph, _color_for, _top_folder, WIKILINK_RE
 import config as cfgmod
 import git_brain
@@ -31,18 +32,52 @@ import engine
 import openai_oauth
 import mcp_store
 import mcp_client
-from telegram_bot import TelegramBot
+import mcp_catalog
+import mcp_hub
+import plugins_host   # hệ PLUGIN: thư mục Python thả vào, tự thêm tool/hook cho mọi engine qua hub
+import web_security   # chống CSRF-to-localhost + DNS-rebinding cho web API cục bộ
+import image_gen      # tạo ảnh bằng gói ChatGPT (OAuth) - Codex Responses + tool image_generation
+import zalo_login
+import oauth_mcp
+import system_sync   # tầng năng lực HỆ THỐNG (skill/loop mặc định) - update theo phiên bản app
+import skill_router   # nguồn chân lý khám phá skill (canonical <brain>/skills) dùng chung mọi engine
+import share_bundle   # xuất/nhập gói agent/skill/workflow (.zip) để chia sẻ giữa brain/người dùng
+import usage_store   # đếm token/chi phí Javis tự đo (đa nhà cung cấp)
+from telegram_bot import TelegramBot, parse_chat_ids as tg_parse_ids
+import channel_context   # metadata kênh + gom file trả về kênh chat (port gateway hermes-agent)
 from sessions import get_store   # kho phiên hội thoại (sqlite + fts5): list/resume/search
+import compaction   # nén hội thoại dài cho engine API (tóm tắt phần cũ thay vì cắt bỏ)
 
 app = FastAPI(title="Javis OS")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+# CORS KHÔNG dùng '*' nữa: dashboard cùng-origin (không cần CORS). Chỉ mở cross-origin cho localhost
+# (tiện dev). Chống trang web độc ĐỌC API qua trình duyệt; phần chống GHI/CSRF ở _csrf_guard bên dưới.
+app.add_middleware(CORSMiddleware,
+                   allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$",
+                   allow_methods=["*"], allow_headers=["*"])
 
 # Đường dẫn KHÔNG cần đăng nhập. CHỈ các auth endpoint công khai (status/login/setup) -
 # KHÔNG để cả prefix /auth public vì /auth/disable, /auth/logout phải yêu cầu đăng nhập.
 _AUTH_PUBLIC_PREFIX = ("/static", "/health")
 # /brand-logo: hiện trên màn đăng nhập (trước session). /tls-check: Caddy gọi (không đăng nhập được).
 _AUTH_PUBLIC_EXACT = ("/", "/favicon.ico", "/auth/status", "/auth/login", "/auth/setup",
-                      "/brand-logo", "/tls-check")
+                      "/brand-logo", "/tls-check",
+                      # /hub/mcp: Claude CLI/Codex gọi bằng Bearer hub_token riêng (không có cookie).
+                      # /connect/oauth/callback: browser redirect từ provider OAuth về.
+                      "/hub/mcp", "/connect/oauth/callback")
+# Endpoint CHỈ-LOCALHOST: agent (Claude CLI chạy cùng máy/container) curl được mà không cần
+# cookie đăng nhập; request từ ngoài (qua Traefik/Caddy/LAN) đến từ IP khác loopback → vẫn bị chặn.
+_AUTH_LOCAL_EXACT = ("/telegram/send-file", "/reminders")
+
+
+@app.middleware("http")
+async def _csrf_guard(request: Request, call_next):
+    """Chống CSRF-to-localhost + DNS-rebinding (xem web_security.py). Chạy TRƯỚC auth guard.
+    Không đụng client không-trình-duyệt (Claude CLI/Codex/curl không gửi Origin) và cùng-origin."""
+    d = web_security.csrf_decision(request.method, request.headers.get("host", ""),
+                                   request.headers.get("origin"), cfgmod.gate_active())
+    if d:
+        return JSONResponse({"error": d[1], "blocked": "web_security"}, status_code=d[0])
+    return await call_next(request)
 
 
 @app.middleware("http")
@@ -52,13 +87,19 @@ async def _auth_guard(request: Request, call_next):
     (setup_required), tránh hở dashboard điều khiển Claude full quyền ra Internet."""
     if cfgmod.gate_active():
         path = request.url.path
-        public = path in _AUTH_PUBLIC_EXACT or any(path.startswith(p) for p in _AUTH_PUBLIC_PREFIX)
+        client_host = request.client.host if request.client else ""
+        public = (path in _AUTH_PUBLIC_EXACT
+                  or any(path.startswith(p) for p in _AUTH_PUBLIC_PREFIX)
+                  or (path in _AUTH_LOCAL_EXACT and client_host in ("127.0.0.1", "::1")))
         if not public and not cfgmod.valid_session(request.cookies.get("javis_session", "")):
             return JSONResponse({"error": "unauthorized", "auth_required": True,
                                  "setup_required": not cfgmod.auth_enabled()}, status_code=401)
     return await call_next(request)
 
 DASHBOARD_PATH = Path(__file__).parent.parent / "dashboard"
+# Windows/mimetypes không biết .webp -> StaticFiles trả text/plain; khai rõ để logo webp đúng kiểu ảnh.
+import mimetypes
+mimetypes.add_type("image/webp", ".webp")
 app.mount("/static", StaticFiles(directory=str(DASHBOARD_PATH)), name="static")
 
 CLAUDE_MD_PATH = Path(__file__).parent.parent / "CLAUDE.md"
@@ -136,18 +177,47 @@ def build_system_prompt(brain: str = "brain") -> str:
         base += "\n\n# === BỘ NHỚ DÀI HẠN (nạp sẵn) ===\n" + mem
     # Đường dẫn lớp Agentic của vault đang làm việc (để Javis tạo agent/workflow/loop qua chat)
     root = _brain_root(brain)
+    system_sync.ensure_synced(root)   # brain nào cũng có đủ năng lực hệ thống (1 lần/process, rẻ)
+    try:
+        # Mirror skills/ → .claude/skills để fork Claude cwd=brain (workflow/loop/learn/lint) nạp
+        # native được skill viết giữa phiên (rẻ: bỏ qua nếu trùng hash).
+        system_sync.mirror_skills(root)
+    except Exception:
+        pass
     ag, wf = _agents_dir(brain), _workflows_dir(brain)
     lp = Path(root) / "Javis" / "loops"
+    sk = _skills_dir(brain)
     base += (
         "\n\n# === LỚP AGENTIC (vault đang làm việc) ===\n"
         f"Vault root: {root}\n"
         f"- AGENT: tạo/sửa tại `{ag}/<slug>.md`\n"
         f"- WORKFLOW: tạo/sửa tại `{wf}/<slug>.md`\n"
         f"- LOOP (nhiệm vụ lặp vô hạn): tạo/sửa tại `{lp}/<slug>.md`\n"
+        f"- SKILL: tạo/sửa tại `{sk}/<slug>/SKILL.md` (tự mirror sang .claude/skills cho Claude native)\n"
         "Khi user yêu cầu tạo/sửa agent, workflow hoặc loop qua chat, ghi file .md đúng định dạng "
         "(xem mục 'Tạo/sửa Agent & Workflow qua chat' và 'Điều phối' trong system prompt) bằng "
         "ĐƯỜNG DẪN TUYỆT ĐỐI ở trên. Studio/trang Tự cải thiện sẽ tự nhận file mới."
     )
+    try:
+        base += _javis_capability_summary(brain)   # chỉ mục năng lực LIVE (mọi engine biết Javis có gì)
+    except Exception:
+        pass
+    try:
+        base += _skill_router_block(brain, root)   # ROUTER SKILL đa-engine: list skill + cách gọi
+    except Exception:
+        pass
+    try:
+        # 1 dòng MỨC DÙNG để Javis TRẢ LỜI được khi user hỏi "token tiêu bao nhiêu" (chi tiết ở panel).
+        _t = usage_store.summary().get("today", {}).get("total", {})
+        if _t.get("in") or _t.get("out"):
+            _c = f", ~${_t.get('cost', 0):.4f}" if _t.get("cost") else ""
+            base += (f"\n\n# === MỨC DÙNG HÔM NAY (Javis tự đo) ===\n"
+                     f"{_t.get('in', 0):,} token vào + {_t.get('out', 0):,} token ra qua "
+                     f"{_t.get('turns', 0)} lượt{_c}. Đây là token Javis TỰ ĐO, KHÔNG phải hạn mức gói "
+                     f"thuê bao (đa số nhà cung cấp không cho lấy hạn mức tài khoản qua API). Chi tiết "
+                     f"từng nhà cung cấp ở panel 'Mức dùng' trên dashboard.")
+    except Exception:
+        pass
     return base
 
 # Redaction patterns - port subset từ hermes-agent/agent/redact.py.
@@ -273,9 +343,14 @@ async def root():
 
 
 @app.post("/stop")
-async def stop():
-    """Nút Stop: chỉ ngắt lệnh CHAT đang chạy, không đụng tới metrics/loop nền."""
-    n = cancel_all("chat")
+async def stop(payload: dict = Body(None)):
+    """Nút Stop: ngắt lệnh CHAT đang chạy, không đụng tới metrics/loop nền.
+    ĐA PHIÊN: body {"tag": "chat:abcd1234"} (server phát cho mỗi kết nối WS qua message hello)
+    → chỉ ngắt ĐÚNG phiên đó, không giết lượt của người khác đang chat song song.
+    Không có tag (frontend cũ) → ngắt cả họ 'chat' như trước."""
+    tag = str((payload or {}).get("tag") or "").strip()
+    # chỉ chấp nhận tag họ chat - chặn lạm dụng endpoint này để giết loop/workflow nền
+    n = cancel_all(tag if tag.startswith("chat:") else "chat")
     return {"ok": True, "cancelled": n}
 
 
@@ -403,6 +478,8 @@ PROVIDER_DEFS = [   # thứ tự = thứ tự hiển thị card ở trang Models
      "default_models": ["claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"]},
     {"id": "openai",        "label": "OpenAI (ChatGPT API)",    "kind": "api", "key_field": "openai_api_key",    "catalog_key": "openai",
      "default_models": ["gpt-4o", "gpt-4o-mini", "o3-mini"]},
+    {"id": "gemini",        "label": "Google Gemini (API)",     "kind": "api", "key_field": "gemini_api_key",    "catalog_key": "gemini",
+     "default_models": ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"]},
 ]
 
 def _provider_def(pid):
@@ -461,6 +538,8 @@ def _set_main_model(cfg, provider, model):
         m["engine"] = "openai"
     elif provider == "openai-oauth":
         m["engine"] = "openai-oauth"
+    elif provider == "gemini":
+        m["engine"] = "gemini"
     else:  # anthropic-cli
         m["engine"] = "cli"; m["claude_model"] = model
 
@@ -477,6 +556,15 @@ def _codex_safe_model(model: str) -> str:
     if m and (m in cat or m.endswith("-codex")):
         return m
     return cat[0]
+
+def _is_codex_model(model: str) -> bool:
+    """Model này thuộc Codex/ChatGPT (chạy qua Codex CLI) hay Claude? gpt* / *-codex / trong
+    catalog openai-oauth = Codex. Còn lại (sonnet/opus/haiku/fable/claude-*) = Claude."""
+    m = (model or "").strip().lower()
+    if not m:
+        return False
+    cat = [c.lower() for c in (cfgmod.read_settings().get("model", {}).get("catalog", {}).get("openai-oauth") or [])]
+    return m.startswith("gpt") or m.endswith("-codex") or m in cat
 
 def _chat_provider(mcfg):
     """Provider dùng cho chat (id, kind, key, model) - từ model chính hiệu lực."""
@@ -495,6 +583,8 @@ def _api_stream(prov, key, model, messages, reasoning="off"):
         return engine.openrouter_stream(key, model, messages, reasoning)
     if prov == "openai":
         return engine.openai_stream(key, model, messages, reasoning)
+    if prov == "gemini":
+        return engine.gemini_stream(key, model, messages, reasoning)
     if prov == "openai-oauth":
         creds = openai_oauth.valid_creds() or {}
         return engine.openai_responses_stream(creds.get("access_token", ""), creds.get("account_id", ""),
@@ -503,34 +593,30 @@ def _api_stream(prov, key, model, messages, reasoning="off"):
 
 
 # Cửa sổ lịch sử chat cho engine API (openrouter/openai/anthropic-api). Mỗi lượt
-# resend TOÀN BỘ history → phiên dài phình vô hạn (cost tăng + nguy cơ vượt context /
-# bị API từ chối body quá to). Port rút gọn từ hermes trajectory_compressor: giữ
-# system turn đầu + N message gần nhất, bỏ phần giữa. Count-based - không cần tokenizer.
-_MAX_HISTORY_MSGS = 12   # ≈6 lượt hỏi-đáp gần nhất (ngoài system message)
+# resend TOÀN BỘ history → phiên dài phình vô hạn. Cửa sổ + logic nén nằm ở compaction.py:
+# phần cũ rơi khỏi cửa sổ được TÓM TẮT (chạy nền) thay vì cắt bỏ mất trí nhớ như trước.
+_trim_history = compaction.trim_history
 
 
-def _trim_history(messages, max_msgs: int = _MAX_HISTORY_MSGS):
-    """Giữ system message (index 0) + max_msgs message user/assistant gần nhất.
-    Bỏ assistant dẫn đầu phần tail vì Anthropic yêu cầu message đầu (sau system)
-    phải là role=user. Trả về list mới; không mutate input."""
-    if not messages or len(messages) <= max_msgs + 1:
-        return messages
-    head = messages[:1] if messages[0].get("role") == "system" else []
-    tail = messages[len(messages) - max_msgs:]
-    while tail and tail[0].get("role") == "assistant":
-        tail = tail[1:]
-    return head + tail
+def _hub_enabled():
+    """Hub MCP bật (mặc định) → mọi engine đấu 1 điểm; tắt qua settings mcp.hub=false (fallback cũ)."""
+    return bool(cfgmod.read_settings().get("mcp", {}).get("hub", True))
 
 
-async def _api_stream_mcp(prov, key, model, messages, reasoning="off"):
-    """Như _api_stream nhưng cho model API/OAuth DÙNG MCP của Javis (vòng tool-calling).
-    Registry rỗng / không discover được tool → fallback chat thuần. anthropic-api chưa có tool loop."""
-    # ChatGPT OAuth (backend Codex) KHÔNG nhận function tool → bỏ MCP, chạy chat thuần.
-    servers = mcp_store.servers_for_client()
+async def _api_stream_mcp(prov, key, model, messages, reasoning="off", brain=None):
+    """Model API/OAuth dùng MCP của Javis qua HUB: đa tài khoản + quyền + audit + builtin tools
+    (file vault, use_skill) → engine API cũng là agent thực thụ. anthropic-api giờ CÓ tool loop.
+    ChatGPT OAuth (backend Codex responses) không nhận function tool → vẫn chat thuần."""
     tools, route = [], {}
-    if servers and prov in ("openrouter", "openai"):
+    if prov in ("openrouter", "openai", "anthropic-api", "gemini"):
         try:
-            tools, route = await mcp_client.discover(servers)
+            if _hub_enabled():
+                vault_root = _brain_root(brain) if brain else None
+                tools, route = await mcp_hub.discover_all("full", vault_root=vault_root)
+            else:
+                servers = mcp_store.servers_for_client()
+                if servers:
+                    tools, route = await mcp_client.discover(servers)
         except Exception as e:
             print(f"[mcp discover] {e}", file=__import__('sys').stderr)
     if tools:
@@ -538,11 +624,15 @@ async def _api_stream_mcp(prov, key, model, messages, reasoning="off"):
             return engine.openrouter_chat_with_mcp(key, model, messages, reasoning, tools, route)
         if prov == "openai":
             return engine.openai_chat_with_mcp(key, model, messages, reasoning, tools, route)
+        if prov == "anthropic-api":
+            return engine.anthropic_chat_with_mcp(key, model, messages, reasoning, tools, route)
+        if prov == "gemini":
+            return engine.gemini_chat_with_mcp(key, model, messages, reasoning, tools, route)
     return _api_stream(prov, key, model, messages, reasoning)
 
 def _api_label(prov):
     return {"openrouter": "OpenRouter", "openai": "OpenAI", "anthropic-api": "Anthropic API",
-            "openai-oauth": "ChatGPT (OAuth)"}.get(prov, prov)
+            "openai-oauth": "ChatGPT (OAuth)", "gemini": "Google Gemini"}.get(prov, prov)
 
 def _reasoning_level(mcfg):
     r = (mcfg or {}).get("reasoning", "off")
@@ -564,8 +654,11 @@ def _toml_str(s):
 
 
 def _write_codex_profile():
-    """Ghi ~/.codex/javis.config.toml từ MCP http của Javis → `codex exec -p javis` thấy được MCP đó
-    (ChatGPT subscription dùng MCP của Javis như POSCake). Trả 'javis' nếu có server, None nếu rỗng."""
+    """Ghi ~/.codex/javis.config.toml → `codex exec -p javis` thấy MCP của Javis.
+    Hub bật (mặc định): 1 entry hub - Codex dùng được MỌI transport (cả stdio/internal) + đa tài
+    khoản + quyền. Hub tắt: per-server http như cũ. Trả 'javis' nếu có server, None nếu rỗng."""
+    if _hub_enabled():
+        return mcp_hub.codex_profile("full")
     path = Path.home() / ".codex" / "javis.config.toml"
     lines, seen = [], set()
     for s in mcp_store.servers_for_client():
@@ -595,13 +688,20 @@ def _write_codex_profile():
     return None
 
 
-def _apply_mcp(cli):
-    """Gắn MCP do Javis quản lý vào 1 ClaudeCLI (registry rỗng → không đổi gì, dùng MCP sẵn của máy)."""
+def _apply_mcp(cli, mode="full"):
+    """Gắn MCP do Javis quản lý vào 1 engine Claude (registry rỗng → không đổi gì, dùng MCP sẵn của máy).
+    Hub bật: config 1 entry trỏ hub kèm X-Javis-Mode - deny/perm/audit chặn TẠI hub (lớp cứng),
+    không cần --disallowedTools. Hub tắt: per-server + --disallowedTools như cũ."""
     try:
-        cli.mcp_config = mcp_store.config_path()
-        cli.mcp_strict = bool(cfgmod.read_settings().get("mcp", {}).get("strict")) and cli.mcp_config is not None
-        dis = mcp_store.disallowed_tools()
-        cli.disallowed_tools = dis or None
+        cli.javis_mode = mode   # engine SDK dùng để enforce min_mode plugin in-process
+        if _hub_enabled():
+            cli.mcp_config = mcp_hub.claude_config_path(mode)
+            cli.mcp_strict = bool(cfgmod.read_settings().get("mcp", {}).get("strict")) and cli.mcp_config is not None
+        else:
+            cli.mcp_config = mcp_store.config_path()
+            cli.mcp_strict = bool(cfgmod.read_settings().get("mcp", {}).get("strict")) and cli.mcp_config is not None
+            dis = mcp_store.disallowed_tools()
+            cli.disallowed_tools = dis or None
     except Exception as e:
         print(f"[mcp apply] {e}", file=__import__('sys').stderr)
     return cli
@@ -691,13 +791,17 @@ async def mcp_add(request: Request):
         if not res.get("ok"):
             return JSONResponse({"ok": False, "error": res.get("error") or res.get("out") or "native add lỗi"}, status_code=400)
     sid = mcp_store.add_server(data)
+    mcp_hub.invalidate_cache()
+    _write_codex_profile()
     return {"ok": True, "id": sid, "oauth": (data.get("auth") or "header") == "oauth"}
 
 
 @app.post("/mcp/update")
 async def mcp_update(request: Request):
     data = await request.json()
-    return {"ok": mcp_store.update_server(data.get("id"), data)}
+    ok = mcp_store.update_server(data.get("id"), data)
+    mcp_hub.invalidate_cache()
+    return {"ok": ok}
 
 
 @app.post("/mcp/delete")
@@ -706,13 +810,18 @@ async def mcp_delete(request: Request):
     s = next((x for x in mcp_store.list_servers() if x["id"] == data.get("id")), None)
     if s and s.get("auth") == "oauth" and s.get("name"):
         mcp_native_remove(s["name"])
-    return {"ok": mcp_store.delete_server(data.get("id"))}
+    ok = mcp_store.delete_server(data.get("id"))
+    mcp_hub.invalidate_cache()
+    _write_codex_profile()
+    return {"ok": ok}
 
 
 @app.post("/mcp/toggle")
 async def mcp_toggle(request: Request):
     data = await request.json()
     en = mcp_store.toggle_server(data.get("id"))
+    mcp_hub.invalidate_cache()
+    _write_codex_profile()
     return {"ok": en is not None, "enabled": en}
 
 
@@ -738,8 +847,220 @@ def mcp_native_status_ep(name: str = Query(...)):
 
 @app.post("/mcp/oauth-auth")
 def mcp_oauth_auth():
-    """Mở terminal chạy claude để user gõ /mcp xác thực OAuth MCP (chỉ máy local)."""
+    """Mở terminal chạy claude để user gõ /mcp xác thực OAuth MCP (chỉ máy local) - fallback cũ."""
     return mcp_open_auth_terminal()
+
+
+# ============================================================
+# KHO KẾT NỐI (connector catalog + đa tài khoản) + MCP HUB
+# ============================================================
+@app.post("/hub/mcp")
+async def hub_mcp(request: Request):
+    """Endpoint MCP hub - Claude Code/Codex đấu vào đây (auth bằng Bearer hub_token riêng)."""
+    return await mcp_hub.handle_http(request)
+
+
+@app.get("/connect/catalog")
+async def connect_catalog():
+    return {"catalog": mcp_catalog.public_catalog(), "connections": mcp_store.list_connections(),
+            "strict": bool(cfgmod.read_settings().get("mcp", {}).get("strict")), "hub": _hub_enabled()}
+
+
+@app.post("/connect/add")
+async def connect_add(request: Request):
+    """Thêm tài khoản cho 1 connector trong kho: lưu tạm → VALIDATE ngay (gọi tool xác minh,
+    tự lấy tên shop làm label) → key sai thì xoá, không lưu rác."""
+    data = await request.json()
+    cid, err = mcp_store.add_connection((data.get("connector_id") or "").strip(), {
+        "label": (data.get("label") or "").strip(), "fields": data.get("fields") or {}})
+    if err:
+        return {"ok": False, "error": err}
+    val = await mcp_hub.validate_connection(cid)
+    if not val.get("ok"):
+        mcp_store.delete_connection(cid)
+        return {"ok": False, "error": val.get("error") or "Không kết nối được"}
+    if val.get("label") and not (data.get("label") or "").strip():
+        mcp_store.update_connection(cid, {"label": val["label"]})
+    mcp_hub.invalidate_cache()
+    _write_codex_profile()
+    c = mcp_store.get_connection(cid) or {}
+    return {"ok": True, "id": cid, "label": c.get("label"), "tools": val.get("tools", 0)}
+
+
+@app.post("/connect/test")
+async def connect_test(request: Request):
+    data = await request.json()
+    return await mcp_hub.validate_connection(data.get("id"))
+
+
+@app.get("/connect/substack/resolve-uid")
+async def connect_substack_resolve_uid(q: str = Query("")):
+    """Tra User ID (+ gợi ý Publication URL) của một tài khoản Substack từ handle hoặc URL trang
+    Hồ sơ. Substack đã đổi URL Hồ sơ sang dạng substack.com/@handle (không còn dãy số), nên trợ lý
+    lấy nhanh ở trang Docs gọi endpoint này - server hỏi API CÔNG KHAI của Substack (không cần đăng
+    nhập Substack, không đụng secret) rồi trả về id. Endpoint vẫn sau auth guard (cần session Javis)."""
+    import re
+    raw = (q or "").strip()
+    m = re.search(r"/profile/(\d{3,})", raw)   # URL /profile/<id>-name kiểu cũ: số chính là user_id
+    if m:
+        return {"ok": True, "user_id": int(m.group(1)), "name": "", "publications": []}
+    m = re.search(r"@([A-Za-z0-9_-]+)", raw) or re.search(r"substack\.com/([A-Za-z0-9_-]+)", raw)
+    handle = (m.group(1) if m else raw).lstrip("@").strip().strip("/")
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", handle):
+        return {"ok": False, "error": "Handle không hợp lệ. Dán link trang Hồ sơ (vd substack.com/@ten) hoặc chính handle."}
+    # Substack đứng sau Cloudflare - chặn httpx theo TLS fingerprint (403), nhưng để curl qua.
+    # Dùng curl (có sẵn cả trên Windows lẫn Docker image); handle đã validate + truyền dạng argv
+    # riêng (không qua shell) nên không có nguy cơ chèn lệnh/SSRF.
+    import shutil
+    curl = shutil.which("curl") or "curl"
+    url = f"https://substack.com/api/v1/user/{handle}/public_profile"
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            curl, "-s", "--max-time", "12", "-A", "Mozilla/5.0", "-H", "accept: application/json", url,
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        out, _ = await asyncio.wait_for(proc.communicate(), timeout=15)
+    except Exception as e:
+        return {"ok": False, "error": f"Không gọi được Substack ({type(e).__name__}). Dùng Cách B (Console) nếu vẫn lỗi."}
+    try:
+        d = json.loads(out.decode("utf-8", "replace"))
+    except Exception:
+        return {"ok": False, "error": f"Không đọc được hồ sơ '{handle}'. Kiểm tra lại handle, hoặc dùng Cách B (Console)."}
+    if isinstance(d, dict) and d.get("error"):
+        return {"ok": False, "error": f"Substack: {d.get('error')} - kiểm tra lại handle '{handle}'."}
+    uid = d.get("id")
+    if not uid:
+        return {"ok": False, "error": "Hồ sơ Substack không trả về id."}
+    pubs, seen = [], set()
+    for pu in (d.get("publicationUsers") or []):
+        p = pu.get("publication") or {}
+        cd, sub = p.get("custom_domain"), p.get("subdomain")
+        url = f"https://{cd}" if cd else (f"https://{sub}.substack.com" if sub else "")
+        if url and url not in seen:
+            seen.add(url)
+            pubs.append({"name": p.get("name") or sub or "", "url": url})
+    return {"ok": True, "user_id": uid, "name": d.get("name") or "", "handle": handle, "publications": pubs}
+
+
+@app.post("/connect/update")
+async def connect_update(request: Request):
+    data = await request.json()
+    ok = mcp_store.update_connection(data.get("id"), data)
+    mcp_hub.invalidate_cache()
+    return {"ok": ok}
+
+
+@app.post("/connect/toggle")
+async def connect_toggle(request: Request):
+    data = await request.json()
+    en = mcp_store.toggle_connection(data.get("id"))
+    mcp_hub.invalidate_cache()
+    _write_codex_profile()
+    return {"ok": en is not None, "enabled": en}
+
+
+@app.post("/connect/delete")
+async def connect_delete(request: Request):
+    data = await request.json()
+    cid = data.get("id")
+    oauth_mcp.forget(cid)
+    ok = mcp_store.delete_connection(cid)
+    mcp_hub.invalidate_cache()
+    _write_codex_profile()
+    return {"ok": ok}
+
+
+@app.post("/connect/default")
+async def connect_default(request: Request):
+    data = await request.json()
+    return {"ok": mcp_store.set_default(data.get("id"))}
+
+
+@app.get("/connect/audit")
+async def connect_audit(limit: int = Query(80), id: str = Query("")):
+    return {"entries": mcp_hub.audit_tail(limit=min(int(limit or 80), 500), conn_id=(id or None))}
+
+
+# ---- Zalo: đăng nhập QR ngay trong UI ----
+@app.post("/connect/zalo/start")
+async def connect_zalo_start(request: Request):
+    data = await request.json()
+    return zalo_login.start(label=(data.get("label") or "").strip() or None)
+
+
+@app.get("/connect/zalo/status")
+async def connect_zalo_status(sid: str = Query(...)):
+    st = zalo_login.status(sid)
+    if st.get("state") == "done":
+        mcp_hub.invalidate_cache()
+        _write_codex_profile()
+    return st
+
+
+@app.post("/connect/zalo/cancel")
+async def connect_zalo_cancel(request: Request):
+    data = await request.json()
+    return zalo_login.cancel(data.get("sid"))
+
+
+# ---- OAuth chuẩn MCP: Javis tự giữ token, không cần terminal ----
+@app.post("/connect/oauth/start")
+async def connect_oauth_start(request: Request):
+    data = await request.json()
+    conn_id = data.get("id")
+    # fields: client_id/secret user tự khai (BYO) cho provider không DCR (vd Google). Rỗng với Meta.
+    fields = {k: v for k, v in (data.get("fields") or {}).items() if v}
+    if not conn_id and data.get("connector_id"):
+        # Tái dùng connection oauth dở dang (chưa có token) của connector này -
+        # tránh mỗi lần bấm nút lại đẻ 1 connection mồ côi.
+        pend = next((c for c in mcp_store.list_connections()
+                     if c.get("connector_id") == data["connector_id"] and c.get("auth") == "oauth"
+                     and not oauth_mcp.status(c["id"]).get("connected")), None)
+        if pend:
+            conn_id = pend["id"]
+            if fields:   # cập nhật lại client_id/secret nếu user nhập mới ở lần bấm này
+                mcp_store.update_connection(conn_id, {"fields": fields})
+        else:
+            conn_id, err = mcp_store.add_connection(data["connector_id"],
+                {"label": (data.get("label") or "").strip(), "auth": "oauth", "fields": fields})
+            if err:
+                return {"ok": False, "error": err}
+    elif conn_id and fields:
+        mcp_store.update_connection(conn_id, {"fields": fields})
+    redirect = str(request.base_url).rstrip("/") + "/connect/oauth/callback"
+    res = await oauth_mcp.start_auth(conn_id, redirect)
+    res["id"] = conn_id
+    return res
+
+
+@app.get("/connect/oauth/callback")
+async def connect_oauth_callback(state: str = Query(""), code: str = Query("")):
+    res = await oauth_mcp.handle_callback(state, code)
+    mcp_hub.invalidate_cache()
+    if res.get("ok"):
+        _write_codex_profile()
+        # Tự đặt tên tài khoản như flow dán key (vd lấy tên tài khoản ads từ Meta) -
+        # chỉ ở lần đăng nhập ĐẦU và khi label còn là tên mặc định (đăng nhập lại giữ tên user
+        # đã đặt, kể cả khi trùng tên connector); lỗi thì bỏ qua, không phá trang báo thành công.
+        try:
+            cid = res.get("conn_id")
+            c = mcp_store.get_connection(cid) or {}
+            con = mcp_catalog.get(c.get("connector_id")) or {}
+            if (cid and res.get("first_auth", True)
+                    and c.get("label") in ("", None, con.get("name"), c.get("connector_id"))):
+                label = res.get("email") or ""   # email từ id_token (Google) chắc chắn hơn validate
+                if not label:
+                    val = await mcp_hub.validate_connection(cid)
+                    label = val.get("label") or ""
+                if label:
+                    mcp_store.update_connection(cid, {"label": label})
+        except Exception as e:
+            print(f"[oauth label] {e}")
+        html = ("<html><body style='font-family:sans-serif;background:#111;color:#eee;text-align:center;padding-top:80px'>"
+                "<h2>✓ Đã kết nối thành công</h2><p>Đóng tab này và quay lại Javis, bấm Làm mới ở trang Kết nối.</p></body></html>")
+    else:
+        html = (f"<html><body style='font-family:sans-serif;background:#111;color:#eee;text-align:center;padding-top:80px'>"
+                f"<h2>⚠ Kết nối thất bại</h2><p>{res.get('error', '')}</p></body></html>")
+    return HTMLResponse(html)
 
 
 @app.get("/settings")
@@ -747,7 +1068,7 @@ async def settings_get():
     cfg = cfgmod.read_settings()
     safe = json.loads(json.dumps(cfg))
     safe["auth"] = {"username": cfg["auth"].get("username", ""), "has_password": bool(cfg["auth"].get("password_hash"))}
-    for kf in ("openrouter_key", "anthropic_api_key", "openai_api_key"):
+    for kf in ("openrouter_key", "anthropic_api_key", "openai_api_key", "gemini_api_key"):
         k = cfg["model"].get(kf, "")
         safe["model"][kf] = ("••••" + k[-4:]) if k else ""
         safe["model"][kf + "_set"] = bool(k)
@@ -793,7 +1114,7 @@ async def settings_set(section: str = Form(...), data: str = Form("{}")):
             if _provider_def(prov) and mod:
                 _set_main_model(cfg, prov, mod)
         # Nhập credential provider (chỉ ghi khi có giá trị mới - tránh xoá bằng giá trị che ••••)
-        for kf in ("openrouter_key", "anthropic_api_key", "openai_api_key"):
+        for kf in ("openrouter_key", "anthropic_api_key", "openai_api_key", "gemini_api_key"):
             if patch.get(kf):
                 m[kf] = patch[kf]
         # Ngắt kết nối 1 provider (xoá key). Nếu nó đang là MAIN → quay về Claude Code CLI để chat không gãy.
@@ -817,13 +1138,17 @@ async def settings_set(section: str = Form(...), data: str = Form("{}")):
         if "enabled" in patch:
             t["enabled"] = bool(patch["enabled"])
         if "chat_id" in patch:
-            t["chat_id"] = str(patch["chat_id"])
+            # Nhận MỘT hoặc NHIỀU ID ("id1, id2" / list) → chuẩn hoá lưu "id1,id2".
+            t["chat_id"] = ",".join(tg_parse_ids(patch["chat_id"]))
         if patch.get("token"):
             t["token"] = patch["token"]
     elif section == "dashboard":
         cfg.setdefault("dashboard", {})
         if "graph_enabled" in patch:
             cfg["dashboard"]["graph_enabled"] = bool(patch["graph_enabled"])
+        if "graph_mode" in patch:
+            gm = str(patch["graph_mode"]).lower()
+            cfg["dashboard"]["graph_mode"] = gm if gm in ("2d", "3d") else "2d"
     elif section == "voice":
         v = cfg.setdefault("voice", {})
         if patch.get("tts_provider") in ("edge", "openai", "elevenlabs"):
@@ -831,7 +1156,9 @@ async def settings_set(section: str = Form(...), data: str = Form("{}")):
         for k in ("openai_tts_voice", "openai_tts_model", "elevenlabs_voice", "elevenlabs_model"):
             if patch.get(k):
                 v[k] = str(patch[k]).strip()
-        if patch.get("elevenlabs_key"):          # chỉ ghi khi có key mới (tránh xoá bằng ••••)
+        # Chỉ ghi khi có key mới THẬT: client lỡ gửi lại giá trị che "••••abcd" (lấy từ GET
+        # /settings rồi POST nguyên object về) mà lưu thì đè mất key thật.
+        if patch.get("elevenlabs_key") and not patch["elevenlabs_key"].strip().startswith("••••"):
             v["elevenlabs_key"] = patch["elevenlabs_key"].strip()
     elif section == "password":
         if patch.get("new_password"):
@@ -851,27 +1178,50 @@ async def settings_set(section: str = Form(...), data: str = Form("{}")):
             restart_telegram()   # áp cấu hình bot ngay
         except Exception as e:
             print(f"[telegram restart] {e}", file=__import__('sys').stderr)
+    if section == "voice":
+        cfgmod.apply_tool_env(cfg)   # key ElevenLabs -> env cho tool ngoài (video-use) ngay, không cần restart
     return {"ok": True}
 
 
 # ============================================================
-# BACKUP brain lên GitHub (đồng bộ repo riêng, khôi phục khi mất máy/VPS)
+# ĐỒNG BỘ brain với GitHub - 2 CHIỀU (kéo về + hoà nhập + đẩy lên).
+# Dùng được nhiều máy (local + VPS) chung 1 repo: các máy tự khớp nhau qua repo.
 # UI + hướng dẫn ở trang Tự học (console.js renderLearn). Token lưu settings.json (gitignored).
 # ============================================================
-def _do_backup(brain: str) -> dict:
-    """Chạy 1 lần backup (đồng bộ nghẽn - gọi trong thread). Cập nhật last_backup/last_status."""
+def _do_backup(brain: str = "") -> dict:
+    """Đồng bộ 2 CHIỀU toàn bộ thư mục brains với repo GitHub. Tham số brain giữ cho
+    tương thích chữ ký cũ nhưng KHÔNG dùng - luôn đồng bộ cả BRAINS_DIR.
+    Cập nhật last_backup/last_status/last_report."""
     cfg = cfgmod.read_settings()
     b = cfg.get("backup", {}) or {}
     if not (b.get("repo_url") and b.get("token")):
         return {"ok": False, "error": "Chưa cấu hình repo URL + token"}
-    root = _brain_root(brain)
-    res = git_brain.backup_to_github(root, b["repo_url"], b["token"], b.get("branch") or "main")
+    mirror = str(cfgmod.STATE_DIR / "brains-backup")   # repo mirror riêng (tránh nested git từng brain)
+    res = git_brain.sync_brains(BRAINS_DIR, mirror, b["repo_url"], b["token"], b.get("branch") or "main")
     # Ghi lại trạng thái (đọc lại cfg mới nhất để không đè thay đổi song song)
     cfg = cfgmod.read_settings()
     cfg.setdefault("backup", {})
     cfg["backup"]["last_backup"] = time.time()
-    cfg["backup"]["last_status"] = ("✓ Đã đồng bộ " + time.strftime("%H:%M %d/%m")) if res.get("ok") \
-        else ("✗ " + (res.get("error") or "lỗi")[:150])
+    if res.get("ok"):
+        bits = []
+        if res.get("applied"):
+            bits.append(f"nhận {res['applied']} file")
+        if res.get("deleted"):
+            bits.append(f"xoá {res['deleted']}")
+        if res.get("conflicts"):
+            bits.append(f"{len(res['conflicts'])} xung đột (giữ cả 2 bản)")
+        if res.get("restored"):
+            bits.append("khôi phục từ backup")
+        detail = (" · " + ", ".join(bits)) if bits else ""
+        cfg["backup"]["last_status"] = "✓ Đồng bộ 2 chiều " + time.strftime("%H:%M %d/%m") + detail
+    else:
+        cfg["backup"]["last_status"] = "✗ " + (res.get("error") or "lỗi")[:150]
+    cfg["backup"]["last_report"] = {
+        "ts": time.time(), "ok": bool(res.get("ok")), "pushed": bool(res.get("pushed")),
+        "applied": res.get("applied", 0), "deleted": res.get("deleted", 0),
+        "conflicts": (res.get("conflicts") or [])[:20], "restored": bool(res.get("restored")),
+        "error": (res.get("error") or "")[:200],
+    }
     cfgmod.write_settings(cfg)
     return res
 
@@ -880,7 +1230,11 @@ def _do_backup(brain: str) -> dict:
 async def backup_status(brain: str = Query("brain")):
     cfg = cfgmod.read_settings()
     b = cfg.get("backup", {}) or {}
-    root = _brain_root(brain)
+    # Đếm số brain trong BRAINS_DIR (để UI báo "backup N brain")
+    try:
+        n_brains = len([d for d in Path(BRAINS_DIR).iterdir() if d.is_dir() and not d.name.startswith(".")])
+    except Exception:
+        n_brains = 0
     return {
         "enabled": bool(b.get("enabled")),
         "repo_url": b.get("repo_url", ""),
@@ -889,8 +1243,10 @@ async def backup_status(brain: str = Query("brain")):
         "token_set": bool(b.get("token")),
         "last_backup": b.get("last_backup", 0.0),
         "last_status": b.get("last_status", ""),
+        "last_report": b.get("last_report") or {},
         "has_git": git_brain.has_git(),
-        "is_git": git_brain.is_git_checkout(root),
+        "brains_dir": BRAINS_DIR,
+        "brains_count": n_brains,
     }
 
 
@@ -987,6 +1343,18 @@ async def _fetch_provider_models(provider, m):
             r.raise_for_status()
             data = r.json().get("data", [])
         return [x.get("id") for x in data if x.get("id")] or None
+    if provider == "gemini":
+        key = m.get("gemini_api_key")
+        if not key:
+            return None
+        async with httpx.AsyncClient(timeout=20) as c:
+            r = await c.get("https://generativelanguage.googleapis.com/v1beta/models", params={"key": key})
+            r.raise_for_status()
+            data = r.json().get("models", [])
+        # name dạng 'models/gemini-2.5-flash' → lấy đuôi; chỉ giữ model sinh nội dung (bỏ embedding/aqa)
+        ids = [(x.get("name") or "").split("/")[-1] for x in data
+               if "generateContent" in (x.get("supportedGenerationMethods") or [])]
+        return sorted(i for i in ids if i.startswith("gemini")) or None
     if provider == "openai-oauth":
         return openai_oauth.list_models(openai_oauth.valid_creds())   # None nếu backend không có endpoint → fallback
     return None   # anthropic-cli: alias CLI, không list được → fallback catalog
@@ -1083,7 +1451,7 @@ async def metrics(fresh: int = Query(0, description="1 = bỏ cache, gọi mới
         cached["cached"] = True
         return cached
 
-    cli = ClaudeCLI(system_prompt=SYSTEM_PROMPT, cwd=CLAUDE_CWD, tag="metrics")
+    cli = claude_engine(system_prompt=SYSTEM_PROMPT, cwd=CLAUDE_CWD, tag="metrics")
     cli.model = _aux_model() or None   # việc nền: dùng model phụ nếu có cấu hình
     _apply_mcp(cli)   # metrics cần MCP (POS/ads) - dùng server Javis quản lý nếu có
     if not cli.is_available():
@@ -1141,9 +1509,10 @@ def _resolve_graph_roots(source: str, path: str = None):
 async def graph(
     source: str = Query("all", description="all | brain | vault"),
     path: str = Query(None, description="Đường dẫn folder tùy ý (ưu tiên nếu có)"),
+    orphans: int = Query(0, description="1 = hiện cả note cô đơn (0 kết nối), như graph view Obsidian"),
 ):
     """Lớp Graphify - dựng đồ thị kết nối note từ wikilink."""
-    return build_graph(_resolve_graph_roots(source, path))
+    return build_graph(_resolve_graph_roots(source, path), include_orphans=bool(orphans))
 
 
 # ============================================================
@@ -1357,7 +1726,7 @@ async def ingest_upload(
     attachments: str = Form(""), kind: str = Form("file"), name: str = Form(""),
 ):
     """Dùng Claude CLI biến file staged thành .md nguồn: text→trích, ảnh→mô tả."""
-    cli = ClaudeCLI(system_prompt=SYSTEM_PROMPT, cwd=CLAUDE_CWD)
+    cli = claude_engine(system_prompt=SYSTEM_PROMPT, cwd=CLAUDE_CWD)
     cli.model = _aux_model() or None   # việc nền: dùng model phụ nếu có cấu hình
     if not cli.is_available():
         return {"ok": False, "error": "Claude CLI chưa cài"}
@@ -1409,8 +1778,9 @@ STANDARD_STRUCTURE = [
     {"key": "agents", "label": "agents", "kind": "dir", "detect": r"^agents$", "alt": "Javis/agents", "create": "agents", "essential": True},
     {"key": "workflows", "label": "workflows", "kind": "dir", "detect": r"^workflows$", "alt": "Javis/workflows", "create": "workflows", "essential": True},
     {"key": "memory", "label": "memory", "kind": "dir", "detect": r"^memory$", "alt": "Memory", "create": "memory", "essential": True},
-    # Skill KHÔNG phải folder top-level: sống ở .claude/skills/<skill>/SKILL.md (Claude Code native),
-    # chia nhóm bằng field `group` trong frontmatter. Nên không liệt kê ở đây.
+    # Skill: canonical phẳng skills/<slug>/SKILL.md (mirror sang .claude/skills cho Claude native),
+    # chia nhóm bằng field `group` trong frontmatter. alt = .claude/skills (vị trí cũ chưa migrate).
+    {"key": "skills", "label": "skills", "kind": "dir", "detect": r"^skills$", "alt": ".claude/skills", "create": "skills", "essential": False},
     # Tuỳ chọn - Javis chưng cất source → wiki (nuôi graph); đính kèm ảnh/file
     {"key": "wiki", "label": "wiki", "kind": "dir", "detect": r"^(\d+\s*[-_.]\s*)?wiki$", "create": "wiki", "essential": False},
     {"key": "attachments", "label": "attachments", "kind": "dir", "detect": r"^(\d+\s*[-_.]\s*)?attachments$", "create": "attachments", "essential": False},
@@ -1448,7 +1818,7 @@ JAVIS_README = (
     "# Javis\n\nLớp điều phối của Javis OS trong vault này.\n\n"
     "- `agents/` - các Agent (vai trò + skills + bộ nhớ riêng)\n"
     "- `workflows/` - quy trình nhiều agent (status active/off)\n"
-    "- Skills dùng chung ở `.claude/skills/`\n"
+    "- Skills dùng chung ở `skills/` (tự mirror sang `.claude/skills` cho Claude Code native)\n"
 )
 SCHEMA_SEED = (
     "# AGENTS.md - Vault Schema (Javis)\n\n"
@@ -1484,6 +1854,26 @@ def _ensure_brain_scaffold(root):
         _brain_memory_dir(str(root))   # memory/ + MEMORY.md seed
     except Exception:
         pass
+    try:
+        # Năng lực HỆ THỐNG (skill javis-builder/ingest/query/lint + loop tự-cải-tiến): nguồn chuẩn
+        # nằm ở tầng app (.claude/skills + system/loops, đi theo phiên bản), mirror vào brain qua
+        # manifest - cài nếu thiếu, UPDATE khi app lên bản mới, giữ nguyên nếu user đã sửa.
+        system_sync.sync_brain(str(root))
+    except Exception as e:
+        print(f"[system sync] {e}", file=__import__('sys').stderr)
+    try:
+        import meta_tools
+        # Bộ khung "compounding wiki" phổ quát: schema doc + điều hướng wiki + HANDOFF - seed 1 LẦN
+        # (create-if-missing) vì user + AI cùng tiến hoá các file này, update app KHÔNG ghi đè.
+        # Resolve đúng thư mục wiki hiện có (vd '07 - Wiki') để không tạo 'wiki' trùng.
+        _wd = _resolve_subfolder(str(root), r"^(\d+\s*[-_.]\s*)?wiki$", "wiki")
+        meta_tools.ensure_brain_pattern(str(root), _wd)
+    except Exception as e:
+        print(f"[meta tools seed] {e}", file=__import__('sys').stderr)
+    try:
+        rebuild_javis_index(str(root))   # chỉ mục tầng vận hành (Javis/index.md)
+    except Exception as e:
+        print(f"[javis index] {e}", file=__import__('sys').stderr)
 
 
 def _ensure_default_brain():
@@ -1493,6 +1883,22 @@ def _ensure_default_brain():
         _ensure_brain_scaffold(_default_brain_dir())
     except Exception as e:
         print(f"[brain scaffold] {e}", file=__import__('sys').stderr)
+
+
+def _sync_system_all_brains():
+    """Đồng bộ năng lực HỆ THỐNG vào MỌI brain trong BRAINS_DIR lúc khởi động - đổi brain nào
+    cũng có đủ chức năng mặc định, và app lên bản mới thì brain cũ nhận bản skill/loop mới
+    (trừ file user đã sửa). Brain ngoài (path:) được sync ở lượt dùng đầu (build_system_prompt).
+    KHÔNG scaffold cấu trúc thư mục ở đây - chỉ đụng file hệ thống, dữ liệu user để yên."""
+    try:
+        base = Path(BRAINS_DIR)
+        if not base.is_dir():
+            return
+        for p in sorted(base.iterdir()):
+            if p.is_dir() and not p.name.startswith("."):
+                system_sync.ensure_synced(p)
+    except Exception as e:
+        print(f"[system sync all] {e}", file=__import__('sys').stderr)
 
 
 def _migrate_legacy_brain():
@@ -1537,33 +1943,16 @@ async def vault_check(brain: str = Query("brain")):
 
 @app.post("/vault/init")
 async def vault_init(brain: str = Form("brain")):
-    """Tạo các mục cấu trúc còn thiếu để vault chạy với Javis."""
+    """Tạo các mục cấu trúc còn thiếu để vault chạy với Javis. Dùng CHUNG scaffold với brain
+    mới tạo (đủ bộ: cấu trúc + memory seed + schema/wiki nav + năng lực HỆ THỐNG + index) →
+    vault ngoài chọn qua path: cũng có đầy đủ chức năng mặc định, không còn bản seed thiếu."""
     root = Path(_brain_root(brain))
-    items = _check_structure(root)
-    present_keys = {i["key"] for i in items if i["present"]}
-    created = []
-    for it in STANDARD_STRUCTURE:
-        if it["key"] in present_keys:
-            continue
-        try:
-            if it["kind"] in ("dir", "exact"):
-                (root / it["create"]).mkdir(parents=True, exist_ok=True)
-                created.append(it["label"])
-            elif it["kind"] == "file_any":
-                (root / it["create"]).write_text(SCHEMA_SEED, encoding="utf-8")
-                created.append(it["label"])
-        except Exception as e:
-            print(f"[vault init error] {it['key']}: {e}", file=__import__('sys').stderr)
-    # Seed Javis/README + Memory
+    missing = [i["label"] for i in _check_structure(root) if not i["present"]]
     try:
-        jr = root / "Javis" / "README.md"
-        if not jr.exists():
-            jr.parent.mkdir(parents=True, exist_ok=True)
-            jr.write_text(JAVIS_README, encoding="utf-8")
-        _brain_memory_dir(brain)  # đảm bảo Memory seed
-    except Exception:
-        pass
-    return {"ok": True, "created": created}
+        _ensure_brain_scaffold(root)
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+    return {"ok": True, "created": missing}
 
 
 @app.post("/brain/migrate")
@@ -1754,51 +2143,33 @@ async def delete_agent(slug: str = Form(...), brain: str = Form("brain")):
 # ---- Skills ----
 @app.get("/skills")
 async def list_skills(brain: str = Query("brain")):
-    # NGUỒN SKILL DUY NHẤT = <brain>/.claude/skills/<skill>/SKILL.md (+ .agents).
-    # Đây CHÍNH là nơi Claude Code native nạp skill lúc agent/CLI chạy → hiển thị == thực thi.
-    # NHÓM = field `group` trong frontmatter SKILL.md (mặc định "Chung"). KHÔNG dùng folder
-    # skills/<nhóm>/ vì Claude Code chỉ quét .claude/skills 1 cấp → nhồi folder nhóm sẽ làm
-    # agent KHÔNG tìm thấy skill. Chia nhóm bằng metadata không ảnh hưởng việc nạp.
-    root = Path(_brain_root(brain))
-    out, seen = [], set()
-    def _add(sk_dir, source, enabled=True):
-        if sk_dir.name in seen:
-            return
-        smd = sk_dir / "SKILL.md"
-        if not smd.is_file():
-            return
-        seen.add(sk_dir.name)
-        meta, body = _read_md(smd)
-        desc = meta.get("description", "") or (body.split("\n")[0][:140] if body else "")
-        out.append({"slug": sk_dir.name, "name": meta.get("name", sk_dir.name),
-                    "description": desc, "group": meta.get("group") or "Chung",
-                    "source": source, "enabled": enabled})
-    # Skill BẬT = <root>/.claude/skills/<slug>; skill TẮT = <root>/.claude/skills/.disabled/<slug>
-    # (Claude Code chỉ quét .claude/skills 1 cấp → skill trong .disabled không được nạp = tắt thật).
-    sk_base = root / ".claude" / "skills"
-    if sk_base.is_dir():
-        for sk in sorted(p for p in sk_base.iterdir() if p.is_dir() and p.name != ".disabled"):
-            _add(sk, ".claude", True)
-        dis = sk_base / ".disabled"
-        if dis.is_dir():
-            for sk in sorted(p for p in dis.iterdir() if p.is_dir()):
-                _add(sk, ".claude", False)
-    ag = root / ".agents"
-    if ag.is_dir():
-        for sk in sorted(p for p in ag.iterdir() if p.is_dir()):
-            _add(sk, ".agents", True)
+    # NGUỒN SKILL: canonical <brain>/skills/<slug>/SKILL.md, fallback đọc .claude/skills (legacy +
+    # bản mirror) và .agents (rất cũ). Dùng skill_router (CHUNG với engine) → hiển thị == thực thi.
+    # NHÓM = field `group` trong frontmatter (mặc định "Chung"). Skill TẮT = <base>/.disabled/<slug>.
+    root = _brain_root(brain)
+    sys_slugs = system_sync.system_skill_slugs()   # skill HỆ THỐNG (đi theo phiên bản app)
+    out = [{**s, "system": s["slug"] in sys_slugs} for s in skill_router.list_skills(root)]
     return {"skills": out}
 
 
 def _skills_dir(brain):
-    """Thư mục skill chuẩn Claude Code: <brain>/.claude/skills (nơi native nạp skill)."""
-    return Path(_brain_root(brain)) / ".claude" / "skills"
+    """Thư mục skill CANONICAL của brain: <brain>/skills (phẳng, cùng hướng agents/workflows).
+    Bản mirror sang <brain>/.claude/skills (cho Claude Code native) do system_sync.mirror_skills lo."""
+    return skill_router.skills_base(_brain_root(brain), canonical=True)
 
 
 @app.post("/skills/toggle")
 async def skill_toggle(slug: str = Form(...), enabled: str = Form(...), brain: str = Form("brain")):
-    """Bật/tắt skill bằng cách di chuyển folder giữa .claude/skills/<slug> và .claude/skills/.disabled/<slug>."""
+    """Bật/tắt skill = di chuyển folder giữa <brain>/skills/<slug> và <brain>/skills/.disabled/<slug>.
+    Đồng bộ bản mirror .claude/skills (bật→copy, tắt→gỡ) để Claude native cwd=brain khớp trạng thái."""
     want = enabled in ("1", "true", "True", "on")
+    if not skill_router.valid_slug(slug):   # chống traversal: slug 1 đoạn, dùng cho rmtree/rename bên dưới
+        return JSONResponse({"error": "slug không hợp lệ"}, status_code=400)
+    root = _brain_root(brain)
+    try:
+        system_sync.migrate_brain(root)   # brain cũ: kéo skill legacy .claude/skills → skills/ trước
+    except Exception:
+        pass
     sk = _skills_dir(brain)
     dis = sk / ".disabled"
     src = (dis / slug) if want else (sk / slug)
@@ -1810,6 +2181,11 @@ async def skill_toggle(slug: str = Form(...), enabled: str = Form(...), brain: s
         if dst.exists():
             shutil.rmtree(dst)
         src.rename(dst)
+        mirror_slug = Path(root) / ".claude" / "skills" / slug
+        if want:
+            system_sync.mirror_skills(root)      # bật → tạo/cập nhật bản mirror cho Claude native
+        elif mirror_slug.is_dir():
+            shutil.rmtree(mirror_slug)           # tắt → gỡ mirror để native không còn nạp
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
     return {"ok": True}
@@ -1817,13 +2193,18 @@ async def skill_toggle(slug: str = Form(...), enabled: str = Form(...), brain: s
 
 @app.get("/skills/get")
 async def skill_get(slug: str = Query(...), brain: str = Query("brain")):
-    smd = _skills_dir(brain) / slug / "SKILL.md"
-    if not smd.is_file():
-        alt = Path(_brain_root(brain)) / ".agents" / slug / "SKILL.md"
-        if alt.is_file():
-            smd = alt
-        else:
-            return JSONResponse({"error": "Không tìm thấy skill"}, status_code=404)
+    if not skill_router.valid_slug(slug):
+        return JSONResponse({"error": "slug không hợp lệ"}, status_code=400)
+    root = _brain_root(brain)
+    smd = skill_router.resolve_skill_file(root, slug)   # canonical → .claude → .agents (bản BẬT)
+    if not smd:
+        for base in ("skills", ".claude/skills"):        # cho phép xem/sửa cả skill đang TẮT
+            cand = Path(root) / base / ".disabled" / slug / "SKILL.md"
+            if cand.is_file():
+                smd = cand
+                break
+    if not smd or not smd.is_file():
+        return JSONResponse({"error": "Không tìm thấy skill"}, status_code=404)
     meta, body = _read_md(smd)
     return {"slug": slug, "name": meta.get("name", slug), "description": meta.get("description", ""),
             "group": meta.get("group") or "Chung", "body": body}
@@ -1832,73 +2213,167 @@ async def skill_get(slug: str = Query(...), brain: str = Query("brain")):
 @app.post("/skills")
 async def save_skill(name: str = Form(...), description: str = Form(""), group: str = Form("Chung"),
                      body: str = Form(""), slug: str = Form(""), brain: str = Form("brain")):
-    """Tạo/cập nhật skill → <brain>/.claude/skills/<slug>/SKILL.md. group vào frontmatter để gom nhóm."""
+    """Tạo/cập nhật skill → CANONICAL <brain>/skills/<slug>/SKILL.md. group vào frontmatter để gom
+    nhóm. Sau khi ghi, mirror sang .claude/skills để Claude native (cwd=brain) thấy ngay."""
     slug = (slug or _ascii_slug(name)).strip()
-    if not slug:
+    if not skill_router.valid_slug(slug):
         return JSONResponse({"error": "Tên skill không hợp lệ"}, status_code=400)
-    d = _skills_dir(brain) / slug
+    root = _brain_root(brain)
+    try:
+        system_sync.migrate_brain(root)   # brain cũ: chuẩn hoá về skills/ trước khi ghi
+    except Exception:
+        pass
+    sk = _skills_dir(brain)
+    # SỬA skill đang TẮT thì GIỮ nguyên trạng thái tắt (ghi lại vào .disabled), không tự bật lên
+    # + không để lại bản mồ côi. Skill MỚI (chưa có ở đâu) → ghi vào vị trí BẬT (mặc định bật).
+    disabled_dir = sk / ".disabled" / slug
+    d = disabled_dir if disabled_dir.is_dir() else (sk / slug)
     d.mkdir(parents=True, exist_ok=True)
     meta = {"name": name, "description": description, "group": (group or "Chung").strip()}
     _write_md(d / "SKILL.md", meta, body or f"# {name}\n\n{description}")
+    try:
+        system_sync.mirror_skills(root)   # bật → cập nhật mirror; tắt (.disabled) → mirror bỏ qua
+    except Exception:
+        pass
     return {"ok": True, "slug": slug}
 
 
 @app.post("/skills/delete")
 async def delete_skill(slug: str = Form(...), brain: str = Form("brain")):
-    for base in (".claude/skills", ".agents"):
-        d = Path(_brain_root(brain)) / Path(base) / slug
+    if system_sync.is_system_skill(slug):
+        return JSONResponse({"error": "Skill hệ thống của Javis OS - không xoá được (đi theo "
+                             "phiên bản app, xoá cũng tự cài lại khi cập nhật). Muốn ngừng dùng "
+                             "thì TẮT skill (bỏ tích)."}, status_code=400)
+    if not skill_router.valid_slug(slug):
+        return JSONResponse({"error": "slug không hợp lệ"}, status_code=400)
+    root = Path(_brain_root(brain))
+    # Xoá ở MỌI nơi: canonical (bật+tắt) + bản mirror .claude (bật+tắt) + legacy .agents.
+    targets = [root / "skills" / slug, root / "skills" / ".disabled" / slug,
+               root / ".claude" / "skills" / slug, root / ".claude" / "skills" / ".disabled" / slug,
+               root / ".agents" / slug]
+    found = False
+    for d in targets:
         if d.is_dir():
             try:
                 shutil.rmtree(d)
+                found = True
             except Exception as e:
                 return JSONResponse({"error": str(e)}, status_code=500)
-            return {"ok": True}
-    return JSONResponse({"error": "Không tìm thấy skill"}, status_code=404)
+    return {"ok": True} if found else JSONResponse({"error": "Không tìm thấy skill"}, status_code=404)
 
 
 @app.post("/skills/group")
 async def skill_set_group(slug: str = Form(...), group: str = Form(...), brain: str = Form("brain")):
     """Đổi nhóm 1 skill (chỉ cập nhật field group, giữ nguyên body)."""
-    smd = _skills_dir(brain) / slug / "SKILL.md"
-    if not smd.is_file():
+    if not skill_router.valid_slug(slug):
+        return JSONResponse({"error": "slug không hợp lệ"}, status_code=400)
+    smd = skill_router.resolve_skill_file(_brain_root(brain), slug)
+    if not smd or not smd.is_file():
         return JSONResponse({"error": "Không tìm thấy"}, status_code=404)
     meta, body = _read_md(smd)
     meta["group"] = (group or "Chung").strip()
     _write_md(smd, meta, body)
+    try:
+        system_sync.mirror_skills(_brain_root(brain))
+    except Exception:
+        pass
     return {"ok": True}
 
 
 # ============================================================
-# Quản lý File (File Manager) - duyệt / đọc / sửa / tải / xoá file TRONG brain đang chọn.
-# An toàn: mọi thao tác bị giới hạn trong _brain_root(brain) (chống traversal ../).
+# Quản lý File (File Manager) - duyệt / đọc / sửa / tải / xoá file.
+# TRẦN duyệt (_files_ceiling): mặc định localhost = ổ đĩa chứa brain (out được ra root để
+# đọc/sửa data ngoài vault); public bind (VPS/login) = khoá trong brain. Chỉnh bằng
+# JAVIS_FILES_ROOT. Điểm vào mặc định LUÔN là brain. _safe_path chặn vượt trần (chống ../).
 # ============================================================
 _TEXT_EXTS = {".md", ".txt", ".json", ".yaml", ".yml", ".csv", ".js", ".ts", ".py",
               ".html", ".css", ".toml", ".ini", ".log", ".sh", ".bat", ".xml", ".svg", ".env"}
 
 
+def _files_ceiling(brain: str) -> Path:
+    """Ranh giới trên của File Manager (không cho 'Lên' quá đây). Brain LUÔN nằm trong trần.
+    JAVIS_FILES_ROOT: `brain`/`vault` = khoá trong brain | `drive`/`root` = ổ đĩa chứa brain |
+    <đường dẫn tuyệt đối> = trần tuỳ ý (phải chứa brain). KHÔNG đặt: localhost → ổ đĩa (chủ máy
+    tin cậy), bind public → khoá brain (fail-closed, tránh hở cả ổ đĩa qua web)."""
+    broot = Path(_brain_root(brain)).resolve()
+    env = os.getenv("JAVIS_FILES_ROOT", "").strip()
+    ceil = None
+    if env:
+        low = env.lower()
+        if low in ("brain", "vault"):
+            ceil = broot
+        elif low in ("drive", "root"):
+            ceil = Path(broot.anchor or broot)
+        else:
+            cand = Path(env).expanduser()
+            if cand.is_dir():
+                ceil = cand.resolve()
+    elif not cfgmod.require_login():
+        ceil = Path(broot.anchor or broot)      # localhost = chủ máy → tới ổ đĩa
+    if ceil is None:
+        ceil = broot                            # public / cấu hình lạ → khoá brain
+    try:
+        broot.relative_to(ceil)                 # brain phải trong trần, else fallback brain
+    except ValueError:
+        ceil = broot
+    return ceil
+
+
 def _files_root(brain: str) -> Path:
-    return Path(_brain_root(brain)).resolve()
+    """Trần duyệt hiện hành (mọi path tương đối tính từ đây). Alias giữ tên cũ cho call site."""
+    return _files_ceiling(brain)
 
 
 def _safe_path(brain: str, rel: str) -> Path:
-    """Resolve rel TRONG brain root; ném ValueError nếu vượt ra ngoài (chống ../)."""
+    """Resolve rel TRONG trần duyệt; ném ValueError nếu vượt ra ngoài (chống ../)."""
     root = _files_root(brain)
     rel = (rel or "").strip().replace("\\", "/").lstrip("/")
     target = (root / rel).resolve()
     if target != root and root not in target.parents:
-        raise ValueError("Đường dẫn ngoài phạm vi brain")
+        raise ValueError("Đường dẫn ngoài phạm vi cho phép")
     return target
 
 
+def _safe_serve_path(brain: str, rel: str) -> Path:
+    """Resolve rel để PHỤC VỤ/ĐỌC file, chấp nhận CẢ HAI quy ước đường dẫn:
+    - tương đối TRẦN duyệt (File Manager, path lấy từ /files/list) → thử trước;
+    - tương đối GỐC BRAIN/vault (link & ảnh trong chat, do AI ghi theo CLAUDE.md) → dự phòng.
+    Lý do: khi trần duyệt nằm CAO hơn gốc brain (vd localhost = tới ổ đĩa), đường dẫn vault kiểu
+    'videos/x.mp4' nếu chỉ tính theo trần sẽ thành 'D:/videos/x.mp4' → 404. Cả hai nhánh đều bị
+    KHOÁ trong trần (chống ../). CHỈ dùng cho endpoint CHỈ-ĐỌC (raw/read/download) - KHÔNG dùng cho
+    ghi/xoá/đổi tên để tránh mơ hồ khi tạo file mới."""
+    root = _files_root(brain)
+    rel = (rel or "").strip().replace("\\", "/").lstrip("/")
+    ceil_target = (root / rel).resolve()
+    ceil_in = ceil_target == root or root in ceil_target.parents
+    if ceil_in and ceil_target.exists():
+        return ceil_target
+    broot = Path(_brain_root(brain)).resolve()
+    if broot != root:                                   # chỉ khi trần KHÁC gốc brain
+        brain_target = (broot / rel).resolve()
+        if (brain_target == broot or broot in brain_target.parents) and brain_target.exists():
+            return brain_target                         # đường dẫn vault, vẫn nằm trong gốc brain
+    if not ceil_in:
+        raise ValueError("Đường dẫn ngoài phạm vi cho phép")
+    return ceil_target                                  # không thấy: trả theo trần để 404 nhất quán
+
+
+def _files_rel(root: Path, p: Path) -> str:
+    """Đường dẫn POSIX của p tương đối so với trần root ('' nếu p == root)."""
+    return "" if p == root else str(p.relative_to(root)).replace("\\", "/")
+
+
 @app.get("/files/list")
-async def files_list(brain: str = Query("brain"), path: str = Query("")):
+async def files_list(brain: str = Query("brain"), path: str = Query(None)):
+    root = _files_root(brain)
+    broot = Path(_brain_root(brain)).resolve()
     try:
-        d = _safe_path(brain, path)
+        # path VẮNG (None) = điểm vào mặc định = BRAIN; path="" = trần (ổ đĩa); còn lại = tương đối trần
+        d = broot if path is None else _safe_path(brain, path)
     except ValueError as e:
         return JSONResponse({"error": str(e)}, status_code=400)
     if not d.is_dir():
         return JSONResponse({"error": "Không phải thư mục"}, status_code=400)
-    root = _files_root(brain)
     items = []
     for p in sorted(d.iterdir(), key=lambda x: (x.is_file(), x.name.lower())):
         try:
@@ -1906,16 +2381,74 @@ async def files_list(brain: str = Query("brain"), path: str = Query("")):
             items.append({"name": p.name, "type": "dir" if p.is_dir() else "file",
                           "size": st.st_size if p.is_file() else 0, "mtime": st.st_mtime,
                           "ext": p.suffix.lower()})
-        except Exception:
+        except (PermissionError, OSError):
             continue
-    return {"root": root.name, "path": "" if d == root else str(d.relative_to(root)).replace("\\", "/"),
+    return {"root": root.name or str(root), "path": _files_rel(root, d),
+            "home": _files_rel(root, broot),                       # brain = 'nhà' (nút ⌂)
+            "parent": None if d == root else _files_rel(root, d.parent),   # None = đã ở trần → ẩn Lên
             "items": items}
+
+
+@app.get("/files/search")
+async def files_search(brain: str = Query("brain"), q: str = Query(""), limit: int = Query(50)):
+    """Tìm note trong GỐC BRAIN (KHÔNG phải trần duyệt - tránh quét cả ổ đĩa trên localhost).
+    Khớp TÊN file (mọi loại) + NỘI DUNG file text; bỏ file >1MB và thư mục ẩn/nặng. Path trả về
+    tính theo TRẦN (giống /files/list) để mở bằng cùng quy ước. Walk chạy trong threadpool để
+    không chặn event loop FastAPI."""
+    from starlette.concurrency import run_in_threadpool
+    q = (q or "").strip()
+    if not q:
+        return {"items": [], "q": q}
+    root = _files_root(brain)                        # trần (để tính path trả về, khớp /files/list)
+    broot = Path(_brain_root(brain)).resolve()       # phạm vi quét = gốc brain
+    ql = q.lower()
+    try:
+        limit = max(1, min(int(limit), 200))
+    except (TypeError, ValueError):
+        limit = 50
+    SKIP_DIRS = {".git", "node_modules", "__pycache__", ".obsidian", ".trash", ".venv", ".pytest_cache"}
+
+    def _walk():
+        out = []
+        for dirpath, dirnames, filenames in os.walk(broot):
+            dirnames[:] = [dn for dn in dirnames if not dn.startswith(".") and dn not in SKIP_DIRS]
+            for fn in sorted(filenames):
+                if len(out) >= limit:
+                    return out
+                p = Path(dirpath) / fn
+                ext = p.suffix.lower()
+                name_hit = ql in fn.lower()
+                content_hit = False
+                snippet, line_no = "", 0
+                if ext in _TEXT_EXTS:
+                    try:
+                        if p.stat().st_size <= 1_000_000:
+                            txt = p.read_text(encoding="utf-8", errors="ignore")
+                            idx = txt.lower().find(ql)
+                            if idx >= 0:
+                                content_hit = True
+                                line_no = txt.count("\n", 0, idx) + 1
+                                a = max(0, idx - 40)
+                                snippet = txt[a:idx + 80].replace("\n", " ").replace("\r", " ").strip()
+                    except (OSError, ValueError):
+                        pass
+                if name_hit or content_hit:
+                    try:
+                        rel = _files_rel(root, p)
+                    except ValueError:
+                        continue
+                    out.append({"path": rel, "name": fn, "ext": ext, "snippet": snippet,
+                                "line": line_no, "match": "content" if content_hit else "name"})
+        return out
+
+    items = await run_in_threadpool(_walk)
+    return {"items": items, "q": q}
 
 
 @app.get("/files/read")
 async def files_read(brain: str = Query("brain"), path: str = Query(...)):
     try:
-        f = _safe_path(brain, path)
+        f = _safe_serve_path(brain, path)
     except ValueError as e:
         return JSONResponse({"error": str(e)}, status_code=400)
     if not f.is_file():
@@ -1957,8 +2490,8 @@ async def files_delete(brain: str = Form("brain"), path: str = Form(...)):
         p = _safe_path(brain, path)
     except ValueError as e:
         return JSONResponse({"error": str(e)}, status_code=400)
-    if p == _files_root(brain):
-        return JSONResponse({"error": "Không thể xoá thư mục gốc"}, status_code=400)
+    if p == _files_root(brain) or p == Path(_brain_root(brain)).resolve():
+        return JSONResponse({"error": "Không thể xoá thư mục gốc / brain"}, status_code=400)
     try:
         if p.is_dir():
             shutil.rmtree(p)
@@ -2001,12 +2534,32 @@ async def files_upload(file: UploadFile = File(...), brain: str = Form("brain"),
 @app.get("/files/download")
 async def files_download(brain: str = Query("brain"), path: str = Query(...)):
     try:
-        f = _safe_path(brain, path)
+        f = _safe_serve_path(brain, path)
     except ValueError as e:
         return JSONResponse({"error": str(e)}, status_code=400)
     if not f.is_file():
         return JSONResponse({"error": "Không tìm thấy file"}, status_code=404)
     return FileResponse(str(f), filename=f.name)
+
+
+@app.get("/files/raw")
+async def files_raw(brain: str = Query("brain"), path: str = Query(...), dl: int = Query(0)):
+    """Phục vụ file THÔ để XEM INLINE trong trình duyệt: ảnh hiện trong <img>, pdf mở thẳng trên
+    tab, mọi file khác có URL tĩnh để mở/tải. Khác /files/download (luôn ép tải về): mặc định
+    inline; truyền dl=1 để ép tải. Cùng rào chống traversal (_safe_serve_path)."""
+    try:
+        f = _safe_serve_path(brain, path)
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    if not f.is_file():
+        return JSONResponse({"error": "Không tìm thấy file"}, status_code=404)
+    if dl:
+        return FileResponse(str(f), filename=f.name)   # ép tải (giữ tên, kể cả tên tiếng Việt)
+    mt, _ = mimetypes.guess_type(f.name)
+    resp = FileResponse(str(f), media_type=mt or "application/octet-stream")
+    resp.headers["Content-Disposition"] = "inline"      # hiển thị trong trình duyệt, không ép tải
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    return resp
 
 # ---- Workflows ----
 @app.get("/workflows")
@@ -2050,6 +2603,85 @@ async def delete_workflow(slug: str = Form(...), brain: str = Form("brain")):
         f.unlink()
     return {"ok": True}
 
+# ---- Xuất / Nhập năng lực (chia sẻ agent/skill/workflow qua file .zip) ----
+def _app_version() -> str:
+    try:
+        return (PROJECT_ROOT / "VERSION").read_text(encoding="utf-8").strip()
+    except Exception:
+        return ""
+
+
+@app.get("/export")
+async def export_capability(kind: str = Query(...), slug: str = Query(...),
+                            brain: str = Query("brain"), deps: int = Query(1)):
+    """Xuất 1 agent/skill/workflow (kèm phụ thuộc nếu deps=1) thành gói .zip để tải về, chia sẻ."""
+    if kind not in ("agent", "skill", "workflow"):
+        return JSONResponse({"error": "kind phải là agent/skill/workflow"}, status_code=400)
+    if not skill_router.valid_slug(slug):
+        return JSONResponse({"error": "slug không hợp lệ"}, status_code=400)
+    data, fname = share_bundle.build_bundle(
+        kind, slug,
+        agents_dir=_agents_dir(brain), workflows_dir=_workflows_dir(brain),
+        skills_root=_skills_dir(brain), include_deps=bool(deps),
+        system_slugs=system_sync.system_skill_slugs(), app_version=_app_version())
+    if not data:
+        return JSONResponse({"error": f"Không tìm thấy {kind} '{slug}' để xuất"}, status_code=404)
+    return Response(content=data, media_type="application/zip",
+                    headers={"Content-Disposition": f'attachment; filename="{fname}"'})
+
+
+@app.post("/import")
+async def import_capability(file: UploadFile = File(...), brain: str = Form("brain"),
+                            overwrite: str = Form("0")):
+    """Nhập gói .zip (hoặc file .md lẻ cho agent/workflow) vào brain. Trùng slug thì bỏ qua trừ khi
+    tick ghi đè. Có rào chống zip-slip + giới hạn dung lượng ở share_bundle."""
+    data = await file.read()
+    if not data:
+        return JSONResponse({"error": "File rỗng"}, status_code=400)
+    if len(data) > 25 * 1024 * 1024:
+        return JSONResponse({"error": "File quá lớn (>25MB)"}, status_code=413)
+    root = _brain_root(brain)
+    res = share_bundle.import_bundle(
+        data, file.filename,
+        agents_dir=_agents_dir(brain), workflows_dir=_workflows_dir(brain),
+        skills_root=_skills_dir(brain),
+        overwrite=(overwrite in ("1", "true", "True", "on")))
+    if any(str(k).startswith("skill:") for k in res.get("imported", [])):
+        try:
+            system_sync.mirror_skills(root)   # skill mới → mirror sang .claude cho Claude native
+        except Exception:
+            pass
+    try:
+        rebuild_javis_index(root)
+    except Exception:
+        pass
+    return {"ok": not res.get("errors"), **res}
+
+
+@app.get("/usage")
+async def usage_stats():
+    """Token/chi phí Javis TỰ ĐO theo nhà cung cấp (hôm nay + tổng). Kèm số dư THẬT của OpenRouter
+    nếu có key (provider duy nhất lộ số dư qua API); các provider còn lại API không cho lấy hạn mức."""
+    out = usage_store.summary()
+    orb = None
+    try:
+        key = (cfgmod.read_settings().get("model", {}) or {}).get("openrouter_key")
+        if key:
+            import httpx
+            async with httpx.AsyncClient(timeout=8) as client:
+                r = await client.get("https://openrouter.ai/api/v1/credits",
+                                     headers={"Authorization": f"Bearer {key}"})
+            if r.status_code == 200:
+                d = (r.json() or {}).get("data") or {}
+                tc, tu = d.get("total_credits"), d.get("total_usage")
+                if tc is not None and tu is not None:
+                    orb = {"total": round(float(tc), 4), "used": round(float(tu), 4),
+                           "remaining": round(float(tc) - float(tu), 4)}
+    except Exception:
+        orb = None
+    out["openrouter"] = orb
+    return out
+
 async def execute_workflow(brain, slug, input="", tools=None):
     """Chạy workflow nhiều agent tuần tự, YIELD event dict (KHÔNG bọc SSE). Dùng CHUNG cho:
       - /workflows/run  : user bấm ở Studio (full quyền, stream SSE).
@@ -2064,12 +2696,27 @@ async def execute_workflow(brain, slug, input="", tools=None):
     meta, _ = _read_md(wf_file)
     steps = meta.get("steps", []) or []
     vault_root = str(_brain_root(brain))
+    try:
+        # Agent workflow chạy cwd=brain, agent nền có MCP rỗng → chỉ nạp skill NATIVE từ
+        # .claude/skills. Đảm bảo đã migrate + mirror trước khi spawn (idempotent, rẻ).
+        system_sync.ensure_synced(vault_root)
+        system_sync.mirror_skills(vault_root)
+    except Exception:
+        pass
 
     def _mk(sysprompt, model=None):
-        c = ClaudeCLI(system_prompt=sysprompt, cwd=vault_root, tag="workflow", allowed_tools=tools)
-        # Model của AGENT (chọn ở Studio: sonnet/opus/haiku/fable) được ÁP THẬT vào CLI.
+        # Agent model = Codex/ChatGPT → chạy qua Codex CLI (có tool file + MCP native của codex).
+        # CHỈ ở chế độ foreground (tools is None): codex không giới hạn tool được như Claude
+        # (--allowedTools), nên chạy nền an-toàn-file-only (tools != None) vẫn ép dùng Claude.
+        if model and _is_codex_model(model) and tools is None and find_codex_cli():
+            openai_oauth.write_codex_auth()   # bắc cầu token ChatGPT → ~/.codex/auth.json
+            cc = CodexCLI(cwd=vault_root, tag="workflow", model=_codex_safe_model(model), instructions=sysprompt)
+            cc.profile = _write_codex_profile()   # đẩy MCP của Javis (POS...) sang codex
+            return cc
+        c = claude_engine(system_prompt=sysprompt, cwd=vault_root, tag="workflow", allowed_tools=tools)
+        # Model Claude của AGENT (sonnet/opus/haiku/fable) được ÁP THẬT vào CLI.
         # Rỗng → dùng model phụ (việc nền) nếu có, cuối cùng None = mặc định CLI.
-        c.model = (model or _aux_model() or None)
+        c.model = ((model if not _is_codex_model(model) else "") or _aux_model() or None)
         if tools is not None:   # chạy nền hạn chế → cô lập MCP + chặn Bash/Web
             _mcpf = _empty_mcp_file()
             if _mcpf:
@@ -2157,10 +2804,12 @@ async def execute_workflow(brain, slug, input="", tools=None):
                 break
             attempt += 1
             yield {"type": "step_retry", "i": i, "attempt": attempt}
+            # Evaluator-optimizer (cookbook Anthropic): lượt sau THẤY kết quả cũ + phản hồi
+            # để CẢI THIỆN tiếp, không làm lại từ đầu (làm lại mù dễ lặp đúng lỗi cũ).
             cur_prompt = (
-                f"{task_f}\n\n# KẾT QUẢ LẦN TRƯỚC CHƯA ĐẠT - sửa lại theo phản hồi kiểm chứng:\n"
-                f"- Vấn đề: {reason}\n- Cần sửa: {fixes}\n"
-                f"Làm lại cho ĐẠT."
+                f"{task_f}\n\n# KẾT QUẢ LẦN TRƯỚC (bị kiểm chứng đánh giá CHƯA ĐẠT):\n{out[:8000]}\n\n"
+                f"# PHẢN HỒI KIỂM CHỨNG:\n- Vấn đề: {reason}\n- Cần sửa: {fixes}\n"
+                "CẢI THIỆN kết quả lần trước theo phản hồi: giữ phần đã tốt, sửa đúng chỗ bị chê. Làm cho ĐẠT."
             )
 
         prev = out
@@ -2230,25 +2879,91 @@ import self_improve
 
 
 async def _loop_notify(text: str) -> None:
-    """Báo Telegram khi loop tự tạm dừng (nice-to-have, im lặng nếu chưa cấu hình bot)."""
+    """Báo Telegram khi loop tự tạm dừng (nice-to-have, im lặng nếu chưa cấu hình bot).
+    Gửi tới TẤT CẢ chat ID trong whitelist (hỗ trợ nhiều người dùng chung bot)."""
     try:
         tg = cfgmod.read_settings().get("telegram", {})
-        if not (tg.get("enabled") and tg.get("token") and tg.get("chat_id")):
+        ids = tg_parse_ids(tg.get("chat_id"))
+        if not (tg.get("enabled") and tg.get("token") and ids):
             return
         import httpx
         async with httpx.AsyncClient(timeout=10) as c:
-            await c.post(f"https://api.telegram.org/bot{tg['token']}/sendMessage",
-                         json={"chat_id": tg["chat_id"], "text": text})
+            for cid in ids:
+                await c.post(f"https://api.telegram.org/bot{tg['token']}/sendMessage",
+                             json={"chat_id": cid, "text": text})
     except Exception as e:
         print(f"[loop notify] {e}", file=__import__('sys').stderr)
 
 
-def _loop_mcp_allow():
-    """Pattern MCP cho allowlist của loop: 'mcp__<server>' mỗi server bật (bỏ oauth).
-    Thêm vào --allowedTools để loop GỌI được tool MCP (Bash/Web/Task vẫn ngoài list → chặn)."""
+async def _tg_send_to(chat_id, text) -> tuple:
+    """Gửi 1 tin Telegram tới ĐÚNG chat_id (dùng cho nhắc hẹn). chat_id rỗng hoặc không nằm
+    trong whitelist → gửi cho CHỦ bot (mọi ID whitelist). Trả (ok, error)."""
+    tg = cfgmod.read_settings().get("telegram", {})
+    token = tg.get("token")
+    ids = tg_parse_ids(tg.get("chat_id"))
+    if not (tg.get("enabled") and token):
+        return False, "Bot Telegram chưa bật"
+    cid = str(chat_id or "").strip()
+    targets = [cid] if (cid and (not ids or cid in ids)) else (ids or ([cid] if cid else []))
+    if not targets:
+        return False, "Chưa có chat_id đích"
+    import httpx
+    ok_any, errs = False, []
     try:
-        return [f"mcp__{s['name']}" for s in mcp_store.list_servers()
-                if s.get("enabled") and s.get("auth") != "oauth" and s.get("name")]
+        async with httpx.AsyncClient(timeout=15) as c:
+            for t in targets:
+                try:
+                    r = await c.post(f"https://api.telegram.org/bot{token}/sendMessage",
+                                     json={"chat_id": t, "text": text})
+                    d = r.json() if r.content else {}
+                    if d.get("ok"):
+                        ok_any = True
+                    else:
+                        errs.append(str(d.get("description") or f"HTTP {r.status_code}")[:80])
+                except Exception as e:
+                    errs.append(type(e).__name__)
+    except Exception as e:
+        return False, f"{type(e).__name__}: {e}"
+    return ok_any, "; ".join(e for e in errs if e)[:200]
+
+
+async def _notify_owner(owner_chat, text) -> tuple:
+    """Báo cáo cho NGƯỜI YÊU CẦU loop/task (mặc định của Javis). Quy tắc:
+      - owner_chat có + nằm trong whitelist → gửi ĐÚNG người đó.
+      - owner_chat rỗng (vd loop/task tạo trên bản WEB) hoặc không rõ → gửi ID ĐẦU TIÊN
+        trong whitelist (chủ bot).
+    Im lặng (trả (False, lý do)) nếu bot chưa bật / chưa có chat_id. Trả (ok, error)."""
+    tg = cfgmod.read_settings().get("telegram", {})
+    token = tg.get("token")
+    ids = tg_parse_ids(tg.get("chat_id"))
+    if not (tg.get("enabled") and token and ids):
+        return False, "Bot Telegram chưa bật hoặc chưa có chat_id"
+    cid = str(owner_chat or "").strip()
+    target = cid if (cid and cid in ids) else ids[0]
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=15) as c:
+            r = await c.post(f"https://api.telegram.org/bot{token}/sendMessage",
+                             json={"chat_id": target, "text": text})
+            d = r.json() if r.content else {}
+            if d.get("ok"):
+                return True, ""
+            return False, str(d.get("description") or f"HTTP {r.status_code}")[:200]
+    except Exception as e:
+        return False, f"{type(e).__name__}: {e}"
+
+
+def _loop_mcp_allow():
+    """Pattern MCP cho allowlist của loop. Hub bật: mọi tool nằm dưới server 'javis' → 1 pattern;
+    quyền đọc/ghi thật sự do hub chặn theo X-Javis-Mode. Hub tắt: 'mcp__<namespace>' như cũ."""
+    try:
+        conns = [c for c in mcp_store.list_connections() if c.get("enabled")]
+        if not conns:
+            return []
+        if _hub_enabled():
+            return mcp_hub.allow_patterns()
+        return [f"mcp__{r['namespace']}" for r in mcp_store.resolved()
+                if r.get("auth") != "oauth" and r.get("namespace")]
     except Exception:
         return []
 
@@ -2264,6 +2979,7 @@ loop_feature = self_improve.register(app, self_improve.LoopDeps(
     safe_tools=SAFE_FILE_TOOLS,
     readonly_tools=READONLY_TOOLS,
     notify=_loop_notify,
+    report=_notify_owner,               # báo Telegram cho NGƯỜI YÊU CẦU loop mỗi vòng (web → ID đầu)
     apply_mcp=_apply_mcp,               # loop ĐỌC được dữ liệu thật qua MCP Javis-quản-lý
     mcp_allow_patterns=_loop_mcp_allow,
 ))
@@ -2320,6 +3036,7 @@ tasks_feature = tasks_mod.register(app, tasks_mod.TasksDeps(
     build_system_prompt=build_system_prompt,
     aux_model=_aux_model,
     safe_tools=SAFE_FILE_TOOLS,
+    report=_notify_owner,               # báo Telegram cho NGƯỜI YÊU CẦU task khi chạy xong (web → ID đầu)
 ))
 
 # Nối learn → Kanban: engine học đề xuất việc nền → enqueue vào backlog.
@@ -2327,10 +3044,31 @@ tasks_feature = tasks_mod.register(app, tasks_mod.TasksDeps(
 learn_feature.deps.enqueue_task = tasks_feature.enqueue
 
 
+# ============================================================
+# NHẮC HẸN TỪ CHAT (reminders.py) - "30 phút nữa nhắc anh...", "8h30 sáng mai...".
+# Javis tự đặt qua POST /reminders (localhost), scheduler nền đánh thức đúng giờ → bắn Telegram.
+# mode notify = nhắn lại · mode task = chạy engine (đọc MCP, ghi nháp) rồi báo. KHÔNG tiền/đơn.
+# ============================================================
+import reminders as reminders_mod
+
+reminders_feature = reminders_mod.register(app, reminders_mod.RemindersDeps(
+    brain_root=_brain_root,
+    atomic_write_text=_atomic_write_text,
+    send_telegram=_tg_send_to,
+    build_system_prompt=build_system_prompt,
+    aux_model=_aux_model,
+    safe_tools=SAFE_FILE_TOOLS,
+    readonly_tools=READONLY_TOOLS,
+    scheduler_brains=loop_feature.scheduler_brains,
+    apply_mcp=_apply_mcp,                 # nhắc mode 'task' ĐỌC được dữ liệu thật qua MCP
+    mcp_allow_patterns=_loop_mcp_allow,
+))
+
+
 @app.get("/lint")
 async def lint(brain: str = Query("brain")):
     """LINT - health-check Wiki (chỉ đọc, không sửa). Trả danh sách 8 loại vấn đề."""
-    cli = ClaudeCLI(system_prompt=SYSTEM_PROMPT, cwd=_brain_root(brain), tag="lint",
+    cli = claude_engine(system_prompt=SYSTEM_PROMPT, cwd=_brain_root(brain), tag="lint",
                     allowed_tools=READONLY_TOOLS)
     _mcpf = _empty_mcp_file()
     if _mcpf:
@@ -2412,7 +3150,7 @@ def _loops_as_routines(brain):
 @app.get("/automations")
 async def automations_list(brain: str = Query("brain")):
     items = _read_automations(brain)
-    builtin = _loops_as_routines(brain)
+    builtin = _loops_as_routines(brain) + reminders_feature.pending_as_automations(brain)
     allitems = builtin + items
     running = sum(1 for a in allitems if a.get("status") == "active")
     return {"automations": items, "builtin": builtin, "running": running, "total": len(allitems)}
@@ -2439,6 +3177,11 @@ async def automations_save(
 
 @app.post("/automations/toggle")
 async def automations_toggle(id: str = Form(...), brain: str = Form("brain")):
+    if id.startswith("__reminder__:"):
+        # Tab Lịch chỉ có 1 nút gạt → coi như HUỶ nhắc hẹn (nhắc là 1-lần, không "tạm dừng").
+        async with reminders_feature._io:
+            hit = reminders_feature.cancel(brain, id.split(":", 1)[1])
+        return {"ok": hit, "status": "paused", "error": ("" if hit else "not found")}
     if id == "__loop__" or id.startswith("__loop__:"):
         # Toggle loop từ tab Lịch. "__loop__" trần (client cũ) = loop legacy vong-lap-goc.
         slug = id.split(":", 1)[1] if ":" in id else self_improve.LEGACY_SLUG
@@ -2461,6 +3204,10 @@ async def automations_toggle(id: str = Form(...), brain: str = Form("brain")):
 
 @app.post("/automations/delete")
 async def automations_delete(id: str = Form(...), brain: str = Form("brain")):
+    if id.startswith("__reminder__:"):
+        async with reminders_feature._io:
+            hit = reminders_feature.cancel(brain, id.split(":", 1)[1])
+        return {"ok": hit, "error": ("" if hit else "not found")}
     if id == "__loop__" or id.startswith("__loop__:"):
         return {"ok": False, "error": "Xóa loop trong tab Loop (trang Tự cải thiện), không xoá từ Lịch"}
     items = [a for a in _read_automations(brain) if a.get("id") != id]
@@ -2473,7 +3220,7 @@ async def automations_sync(brain: str = Form("brain")):
     """Đồng bộ THẬT (Hướng 2): gọi Claude CLI dùng CronList / list_scheduled_tasks để lấy
     routine/cron đang chạy trên cloud, upsert vào registry (mục source=cloud)."""
     try:
-        cli = ClaudeCLI(system_prompt=None, cwd=CLAUDE_CWD, tag="routines")
+        cli = claude_engine(system_prompt=None, cwd=CLAUDE_CWD, tag="routines")
         if not cli.is_available():
             return {"ok": False, "error": "Claude CLI chưa cài"}
         prompt = (
@@ -2520,6 +3267,274 @@ async def automations_sync(brain: str = Form("brain")):
         return {"ok": False, "error": f"{type(e).__name__}: {e}"}
 
 
+# ============================================================
+# JAVIS INDEX - chỉ mục tầng vận hành (agents/skills/workflows/loops/automations).
+# Song song wiki/index.md: để MỌI engine (Claude/Codex/OpenRouter) đọc 1 chỗ là hiểu Javis
+# có năng lực gì. SINH TỪ FILE (không sửa tay) → không bao giờ lệch. Ghi Javis/index.md CHỈ KHI
+# nội dung đổi (change-gated → không churn git). Bản LIVE gọn được chèn vào system prompt.
+# ============================================================
+def _gather_capabilities(brain: str) -> dict:
+    root = Path(_brain_root(brain))
+    caps = {"agents": [], "skills": [], "workflows": [], "loops": [], "automations": [], "plugins": []}
+    ad = _agents_dir(brain)
+    if ad.is_dir():
+        for f in sorted(ad.glob("*.md")):
+            m, _ = _read_md(f)
+            caps["agents"].append({"slug": f.stem, "name": m.get("name", f.stem), "role": m.get("role", ""),
+                                   "model": m.get("model", ""), "skills": m.get("skills", []) or []})
+    wd = _workflows_dir(brain)
+    if wd.is_dir():
+        for f in sorted(wd.glob("*.md")):
+            m, _ = _read_md(f)
+            steps = m.get("steps", []) or []
+            caps["workflows"].append({"slug": f.stem, "name": m.get("name", f.stem),
+                                      "status": m.get("status", "active"), "description": m.get("description", ""),
+                                      "agents": [s.get("agent") for s in steps if isinstance(s, dict)],
+                                      "n_steps": len(steps)})
+    # Skill: canonical <root>/skills + fallback .claude/skills + .agents (qua skill_router, de-dup).
+    caps["skills"] = [{"slug": s["slug"], "name": s["name"], "description": s["description"],
+                       "group": s["group"], "enabled": s["enabled"]}
+                      for s in skill_router.list_skills(root)]
+    try:
+        st = loop_feature.read_state(brain)
+        for lp in loop_feature.list_loops(brain):
+            caps["loops"].append({"slug": lp["slug"], "name": lp["name"], "enabled": lp["enabled"],
+                "mode": lp["mode"], "interval_min": lp["interval_min"], "goal": lp["goal"],
+                "paused": bool(st.get(lp["slug"], {}).get("auto_paused_reason"))})
+    except Exception:
+        pass
+    for a in _read_automations(brain):
+        caps["automations"].append({"id": a.get("id"), "name": a.get("name"), "type": a.get("type"),
+            "schedule": a.get("schedule", ""), "status": a.get("status", "active")})
+    try:
+        for p in plugins_host.describe(str(root)):
+            caps["plugins"].append({"slug": p["slug"], "name": p["name"], "source": p["source"],
+                "description": p["description"], "enabled": p["enabled"], "loaded": p["loaded"],
+                "gated": p["gated"], "min_mode": p["min_mode"], "tools": p["tools"],
+                "hooks": p["hooks"], "error": p["error"]})
+    except Exception:
+        pass
+    return caps
+
+
+def _render_javis_index(caps: dict) -> str:
+    n_on_loops = sum(1 for l in caps["loops"] if l["enabled"])
+    n_on_wf = sum(1 for w in caps["workflows"] if w["status"] == "active")
+    plugins = caps.get("plugins", [])
+    n_on_plugins = sum(1 for p in plugins if p.get("loaded"))
+    L = ["# Javis Index (tầng vận hành)", "",
+         "> Tự sinh từ file - ĐỪNG sửa tay. Chỉ mục mọi năng lực của Javis trong brain này để bất kỳ "
+         "AI/engine đọc 1 chỗ là hiểu Javis làm được gì. Song song `wiki/index.md` (tri thức).", "",
+         f"**Tổng quan:** {len(caps['agents'])} agents · {len(caps['skills'])} skills · "
+         f"{len(caps['workflows'])} workflows ({n_on_wf} bật) · {len(caps['loops'])} loops ({n_on_loops} bật) · "
+         f"{len(caps['automations'])} lịch · {len(plugins)} plugins ({n_on_plugins} chạy)", ""]
+    L.append("## Agents")
+    if caps["agents"]:
+        for a in caps["agents"]:
+            mdl = f" · model {a['model']}" if a["model"] else ""
+            sk = f" · skills: {', '.join(a['skills'])}" if a["skills"] else ""
+            L.append(f"- **{a['name']}** (`{a['slug']}`) - {a['role']}{mdl}{sk}")
+    else:
+        L.append("_(chưa có)_")
+    L.append("\n## Skills")
+    if caps["skills"]:
+        by_group = {}
+        for s in caps["skills"]:
+            by_group.setdefault(s["group"], []).append(s)
+        for g in sorted(by_group):
+            L.append(f"### {g}")
+            for s in by_group[g]:
+                off = "" if s["enabled"] else " · [TẮT]"
+                L.append(f"- **{s['name']}** (`{s['slug']}`){off} - {s['description']}")
+    else:
+        L.append("_(chưa có)_")
+    L.append("\n## Workflows")
+    if caps["workflows"]:
+        for w in caps["workflows"]:
+            L.append(f"- **{w['name']}** (`{w['slug']}`) - {w['status']} · {w['n_steps']} bước "
+                     f"[{' -> '.join(x for x in w['agents'] if x)}]" + (f" · {w['description']}" if w["description"] else ""))
+    else:
+        L.append("_(chưa có)_")
+    L.append("\n## Loops")
+    if caps["loops"]:
+        for l in caps["loops"]:
+            stt = "⚠ tự tạm dừng" if l["paused"] else ("bật" if l["enabled"] else "tắt")
+            L.append(f"- **{l['name']}** (`{l['slug']}`) - {stt} · {l['goal']}/{l['mode']} · mỗi {l['interval_min']} phút")
+    else:
+        L.append("_(chưa có)_")
+    if caps["automations"]:
+        L.append("\n## Lịch (automations)")
+        for a in caps["automations"]:
+            L.append(f"- **{a['name']}** - {a['type']} · {a['schedule']} · {a['status']}")
+    if plugins:
+        L.append("\n## Plugins (tool/hook native cho mọi engine)")
+        for p in plugins:
+            if p.get("loaded"):
+                stt = "chạy"
+            elif p.get("gated"):
+                stt = "⚠ chờ env JAVIS_ENABLE_USER_PLUGINS"
+            elif p.get("error"):
+                stt = "⚠ lỗi"
+            else:
+                stt = "tắt"
+            extra = []
+            if p.get("tools"):
+                extra.append("tools: " + ", ".join(p["tools"]))
+            if p.get("hooks"):
+                extra.append("hooks: " + ", ".join(p["hooks"]))
+            tail = (" · " + " · ".join(extra)) if extra else ""
+            L.append(f"- **{p['name']}** (`{p['slug']}`) - {p['source']}/{stt}{tail}"
+                     + (f" · {p['description']}" if p.get("description") else ""))
+    # Cờ sức khoẻ (mini-LINT tầng vận hành)
+    agent_slugs = {a["slug"] for a in caps["agents"]}
+    used = {ag for w in caps["workflows"] for ag in w["agents"] if ag}
+    missing = sorted({ag for w in caps["workflows"] for ag in w["agents"] if ag and ag not in agent_slugs})
+    orphan = sorted(s for s in agent_slugs if s not in used)
+    flags = []
+    if missing:
+        flags.append(f"- Workflow trỏ agent KHÔNG tồn tại: {', '.join(missing)}")
+    if orphan:
+        flags.append(f"- Agent chưa workflow nào dùng: {', '.join(orphan)}")
+    dis_sk = [s["slug"] for s in caps["skills"] if not s["enabled"]]
+    if dis_sk:
+        flags.append(f"- Skill đang tắt: {', '.join(dis_sk)}")
+    paused = [l["slug"] for l in caps["loops"] if l["paused"]]
+    if paused:
+        flags.append(f"- Loop tự tạm dừng (cần xem): {', '.join(paused)}")
+    p_gated = [p["slug"] for p in plugins if p.get("gated")]
+    if p_gated:
+        flags.append(f"- Plugin bật nhưng bị chặn (đặt env JAVIS_ENABLE_USER_PLUGINS=true): {', '.join(p_gated)}")
+    p_err = [p["slug"] for p in plugins if p.get("error")]
+    if p_err:
+        flags.append(f"- Plugin lỗi nạp: {', '.join(p_err)}")
+    if flags:
+        L.append("\n## Cờ sức khoẻ")
+        L.extend(flags)
+    return "\n".join(L) + "\n"
+
+
+def rebuild_javis_index(brain: str) -> dict:
+    """Dựng lại Javis/index.md từ file. Chỉ ghi KHI nội dung đổi (chống churn git)."""
+    try:
+        content = _render_javis_index(_gather_capabilities(brain))
+        idx = Path(_brain_root(brain)) / "Javis" / "index.md"
+        old = idx.read_text(encoding="utf-8") if idx.exists() else ""
+        if old != content:
+            idx.parent.mkdir(parents=True, exist_ok=True)
+            _atomic_write_text(idx, content)
+            return {"ok": True, "written": True}
+        return {"ok": True, "written": False}
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
+
+
+def _javis_capability_summary(brain: str) -> str:
+    """Bản LIVE gọn (capped) chèn vào system prompt: để engine nào cũng biết Javis có gì.
+    Skill nhiều -> chỉ đếm + nhóm (chi tiết ở Javis/index.md), tránh phình context."""
+    try:
+        c = _gather_capabilities(brain)
+    except Exception:
+        return ""
+    if not any(c.values()):
+        return ""
+    parts = ["\n\n# === NĂNG LỰC JAVIS HIỆN CÓ (đọc `Javis/index.md` để biết chi tiết + trigger) ==="]
+    if c["agents"]:
+        parts.append("Agents: " + ", ".join(a["name"] for a in c["agents"][:30]))
+    if c["skills"]:
+        groups = sorted({s["group"] for s in c["skills"] if s["enabled"]})
+        parts.append(f"Skills: {sum(1 for s in c['skills'] if s['enabled'])} kỹ năng (nhóm: {', '.join(groups[:12])})")
+    if c["workflows"]:
+        parts.append("Workflows: " + ", ".join(w["name"] for w in c["workflows"][:20] if w["status"] == "active"))
+    if c["loops"]:
+        parts.append("Loops: " + ", ".join(f"{l['name']}({'bật' if l['enabled'] else 'tắt'})" for l in c["loops"][:20]))
+    live_plugins = [p for p in c.get("plugins", []) if p.get("loaded")]
+    if live_plugins:
+        tool_names = [t for p in live_plugins for t in p.get("tools", [])]
+        parts.append("Plugins đang chạy: " + ", ".join(p["name"] for p in live_plugins[:12])
+                     + (f" (tool: {', '.join(tool_names[:12])})" if tool_names else ""))
+    parts.append("Trước khi tạo năng lực mới, kiểm chỉ mục này để khỏi trùng.")
+    return "\n".join(parts)
+
+
+def _skill_router_block(brain: str, root: str) -> str:
+    """ROUTER SKILL đa-engine (chèn vào system prompt của MỌI engine). Liệt kê skill đang BẬT kèm
+    mô tả (trigger) + chỉ rõ 2 cách nạp: tool javis_use_skill (engine API có tool) HOẶC mở thẳng
+    file SKILL.md bằng công cụ đọc file (Claude/Codex - dùng ĐƯỜNG DẪN TUYỆT ĐỐI vì cwd có thể là
+    /app). Đây là thứ giúp skill chạy trên cả ChatGPT/Codex, không phụ thuộc cơ chế native của Claude.
+    Cap 15 skill để không phình context (nhiều hơn → trỏ Javis/index.md)."""
+    metas = skill_router.list_enabled_meta(root)
+    if not metas:
+        return ""
+    sk_dir = skill_router.skills_base(root, canonical=True)
+    lines = ["\n\n# === SKILL KHẢ DỤNG (router - dùng được trên MỌI engine) ==="]
+    for s in metas[:15]:
+        desc = (s.get("description") or "").replace("\n", " ")[:100]
+        lines.append(f"- {s['slug']} ({s['name']}): {desc}")
+    if len(metas) > 15:
+        lines.append(f"…(+{len(metas) - 15} skill nữa - xem `Javis/index.md`)")
+    lines.append(
+        "CÁCH DÙNG: khi yêu cầu của user KHỚP mô tả 1 skill ở trên, hãy NẠP skill đó rồi LÀM THEO - "
+        "gọi tool `javis_use_skill(name=<slug>)` nếu engine có tool này; nếu không, mở file "
+        f"`{sk_dir}/<slug>/SKILL.md` bằng công cụ đọc file rồi tuân theo hướng dẫn trong đó. "
+        "Chỉ nạp khi thực sự khớp, không nạp tràn lan."
+    )
+    return "\n".join(lines)
+
+
+@app.get("/javis/index")
+async def javis_index(brain: str = Query("brain")):
+    """Dựng lại + trả nội dung Javis/index.md (chỉ mục tầng vận hành)."""
+    rebuild_javis_index(brain)
+    idx = Path(_brain_root(brain)) / "Javis" / "index.md"
+    return {"ok": True, "content": idx.read_text(encoding="utf-8") if idx.exists() else "",
+            "counts": {k: len(v) for k, v in _gather_capabilities(brain).items()}}
+
+
+# ============================================================
+# PLUGINS - tool/hook native cho MỌI engine (port ý tưởng plugin của Hermes).
+# Plugin = thư mục Python (plugin.yaml + plugin.py với register(ctx)) thả vào 1 trong 3 nơi:
+#   - bundled  <project>/system/plugins/<slug>/     (ship theo app, tin cậy)
+#   - user     <JAVIS_STATE_DIR>/plugins/<slug>/    (TOÀN CỤC - chung MỌI brain; nơi cài mặc định)
+#   - vault    <brain>/plugins/<slug>/              (riêng 1 brain)
+# user + vault chạy code thật → CHỈ nạp khi env JAVIS_ENABLE_USER_PLUGINS=true (alias cũ *_VAULT_*).
+# ============================================================
+@app.post("/image/generate")
+async def image_generate(prompt: str = Form(...), aspect_ratio: str = Form("square"),
+                         quality: str = Form("medium"), brain: str = Form("brain")):
+    """Tạo ảnh bằng gói ChatGPT (OAuth) → lưu vào attachments/ của vault. Cho UI/gọi trực tiếp;
+    engine LLM dùng tool javis_generate_image (plugin image-chatgpt). Trả rel_path để nhúng ![](...)."""
+    res = await image_gen.generate_chatgpt(prompt, aspect_ratio, quality, vault_root=_brain_root(brain))
+    return JSONResponse(res, status_code=200 if res.get("ok") else 400)
+
+
+@app.get("/plugins")
+async def plugins_list(brain: str = Query("brain")):
+    """Liệt kê MỌI plugin (bundled + vault) kèm trạng thái bật/nạp/gated/lỗi. KHÔNG chạy code plugin."""
+    root = _brain_root(brain)
+    items = plugins_host.describe(root)
+    return {"ok": True, "user_gate": plugins_host._env_user_enabled(),
+            "global_dir": str(plugins_host.global_plugins_dir()),
+            "vault_dir": str(plugins_host.vault_plugins_dir(root) or ""), "plugins": items}
+
+
+@app.post("/plugins/toggle")
+async def plugins_toggle(slug: str = Form(...), enabled: str = Form(...), brain: str = Form("brain")):
+    """Bật/tắt 1 plugin. Bundled → ghi STATE_DIR/plugins.json (không đụng file app); vault → ghi
+    frontmatter plugin.yaml. Làm mới cache hub để tool xuất hiện/biến mất ngay."""
+    if not plugins_host.valid_slug(slug):
+        return JSONResponse({"error": "slug không hợp lệ"}, status_code=400)
+    want = enabled in ("1", "true", "True", "on")
+    res = plugins_host.set_enabled(slug, want, _brain_root(brain))
+    if not res.get("ok"):
+        return JSONResponse({"error": res.get("error", "lỗi")}, status_code=400)
+    mcp_hub.invalidate_cache()   # tool builtin/plugin nằm trong route cache của hub → phải làm mới
+    try:
+        rebuild_javis_index(brain)
+    except Exception:
+        pass
+    return res
+
+
 @app.on_event("startup")
 async def _start_scheduler():
     # Bootstrap bảo mật cho deploy public: (1) tạo admin từ env nếu có; (2) nếu vẫn chưa có admin
@@ -2527,6 +3542,8 @@ async def _start_scheduler():
     import sys as _sys
     _migrate_legacy_brain()   # dữ liệu brain cũ → <BRAINS_DIR>/Brain Default (không mất data)
     _ensure_default_brain()   # brain mặc định có sẵn cấu trúc chuẩn (ghi được trên mount /brains)
+    _sync_system_all_brains() # năng lực hệ thống → mọi brain (update theo phiên bản app)
+    cfgmod.apply_tool_env()   # secret Cài đặt (key ElevenLabs...) → env cho tool ngoài (video-use)
     try:
         loop_feature.ensure_migrated()   # loop_config.json cũ → Javis/loops/vong-lap-goc.md (1 lần)
     except Exception as e:
@@ -2567,18 +3584,26 @@ async def _start_scheduler():
                     await tasks_feature.tick(["brain"])
                 except Exception as te:
                     print(f"[kanban tick] {type(te).__name__}: {te}", file=__import__('sys').stderr)
-                # 4) Backup GitHub tự động: đủ interval → đồng bộ các brain đang học
+                # 3b) Nhắc hẹn từ chat: tới giờ → bắn Telegram (mode task: chạy engine rồi báo)
+                try:
+                    await reminders_feature.tick()
+                except Exception as rte:
+                    print(f"[reminders tick] {type(rte).__name__}: {rte}", file=__import__('sys').stderr)
+                # 4) Đồng bộ GitHub tự động (2 CHIỀU): đủ interval → kéo về + hoà nhập + đẩy lên
                 try:
                     bcfg = cfgmod.read_settings().get("backup", {}) or {}
                     if bcfg.get("enabled") and bcfg.get("repo_url") and bcfg.get("token") and git_brain.has_git():
                         interval = max(1, int(bcfg.get("interval_hours", 6))) * 3600
                         if time.time() - float(bcfg.get("last_backup", 0)) >= interval:
-                            # Backup mỗi brain learn đang theo dõi (nơi có dữ liệu mới); fallback brain mặc định
-                            _bbrains = learn_feature.read_config().get("brains") or ["brain"]
-                            for _bb in _bbrains:
-                                await asyncio.to_thread(_do_backup, _bb)
+                            await asyncio.to_thread(_do_backup)   # 1 lần: toàn bộ thư mục brains, 2 chiều
                 except Exception as be:
                     print(f"[backup tick] {type(be).__name__}: {be}", file=__import__('sys').stderr)
+                # 5) Javis index: dựng lại chỉ mục tầng vận hành (chỉ ghi khi đổi → không churn)
+                try:
+                    for _ib in loop_feature.scheduler_brains():
+                        await asyncio.to_thread(rebuild_javis_index, _ib)
+                except Exception as ie:
+                    print(f"[javis index tick] {type(ie).__name__}: {ie}", file=__import__('sys').stderr)
             except Exception as e:
                 print(f"[scheduler] {type(e).__name__}: {e}", file=__import__('sys').stderr)
     asyncio.create_task(_scheduler_loop())
@@ -2696,6 +3721,30 @@ def _is_git_checkout(root: str) -> bool:
         return False
 
 
+async def _watchtower_reachable() -> bool:
+    """True nếu container Watchtower (profile 'update') đang CHẠY và mở cổng API.
+    Chỉ có ý nghĩa ở mode docker (host 'watchtower' trên mạng nội bộ compose). Biến env
+    WATCHTOWER_TOKEN luôn được set sẵn trong compose nên KHÔNG đủ để kết luận - phải dò thật.
+    Dò bằng cách MỞ KẾT NỐI TCP tới cổng, TUYỆT ĐỐI không gửi HTTP: endpoint /v1/update của
+    Watchtower bị kích hoạt update kể cả với GET, nên một request 'thăm dò' sẽ trigger nhầm."""
+    if not os.getenv("WATCHTOWER_TOKEN", ""):
+        return False
+    import asyncio
+    writer = None
+    try:
+        reader, writer = await asyncio.wait_for(
+            asyncio.open_connection("watchtower", 8080), timeout=4)
+        return True   # bắt tay TCP xong = container Watchtower đang lắng nghe
+    except Exception:
+        return False  # không phân giải host / connection refused = Watchtower không chạy
+    finally:
+        if writer is not None:
+            try:
+                writer.close()
+            except Exception:
+                pass
+
+
 @app.get("/version")
 async def version_info():
     cur = _read_version()
@@ -2713,7 +3762,9 @@ async def version_info():
         err = f"{type(e).__name__}: {e}"
     mode = _deploy_mode()
     avail = _ver_newer(latest, cur)
-    can = mode in ("native", "windows") or bool(os.getenv("WATCHTOWER_TOKEN"))
+    # docker: chỉ tự cập nhật tại chỗ được nếu Watchtower ĐANG chạy (ping thật). Không có →
+    # frontend chuyển sang hướng dẫn REDEPLOY. native/windows: git pull tự lo.
+    can = mode in ("native", "windows") or (mode == "docker" and await _watchtower_reachable())
     return {"current": cur, "latest": latest, "update_available": avail,
             "mode": mode, "can_self_update": can, "error": err}
 
@@ -2725,11 +3776,11 @@ async def do_update():
     import sys as _sys
     mode = _deploy_mode()
     if mode == "docker":
-        token = os.getenv("WATCHTOWER_TOKEN", "")
-        if not token:
+        if not await _watchtower_reachable():
             return JSONResponse({"ok": False,
-                "error": "Bản Docker chưa bật Watchtower để tự cập nhật. Thêm service watchtower (xem DEPLOY.md) rồi thử lại.",
-                "manual": "./update.sh"}, status_code=400)
+                "error": "Bản Docker cập nhật bằng cách REDEPLOY để kéo image mới nhất: trên Hostinger bấm nút Redeploy trong Docker Manager; trên VPS chạy lại lệnh dưới.",
+                "manual": "docker compose up -d --pull always"}, status_code=400)
+        token = os.getenv("WATCHTOWER_TOKEN", "")
         import asyncio
         import httpx
 
@@ -2771,6 +3822,71 @@ async def do_update():
         return {"ok": True, "mode": mode, "message": "Đang cập nhật + khởi động lại (log: update.log)."}
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e), "manual": "./update.sh"}, status_code=500)
+
+
+# ============================================================
+# Tự khởi động cùng máy (autostart) - Windows: ghi HKCU Run key trỏ wscript chạy
+# start-javis.vbs (đã tự tắt bản cũ + chạy NỀN ẩn). Per-user, KHÔNG cần quyền admin.
+# Registry là nguồn sự thật duy nhất - không lưu trùng vào settings.json.
+# ============================================================
+_AUTOSTART_NAME = "JavisOS"
+_AUTOSTART_RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
+
+
+def _autostart_command() -> str:
+    """Lệnh chạy khi đăng nhập Windows: wscript chạy start-javis.vbs ẩn (kill cũ + chạy nền)."""
+    vbs = str(PROJECT_ROOT / "start-javis.vbs")
+    return f'wscript.exe //nologo "{vbs}"'
+
+
+def _autostart_status() -> dict:
+    """{supported, enabled, command, stale}. stale = đang bật nhưng trỏ đường dẫn cũ (đã move folder)."""
+    if os.name != "nt":
+        return {"supported": False, "enabled": False}
+    expected = _autostart_command()
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, _AUTOSTART_RUN_KEY) as k:
+            try:
+                val, _ = winreg.QueryValueEx(k, _AUTOSTART_NAME)
+                return {"supported": True, "enabled": bool(val),
+                        "command": val, "expected": expected,
+                        "stale": bool(val) and val.strip() != expected}
+            except FileNotFoundError:
+                return {"supported": True, "enabled": False, "expected": expected}
+    except FileNotFoundError:
+        return {"supported": True, "enabled": False, "expected": expected}
+    except Exception as e:
+        return {"supported": True, "enabled": False, "expected": expected, "error": str(e)}
+
+
+def _autostart_set(enabled: bool) -> dict:
+    if os.name != "nt":
+        return {"ok": False, "error": "Chỉ hỗ trợ trên Windows"}
+    try:
+        import winreg
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, _AUTOSTART_RUN_KEY) as k:
+            if enabled:
+                winreg.SetValueEx(k, _AUTOSTART_NAME, 0, winreg.REG_SZ, _autostart_command())
+            else:
+                try:
+                    winreg.DeleteValue(k, _AUTOSTART_NAME)
+                except FileNotFoundError:
+                    pass
+        return {"ok": True, "enabled": enabled}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.get("/autostart")
+async def autostart_get():
+    return _autostart_status()
+
+
+@app.post("/autostart")
+async def autostart_post(enabled: str = Form(...)):
+    on = str(enabled).strip().lower() in ("1", "true", "on", "yes")
+    return _autostart_set(on)
 
 
 # ---- Nhật ký cập nhật (changelog) -------------------------------------------
@@ -2862,6 +3978,18 @@ async def brand_logo():
         return JSONResponse({"error": "no logo"}, status_code=404)
     # cache ngắn: đổi ảnh xong thấy ngay trong ~1 phút; JS còn bust bằng ?v= khi vừa upload.
     return FileResponse(str(p), headers={"Cache-Control": "public, max-age=60"})
+
+
+@app.get("/favicon.ico")
+async def favicon_ico():
+    """Favicon = logo hiện tại. Trình duyệt LUÔN tự gọi /favicon.ico và cache rất lì;
+    trước đây route này trả 404 nên tab giữ icon cũ. Trả thẳng ảnh logo cho khớp app."""
+    p = _current_logo_file() or _DEFAULT_LOGO
+    if not p.exists():
+        return JSONResponse({"error": "no favicon"}, status_code=404)
+    media = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+             ".webp": "image/webp", ".gif": "image/gif"}.get(p.suffix.lower(), "image/png")
+    return FileResponse(str(p), media_type=media, headers={"Cache-Control": "public, max-age=300"})
 
 
 @app.post("/branding/logo")
@@ -3162,57 +4290,57 @@ async def websocket_endpoint(ws: WebSocket):
         await ws.close(code=1008)
         return
     await ws.accept()
-    cli = ClaudeCLI(system_prompt=SYSTEM_PROMPT, cwd=CLAUDE_CWD)
-
-    if not cli.is_available():
-        await ws.send_text(json.dumps({
-            "type": "error",
-            "content": "Claude Code CLI chưa được cài. Chạy: npm install -g @anthropic-ai/claude-code"
-        }))
-        await ws.close()
-        return
-
-    or_messages = None   # lịch sử chat cho engine API (seed lại từ DB khi resume)
+    # ĐA PHIÊN: tag riêng cho từng kết nối → nút Stop của người này không giết lượt người khác.
+    # Frontend nhận tag qua message hello và gửi kèm khi POST /stop.
+    conn_tag = f"chat:{uuid.uuid4().hex[:8]}"
+    _real_ws = ws                       # ws THẬT; mỗi lượt dùng proxy (bơm session_id + khoá ghi)
     store = get_store()
-    conv_sid = None      # id phiên hội thoại (KHÁC cli.session_id của Claude)
-    seeded = False       # đã nạp lịch sử cũ từ DB vào or_messages chưa
     try:
-        while True:
-            raw = await ws.receive_text()
-            payload = json.loads(raw)
+        await _real_ws.send_text(json.dumps({"type": "hello", "stop_tag": conn_tag}))
+    except Exception:
+        pass
 
-            # Lệnh đặc biệt
-            if payload.get("action") == "reset":
-                cli.reset_session()
-                or_messages = None
-                conv_sid = None      # bắt đầu 1 phiên hội thoại mới ở lượt sau
-                seeded = False
-                await ws.send_text(json.dumps({"type": "system", "content": "Đã reset hội thoại."}))
-                continue
+    # ĐA HỘI THOẠI SONG SONG: mỗi lượt chat chạy như 1 task nền (không chặn vòng nhận tin), engine
+    # riêng từng lượt nên 2 hội thoại generate cùng lúc được. Mọi gói gửi kèm session_id để client
+    # định tuyến về đúng phiên; mở "hội thoại mới" KHÔNG giết lượt cũ (nó chạy nốt + tự lưu).
+    send_lock = asyncio.Lock()          # nhiều lượt ghi chung 1 ws → khoá cho khỏi xen kẽ hỏng gói
+    running: dict = {}                  # conv_sid -> asyncio.Task (lượt đang chạy của phiên đó)
 
-            user_message = payload.get("message", "").strip()
-            if not user_message:
-                continue
-            brain = payload.get("brain", "brain")
+    async def send_raw(obj):
+        async with send_lock:
+            try:
+                await _real_ws.send_text(json.dumps(obj))
+            except Exception:
+                pass
 
+    class _SendProxy:
+        """Đội lốt ws bên trong 1 lượt: mọi send_text tự gắn session_id của lượt + qua khoá ghi.
+        Nhờ vậy toàn bộ code các nhánh engine bên dưới KHÔNG cần sửa mà vẫn định tuyến đúng phiên."""
+        def __init__(self, sid):
+            self._sid = sid
+
+        async def send_text(self, txt):
+            try:
+                o = json.loads(txt); o["session_id"] = self._sid; txt = json.dumps(o)
+            except Exception:
+                pass
+            async with send_lock:
+                try:
+                    await _real_ws.send_text(txt)
+                except Exception:
+                    pass
+
+    try:
+        async def _do_turn(conv_sid, user_message, brain):
+            ws = _SendProxy(conv_sid)               # các nhánh engine bên dưới dùng ws proxy này
+            turn_tag = f"{conn_tag}:{conv_sid[:8]}"
             mcfg = cfgmod.read_settings().get("model", {})
             prov, kind, api_key, api_model = _chat_provider(mcfg)
             reasoning = _reasoning_level(mcfg)
-            engine_label = ("codex" if prov == "openai-oauth"
-                            else prov if ((kind == "api" and api_key) or kind == "oauth")
-                            else "cli")
-
-            # ── Phiên hội thoại: resume-or-create (session_id ở đây là CONV id) ──
-            incoming_sid = payload.get("session_id")
-            if conv_sid is None:
-                conv_sid = store.get_or_create(
-                    incoming_sid, brain=brain, engine=engine_label,
-                    model=(api_model or mcfg.get("claude_model")))
-                # Resume hội thoại CLI cũ → nạp lại session_id của Claude cho --resume.
-                _row = store.get_session(conv_sid)
-                if _row and _row.get("cli_session_id") and not cli.session_id:
-                    cli.session_id = _row["cli_session_id"]
-            store.append_message(conv_sid, "user", user_message)
+            _row0 = store.get_session(conv_sid) or {}
+            cli = claude_engine(system_prompt=SYSTEM_PROMPT, cwd=CLAUDE_CWD, tag=turn_tag)
+            cli.session_id = _row0.get("cli_session_id") or None    # --resume đúng mạch phiên này
+            final_text = ""
 
             await ws.send_text(json.dumps({
                 "type": "status",
@@ -3220,7 +4348,9 @@ async def websocket_endpoint(ws: WebSocket):
             }))
 
             # Nạp bộ nhớ của vault đang chọn vào system prompt (Javis luôn nhớ)
-            sysprompt = build_system_prompt(brain)
+            # + block kênh (port gateway hermes): engine biết đang trả lời qua dashboard web
+            sysprompt = build_system_prompt(brain) + channel_context.build_channel_block(
+                "dashboard", telegram_running=bool(_TG_BOT), port=_javis_port())
 
             final_text = ""
             if prov == "openai-oauth":
@@ -3234,7 +4364,10 @@ async def websocket_endpoint(ws: WebSocket):
                     except Exception as _e:
                         print(f"[codex model self-heal] {_e}", file=__import__('sys').stderr)
                 openai_oauth.write_codex_auth()   # bắc cầu token đã nối ở Models → ~/.codex/auth.json (codex dùng được)
-                ccli = CodexCLI(cwd=CLAUDE_CWD, model=actual_model, tag="chat")
+                # cwd=brain (để Codex đọc được Javis/skills + .claude/skills mirror bằng tool file
+                # native, như nhánh workflow) + instructions=sysprompt (kèm ROUTER SKILL) → Codex
+                # dùng được skill. CodexCLI stateless (không --resume) nên đổi cwd an toàn.
+                ccli = CodexCLI(cwd=_brain_root(brain), model=actual_model, tag=conn_tag, instructions=sysprompt)
                 ccli.profile = _write_codex_profile()   # đẩy MCP của Javis (POSCake...) sang codex
                 if not ccli.is_available():
                     await ws.send_text(json.dumps({"type": "error", "content": "Chưa cài Codex CLI trong container. ChatGPT subscription là THỬ NGHIỆM - dùng Claude Code hoặc OpenRouter cho ổn định (đổi ở Models)."}))
@@ -3248,6 +4381,7 @@ async def websocket_endpoint(ws: WebSocket):
                             await ws.send_text(json.dumps({"type": "stream", "content": ev["content"], "tts": False}))
                         elif et == "final":
                             final_text = ev.get("content") or final_text
+                            usage_store.record("codex", actual_model, ev.get("tokens_in", 0), ev.get("tokens_out", 0))
                         elif et == "error":
                             await ws.send_text(json.dumps({"type": "error", "content": ev["content"]}))
                     await ws.send_text(json.dumps({"type": "response", "content": final_text, "engine": "codex", "model": actual_model, "session_id": conv_sid}))
@@ -3255,26 +4389,28 @@ async def websocket_endpoint(ws: WebSocket):
                 # ===== PROVIDER API/OAuth (openrouter | openai | anthropic-api) - chat thuần (MCP đa-model cho openrouter/openai) =====
                 label = _api_label(prov)
                 actual_model = api_model or "?"
-                if or_messages is None:
-                    _ident = (
-                        f"\n\n[Sự thật hệ thống - TUÂN THỦ tuyệt đối: Bạn đang chạy qua {label}, "
-                        f"model thực tế là '{actual_model}'. Khi được hỏi bạn là AI/model nào, "
-                        f"trả lời ĐÚNG tên model này. KHÔNG được tự nhận là model khác.]"
-                    )
-                    or_messages = [{"role": "system", "content": sysprompt + _ident}]
-                    # Resume: nạp lại lượt user/assistant cũ từ SQLite để engine API
-                    # thấy lại mạch hội thoại (trừ lượt user vừa lưu ở trên).
-                    if not seeded:
-                        for _m in store.get_messages(conv_sid)[:-1]:
-                            if _m["role"] in ("user", "assistant") and _m.get("content"):
-                                or_messages.append({"role": _m["role"], "content": _m["content"]})
-                        or_messages = _trim_history(or_messages)
-                        seeded = True
+                _ident = (
+                    f"\n\n[Sự thật hệ thống - TUÂN THỦ tuyệt đối: Bạn đang chạy qua {label}, "
+                    f"model thực tế là '{actual_model}'. Khi được hỏi bạn là AI/model nào, "
+                    f"trả lời ĐÚNG tên model này. KHÔNG được tự nhận là model khác.]"
+                )
+                _head = [{"role": "system", "content": sysprompt + _ident}]
+                # Resume: nạp lại lượt user/assistant cũ từ SQLite để engine API thấy lại mạch
+                # hội thoại (trừ lượt user vừa lưu ở trên). prepare_history đảm bảo phần cũ CHỈ
+                # rời payload khi đã vào tóm tắt nén - KHÔNG cắt câm như trim cũ (đó là lỗi mất
+                # ngữ cảnh khi phiên dài / vừa đổi từ engine Claude sang API).
+                _raw = [{"role": _m["role"], "content": _m["content"]}
+                        for _m in store.get_messages(conv_sid)[:-1]
+                        if _m["role"] in ("user", "assistant") and _m.get("content")]
+                or_messages = await compaction.prepare_history(
+                    _head, store, conv_sid, _raw, prov, api_key, api_model, _api_stream)
                 or_messages.append({"role": "user", "content": user_message})
-                gen = await _api_stream_mcp(prov, api_key, api_model, or_messages, reasoning)   # MCP đa-model
+                gen = await _api_stream_mcp(prov, api_key, api_model, or_messages, reasoning, brain=brain)   # MCP đa-model qua hub
                 async for ev in gen:
                     if ev["type"] == "meta":
                         actual_model = ev.get("model") or actual_model
+                    elif ev["type"] == "usage":
+                        usage_store.record(prov, actual_model, ev.get("input", 0), ev.get("output", 0))
                     elif ev["type"] == "tool_call":
                         await ws.send_text(json.dumps({"type": "tool_call", "tool": ev.get("name", ""), "content": f"⚙ MCP: {ev.get('name', '')}"}))
                     elif ev["type"] == "text":
@@ -3283,8 +4419,8 @@ async def websocket_endpoint(ws: WebSocket):
                         await ws.send_text(json.dumps({"type": "stream", "content": ev["content"], "tts": False}))
                     elif ev["type"] == "error":
                         await ws.send_text(json.dumps({"type": "error", "content": ev["content"]}))
-                or_messages.append({"role": "assistant", "content": final_text})
-                or_messages = _trim_history(or_messages)   # bound history → payload không phình vô hạn
+                # (or_messages là biến cục bộ của lượt - mỗi lượt dựng lại từ SQLite qua
+                # prepare_history, nên không cần append/trim để giữ mạch; lịch sử ở store.)
                 await ws.send_text(json.dumps({"type": "response", "content": final_text, "engine": prov, "model": actual_model, "session_id": conv_sid}))
             else:
                 # ===== PROVIDER anthropic-cli - qua Claude Code, đầy đủ MCP / skill / session =====
@@ -3303,6 +4439,8 @@ async def websocket_endpoint(ws: WebSocket):
                         final_text = event.get("content") or final_text
                         if event.get("session_id"):
                             store.set_cli_session_id(conv_sid, event["session_id"])
+                        usage_store.record("cli", cli.model or mcfg.get("claude_model") or "mặc định",
+                                           event.get("tokens_in", 0), event.get("tokens_out", 0), event.get("cost_usd") or 0)
                         await ws.send_text(json.dumps({"type": "response", "content": final_text, "session_id": conv_sid, "cli_session_id": event.get("session_id"), "cost_usd": event.get("cost_usd"), "engine": "cli", "model": (mcfg.get("claude_model") or "mặc định")}))
                     elif etype == "error":
                         await ws.send_text(json.dumps({"type": "error", "content": event["content"]}))
@@ -3312,6 +4450,14 @@ async def websocket_endpoint(ws: WebSocket):
                 store.append_message(conv_sid, "assistant", final_text)
                 store.auto_title(conv_sid, user_message)
                 log_conversation(brain, user_message, final_text)
+                # Nén NỀN phần lịch sử cũ sắp rơi khỏi cửa sổ (chỉ engine API - CLI tự quản
+                # context). Lỗi nén không ảnh hưởng lượt chat; lượt sau vẫn còn fallback trim.
+                if kind == "api" and api_key and prov in ("openrouter", "openai", "anthropic-api", "gemini"):
+                    try:
+                        asyncio.create_task(compaction.maybe_compact(
+                            store, conv_sid, prov, api_key, api_model, _api_stream))
+                    except Exception as _e:
+                        print(f"[compact hook] {_e}", file=__import__('sys').stderr)
                 # Rewire: đưa lượt vào hàng đợi học (non-blocking; gate/debounce/rate-limit ở learn.py).
                 # Đi theo guard `if final_text` sẵn có → lượt rỗng/lỗi cố ý không enqueue.
                 try:
@@ -3319,8 +4465,53 @@ async def websocket_endpoint(ws: WebSocket):
                 except Exception as _e:
                     print(f"[learn enqueue hook] {_e}", file=__import__('sys').stderr)
 
+        async def run_turn(conv_sid, user_message, brain):
+            try:
+                await _do_turn(conv_sid, user_message, brain)
+            except asyncio.CancelledError:
+                await send_raw({"type": "system", "content": "Đã dừng lượt này.", "session_id": conv_sid})
+            except Exception as e:
+                await send_raw({"type": "error", "content": f"Lỗi xử lý: {type(e).__name__}: {e}", "session_id": conv_sid})
+            finally:
+                running.pop(conv_sid, None)
+                await send_raw({"type": "turn_done", "session_id": conv_sid})
+
+        while True:
+            raw = await _real_ws.receive_text()
+            payload = json.loads(raw)
+            action = payload.get("action")
+            if action == "reset":
+                continue                        # client tự quản phiên; reset KHÔNG còn giết lượt nào
+            if action == "stop":
+                _sid = payload.get("session_id") or ""
+                _t = running.get(_sid)
+                if _t and not _t.done():
+                    _t.cancel()
+                cancel_all(f"{conn_tag}:{_sid[:8]}")     # giết subprocess engine của đúng lượt đó
+                continue
+            user_message = payload.get("message", "").strip()
+            if not user_message:
+                continue
+            brain = payload.get("brain", "brain")
+            mcfg = cfgmod.read_settings().get("model", {})
+            prov, kind, api_key, api_model = _chat_provider(mcfg)
+            engine_label = ("codex" if prov == "openai-oauth"
+                            else prov if ((kind == "api" and api_key) or kind == "oauth")
+                            else "cli")
+            conv_sid = store.get_or_create(
+                payload.get("session_id"), brain=brain, engine=engine_label,
+                model=(api_model or mcfg.get("claude_model")))
+            if conv_sid in running and not running[conv_sid].done():
+                await send_raw({"type": "error", "content": "Phiên này đang trả lời - đợi lượt hiện tại xong đã.", "session_id": conv_sid})
+                continue
+            store.append_message(conv_sid, "user", user_message)
+            running[conv_sid] = asyncio.create_task(run_turn(conv_sid, user_message, brain))
     except WebSocketDisconnect:
         pass
+    finally:
+        for _t in list(running.values()):
+            if not _t.done():
+                _t.cancel()
 
 
 # ============================================================
@@ -3363,48 +4554,143 @@ async def sessions_delete(session_id: str):
 # Telegram bot - nhắn Telegram ↔ Javis (dùng engine theo Settings; CLI thì có cả MCP)
 # ============================================================
 _TG_BOT = None
-_tg_cli = None
-_tg_or = None   # lịch sử hội thoại cho engine openrouter
-_tg_last_msg = None   # câu hỏi gần nhất (cho /retry)
+# ĐA PHIÊN theo tài khoản: mỗi chat_id giữ NGỮ CẢNH RIÊNG để không lẫn hội thoại giữa
+# các người dùng chung 1 bot. Map chat_id(str) -> phiên:
+#   {"cli": engine Claude|None,   # session Claude riêng (giữ session_id để resume)
+#    "or":  list|None,        # lịch sử hội thoại engine OpenRouter/API
+#    "last": str|None,        # câu hỏi gần nhất của chat này (cho /retry)
+#    "sent": set,             # path đã gửi qua /telegram/send-file trong lượt (chống gửi trùng)
+#    "brain": str|None}       # brain RIÊNG của phiên (path); None = brain mặc định (theo Settings)
+_TG_SESS = {}
 
 
-async def _tg_answer(text):
-    global _tg_cli, _tg_or, _tg_last_msg
-    _tg_last_msg = text
-    brain = _read_loop_config().get("brain", "brain")
+def _tg_session(chat_id):
+    """Lấy (tạo nếu chưa có) phiên riêng của 1 chat_id. chat_id rỗng → gộp vào 'default'."""
+    key = str(chat_id or "default")
+    s = _TG_SESS.get(key)
+    if s is None:
+        s = {"cli": None, "or": None, "last": None, "sent": set(), "brain": None}
+        _TG_SESS[key] = s
+    return s
+
+
+def _tg_brain(chat_id):
+    """Brain của phiên Telegram này: phiên đã /brain thì dùng brain đó (nếu folder còn),
+    chưa chọn thì rơi về brain mặc định (cấu hình loop/Settings) - hành vi cũ."""
+    sess = _TG_SESS.get(str(chat_id or "default")) or {}
+    b = sess.get("brain")
+    if b and os.path.isdir(b):
+        return b
+    return _read_loop_config().get("brain", "brain")
+
+
+def _tg_set_brain(chat_id, brain_path):
+    """Đổi brain cho 1 phiên Telegram + reset ngữ cảnh (brain khác = bộ nhớ/skill khác,
+    giữ mạch cũ sẽ trộn tri thức 2 vault)."""
+    sess = _tg_session(chat_id)
+    sess["brain"] = str(brain_path)
+    if sess.get("cli"):
+        sess["cli"].reset_session()
+    sess["or"] = None
+    sess["last"] = None
+
+
+def _tg_chat_busy(chat) -> bool:
+    """Chat này đang có lượt trả lời chạy dở không (đa phiên: _current là dict theo chat)."""
+    cur = getattr(_TG_BOT, "_current", None)
+    if not isinstance(cur, dict):
+        return False
+    t = cur.get(str(chat)) if chat else None
+    return bool(t and not t.done())
+
+
+def _javis_port() -> int:
+    try:
+        return int(os.getenv("JAVIS_PORT", "7777"))
+    except ValueError:
+        return 7777
+
+
+async def _tg_answer(text, meta=None, progress=None):
+    # ĐA PHIÊN: định tuyến theo chat_id → ngữ cảnh của mỗi tài khoản tách biệt.
+    chat_id = str((meta or {}).get("chat_id") or "default")
+    sess = _tg_session(chat_id)
+    sess["last"] = text
+    sess["sent"] = set()    # lượt mới → reset dedupe (endpoint /telegram/send-file add vào đây)
+    brain = _tg_brain(chat_id)   # brain riêng của phiên (đổi bằng /brain), mặc định theo Settings
     mcfg = cfgmod.read_settings().get("model", {})
     prov, kind, api_key, api_model = _chat_provider(mcfg)
     reasoning = _reasoning_level(mcfg)
-    sysprompt = build_system_prompt(brain)
+
+    async def _p(s):
+        # Báo trạng thái trung gian về kênh (Telegram) cho user đỡ lo khi chờ. Bỏ qua nếu lỗi.
+        if progress:
+            try:
+                await progress(s)
+            except Exception:
+                pass
+    # Block kênh (port gateway hermes-agent): engine biết đang trả lời qua Telegram,
+    # ai đang nhắn, và cách gửi file trả về (auto-attach + endpoint send-file).
+    sysprompt = build_system_prompt(brain) + channel_context.build_channel_block(
+        "telegram", meta, telegram_running=True, port=_javis_port())
     if (kind == "api" and api_key) or kind == "oauth":
         label = _api_label(prov)
-        if _tg_or is None:
+        if sess["or"] is None:
             ident = (f"\n\n[Sự thật hệ thống: bạn chạy qua {label}, model '{api_model}'. "
                      f"Hỏi model nào thì khai đúng tên này, KHÔNG nhận là model khác.]")
-            _tg_or = [{"role": "system", "content": sysprompt + ident}]
-        _tg_or.append({"role": "user", "content": text})
+            sess["or"] = [{"role": "system", "content": sysprompt + ident}]
+        sess["or"].append({"role": "user", "content": text})
         out = ""
-        async for ev in (await _api_stream_mcp(prov, api_key, api_model, _tg_or, reasoning)):
+        _pinged = False
+        async for ev in (await _api_stream_mcp(prov, api_key, api_model, sess["or"], reasoning, brain=brain)):
             if ev["type"] == "text":
+                if not _pinged:
+                    _pinged = True; await _p("✍ Đang soạn câu trả lời…")
                 out += ev["content"]
+            elif ev["type"] == "tool_call":
+                await _p(f"⚙ Đang gọi công cụ: {ev.get('name', '')}")
             elif ev["type"] == "error":
                 return "⚠ " + ev["content"]
-        _tg_or.append({"role": "assistant", "content": out})
-        _tg_or = _trim_history(_tg_or)   # bound history → payload không phình vô hạn
-        return out
+        sess["or"].append({"role": "assistant", "content": out})
+        # Nén (KHÔNG cắt câm) phần cũ rơi khỏi cửa sổ. Phiên Telegram giữ lịch sử in-memory
+        # nên dùng compact_mem - bản in-memory của cơ chế nén dashboard: phần cũ vào tóm tắt
+        # thay vì bị trim cứng bỏ mất, hết mất trí nhớ khi phiên dài / đổi từ Claude sang API.
+        sess["or"] = await compaction.compact_mem(sess["or"], prov, api_key, api_model, _api_stream)
+        return out   # engine API không có tool ghi file → không có gì để đính kèm
     else:
-        if _tg_cli is None:
-            _tg_cli = ClaudeCLI(system_prompt=sysprompt, cwd=CLAUDE_CWD, tag="telegram")
-        _tg_cli.system_prompt = sysprompt
-        _tg_cli.model = api_model or mcfg.get("claude_model") or None
-        _apply_mcp(_tg_cli)
+        if sess["cli"] is None:
+            # tag riêng theo chat → /stop chỉ giết đúng subprocess của chat này, không đụng người khác
+            sess["cli"] = claude_engine(system_prompt=sysprompt, cwd=CLAUDE_CWD, tag=f"telegram:{chat_id}")
+        cli = sess["cli"]
+        cli.system_prompt = sysprompt
+        cli.model = api_model or mcfg.get("claude_model") or None
+        _apply_mcp(cli)
+        t0 = time.time()
+        written = []   # file agent ghi bằng tool Write trong lượt này (ứng viên auto-gửi)
         out = ""
-        async for ev in _tg_cli.query(_cli_think(reasoning, text)):
-            if ev["type"] == "final":
+        _pinged = False
+        async for ev in cli.query(_cli_think(reasoning, text)):
+            et = ev["type"]
+            if et == "final":
                 out = ev.get("content") or out
-            elif ev["type"] == "error":
+            elif et == "tool_call":
+                nm = ev.get("name", "")
+                if nm in ("Write", "NotebookEdit"):
+                    fp = (ev.get("input") or {}).get("file_path") or (ev.get("input") or {}).get("notebook_path")
+                    if fp:
+                        written.append(str(fp))
+                await _p(f"⚙ Đang gọi: {nm}")
+            elif et == "tool_result":
+                await _p("✓ Nhận kết quả - đang phân tích…")
+            elif et == "text":
+                if not _pinged:
+                    _pinged = True; await _p("✍ Đang soạn câu trả lời…")
+            elif et == "error":
                 return "⚠ " + ev["content"]
-        return out
+        # File sinh ra trong lượt → bot gửi đính kèm SAU câu trả lời (xem telegram_bot._handle_turn)
+        files = channel_context.collect_turn_files(out, written, t0,
+                                                   cwd=CLAUDE_CWD, exclude=sess["sent"])
+        return {"text": out, "files": files}
 
 
 async def _tg_help_text(brain):
@@ -3416,11 +4702,13 @@ async def _tg_help_text(brain):
         "/agents - liệt kê agent + việc đang chạy\n"
         "/workflows - liệt kê workflow\n"
         "/model - xem/đổi model (opus|sonnet|haiku|fable|<claude-id> hoặc <provider/id> cho OpenRouter)\n"
+        "/brain - xem/đổi brain (vault) cho riêng phiên của bạn (vd /brain hoặc /brain <tên>)\n"
         "/cli - engine Claude (có MCP/skill)\n"
         "/or - engine OpenRouter (chat thuần)\n"
         "/retry - gửi lại câu gần nhất\n"
         "/reset - hội thoại mới · /stop - dừng\n\n"
-        "Gửi tin thường để hỏi Javis. Gõ /tên-skill để gọi skill (cần engine Claude CLI)."
+        "Gửi tin thường để hỏi Javis. Gõ /tên-skill để gọi skill (cần engine Claude CLI).\n"
+        "Gửi file/ảnh vào đây để Javis đọc. File Javis tạo ra sẽ tự gửi lại cho bạn ở đây."
     )
 
 
@@ -3431,19 +4719,51 @@ async def _tg_skills_text(brain):
     except Exception:
         sk = []
     if not sk:
-        return "Vault chưa có skill nào trong .claude/skills."
+        return "Vault chưa có skill nào trong skills/."
     lines = [f"/{s['slug']} - {(s.get('description') or '')[:60]}" for s in sk[:30]]
     return "🧩 Skill có sẵn (gõ /slug để gọi, cần engine Claude CLI):\n" + "\n".join(lines)
 
 
-# ---- Menu chọn model (inline keyboard Telegram) ----
-def _model_catalog():
-    """Đọc danh sách model từ config. Mở rộng = sửa settings.json, không sửa code."""
-    cat = (cfgmod.read_settings().get("model", {}) or {}).get("catalog") or {}
-    return {
-        "claude": [str(x) for x in (cat.get("claude") or ["opus", "sonnet", "haiku", "fable"])],
-        "openrouter": [str(x) for x in (cat.get("openrouter") or [])],
-    }
+# ---- Menu chọn model (inline keyboard Telegram) - kiểu Hermes: chọn provider
+#      (đánh dấu ✓ + số model) → lưới model 2 cột PHÂN TRANG ◀ 1/N ▶.
+#      Danh sách model lấy LIVE qua provider_models() (OpenRouter đầy đủ, ChatGPT,
+#      Claude API...), fallback catalog trong settings khi provider không list được. ----
+_TG_PROVIDERS = [   # (id provider, nhãn nút ngắn)
+    ("anthropic-cli", "Claude Code"),
+    ("openai-oauth", "ChatGPT"),
+    ("openrouter", "OpenRouter"),
+    ("anthropic-api", "Claude API"),
+    ("openai", "OpenAI API"),
+]
+_TG_MODEL_LISTS = {}   # provider -> list model id ĐÃ render (index nút ổn định khi bấm)
+_TG_PAGE = 8           # model mỗi trang (lưới 2 cột x 4 hàng)
+
+
+def _tg_prov_label(pid):
+    return dict(_TG_PROVIDERS).get(pid, pid)
+
+
+def _tg_prov_ready(pid, m):
+    """Provider dùng được ngay chưa? CLI luôn sẵn; OAuth cần đã kết nối; API cần key
+    (cùng logic 'configured' của _providers_view)."""
+    d = _provider_def(pid) or {}
+    if d.get("kind") == "oauth":
+        o = m.get("openai_oauth") or {}
+        return bool(o.get("access_token") or o.get("refresh_token"))
+    kf = d.get("key_field")
+    return True if kf is None else bool(m.get(kf))
+
+
+async def _tg_models_for(pid):
+    """Model của 1 provider (live, cache 10' trong provider_models) + nhớ lại danh sách
+    đã render để index nút bấm không lệch giữa lúc hiện menu và lúc user bấm."""
+    try:
+        d = await provider_models(provider=pid)
+        ids = [str(x) for x in (d.get("models") or [])]
+    except Exception:
+        ids = []
+    _TG_MODEL_LISTS[pid] = ids
+    return ids
 
 
 def _model_current():
@@ -3451,81 +4771,177 @@ def _model_current():
     return em["provider"], em["model"] or "mặc định"
 
 
-def _model_provider_kb():
-    cat = _model_catalog()
-    return {"inline_keyboard": [
-        [{"text": f"Claude ({len(cat['claude'])})", "callback_data": "mp:claude"},
-         {"text": f"OpenRouter ({len(cat['openrouter'])})", "callback_data": "mp:openrouter"}],
-        [{"text": "✕ Đóng", "callback_data": "mx"}],
-    ]}
-
-
-def _model_list_kb(provider):
-    cat = _model_catalog()
-    _, cur = _model_current()
-    rows = []
-    for i, mdl in enumerate(cat.get(provider, [])):
-        mark = "✓ " if mdl == cur else ""
-        rows.append([{"text": f"{mark}{mdl}", "callback_data": f"ms:{provider}:{i}"}])
-    rows.append([{"text": "‹ Quay lại", "callback_data": "mp:back"}, {"text": "✕ Đóng", "callback_data": "mx"}])
+async def _model_provider_kb():
+    m = cfgmod.read_settings().get("model", {})
+    cur_prov, _ = _model_current()
+    ready = [(pid, lb) for pid, lb in _TG_PROVIDERS if _tg_prov_ready(pid, m)]
+    lists = await asyncio.gather(*(_tg_models_for(pid) for pid, _ in ready))
+    rows, row = [], []
+    for (pid, lb), ids in zip(ready, lists):
+        mark = "✓ " if pid == cur_prov else ""
+        row.append({"text": f"{mark}{lb} ({len(ids)})", "callback_data": f"mp:{pid}"})
+        if len(row) == 2:
+            rows.append(row); row = []
+    if row:
+        rows.append(row)
+    rows.append([{"text": "✕ Đóng", "callback_data": "mx"}])
     return {"inline_keyboard": rows}
 
 
+def _model_list_kb(pid, page=0):
+    ids = _TG_MODEL_LISTS.get(pid) or []
+    _, cur = _model_current()
+    pages = max(1, (len(ids) + _TG_PAGE - 1) // _TG_PAGE)
+    page = max(0, min(page, pages - 1))
+    rows, row = [], []
+    for i in range(page * _TG_PAGE, min((page + 1) * _TG_PAGE, len(ids))):
+        mid = ids[i]
+        # OpenRouter id dạng vendor/tên → nút chỉ hiện tên cho gọn (chọn vẫn theo id đầy đủ)
+        disp = mid.split("/", 1)[-1] if pid == "openrouter" else mid
+        mark = "✓ " if mid == cur else ""
+        row.append({"text": f"{mark}{disp}"[:60], "callback_data": f"ms:{pid}:{i}"})
+        if len(row) == 2:
+            rows.append(row); row = []
+    if row:
+        rows.append(row)
+    if pages > 1:
+        nav = []
+        if page > 0:
+            nav.append({"text": "◀", "callback_data": f"ml:{pid}:{page - 1}"})
+        nav.append({"text": f"{page + 1}/{pages}", "callback_data": "noop"})
+        if page < pages - 1:
+            nav.append({"text": "▶", "callback_data": f"ml:{pid}:{page + 1}"})
+        rows.append(nav)
+    rows.append([{"text": "‹ Provider", "callback_data": "mp:back"},
+                 {"text": "✕ Đóng", "callback_data": "mx"}])
+    return {"inline_keyboard": rows}
+
+
+def _tg_model_list_text(pid):
+    n = len(_TG_MODEL_LISTS.get(pid) or [])
+    tip = "\nMẹo: gõ /model <id> để chọn nhanh không cần lật trang." if n > _TG_PAGE else ""
+    return f"⚙️ {_tg_prov_label(pid)} - chọn model ({n}):{tip}"
+
+
 def _model_header():
-    eng, cur = _model_current()
+    prov, cur = _model_current()
     return ("⚙️ Cấu hình model\n"
             f"Hiện tại: {cur}\n"
-            f"Engine: {'OpenRouter (chat thuần)' if eng == 'openrouter' else 'Claude CLI (có MCP)'}\n\n"
-            "Chọn nhóm:")
+            f"Provider: {_tg_prov_label(prov)}\n\n"
+            "Chọn provider (chỉ hiện provider đã kết nối):")
 
 
-async def _tg_callback(data):
-    """Xử lý khi user bấm nút inline. Trả {'text','reply_markup','alert'} hoặc None."""
+# ---- Menu chọn brain cho PHIÊN Telegram (inline keyboard, giống menu model) ----
+def _tg_brain_header(chat_key):
+    cur = Path(_brain_root(_tg_brain(chat_key))).name
+    return ("🧠 Brain của phiên này: " + cur + "\n"
+            "Chọn brain khác (chỉ đổi cho phiên CỦA BẠN, người khác và dashboard không đổi):")
+
+
+def _tg_brain_kb(brains, chat_key):
+    try:
+        cur = str(Path(_brain_root(_tg_brain(chat_key))).resolve())
+    except Exception:
+        cur = ""
+    rows = []
+    for i, b in enumerate(brains[:20]):   # Telegram giới hạn nút; >20 brain thì gõ /brain <tên>
+        try:
+            mark = "✓ " if str(Path(b["path"]).resolve()) == cur else ""
+        except Exception:
+            mark = ""
+        rows.append([{"text": f"{mark}{b['name']} · {b.get('notes', 0)} note",
+                      "callback_data": f"bs:{i}"}])
+    rows.append([{"text": "✕ Đóng", "callback_data": "bx"}])
+    return {"inline_keyboard": rows}
+
+
+async def _tg_callback(data, chat=None):
+    """Xử lý khi user bấm nút inline. Trả {'text','reply_markup','alert'} hoặc None.
+    chat = chat_id người bấm → nút brain chỉ đổi cho PHIÊN của họ (model vẫn đổi toàn cục)."""
     data = data or ""
+    chat_key = str(chat or "default")
     if data == "mx":
         return {"text": "Đã đóng bảng chọn model.", "alert": "Đã đóng"}
+    # ---- nút chọn brain (bs:<idx> | bx) - tác động PHIÊN của người bấm ----
+    if data == "bx":
+        return {"text": "Đã đóng bảng chọn brain.", "alert": "Đã đóng"}
+    if data.startswith("bs:"):
+        try:
+            i = int(data.split(":", 1)[1])
+        except ValueError:
+            return {"alert": "Dữ liệu nút lỗi"}
+        d = await list_brains(); brains = d.get("brains") or []
+        if i < 0 or i >= len(brains):
+            return {"alert": "Danh sách brain đã đổi - gõ /brain lại"}
+        hit = brains[i]
+        _tg_set_brain(chat_key, hit["path"])
+        return {"text": f"🧠 Đã chuyển phiên này sang brain: {hit['name']}\n"
+                        "(hội thoại reset để nạp đúng bộ nhớ/skill của brain mới)",
+                "alert": "Đã đổi brain"}
+    if data == "noop":
+        return None   # nút chỉ-hiển-thị (số trang) - answer callback cho tắt spinner, không sửa tin
     if data in ("mp:back", "model"):
-        return {"text": _model_header(), "reply_markup": _model_provider_kb()}
+        return {"text": _model_header(), "reply_markup": await _model_provider_kb()}
     if data.startswith("mp:"):
-        provider = data.split(":", 1)[1]
-        cat = _model_catalog()
-        if provider not in cat:
-            return {"alert": "Nhóm không hợp lệ"}
-        label = "Claude" if provider == "claude" else "OpenRouter"
-        return {"text": f"⚙️ {label} - chọn model:", "reply_markup": _model_list_kb(provider)}
+        pid = data.split(":", 1)[1]
+        if pid not in dict(_TG_PROVIDERS):
+            return {"alert": "Provider không hợp lệ - gõ /model lại"}
+        if not _tg_prov_ready(pid, cfgmod.read_settings().get("model", {})):
+            return {"alert": f"{_tg_prov_label(pid)} chưa kết nối - vào dashboard trang Models"}
+        await _tg_models_for(pid)   # nạp danh sách mới nhất trước khi vẽ trang 1
+        return {"text": _tg_model_list_text(pid), "reply_markup": _model_list_kb(pid, 0)}
+    if data.startswith("ml:"):
+        # lật trang danh sách model
+        try:
+            _, pid, pg = data.split(":")
+            page = int(pg)
+        except ValueError:
+            return {"alert": "Dữ liệu nút lỗi"}
+        if pid not in _TG_MODEL_LISTS:
+            await _tg_models_for(pid)   # server vừa restart → nạp lại rồi vẽ tiếp
+        return {"text": _tg_model_list_text(pid), "reply_markup": _model_list_kb(pid, page)}
     if data.startswith("ms:"):
         try:
-            _, provider, idx = data.split(":")
+            _, pid, idx = data.split(":")
             i = int(idx)
         except ValueError:
             return {"alert": "Dữ liệu nút lỗi"}
-        models = _model_catalog().get(provider, [])
-        if i < 0 or i >= len(models):
-            return {"alert": "Model không tồn tại"}
-        mdl = models[i]
+        ids = _TG_MODEL_LISTS.get(pid) or []
+        if i < 0 or i >= len(ids):
+            return {"alert": "Danh sách đã đổi - gõ /model lại"}
+        mdl = ids[i]
         s = cfgmod.read_settings(); m = s["model"]
-        if provider == "openrouter":
-            if not m.get("openrouter_key"):
-                return {"alert": "Chưa có OpenRouter key (đặt ở dashboard)"}
-            _set_main_model(s, "openrouter", mdl); cfgmod.write_settings(s)
-            return {"text": f"✅ OpenRouter - model: {mdl}\n(chat thuần, không MCP)", "alert": "Đã đổi model"}
-        _set_main_model(s, "anthropic-cli", mdl.lower()); cfgmod.write_settings(s)
-        return {"text": f"✅ Claude Code - model: {mdl.lower()}\n(đầy đủ MCP/skill)", "alert": "Đã đổi model"}
+        if not _tg_prov_ready(pid, m):
+            return {"alert": f"{_tg_prov_label(pid)} chưa kết nối - vào dashboard trang Models"}
+        if pid == "anthropic-cli":
+            mdl = mdl.lower()   # alias opus/sonnet/haiku/fable
+        _set_main_model(s, pid, mdl); cfgmod.write_settings(s)
+        note = {"anthropic-cli": "Claude Code - đầy đủ MCP/skill",
+                "openai-oauth": "ChatGPT qua Codex CLI - có MCP",
+                "openrouter": "OpenRouter - chat + MCP đa-model",
+                "anthropic-api": "Claude API - chat + MCP đa-model",
+                "openai": "OpenAI API - chat + MCP đa-model"}.get(pid, pid)
+        return {"text": f"✅ {note}\nModel: {mdl}", "alert": "Đã đổi model"}
     return None
 
 
-async def _tg_command(cmd, arg):
-    """Xử lý lệnh Telegram. Trả {'reply':...} hoặc {'ask':...} (chuyển thành câu hỏi) hoặc None."""
-    global _tg_cli, _tg_or
-    brain = _read_loop_config().get("brain", "brain")
+async def _tg_command(cmd, arg, chat=None):
+    """Xử lý lệnh Telegram cho 1 chat. Trả {'reply':...} hoặc {'ask':...} hoặc None.
+    chat = chat_id của người gõ lệnh → reset/stop/retry/brain chỉ tác động PHIÊN của họ."""
+    chat_key = str(chat or "default")
+    brain = _tg_brain(chat_key)   # brain riêng của phiên (đổi bằng /brain)
     if cmd == "stop":
-        cancel_all("telegram")
+        # Chỉ giết subprocess Claude của CHÍNH chat này (tag telegram:<chat>), không đụng người khác.
+        cancel_all(f"telegram:{chat_key}")
         return {"reply": "⏹ Đã dừng lệnh đang chạy."}
     if cmd in ("reset", "new", "clear"):
-        if _tg_cli:
-            _tg_cli.reset_session()
-        _tg_or = None
-        return {"reply": "🔄 Đã reset hội thoại."}
+        sess = _TG_SESS.get(chat_key)
+        if sess:
+            if sess.get("cli"):
+                sess["cli"].reset_session()
+            sess["or"] = None
+            sess["last"] = None
+        return {"reply": "🔄 Đã reset hội thoại (chỉ phiên của bạn)."}
     if cmd in ("cli", "claude"):
         s = cfgmod.read_settings()
         _set_main_model(s, "anthropic-cli", (s["model"].get("main") or {}).get("model") or s["model"].get("claude_model") or "opus")
@@ -3543,27 +4959,35 @@ async def _tg_command(cmd, arg):
         return {"reply": await _tg_skills_text(brain)}
     if cmd == "status":
         prov, model = _model_current()
-        busy = bool(_TG_BOT and _TG_BOT._current and not _TG_BOT._current.done())
+        busy = _tg_chat_busy(chat_key)
+        bname = Path(_brain_root(brain)).name
         return {"reply": ("📊 Trạng thái Javis\n"
                           f"Provider: {prov}\n"
-                          f"Model: {model}\nVault: {brain}\n"
+                          f"Model: {model}\n"
+                          f"Brain: {bname} (đổi bằng /brain)\n"
+                          f"Phiên: {chat_key} (ngữ cảnh riêng)\n"
                           f"Đang xử lý: {'có (gửi /stop để dừng)' if busy else 'rảnh'}")}
     if cmd == "model":
         s = cfgmod.read_settings(); m = s["model"]
         a = arg.strip()
         if a:
-            # Không whitelist cứng → model mới (vd "fable") dùng ngay. id OpenRouter chứa "/";
-            # còn lại là alias/id Claude (anthropic-cli).
+            # Không whitelist cứng → model mới dùng ngay. id chứa "/" = OpenRouter;
+            # gpt*/*-codex = ChatGPT (Codex, cần đã kết nối); còn lại = alias/id Claude.
             if "/" in a:
                 _set_main_model(s, "openrouter", a); cfgmod.write_settings(s)
                 return {"reply": f"✅ OpenRouter model: {a}."}
+            if _is_codex_model(a):
+                if not _tg_prov_ready("openai-oauth", m):
+                    return {"reply": "⚠ Chưa kết nối ChatGPT (OpenAI OAuth) - nối ở dashboard trang Models trước."}
+                _set_main_model(s, "openai-oauth", a); cfgmod.write_settings(s)
+                return {"reply": f"✅ ChatGPT (Codex) model: {a}."}
             _set_main_model(s, "anthropic-cli", a.lower()); cfgmod.write_settings(s)
             return {"reply": f"✅ Model Claude: {a.lower()}. Nếu CLI chưa hỗ trợ tên này, query sẽ báo lỗi."}
-        # Không tham số → mở menu nút bấm (chọn provider → chọn model)
-        return {"reply": _model_header(), "reply_markup": _model_provider_kb()}
+        # Không tham số → mở menu nút bấm (chọn provider → chọn model, phân trang)
+        return {"reply": _model_header(), "reply_markup": await _model_provider_kb()}
     if cmd == "agents":
         d = await list_agents(brain); ags = d.get("agents", []) or []
-        busy = bool(_TG_BOT and _TG_BOT._current and not _TG_BOT._current.done())
+        busy = _tg_chat_busy(chat_key)
         if not ags:
             return {"reply": "Chưa có agent nào (tạo trong Studio trên dashboard)."}
         lines = [f"• {a.get('name')} - {(a.get('role') or '')[:50]}" for a in ags[:20]]
@@ -3575,9 +4999,27 @@ async def _tg_command(cmd, arg):
         lines = [f"• {w.get('name')} ({w.get('status')})" for w in wfs[:20]]
         return {"reply": "⚡ Workflows:\n" + "\n".join(lines) + "\n\n(Hiện chạy trên dashboard; chạy qua Telegram sẽ thêm sau.)"}
     if cmd == "retry":
-        if not _tg_last_msg:
+        last = (_TG_SESS.get(chat_key) or {}).get("last")
+        if not last:
             return {"reply": "Chưa có câu nào để gửi lại."}
-        return {"ask": _tg_last_msg}
+        return {"ask": last}
+    if cmd in ("brain", "vault"):
+        d = await list_brains(); brains = d.get("brains") or []
+        if not brains:
+            return {"reply": "Chưa có brain nào (tạo trong dashboard, nút + cạnh dropdown brain)."}
+        a = arg.strip()
+        if a:
+            # match theo tên: khớp đúng trước, khớp một phần sau (không phân biệt hoa thường)
+            hit = (next((b for b in brains if b["name"].lower() == a.lower()), None)
+                   or next((b for b in brains if a.lower() in b["name"].lower()), None))
+            if not hit:
+                names = ", ".join(b["name"] for b in brains[:15])
+                return {"reply": f"⚠ Không thấy brain '{a}'. Có: {names}"}
+            _tg_set_brain(chat_key, hit["path"])
+            return {"reply": f"🧠 Đã chuyển phiên này sang brain: {hit['name']}\n"
+                             "(hội thoại reset để nạp đúng bộ nhớ/skill của brain mới)"}
+        # Không tham số → menu nút bấm chọn brain
+        return {"reply": _tg_brain_header(chat_key), "reply_markup": _tg_brain_kb(brains, chat_key)}
     # /<slug> khác → coi là gọi skill (cần CLI)
     if cfgmod.read_settings().get("model", {}).get("engine") == "openrouter":
         return {"reply": f"⚠ Skill cần engine Claude CLI. Gửi /cli để đổi, rồi /{cmd} lại."}
@@ -3586,16 +5028,24 @@ async def _tg_command(cmd, arg):
     return {"ask": ask}
 
 
+def _tg_inbox_dir(chat=None):
+    """Nơi lưu file user gửi lên Telegram - đặt trong brain CỦA PHIÊN người gửi
+    (đổi bằng /brain; chưa đổi thì brain mặc định) để agent đọc được ngay."""
+    root = _brain_root(_tg_brain(chat))
+    return str(Path(root) / "inbox" / "telegram")
+
+
 def restart_telegram():
     """Bật lại bot theo cấu hình settings.telegram (tắt bot cũ nếu có)."""
-    global _TG_BOT, _tg_or
+    global _TG_BOT
     t = cfgmod.read_settings().get("telegram", {})
     if _TG_BOT:
         _TG_BOT.stop()
         _TG_BOT = None
-    _tg_or = None
+    _TG_SESS.clear()   # xoá mọi phiên hội thoại cũ khi khởi động lại bot
     if t.get("enabled") and t.get("token"):
-        _TG_BOT = TelegramBot(t["token"], t.get("chat_id", ""), _tg_answer, _tg_command, _tg_callback)
+        _TG_BOT = TelegramBot(t["token"], t.get("chat_id", ""), _tg_answer, _tg_command, _tg_callback,
+                              download_dir=_tg_inbox_dir)
         _TG_BOT.start()
         return True
     return False
@@ -3606,7 +5056,8 @@ async def telegram_status():
     t = cfgmod.read_settings().get("telegram", {})
     running = bool(_TG_BOT and _TG_BOT._task and not _TG_BOT._task.done())
     return {"enabled": bool(t.get("enabled")), "token_set": bool(t.get("token")),
-            "chat_id": t.get("chat_id", ""), "running": running,
+            "chat_id": t.get("chat_id", ""), "chat_ids": tg_parse_ids(t.get("chat_id")),
+            "running": running,
             "status": (_TG_BOT.status if _TG_BOT else "off"),
             "last_error": (_TG_BOT.last_error if _TG_BOT else "")}
 
@@ -3618,18 +5069,81 @@ async def telegram_restart():
 
 @app.post("/telegram/test")
 async def telegram_test():
+    """Gửi tin test tới TẤT CẢ chat ID trong whitelist - báo rõ ID nào lỗi (vd chưa bấm Start bot)."""
     t = cfgmod.read_settings().get("telegram", {})
-    if not t.get("token") or not t.get("chat_id"):
-        return {"ok": False, "error": "Thiếu token hoặc chat_id (lưu trước đã)"}
+    ids = tg_parse_ids(t.get("chat_id"))
+    if not t.get("token") or not ids:
+        return {"ok": False, "error": "Thiếu token hoặc chat ID (lưu trước đã)"}
     import httpx
+    sent, errs = 0, []
     try:
         async with httpx.AsyncClient(timeout=15) as c:
-            r = await c.post(f"https://api.telegram.org/bot{t['token']}/sendMessage",
-                             json={"chat_id": t["chat_id"], "text": "✅ Javis Telegram đã kết nối. Nhắn câu hỏi bất kỳ nhé."})
-        d = r.json()
-        return {"ok": bool(d.get("ok")), "error": d.get("description", "")}
+            for cid in ids:
+                try:
+                    r = await c.post(f"https://api.telegram.org/bot{t['token']}/sendMessage",
+                                     json={"chat_id": cid, "text": "✅ Javis Telegram đã kết nối. Nhắn câu hỏi bất kỳ nhé."})
+                    d = r.json()
+                    if d.get("ok"):
+                        sent += 1
+                    else:
+                        errs.append(f"{cid}: {d.get('description', 'lỗi')}")
+                except Exception as e:
+                    errs.append(f"{cid}: {type(e).__name__}")
+        return {"ok": sent > 0, "sent": sent, "total": len(ids),
+                "error": "; ".join(errs)[:300]}
     except Exception as e:
         return {"ok": False, "error": f"{type(e).__name__}: {e}"}
+
+
+@app.post("/telegram/send-file")
+async def telegram_send_file(payload: dict = Body(...)):
+    """Gửi 1 file qua Telegram tới chat whitelist. Agent gọi bằng curl từ localhost
+    (miễn đăng nhập qua _AUTH_LOCAL_EXACT - request từ ngoài vẫn bị chặn).
+    Body: {"path": "<đường dẫn tuyệt đối>", "caption": "<mô tả ngắn>", "chat_id": "<id người hỏi>"}.
+    ĐA PHIÊN: có chat_id (và trong whitelist) → gửi ĐÚNG người đang hỏi + dedupe theo phiên họ;
+    thiếu chat_id → gửi chủ bot (ID đầu whitelist) như cũ."""
+    path = str((payload or {}).get("path", "")).strip().strip('"')
+    caption = str((payload or {}).get("caption", "")).strip()
+    chat_id = str((payload or {}).get("chat_id", "")).strip()
+    if not (_TG_BOT and _TG_BOT._task and not _TG_BOT._task.done()):
+        return {"ok": False, "error": "Bot Telegram chưa chạy (bật ở Settings → Telegram)."}
+    if not path:
+        return {"ok": False, "error": "Thiếu path"}
+    # chỉ nhận chat_id nằm trong whitelist (chống gửi tới ID lạ); ngoài whitelist → về chủ bot
+    target = chat_id if (chat_id and chat_id in (_TG_BOT.chat_ids or [])) else None
+    ok, err = await _TG_BOT.send_file(path, caption, chat=target)
+    if ok:
+        # ghi nhận vào ĐÚNG phiên để auto-attach cuối lượt không gửi lại file này lần nữa
+        try:
+            sess = _TG_SESS.get(chat_id) if chat_id else None
+            if sess is not None:
+                sess["sent"].add(os.path.normcase(os.path.normpath(os.path.abspath(path))))
+        except Exception:
+            pass
+    return {"ok": ok, "error": err}
+
+
+@app.on_event("startup")
+async def _warm_mcp_hub():
+    """Làm nóng hub sau khi boot: mở sẵn session MCP (stdio npx lần đầu phải tải package)
+    để tin nhắn/tool call đầu tiên không phải chờ."""
+    async def _w():
+        try:
+            await asyncio.sleep(3)
+            if _hub_enabled():
+                await mcp_hub.discover_all("full")
+        except Exception as e:
+            print(f"[hub warmup] {e}", file=__import__('sys').stderr)
+    asyncio.create_task(_w())
+
+
+@app.on_event("shutdown")
+async def _shutdown_mcp_pool():
+    """Đóng các session MCP sống lâu (stdio subprocess, httpx client) khi server tắt."""
+    try:
+        await mcp_client.pool.close_all()
+    except Exception:
+        pass
 
 
 if __name__ == "__main__":

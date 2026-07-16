@@ -81,7 +81,7 @@ log "Creating virtualenv (.venv)..."
 ok "Python deps installed"
 
 # --- 6. .env (chmod 600 - holds tokens) ---
-if [ ! -f .env ]; then cp .env.example .env; chmod 600 .env; ok "Created .env from template"; else chmod 600 .env 2>/dev/null || true; ok ".env exists"; fi
+if [ ! -f .env ]; then cp env.example .env; chmod 600 .env; ok "Created .env from template"; else chmod 600 .env 2>/dev/null || true; ok ".env exists"; fi
 
 # --- 7. minimal config prompt ---
 if [ -t 0 ]; then

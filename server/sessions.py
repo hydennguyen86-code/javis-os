@@ -46,7 +46,9 @@ CREATE TABLE IF NOT EXISTS sessions (
     updated_at     REAL NOT NULL,
     msg_count      INTEGER NOT NULL DEFAULT 0,
     parent_session_id TEXT,
-    archived       INTEGER NOT NULL DEFAULT 0
+    archived       INTEGER NOT NULL DEFAULT 0,
+    compact_summary TEXT,
+    compact_count  INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS messages (
@@ -126,6 +128,12 @@ class SessionStore:
     def _init_schema(self) -> None:
         with self._lock:
             self._conn.executescript(_SCHEMA_SQL)
+            # Migration cột mới cho DB cũ (CREATE IF NOT EXISTS không tự thêm cột)
+            cols = {r[1] for r in self._conn.execute("PRAGMA table_info(sessions)").fetchall()}
+            for name, ddl in (("compact_summary", "TEXT"),
+                              ("compact_count", "INTEGER NOT NULL DEFAULT 0")):
+                if name not in cols:
+                    self._conn.execute(f"ALTER TABLE sessions ADD COLUMN {name} {ddl}")
             if self._probe_fts5():
                 try:
                     self._conn.executescript(_FTS_SQL)
@@ -281,6 +289,13 @@ class SessionStore:
         self._write(lambda c: c.execute(
             "UPDATE sessions SET archived = ?, updated_at = ? WHERE id = ?",
             (1 if archived else 0, time.time(), session_id),
+        ))
+
+    def set_compact(self, session_id: str, summary: str, count: int) -> None:
+        """Lưu tóm tắt nén hội thoại: summary phủ `count` message user/assistant đầu phiên."""
+        self._write(lambda c: c.execute(
+            "UPDATE sessions SET compact_summary = ?, compact_count = ? WHERE id = ?",
+            (summary, int(count), session_id),
         ))
 
     def set_cli_session_id(self, session_id: str, cli_session_id: str) -> None:

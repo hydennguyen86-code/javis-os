@@ -30,8 +30,9 @@ from typing import Any, Callable, Dict, List, Optional
 
 from fastapi import APIRouter, Form, Query
 
-from claude_cli import ClaudeCLI, cancel_all, _empty_mcp_file
+from claude_cli import claude_engine, cancel_all, _empty_mcp_file
 import git_brain
+import skill_router
 
 
 def _now_vn() -> datetime:
@@ -152,7 +153,7 @@ class LearnDeps:
     enqueue_task: Optional[Callable] = None
 
 
-ALLOWED_WRITE_PREFIXES = ["memory", "Memory", "Wiki", ".claude/skills", "Javis"]
+ALLOWED_WRITE_PREFIXES = ["memory", "Memory", "Wiki", "skills", ".claude/skills", "Javis"]
 
 
 class LearnFeature:
@@ -348,7 +349,8 @@ class LearnFeature:
                 '"supersedes":"slug-cũ-hoặc-rỗng","confidence":0..3}]')
         if caps.get("wiki"):
             schema_bits.append(
-                '"wiki":[{"title":"Tên Khái Niệm","body":"markdown có [[wikilink]] + citation cuối câu",'
+                '"wiki":[{"title":"Tên Khái Niệm","body":"markdown; MỖI câu cụ thể kết bằng [[nguồn]]; '
+                'số liệu/khẳng định mạnh phải gắn nhãn (mục tiêu) hoặc (thực tế tính đến ...) hoặc (cần xác minh)",'
                 '"provenance":"user|source|assistant","density":0..3,"same_as":"tên-trang-đã-có-hoặc-rỗng",'
                 '"conflict_with":"tên-trang-đã-có-hoặc-rỗng"}]')
         if caps.get("skill"):
@@ -374,7 +376,13 @@ class LearnFeature:
             "DENSITY (wiki, 0-3): 0=nhắc thoáng, 3=được định nghĩa/giải thích có cấu trúc. Chỉ đưa density>=2.\n"
             "DEDUP: đọc INDEX dưới đây trước; nếu khái niệm ĐÃ CÓ → set same_as=tên trang (đừng tạo trùng); "
             "nếu MÂU THUẪN với trang cũ → set conflict_with (KHÔNG ghi đè, sẽ ghi mục ## Mâu thuẫn).\n"
-            "CITATION: mọi câu wiki cụ thể kết bằng [[conversations/" + _today() + "]] hoặc nguồn có tên.\n\n"
+            "3 KỶ LUẬT WIKI (đồng bộ schema vault - áp cho MỌI mục wiki):\n"
+            "  1. CITATION cứng: mọi câu cụ thể (số liệu/quy trình/framework/trích dẫn) PHẢI kết bằng "
+            "[[conversations/" + _today() + "]] hoặc [[nguồn có tên]]. Câu không nguồn = bỏ, đừng đưa vào.\n"
+            "  2. MỤC TIÊU vs THỰC TẾ: câu nói về tương lai/mong muốn → gắn '(mục tiêu)'; hiện trạng đo được "
+            "→ '(thực tế tính đến <thời điểm>)'; không chắc → '(cần xác minh)'. TUYỆT ĐỐI không biến câu tầm nhìn "
+            "thành claim chắc nịch (vd 'đặt mục tiêu 13.500' ≠ 'có 13.500').\n"
+            "  3. MÂU THUẪN: nếu chọi trang cũ → set conflict_with, KHÔNG ghi đè (Python sẽ ghi ## Mâu thuẫn).\n\n"
             + ("TASK (chống spam backlog): CHỈ đề xuất task khi hội thoại có VIỆC RÕ RÀNG chưa làm - "
                "user nhờ lặp lại, việc bỏ dở được nhắc, hoặc câu hỏi mở cần điều tra thêm. intent phải "
                "TỰ-ĐỦ (agent nền chỉ thao tác file, KHÔNG thấy hội thoại này). Đa số batch không có việc "
@@ -392,7 +400,7 @@ class LearnFeature:
         mcpf = _empty_mcp_file()
         if not mcpf:
             return ""   # không tạo được file MCP rỗng → từ chối spawn (không để nuốt MCP máy)
-        gcli = ClaudeCLI(system_prompt=self.deps.build_system_prompt(brain),
+        gcli = claude_engine(system_prompt=self.deps.build_system_prompt(brain),
                          cwd=self.deps.brain_root(brain), tag=tag,
                          allowed_tools=self.deps.readonly_tools)
         gcli.model = self._model(cfg)
@@ -533,9 +541,10 @@ class LearnFeature:
                     self._merge_wiki_index(wiki_dir, title, w.get("hook") or body[:80], written_paths, root)
                     self._append_wiki_log(wiki_dir, title, written_paths, root)
 
-            # ---- SKILLS (draft/disabled) ----
+            # ---- SKILLS (tự học) - tạo BẬT sẵn (chính sách user), đánh dấu origin để nhận diện ----
             if caps.get("skill"):
-                sk_dis = Path(root) / ".claude" / "skills" / ".disabled"
+                sk_root = Path(root) / "skills"
+                cl_dis = Path(root) / ".claude" / "skills" / ".disabled"
                 for s in (manifest.get("skills") or []):
                     slug = _slugify(s.get("slug") or s.get("name") or "")
                     body = (s.get("body") or "").strip()
@@ -543,10 +552,17 @@ class LearnFeature:
                         continue
                     if secret_hits(body) or injection_in_output(body):
                         rep["blocked"].append(f"skill '{slug}': nội dung không an toàn"); continue
-                    d = sk_dis / slug
+                    # AN TOÀN: KHÔNG ghi đè skill ĐÃ CÓ (của user, bất kỳ vị trí nào) và KHÔNG hồi sinh
+                    # skill user đã TẮT → tránh mất dữ liệu / bật lại thứ user cố ý tắt.
+                    if (skill_router.resolve_skill_file(root, slug)
+                            or (sk_root / ".disabled" / slug / "SKILL.md").is_file()
+                            or (cl_dis / slug / "SKILL.md").is_file()):
+                        rep["blocked"].append(f"skill '{slug}': đã tồn tại → không ghi đè")
+                        continue
+                    d = sk_root / slug   # vị trí BẬT (canonical) → mirror sang .claude ở lượt sysprompt kế
                     d.mkdir(parents=True, exist_ok=True)
                     fm = (f"---\nname: {s.get('name', slug)}\ndescription: {s.get('description','')}\n"
-                          f"origin: javis-learned\nstatus: draft\ncreated: {today}\n---\n")
+                          f"origin: javis-learned\nstatus: active\ncreated: {today}\n---\n")
                     self.deps.atomic_write_text(d / "SKILL.md", fm + body + "\n")
                     written_paths.append(str((d / 'SKILL.md').relative_to(root)).replace("\\", "/"))
                     rep["skills"].append(slug)

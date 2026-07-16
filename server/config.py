@@ -56,6 +56,7 @@ _DEFAULT = {
         "openrouter_key": "",
         "anthropic_api_key": "",               # provider Anthropic API (P2)
         "openai_api_key": "",                  # provider OpenAI (ChatGPT API)
+        "gemini_api_key": "",                  # provider Google Gemini (endpoint OpenAI-compat)
         # Provider 'openai-oauth' - đăng nhập ChatGPT Plus/Pro qua device-code (xem openai_oauth.py).
         "openai_oauth": {"access_token": "", "refresh_token": "", "id_token": "", "account_id": "", "plan": "", "expires_at": 0},
         # --- Legacy: giữ đồng bộ với main để engine cũ không vỡ (engine/claude_model/openrouter_model) ---
@@ -67,6 +68,7 @@ _DEFAULT = {
             "claude": ["opus", "sonnet", "haiku", "fable"],                       # anthropic-cli (alias)
             "anthropic-api": ["claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"],
             "openai": ["gpt-4o", "gpt-4o-mini", "o3-mini"],                        # OpenAI API
+            "gemini": ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"],  # Google Gemini API (picker load động)
             "openai-oauth": ["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex"],  # ChatGPT OAuth (Codex; chỉ fallback - picker load động)
             "openrouter": ["openai/gpt-4o-mini", "anthropic/claude-3.5-sonnet", "google/gemini-2.0-flash-001", "deepseek/deepseek-chat"],
         },
@@ -81,10 +83,39 @@ _DEFAULT = {
         # Frontend cũng tự ép lite-mode khi màn hình hẹp dù cờ này bật.
         "graph_enabled": True,
     },
-    # MCP do Javis quản lý (danh sách server ở mcp_servers.json). strict=True → CHỈ dùng
-    # server của Javis (--strict-mcp-config), bỏ qua config MCP sẵn có của máy.
-    "mcp": {"strict": False},
+    # MCP do Javis quản lý (registry connection ở mcp_servers.json). strict=True → CHỈ dùng
+    # kết nối của Javis (--strict-mcp-config), bỏ qua config MCP sẵn có của máy.
+    # hub=True (mặc định): mọi engine đấu qua MCP HUB (1 entry "javis" - đa tài khoản, quyền,
+    # audit tại hub). Đặt false để về chế độ cũ (per-server) nếu gặp sự cố.
+    "mcp": {"strict": False, "hub": True},
 }
+
+
+# Các trường SECRET trong settings.json → mã hoá at rest (Fernet, qua secrets_store) như MCP secret.
+# Backward-compat: giá trị plaintext cũ đọc vẫn ra nguyên văn; lần ghi kế tiếp tự bọc "enc:".
+# Mất file .secret_key → decrypt trả "" (nhập lại key) - đánh đổi giống MCP secret, an toàn hơn lộ key.
+_SECRET_PATHS = (
+    "model.openrouter_key", "model.anthropic_api_key", "model.openai_api_key", "model.gemini_api_key",
+    "model.openai_oauth.access_token", "model.openai_oauth.refresh_token", "model.openai_oauth.id_token",
+    "telegram.token", "backup.token", "voice.elevenlabs_key",
+)
+
+
+def _transform_secret_fields(cfg, fn):
+    """Áp fn (encrypt|decrypt) lên các trường secret theo _SECRET_PATHS, tại chỗ. Bỏ qua nếu thiếu."""
+    for path in _SECRET_PATHS:
+        parts = path.split(".")
+        parent = cfg
+        for p in parts[:-1]:
+            if isinstance(parent, dict) and isinstance(parent.get(p), dict):
+                parent = parent[p]
+            else:
+                parent = None
+                break
+        key = parts[-1]
+        if isinstance(parent, dict) and isinstance(parent.get(key), str) and parent.get(key):
+            parent[key] = fn(parent[key])
+    return cfg
 
 
 def read_settings():
@@ -99,11 +130,54 @@ def read_settings():
                     cfg[k] = v
     except Exception:
         pass
+    try:
+        import secrets_store   # lazy: secrets_store import config → tránh vòng lặp import
+        _transform_secret_fields(cfg, secrets_store.decrypt)
+    except Exception as e:
+        print(f"[config] giải mã secret lỗi: {e}", file=__import__('sys').stderr)
     return cfg
 
 
 def write_settings(cfg):
-    SETTINGS_PATH.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+    # Deep-copy rồi mã hoá BẢN SAO: caller vẫn giữ cfg plaintext để dùng tiếp (không bị hỏng).
+    out = json.loads(json.dumps(cfg))
+    try:
+        import secrets_store
+        _transform_secret_fields(out, secrets_store.encrypt)   # encrypt idempotent (bỏ qua enc:/plain:)
+    except Exception as e:
+        print(f"[config] mã hoá secret lỗi: {e}", file=__import__('sys').stderr)
+    SETTINGS_PATH.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+_TOOL_ENV_OWNED = False   # ELEVENLABS_API_KEY trong env hiện do apply_tool_env đặt → được phép gỡ khi user xoá key
+
+
+def apply_tool_env(cfg=None):
+    """Bơm secret dùng chung từ Cài đặt vào os.environ để TOOL NGOÀI thừa kế khi engine CLI
+    (Claude Code/Codex) spawn tiến trình con (Bash -> python/node). Hiện có: key ElevenLabs
+    (Cài đặt > Giọng đọc) -> ELEVENLABS_API_KEY cho video-use phiên âm khi cắt sửa video.
+    Lưu ý phạm vi: đặt vào env của CẢ server nên mọi tiến trình con (MCP stdio, script vault...)
+    đều thừa kế - chấp nhận vì mục đích chính là đến được Bash con của engine, và cùng user
+    thì con nào cũng đọc được settings.json + .secret_key; blast radius chỉ là key TTS.
+    Chỉ ghi đè khi settings có giá trị; user xoá key trong settings thì gỡ khỏi env (nhưng
+    không đụng biến user tự đặt ngoài shell). Gọi lúc startup + sau khi lưu Cài đặt giọng đọc."""
+    global _TOOL_ENV_OWNED
+    try:
+        if cfg is None:
+            cfg = read_settings()
+        k = ((cfg.get("voice") or {}).get("elevenlabs_key") or "").strip()
+        if k and not k.startswith("••••"):   # bỏ qua giá trị che mà client lỡ gửi lại
+            os.environ["ELEVENLABS_API_KEY"] = k
+            _TOOL_ENV_OWNED = True
+        elif not k and _TOOL_ENV_OWNED:
+            os.environ.pop("ELEVENLABS_API_KEY", None)
+            _TOOL_ENV_OWNED = False
+    except Exception as e:
+        print(f"[config] apply_tool_env lỗi: {e}", file=__import__('sys').stderr)
+    # Windows: helper Python con (vd video-use) in Unicode ra console cp1252 sẽ crash
+    # (UnicodeEncodeError) -> ép UTF-8 cho mọi tiến trình con. Tôn trọng giá trị user tự đặt.
+    if os.name == "nt" and not os.environ.get("PYTHONUTF8"):
+        os.environ["PYTHONUTF8"] = "1"
 
 
 # ---- Mật khẩu ----

@@ -1,7 +1,9 @@
 """
-Lớp tương tác với Claude Code CLI đã cài trên máy.
-Dùng subprocess.Popen + thread thay vì asyncio.create_subprocess_exec
-=> Tương thích với mọi event loop (Selector/Proactor) trên Windows.
+Hạ tầng engine CLI: factory claude_engine() (engine Claude - chạy qua claude_sdk_engine),
+CodexCLI (ChatGPT subscription, spawn `codex exec` bằng Popen + thread cho tương thích mọi
+event loop Windows), auth Claude Code, registry ngắt tiến trình theo tag.
+Nhánh ClaudeCLI Popen cũ đã gỡ ở v0.9.37 (engine Claude giờ luôn đi qua Agent SDK -
+kế hoạch + nhật ký: docs/dev/2026-07-ke-hoach-agent-sdk.md).
 """
 import asyncio
 import json
@@ -22,9 +24,13 @@ _ACTIVE_PROCS = {}
 _PROC_LOCK = threading.Lock()
 
 def cancel_all(tag=None):
-    """Ngắt tiến trình Claude. tag=None → tất cả; có tag → chỉ ngắt nhóm khớp (vd nút Stop chỉ ngắt 'chat')."""
+    """Ngắt tiến trình Claude. tag=None → tất cả; có tag → ngắt nhóm khớp.
+    Khớp theo HỌ tag: 'chat' ngắt cả 'chat:abc' (tag đa phiên per-kết-nối/per-chat_id);
+    'chat:abc' chỉ ngắt đúng phiên đó. Tương tự 'telegram' vs 'telegram:<chat_id>'.
+    Ngắt CẢ hai engine: subprocess CLI (Popen) lẫn phiên Agent SDK đang chạy."""
     with _PROC_LOCK:
-        procs = [p for p, t in _ACTIVE_PROCS.items() if tag is None or t == tag]
+        procs = [p for p, t in _ACTIVE_PROCS.items()
+                 if tag is None or t == tag or str(t).startswith(str(tag) + ":")]
     for p in procs:
         try:
             if os.name == "nt":
@@ -35,7 +41,13 @@ def cancel_all(tag=None):
                 p.terminate()
         except Exception:
             pass
-    return len(procs)
+    n = len(procs)
+    try:
+        import claude_sdk_engine
+        n += claude_sdk_engine.cancel_all(tag)
+    except Exception:
+        pass
+    return n
 
 
 def _kill_tree(p):
@@ -328,205 +340,24 @@ def mcp_open_auth_terminal():
         return {"ok": False, "error": f"{type(e).__name__}: {e}"}
 
 
-class ClaudeCLI:
-    def __init__(self, system_prompt: Optional[str] = None, cwd: Optional[str] = None,
-                 tag: str = "chat", allowed_tools: Optional[list] = None, model: Optional[str] = None):
-        self.cli_path = find_claude_cli()
-        self.system_prompt = system_prompt
-        self.cwd = cwd or os.getcwd()
-        self.session_id: Optional[str] = None
-        self.tag = tag                      # nhóm để ngắt chọn lọc
-        self.allowed_tools = allowed_tools  # None = mọi tool; list = CHỈ các tool này (an toàn cho loop)
-        self.model = model                  # None = model mặc định của CLI; hoặc sonnet/opus/haiku
-        self.mcp_config: Optional[str] = None   # path file --mcp-config (MCP do Javis quản lý)
-        self.mcp_strict: bool = False           # True → --strict-mcp-config (bỏ qua MCP sẵn của máy)
-        self.disallowed_tools: Optional[list] = None  # pattern --disallowedTools (server chỉ-đọc)
-        self.max_wall_s: Optional[float] = None  # trần wall-clock (giây) cho fork nền; None = không cap
-                                                 # (khác idle watchdog: cap cả fork ĐANG chạy loop rác)
+_engine_env_warned = False
 
-    def is_available(self) -> bool:
-        return self.cli_path is not None
 
-    async def query(self, prompt: str) -> AsyncIterator[dict]:
-        if not self.cli_path:
-            yield {"type": "error", "content": "Không tìm thấy Claude Code CLI."}
-            return
-
-        args = [
-            self.cli_path,
-            "-p", prompt,
-            "--output-format", "stream-json",
-            "--verbose",
-            "--dangerously-skip-permissions",
-        ]
-        if self.model:
-            args.extend(["--model", self.model])
-        if self.allowed_tools:
-            # Giới hạn CHỈ các tool an toàn (vd Read,Write,Edit,Glob,Grep) → loop không gọi được MCP tiền/đơn
-            args.extend(["--allowedTools", ",".join(self.allowed_tools)])
-        if self.disallowed_tools:
-            args.extend(["--disallowedTools", ",".join(self.disallowed_tools)])
-        if self.mcp_config:
-            args.extend(["--mcp-config", self.mcp_config])
-            if self.mcp_strict:
-                args.append("--strict-mcp-config")
-        if self.system_prompt:
-            args.extend(["--append-system-prompt", self.system_prompt])
-        if self.session_id:
-            args.extend(["--resume", self.session_id])
-
-        loop = asyncio.get_running_loop()
-        queue: asyncio.Queue = asyncio.Queue()
-        SENTINEL = object()
-
-        def reader_thread():
-            """Chạy subprocess trong thread, đẩy từng dòng vào queue.
-            WATCHDOG idle-timeout: claude không in gì trong IDLE giây (treo / kẹt auth / flail trên
-            path không tồn tại) → giết cả cây tiến trình (claude + node con). Chống tích tụ tiến
-            trình treo làm đói tài nguyên → treo server. Chỉnh bằng JAVIS_CLAUDE_IDLE_TIMEOUT."""
-            proc = None
-            tinfo = {"timed_out": False}
-            last = {"t": time.time()}            # cập nhật mỗi dòng stdout → "còn sống"
-            IDLE = float(os.getenv("JAVIS_CLAUDE_IDLE_TIMEOUT", "180"))
-            try:
-                # CREATE_NO_WINDOW để không pop cửa sổ cmd trên Windows
-                creationflags = 0
-                if os.name == "nt":
-                    creationflags = subprocess.CREATE_NO_WINDOW
-
-                proc = subprocess.Popen(
-                    args,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    cwd=self.cwd,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
-                    bufsize=1,
-                    creationflags=creationflags,
-                    start_new_session=(os.name != "nt"),  # nhóm tiến trình riêng → killpg giết cả cây
-                )
-                with _PROC_LOCK:
-                    _ACTIVE_PROCS[proc] = self.tag
-
-                started = time.time()
-                def _watchdog(p):
-                    while p.poll() is None:
-                        if time.time() - last["t"] > IDLE:
-                            tinfo["timed_out"] = True
-                            _kill_tree(p)
-                            asyncio.run_coroutine_threadsafe(queue.put({"__error__":
-                                f"Claude không phản hồi {int(IDLE)}s - đã dừng để tránh treo server. "
-                                f"(tăng JAVIS_CLAUDE_IDLE_TIMEOUT nếu tác vụ thật sự dài)"}), loop)
-                            return
-                        if self.max_wall_s and time.time() - started > self.max_wall_s:
-                            tinfo["timed_out"] = True
-                            _kill_tree(p)
-                            asyncio.run_coroutine_threadsafe(queue.put({"__error__":
-                                f"Fork vượt trần {int(self.max_wall_s)}s - đã dừng (cap wall-clock nền)."}), loop)
-                            return
-                        time.sleep(5)
-                threading.Thread(target=_watchdog, args=(proc,), daemon=True).start()
-
-                # Đọc stderr riêng trong thread phụ
-                stderr_lines = []
-                def read_stderr():
-                    for line in proc.stderr:
-                        line = line.rstrip()
-                        if line:
-                            stderr_lines.append(line)
-                            print(f"[claude-cli stderr] {line}", file=sys.stderr)
-                stderr_thread = threading.Thread(target=read_stderr, daemon=True)
-                stderr_thread.start()
-
-                # Đọc stdout dòng-dòng, đẩy vào queue
-                for line in proc.stdout:
-                    last["t"] = time.time()
-                    line = line.strip()
-                    if line:
-                        asyncio.run_coroutine_threadsafe(queue.put(line), loop)
-
-                proc.wait()
-                stderr_thread.join(timeout=2)
-
-                if proc.returncode not in (0, None) and stderr_lines and not tinfo["timed_out"]:
-                    err_msg = "Claude CLI lỗi (exit " + str(proc.returncode) + "):\n" + "\n".join(stderr_lines[-5:])
-                    asyncio.run_coroutine_threadsafe(queue.put({"__error__": err_msg}), loop)
-
-            except Exception as e:
-                traceback.print_exc()
-                err_msg = f"Subprocess error: {type(e).__name__}: {e}"
-                asyncio.run_coroutine_threadsafe(queue.put({"__error__": err_msg}), loop)
-            finally:
-                try:
-                    if proc is not None:
-                        with _PROC_LOCK:
-                            _ACTIVE_PROCS.pop(proc, None)
-                except Exception:
-                    pass
-                asyncio.run_coroutine_threadsafe(queue.put(SENTINEL), loop)
-
-        thread = threading.Thread(target=reader_thread, daemon=True)
-        thread.start()
-
-        while True:
-            item = await queue.get()
-            if item is SENTINEL:
-                break
-            if isinstance(item, dict) and "__error__" in item:
-                yield {"type": "error", "content": item["__error__"]}
-                continue
-
-            try:
-                event = json.loads(item)
-            except json.JSONDecodeError:
-                continue
-
-            etype = event.get("type")
-
-            if etype == "system" and event.get("subtype") == "init":
-                self.session_id = event.get("session_id")
-                continue
-
-            if etype == "assistant":
-                msg = event.get("message", {})
-                for block in msg.get("content", []):
-                    btype = block.get("type")
-                    if btype == "text":
-                        text = block.get("text", "")
-                        if text.strip():
-                            yield {"type": "text", "content": text}
-                    elif btype == "tool_use":
-                        yield {
-                            "type": "tool_call",
-                            "name": block.get("name", ""),
-                            "input": block.get("input", {}),
-                        }
-                continue
-
-            if etype == "user":
-                msg = event.get("message", {})
-                for block in msg.get("content", []):
-                    if block.get("type") == "tool_result":
-                        content = block.get("content", "")
-                        if isinstance(content, list):
-                            content = " ".join(
-                                c.get("text", "") for c in content if isinstance(c, dict)
-                            )
-                        yield {"type": "tool_result", "content": str(content)[:500]}
-                continue
-
-            if etype == "result":
-                yield {
-                    "type": "final",
-                    "content": event.get("result", ""),
-                    "session_id": self.session_id,
-                    "cost_usd": event.get("total_cost_usd"),
-                    "duration_ms": event.get("duration_ms"),
-                }
-
-    def reset_session(self):
-        self.session_id = None
+def claude_engine(system_prompt=None, cwd=None, tag="chat", allowed_tools=None, model=None):
+    """FACTORY engine Claude - mọi call site tạo engine qua đây. Từ v0.9.37 engine Claude
+    CHỈ chạy qua claude-agent-sdk (claude_sdk_engine.ClaudeSDK); nhánh Popen ClaudeCLI cũ
+    đã gỡ sau khi bake ổn (nhật ký ở docs/dev/2026-07-ke-hoach-agent-sdk.md mục 8).
+    SDK chưa cài thì ClaudeSDK tự báo lỗi rõ trong .query() (hướng dẫn pip install).
+    Env JAVIS_CLAUDE_ENGINE=cli|sdk-loops chỉ còn giá trị lịch sử - bị bỏ qua kèm log 1 lần."""
+    global _engine_env_warned
+    mode = os.getenv("JAVIS_CLAUDE_ENGINE", "sdk").strip().lower()
+    if mode in ("cli", "sdk-loops") and not _engine_env_warned:
+        _engine_env_warned = True
+        print(f"[claude engine] JAVIS_CLAUDE_ENGINE={mode} đã gỡ từ v0.9.37 - engine Claude "
+              "luôn chạy Agent SDK. Gặp lỗi hãy báo issue kèm log.", file=sys.stderr)
+    from claude_sdk_engine import ClaudeSDK
+    return ClaudeSDK(system_prompt=system_prompt, cwd=cwd, tag=tag,
+                     allowed_tools=allowed_tools, model=model)
 
 
 # ============================================================
@@ -586,7 +417,11 @@ class CodexCLI:
             args += ["-p", self.profile]
         for c in (self.extra_config or []):
             args += ["-c", c]
-        args.append(prompt)
+        # Codex exec không nhận system-prompt riêng → gộp instructions (vai trò agent) vào đầu prompt.
+        # Prompt bơm qua STDIN (positional "-") thay vì argv - né trần command line 32767 ký tự
+        # của Windows (WinError 206 khi dán bài dài).
+        full_prompt = (self.instructions.strip() + "\n\n" + prompt) if self.instructions else prompt
+        args.append("-")
 
         loop = asyncio.get_running_loop()
         queue: asyncio.Queue = asyncio.Queue()
@@ -597,23 +432,41 @@ class CodexCLI:
             tinfo = {"timed_out": False}
             last = {"t": time.time()}
             IDLE = float(os.getenv("JAVIS_CLAUDE_IDLE_TIMEOUT", "180"))
+            # Trần RIÊNG khi codex đang chạy TOOL/lệnh (im lặng lúc đó là bình thường -
+            # render video, build... có thể rất lâu). Cùng logic với engine Claude SDK.
+            TOOL_IDLE = float(os.getenv("JAVIS_CLAUDE_TOOL_TIMEOUT", "3600"))
+            busy = {"n": 0}   # số item tool/lệnh đã started mà chưa completed
+            _TOOL_ITEMS = ("command_execution", "mcp_tool_call", "function_call",
+                           "tool_call", "local_shell_call", "web_search_call")
             try:
                 creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
                 proc = subprocess.Popen(
-                    args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                    args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                     cwd=self.cwd, text=True, encoding="utf-8", errors="replace", bufsize=1,
                     creationflags=creationflags, start_new_session=(os.name != "nt"),
                 )
                 with _PROC_LOCK:
                     _ACTIVE_PROCS[proc] = self.tag
 
+                def _feed_stdin():
+                    try:
+                        proc.stdin.write(full_prompt)
+                        proc.stdin.close()
+                    except Exception:
+                        pass
+                threading.Thread(target=_feed_stdin, daemon=True).start()
+
                 def _watchdog(p):
                     while p.poll() is None:
-                        if time.time() - last["t"] > IDLE:
+                        limit = TOOL_IDLE if busy["n"] > 0 else IDLE
+                        if time.time() - last["t"] > limit:
                             tinfo["timed_out"] = True
                             _kill_tree(p)
-                            asyncio.run_coroutine_threadsafe(queue.put({"__error__":
-                                f"Codex không phản hồi {int(IDLE)}s - đã dừng để tránh treo server."}), loop)
+                            err = (f"Tool chạy quá {int(TOOL_IDLE)}s chưa xong - đã dừng để tránh treo server. "
+                                   f"(tăng JAVIS_CLAUDE_TOOL_TIMEOUT nếu tác vụ thật sự dài hơn)"
+                                   if busy["n"] > 0 else
+                                   f"Codex không phản hồi {int(IDLE)}s - đã dừng để tránh treo server.")
+                            asyncio.run_coroutine_threadsafe(queue.put({"__error__": err}), loop)
                             return
                         time.sleep(5)
                 threading.Thread(target=_watchdog, args=(proc,), daemon=True).start()
@@ -631,6 +484,11 @@ class CodexCLI:
                     last["t"] = time.time()
                     line = line.strip()
                     if line:
+                        # Theo dõi tool/lệnh đang chạy dở để watchdog nới trần đúng lúc
+                        if '"item.started"' in line and any(t in line for t in _TOOL_ITEMS):
+                            busy["n"] += 1
+                        elif '"item.completed"' in line and any(t in line for t in _TOOL_ITEMS):
+                            busy["n"] = max(0, busy["n"] - 1)
                         asyncio.run_coroutine_threadsafe(queue.put(line), loop)
                 proc.wait()
                 st.join(timeout=2)
@@ -677,7 +535,10 @@ class CodexCLI:
                     name = it.get("name") or it.get("server") or it.get("command") or itype
                     yield {"type": "tool_call", "name": str(name)[:80]}
             elif t == "turn.completed":
-                yield {"type": "final", "content": final_text, "session_id": None}
+                u = ev.get("usage") or {}
+                yield {"type": "final", "content": final_text, "session_id": None,
+                       "tokens_in": (u.get("input_tokens") or 0) + (u.get("cached_input_tokens") or 0),
+                       "tokens_out": u.get("output_tokens") or 0}
             elif t in ("error", "turn.failed", "thread.error", "stream.error"):
                 msg = ev.get("message") or (ev.get("error") or {}).get("message") or json.dumps(ev)[:200]
                 yield {"type": "error", "content": "Codex: " + str(msg)}

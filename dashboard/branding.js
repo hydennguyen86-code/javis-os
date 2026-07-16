@@ -12,7 +12,7 @@
     el.style.color = isErr ? "#ff8a8a" : "";
   }
 
-  function esc(s) { return (s || "").toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+  function esc(s) { return (s || "").toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;"); }
 
   function _injectDomCss() {
     if (document.getElementById("domCss")) return;

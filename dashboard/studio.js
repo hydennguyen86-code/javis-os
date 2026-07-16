@@ -5,7 +5,7 @@
   const studio = document.getElementById("studio");
   const editor = document.getElementById("studioEditor");
   const brain = () => (window.currentBrainPath ? currentBrainPath() : "brain");
-  const esc = (s) => (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const esc = (s) => (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   const api = async (p, o) => {
     // Timeout 12s → loader hiện trạng thái rỗng thay vì kẹt "Đang tải..." mãi nếu server chậm/treo.
     const ctrl = new AbortController();
@@ -15,6 +15,29 @@
     finally { clearTimeout(t); }
   };
   const fd = (obj) => { const f = new FormData(); Object.entries(obj).forEach(([k, v]) => f.append(k, v)); return f; };
+
+  // ===== Xuất / Nhập năng lực (chia sẻ agent/skill/workflow qua file .zip) =====
+  const exportUrl = (kind, slug) => `/export?kind=${kind}&slug=${encodeURIComponent(slug)}&brain=${encodeURIComponent(brain())}&deps=1`;
+  function exportItem(kind, slug) { window.open(exportUrl(kind, slug), "_blank"); }
+  function importItems(reload) {
+    const inp = document.createElement("input");
+    inp.type = "file"; inp.accept = ".zip,.md,.skill,application/zip";
+    inp.onchange = async () => {
+      if (!inp.files || !inp.files.length) return;
+      const ow = confirm("Nếu đã có agent/skill/workflow TRÙNG TÊN thì GHI ĐÈ bằng bản mới?\n\nOK = ghi đè · Huỷ = giữ bản cũ (chỉ nhập cái chưa có).");
+      const f = new FormData();
+      f.append("file", inp.files[0]); f.append("brain", brain()); f.append("overwrite", ow ? "1" : "0");
+      let r;
+      try { r = await (await fetch("/import", { method: "POST", body: f })).json(); }
+      catch (e) { alert("Lỗi tải lên: " + e.message); return; }
+      if (r && r.error) { alert("Nhập thất bại: " + r.error); return; }
+      const show = (a) => (a && a.length) ? a.join(", ") : "(không)";
+      alert(`Nhập xong.\n• Đã nhập: ${show(r.imported)}\n• Bỏ qua (đã có): ${show(r.skipped)}`
+        + ((r.errors && r.errors.length) ? `\n• Lỗi: ${r.errors.join("; ")}` : ""));
+      if (reload) reload();
+    };
+    inp.click();
+  }
 
   // Studio đã tách thành các trang sidebar riêng. openStudio = điều hướng rail (giữ tương thích
   // cho nút header & dải số liệu .bstat ở đáy graph). Console gọi loader qua window.JavisStudio.
@@ -51,8 +74,9 @@
 
   async function loadWorkflows() {
     const panel = document.getElementById("panel-workflows");
-    panel.innerHTML = `<div class="panel-bar"><h3>Workflows</h3><div class="pb-actions"><button class="s-btn-ghost" id="seedBtn">Tạo mẫu</button><button class="s-btn" id="newWf">+ Workflow</button></div></div><div class="cards" id="wfCards">Đang tải...</div>`;
+    panel.innerHTML = `<div class="panel-bar"><h3>Workflows</h3><div class="pb-actions"><button class="s-btn-ghost" id="wfImport">⤒ Nhập</button><button class="s-btn-ghost" id="seedBtn">Tạo mẫu</button><button class="s-btn" id="newWf">+ Workflow</button></div></div><div class="cards" id="wfCards">Đang tải...</div>`;
     document.getElementById("newWf").onclick = () => editWorkflow(null);
+    document.getElementById("wfImport").onclick = () => importItems(loadWorkflows);
     document.getElementById("seedBtn").onclick = async () => { await api("/studio/seed", { method: "POST", body: fd({ brain: brain() }) }); loadWorkflows(); };
     const d = await api(`/workflows?brain=${encodeURIComponent(brain())}`);
     const wfs = d.workflows || [];
@@ -76,8 +100,10 @@
           <button class="s-btn run" ${active ? "" : "disabled"}>▶ Chạy</button>
           <button class="s-btn-ghost edit">Sửa</button>
           <button class="s-btn-ghost archive">${active ? "Lưu trữ" : "Kích hoạt"}</button>
+          <button class="s-btn-ghost exp" title="Xuất gói .zip (kèm agent + skill phụ thuộc) để chia sẻ">⤓ Xuất</button>
           <button class="s-btn-ghost del">Xoá</button>
         </div>`;
+      div.querySelector(".exp").onclick = () => exportItem("workflow", w.slug);
       div.querySelector(".archive").onclick = async () => { await api("/workflows/toggle", { method: "POST", body: fd({ slug: w.slug, brain: brain() }) }); loadWorkflows(); };
       div.querySelector(".run").onclick = () => runWorkflow(w, div);
       div.querySelector(".edit").onclick = () => editWorkflow(w);
@@ -229,8 +255,9 @@
   // ===== Agents =====
   async function loadAgents() {
     const panel = document.getElementById("panel-agents");
-    panel.innerHTML = `<div class="panel-bar"><h3>Agents</h3><button class="s-btn" id="newAgent">+ Agent</button></div><div class="cards" id="agCards">Đang tải...</div>`;
+    panel.innerHTML = `<div class="panel-bar"><h3>Agents</h3><div class="pb-actions"><button class="s-btn-ghost" id="agImport">⤒ Nhập</button><button class="s-btn" id="newAgent">+ Agent</button></div></div><div class="cards" id="agCards">Đang tải...</div>`;
     document.getElementById("newAgent").onclick = () => editAgent(null);
+    document.getElementById("agImport").onclick = () => importItems(loadAgents);
     const d = await api(`/agents?brain=${encodeURIComponent(brain())}`);
     refreshStats();
     const cards = document.getElementById("agCards");
@@ -238,7 +265,8 @@
     cards.innerHTML = "";
     d.agents.forEach(a => {
       const div = document.createElement("div"); div.className = "ag-card";
-      div.innerHTML = `<div class="ag-name">🤖 ${esc(a.name)} <span class="ag-model">${esc(a.model || "")}</span></div><div class="ag-role">${esc(a.role)}</div><div class="ag-skills">${(a.skills || []).map(s => `<span class="chip-skill">${esc(s)}</span>`).join("") || '<span class="dim">chưa gán skill</span>'}</div><div class="wf-actions"><button class="s-btn-ghost edit">Sửa</button><button class="s-btn-ghost del">Xoá</button></div>`;
+      div.innerHTML = `<div class="ag-name">🤖 ${esc(a.name)} <span class="ag-model">${esc(a.model || "")}</span></div><div class="ag-role">${esc(a.role)}</div><div class="ag-skills">${(a.skills || []).map(s => `<span class="chip-skill">${esc(s)}</span>`).join("") || '<span class="dim">chưa gán skill</span>'}</div><div class="wf-actions"><button class="s-btn-ghost edit">Sửa</button><button class="s-btn-ghost exp" title="Xuất gói .zip (kèm skill) để chia sẻ">⤓ Xuất</button><button class="s-btn-ghost del">Xoá</button></div>`;
+      div.querySelector(".exp").onclick = () => exportItem("agent", a.slug);
       div.querySelector(".edit").onclick = () => editAgent(a);
       div.querySelector(".del").onclick = async () => { if (confirm(`Xoá agent "${a.name}"?`)) { await api("/agents/delete", { method: "POST", body: fd({ slug: a.slug, brain: brain() }) }); loadAgents(); } };
       cards.appendChild(div);
@@ -253,8 +281,13 @@
       <label>Tên</label><input id="agName" value="${esc(a ? a.name : "")}">
       <label>Vai trò (mô tả ngắn)</label><input id="agRole" value="${esc(a ? a.role : "")}">
       <label>System prompt (cách làm việc chi tiết)</label><textarea id="agPrompt" rows="4">${esc(a ? (a.prompt || "") : "")}</textarea>
-      <label>Skills</label><div class="skill-pick" id="skillPick">${skills.length ? skills.map(s => `<label class="sp"><input type="checkbox" value="${esc(s.slug)}" ${a && (a.skills || []).includes(s.slug) ? "checked" : ""}> ${esc(s.name)}</label>`).join("") : '<span class="dim">Vault chưa có skill trong .claude/skills - vẫn tạo agent được, gán skill sau.</span>'}</div>
-      <label>Model</label><select id="agModel"><option value="">Mặc định (theo CLI)</option><option value="sonnet">Sonnet</option><option value="opus">Opus</option><option value="haiku">Haiku</option><option value="fable">Fable</option></select>
+      <label>Skills</label><div class="skill-pick" id="skillPick">${skills.length ? skills.map(s => `<label class="sp"><input type="checkbox" value="${esc(s.slug)}" ${a && (a.skills || []).includes(s.slug) ? "checked" : ""}> ${esc(s.name)}</label>`).join("") : '<span class="dim">Vault chưa có skill trong skills/ - vẫn tạo agent được, gán skill sau.</span>'}</div>
+      <label>Model</label><select id="agModel">
+        <option value="">Mặc định (theo CLI)</option>
+        <optgroup label="Claude (Claude Code)"><option value="sonnet">Sonnet</option><option value="opus">Opus</option><option value="haiku">Haiku</option><option value="fable">Fable</option></optgroup>
+        <optgroup label="ChatGPT (Codex - cần đăng nhập ChatGPT)"><option value="gpt-5.5">GPT-5.5</option><option value="gpt-5.4">GPT-5.4</option><option value="gpt-5.3-codex">GPT-5.3 Codex</option></optgroup>
+      </select>
+      <div class="dim" style="font-size:12px;margin-top:4px">Agent chạy qua CLI của nhà cung cấp: chọn Claude → Claude Code; chọn ChatGPT → Codex (cần đã đăng nhập ChatGPT ở máy/VPS). Cả hai đều đọc/ghi file vault + dùng MCP.</div>
       <div class="editor-actions"><button class="s-btn-ghost" id="cancelEd">Huỷ</button><button class="s-btn" id="saveAg">Lưu</button></div>`;
     if (a && a.model) box.querySelector("#agModel").value = a.model;
     box.querySelector("#cancelEd").onclick = () => editor.classList.remove("open");
@@ -294,17 +327,21 @@
     cards.innerHTML = "";
     all.forEach(a => {
       const active = a.status === "active";
-      const typeLabel = a.type === "trigger" ? "Trigger" : a.type === "routine" ? "Routine" : "Cron";
+      const isRem = a.type === "reminder" || a.type === "script";
+      const typeLabel = a.type === "script" ? "Script (không AI)" : a.type === "reminder" ? "Nhắc hẹn" : a.type === "trigger" ? "Trigger" : a.type === "routine" ? "Routine" : "Cron";
+      const prefix = a.type === "script" ? "🖥 " : isRem ? "⏰ " : a.builtin ? "🔁 " : (a.source === "cloud" ? "☁ " : "");
       const div = document.createElement("div");
       div.className = "wf-card" + (active ? "" : " off");
       div.innerHTML = `
         <div class="wf-top">
-          <div class="wf-name">${a.builtin ? "🔁 " : (a.source === "cloud" ? "☁ " : "")}${esc(a.name)} <span class="wf-status ${active ? "on" : "off"}">${active ? "ĐANG CHẠY" : "TẮT"}</span></div>
+          <div class="wf-name">${prefix}${esc(a.name)} <span class="wf-status ${active ? "on" : "off"}">${active ? "ĐANG CHẠY" : "TẮT"}</span></div>
           <label class="toggle"><input type="checkbox" ${active ? "checked" : ""}><span></span></label>
         </div>
         <div class="wf-desc">⏰ ${esc(a.schedule || "-")} · <span class="dim">${typeLabel}</span></div>
         ${a.note ? `<div class="wf-steps">${esc(a.note)}</div>` : ""}
-        <div class="wf-actions">${a.builtin
+        <div class="wf-actions">${isRem
+          ? `<span class="dim" style="font-size:13px">${a.type === "script" ? "Job script" : "Nhắc hẹn"} - gạt công tắc để huỷ</span>`
+          : a.builtin
           ? `<span class="dim" style="font-size:13px">Loop - cấu hình/xoá ở trang Tự cải thiện</span>`
           : `<button class="s-btn-ghost edit">Sửa</button><button class="s-btn-ghost del">Xoá</button>`}</div>`;
       div.querySelector(".toggle input").onchange = async () => {
@@ -366,7 +403,8 @@
     .sk2-info .gp{color:#6b7894;font-size:13px;margin-top:4px}
     .sk2-act{display:flex;gap:5px;opacity:0;transition:.15s;flex:none} .sk2-card:hover .sk2-act{opacity:1}
     .sk2-act button{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);color:#aebbd6;border-radius:6px;cursor:pointer;font-size:13px;padding:3px 9px} .sk2-act button:hover{color:#fff;border-color:rgba(120,180,255,.5)}
-    .sk2-act button.danger:hover{color:#ff9a9a;border-color:rgba(255,120,120,.5)}`;
+    .sk2-act button.danger:hover{color:#ff9a9a;border-color:rgba(255,120,120,.5)}
+    .sysb{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.02em;color:#8fd0ff;background:rgba(90,170,255,.12);border:1px solid rgba(90,170,255,.35);vertical-align:2px}`;
     const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
   }
 
@@ -397,8 +435,8 @@
     const cats = ["ALL"].concat(Object.keys(groups).sort());
     const catHtml = cats.map(c => `<div class="cat ${_skState.cat === c ? "sel" : ""}" data-cat="${esc(c)}"><span>${c === "ALL" ? "Tất cả" : esc(c)}</span><span class="n">${c === "ALL" ? all.length : groups[c]}</span></div>`).join("");
     panel.innerHTML = `
-      <div class="panel-bar"><h3>Skills <span class="dim">${enabledN}/${all.length} bật · nguồn <code>.claude/skills</code></span></h3>
-        <button class="s-btn" id="skNew">+ Skill</button></div>
+      <div class="panel-bar"><h3>Skills <span class="dim">${enabledN}/${all.length} bật · nguồn <code>skills/</code></span></h3>
+        <div class="pb-actions"><button class="s-btn-ghost" id="skImport">⤒ Nhập</button><button class="s-btn" id="skNew">+ Skill</button></div></div>
       ${all.length ? `<div class="sk2">
         <div class="sk2-side"><div class="sec">Nhóm</div>${catHtml}</div>
         <div class="sk2-main">
@@ -406,8 +444,9 @@
             <input id="skSearch" placeholder="Tìm skill…" value="${esc(_skState.q)}"></div>
           <div class="sk2-list" id="skList"></div>
         </div></div>`
-      : `<div class="empty">Brain chưa có skill. Bấm <b>+ Skill</b> để tạo (tự lưu vào <code>.claude/skills</code> + xếp nhóm).</div>`}`;
+      : `<div class="empty">Brain chưa có skill. Bấm <b>+ Skill</b> để tạo (tự lưu vào <code>skills/</code> + xếp nhóm).</div>`}`;
     document.getElementById("skNew").onclick = () => openSkillForm(null);
+    document.getElementById("skImport").onclick = () => importItems(loadSkills);
     if (!all.length) return;
     panel.querySelectorAll(".sk2-side .cat").forEach(c => c.onclick = () => { _skState.cat = c.dataset.cat; renderSkillUI(); });
     const search = document.getElementById("skSearch");
@@ -424,12 +463,16 @@
     list.forEach(s => {
       const on = s.enabled !== false;
       const div = document.createElement("div"); div.className = "sk2-card" + (on ? "" : " off");
+      const sysBadge = s.system ? ` <span class="sysb" title="Skill hệ thống Javis OS - có ở mọi brain, tự cập nhật theo phiên bản app. Sửa nội dung thì giữ bản của bạn (ngừng tự cập nhật). Không xoá được - chỉ tắt.">hệ thống</span>` : "";
       div.innerHTML = `<input type="checkbox" class="sk2-tog" ${on ? "checked" : ""} title="${on ? "Đang bật - bấm để tắt" : "Đang tắt - bấm để bật"}">
-        <div class="sk2-info"><div class="nm">🧩 ${esc(s.name)}</div><div class="ds">${esc(s.description || "")}</div><div class="gp">📂 ${esc(s.group || "Chung")} · ${esc(s.slug)}${s.source === ".agents" ? " · .agents" : ""}</div></div>
-        <div class="sk2-act"><button class="edit">Sửa</button><button class="del danger">Xoá</button></div>`;
+        <div class="sk2-info"><div class="nm">🧩 ${esc(s.name)}${sysBadge}</div><div class="ds">${esc(s.description || "")}</div><div class="gp">📂 ${esc(s.group || "Chung")} · ${esc(s.slug)}${s.source === ".agents" ? " · .agents" : ""}</div></div>
+        <div class="sk2-act"><button class="edit">Sửa</button>${s.system ? "" : `<button class="exp" title="Xuất gói .zip để chia sẻ">⤓ Xuất</button><button class="del danger">Xoá</button>`}</div>`;
       div.querySelector(".sk2-tog").onchange = (e) => toggleSkill(s, e.target.checked);
       div.querySelector(".edit").onclick = () => openSkillForm(s.slug);
-      div.querySelector(".del").onclick = () => deleteSkill(s.slug, s.name);
+      const expBtn = div.querySelector(".exp");
+      if (expBtn) expBtn.onclick = () => exportItem("skill", s.slug);
+      const delBtn = div.querySelector(".del");
+      if (delBtn) delBtn.onclick = () => deleteSkill(s.slug, s.name);
       box.appendChild(div);
     });
   }
@@ -469,7 +512,7 @@
   }
 
   async function deleteSkill(slug, name) {
-    if (!confirm(`Xoá skill "${name}"? Sẽ xoá cả thư mục .claude/skills/${slug}.`)) return;
+    if (!confirm(`Xoá skill "${name}"? Sẽ xoá cả thư mục skills/${slug}.`)) return;
     await api("/skills/delete", { method: "POST", body: fd({ slug, brain: brain() }) });
     loadSkills();
   }

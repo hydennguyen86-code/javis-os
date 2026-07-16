@@ -17,7 +17,7 @@ FROM python:3.12-slim
 # OCI image labels: Docker Manager (Hostinger) + registry đọc để hiện cột "Guide"
 # (Documentation / Quick start / Source). Trỏ về docs trên GitHub.
 LABEL org.opencontainers.image.title="Javis OS" \
-      org.opencontainers.image.description="AI operating layer: chat + voice + second brain + tự động hoá, chạy trên Claude Code CLI." \
+      org.opencontainers.image.description="AI operating layer: chat + voice + second brain + tự động hoá, xây trên CLI của nhà cung cấp AI (Claude Code, ChatGPT/Codex)." \
       org.opencontainers.image.url="https://github.com/blogminhquy/javis-os" \
       org.opencontainers.image.source="https://github.com/blogminhquy/javis-os" \
       org.opencontainers.image.documentation="https://github.com/blogminhquy/javis-os/blob/main/docs/README.md" \

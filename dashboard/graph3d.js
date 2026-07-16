@@ -12,9 +12,9 @@ function glowTexture(THREE, hex) {
   cv.width = cv.height = s;
   const ctx = cv.getContext("2d");
   const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
-  g.addColorStop(0, "rgba(255,255,255,1)");      // lõi trắng nóng
-  g.addColorStop(0.18, hexA(hex, 0.95));
-  g.addColorStop(0.45, hexA(hex, 0.45));
+  g.addColorStop(0, "rgba(255,255,255,0.7)");    // lõi trắng DỊU (bớt gắt để đa màu không cộng dồn thành trắng)
+  g.addColorStop(0.12, hexA(hex, 0.9));          // màu danh mục ra sớm → giữ đúng hue thay vì cháy trắng
+  g.addColorStop(0.42, hexA(hex, 0.4));
   g.addColorStop(1, hexA(hex, 0));               // viền tan vào nền
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, s, s);
@@ -51,6 +51,17 @@ function hexA(hex, a) {
   return `rgba(${r},${g},${b},${a})`;
 }
 
+// Lực hút về tâm 3D (x,y,z) → cả tinh vân co tròn lại, node lẻ/cụm xa bị kéo vào gần.
+function centerGravity3D(strength) {
+  let _nodes = [];
+  const force = (alpha) => {
+    const k = strength * alpha;
+    for (let i = 0; i < _nodes.length; i++) { const n = _nodes[i]; n.vx -= n.x * k; n.vy -= n.y * k; n.vz -= (n.z || 0) * k; }
+  };
+  force.initialize = (ns) => { _nodes = ns; };
+  return force;
+}
+
 class JavisGraph3D {
   constructor(container, tooltip) {
     this.container = container;
@@ -72,6 +83,7 @@ class JavisGraph3D {
   async load(query = "source=all") {
     const res = await fetch(`/graph?${query}`);
     const data = await res.json();
+    if (window.JavisCatColorize) window.JavisCatColorize(data.nodes);   // tô màu theo danh mục như 2D
     const links = data.edges.map(e => ({ source: e.source, target: e.target }));
     const THREE = window.THREE;
 
@@ -121,10 +133,11 @@ class JavisGraph3D {
           if (window.onGraphNodeClick) window.onGraphNodeClick(n);
         });
 
-      // Layout cầu chặt: lực đẩy vừa, link ngắn
+      // Layout cầu chặt: lực đẩy vừa, link ngắn, + hút về tâm cho co TRÒN lại (kéo cụm/node xa vào)
       this.graph.d3Force("charge").strength(-45);
       const linkForce = this.graph.d3Force("link");
       if (linkForce) linkForce.distance(28);
+      this.graph.d3Force("gravity", centerGravity3D(0.06));
 
       const controls = this.graph.controls();
       controls.autoRotate = true;
@@ -289,7 +302,9 @@ class JavisGraph3D {
 
       // Pulse từng sprite: phồng + sáng theo nhịp giọng
       const pulse = 1 + lvl * 1.6;
-      const op = Math.min(1, 0.85 + lvl * 0.6);
+      // Nền để DỊU (0.5) - vừa hết chói (đa màu cộng dồn không còn cháy trắng),
+      // vừa cho node "suy nghĩ" loé lên nổi bật trở lại (tương phản với nền tối).
+      const op = Math.min(1, 0.5 + lvl * 0.6);
       for (const sp of this._sprites) {
         if (!sp) continue;
         const b = sp.__base;
@@ -339,8 +354,8 @@ class JavisGraph3D {
       if (this._thinking) {
         const n = this._sprites.length;
         // Điểm khởi phát: 1-2 node "loé" lên thưa thớt (ý nghĩ mới) - chậm cho đỡ rối
-        if (n > 0 && this._frame % 22 === 0) {
-          const seeds = Math.max(1, Math.floor(n * 0.012));
+        if (n > 0 && this._frame % 14 === 0) {
+          const seeds = Math.max(2, Math.floor(n * 0.02));
           for (let i = 0; i < seeds; i++) {
             this._firingNodes.set(Math.floor(Math.random() * n), 14);
           }

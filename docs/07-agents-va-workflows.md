@@ -4,7 +4,8 @@
 
 ## Tính năng này là gì
 
-- **Agent** là một "nhân viên AI" có vai trò cố định. Mỗi agent gồm: một cái tên, một mô tả vai trò, một hướng dẫn làm việc chi tiết (system prompt), danh sách kỹ năng (skill) được phép dùng, và một model chạy (Sonnet, Opus hoặc Haiku).
+- **Agent** là một "nhân viên AI" có vai trò cố định. Mỗi agent gồm: một cái tên, một mô tả vai trò, một hướng dẫn làm việc chi tiết (system prompt), danh sách kỹ năng (skill) được phép dùng, và một **model chạy**. Model chọn được cả **Claude** (Sonnet/Opus/Haiku/Fable - chạy qua Claude Code CLI) lẫn **ChatGPT/Codex** (GPT-5.x - chạy qua Codex CLI, cần đã đăng nhập ChatGPT ở máy/VPS). Cả hai đều đọc/ghi được file trong vault và dùng được MCP. Để trống = model mặc định của Claude Code. Model của agent được áp THẬT khi workflow chạy.
+  - Lưu ý an toàn: khi workflow chạy **nền tự động** (dispatcher Kanban, chế độ file-only), agent luôn dùng Claude Code để giữ giới hạn công cụ an toàn - kể cả khi bạn chọn model Codex. Model Codex chỉ áp khi bạn chạy workflow trực tiếp ở Studio.
 - **Workflow** là một chuỗi nhiều bước, mỗi bước giao cho một agent làm một nhiệm vụ. Kết quả bước trước có thể chảy sang bước sau. Bạn có thể gắn thêm một **bước kiểm chứng**: một agent khác đóng vai người soi lỗi, mặc định giả định kết quả đang sai và phải tự chứng minh; nếu chưa đạt, workflow tự sửa lại vài lần.
 - Mọi agent và workflow được lưu thành **file .md trong vault** (bộ não đang chọn), nên bạn xem được, sửa tay được, và Javis cũng tạo được bằng lời qua chat.
 
@@ -50,7 +51,7 @@ Sau khi có mẫu, bạn có thể chạy thử ngay (xem mục "Chạy một wo
 4. Bấm **Lưu**. Nếu bạn quên nhập Tên, Javis sẽ nhắc "Nhập tên".
 5. Thẻ agent mới hiện trong danh sách, có biểu tượng 🤖, kèm tên model và các nhãn skill đã gán. Nếu chưa gán skill nào, thẻ ghi "chưa gán skill".
 
-Ghi chú về ô Skills: danh sách skill lấy từ thư mục skill của vault. Nếu vault chưa có skill nào, khung sẽ báo "Vault chưa có skill trong .claude/skills - vẫn tạo agent được, gán skill sau." Bạn vẫn tạo agent bình thường và quay lại gán sau. Cách tạo skill xem trang [Skills](06-skills.md).
+Ghi chú về ô Skills: danh sách skill lấy từ thư mục skill của vault. Nếu vault chưa có skill nào, khung sẽ báo "Vault chưa có skill trong skills/ - vẫn tạo agent được, gán skill sau." Bạn vẫn tạo agent bình thường và quay lại gán sau. Cách tạo skill xem trang [Skills](06-skills.md).
 
 ### Sửa hoặc xoá agent
 
@@ -143,6 +144,14 @@ Sửa file rồi lưu thì trang Studio tự nhận nội dung mới ở lần t
 - **Đặt số lần sửa vừa phải.** 1 đến 2 lần thường đủ. Đặt quá cao khiến workflow chạy lâu và tốn khi kết quả khó đạt.
 - **Chọn model theo việc.** Bước nặng suy luận (phân tích, kiểm chứng) dùng Opus; bước đơn giản, số lượng nhiều dùng Haiku cho nhanh và tiết kiệm. Chi tiết ở [Models & engine](10-models-va-engine.md).
 - **Gán skill đúng chỗ.** Agent chỉ mạnh khi có skill phù hợp. Ví dụ agent viết sales page nên gán skill viết sales page. Quản lý skill ở [Skills](06-skills.md).
+
+## Chia sẻ: Xuất / Nhập (agent, skill, workflow)
+
+Bạn có thể đóng gói một agent, skill hoặc workflow thành **một file `.zip`** để gửi cho người khác, và nhận file của người khác về brain của mình.
+
+- **Xuất:** mỗi thẻ agent / skill / workflow có nút **⤓ Xuất**. Bấm là tải về một gói `.zip`. Gói này **tự kèm phụ thuộc** để bên nhận chạy được ngay: xuất một workflow sẽ kèm luôn các agent mà workflow đó dùng và các skill của những agent đó; xuất một agent sẽ kèm skill của agent. Skill **hệ thống** (javis-builder, ingest, query, lint...) không được đóng gói vì brain nào cũng đã có sẵn.
+- **Nhập:** mỗi trang **Agents / Skills / Workflows** có nút **⤒ Nhập**. Chọn file `.zip` (gói Javis), file `.md` lẻ (agent/workflow), hoặc **gói skill `.skill` của Claude** (Javis tự nhận diện `SKILL.md` trong gói và đưa vào đúng thư mục skill) để đưa vào brain đang chọn. Javis hỏi có **ghi đè** khi trùng tên không: bấm Huỷ để giữ nguyên cái đã có (chỉ nhập cái mới), bấm OK để ghi đè bằng bản trong gói. Sau khi nhập, Javis báo đã nhập gì, bỏ qua gì.
+- **An toàn:** khi nhập, Javis chặn các đường dẫn bất thường trong gói (không cho ghi ra ngoài các thư mục agent/skill/workflow) và giới hạn dung lượng để tránh file độc. Dù vậy, chỉ nên nhập gói từ nguồn bạn tin tưởng, vì nội dung skill là hướng dẫn cho AI làm theo.
 
 ## Sự cố thường gặp
 

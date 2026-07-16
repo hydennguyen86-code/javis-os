@@ -33,28 +33,28 @@ Mỗi cuộc trò chuyện lưu kèm: tên (title), bộ não, engine đang dùn
 
 ## Mở ở đâu trong Javis
 
-Nút mở panel nằm cố định ở góc trên bên phải màn hình, ngoài thanh nav trái.
+Lịch sử giờ nằm ở **cột trái của chat phóng to** (chat workspace), giống bố cục Claude/Cowork:
 
-1. Nhìn góc trên cùng bên phải dashboard, tìm nút bo tròn có biểu tượng đồng hồ và chữ **Lịch sử** (`🕘 Lịch sử`).
-2. Bấm vào nút đó. Một bảng trượt ra từ cạnh phải màn hình, tiêu đề **Lịch sử hội thoại**.
-3. Phía trên bảng có ô tìm kiếm và nút **+ Mới**; phía dưới là danh sách các cuộc trò chuyện.
+1. Bấm nút **🕘 Lịch sử** ở góc trên bên phải màn hình (hoặc bấm nút **⛶** trên khung Hội thoại để phóng to chat, rồi bấm **🕘 Lịch sử** ở góc trái thanh tiêu đề).
+2. Khung chat mở rộng gần hết màn hình; cột bên trái là **sidebar Lịch sử** gồm: nút **＋ Hội thoại mới** trên cùng, ô tìm kiếm, và danh sách các cuộc trò chuyện nhóm theo thời gian (**Hôm nay / Hôm qua / 7 ngày qua / Cũ hơn**).
+3. Cuộc đang mở được tô sáng trong danh sách để bạn biết mình đang ở đâu.
 
-Để đóng bảng: bấm dấu **✕** ở góc trên bên phải của bảng, bấm vào vùng tối bên ngoài bảng, hoặc nhấn phím **Esc**.
+Ẩn/hiện sidebar: bấm nút **🕘 Lịch sử** trên thanh tiêu đề của khung chat (trạng thái được nhớ cho lần sau). Trên màn hình hẹp (dưới ~900px), sidebar tự ẩn và mở dạng ngăn kéo nổi; nhấn **Esc** đóng ngăn kéo trước, nhấn lần nữa mới thu nhỏ chat.
 
 ## Cách dùng (từng bước)
 
 ### Xem lại danh sách cuộc trò chuyện
 
-1. Bấm nút **🕘 Lịch sử** để mở bảng.
-2. Danh sách hiện các cuộc thuộc bộ não đang chọn, cuộc cập nhật gần nhất nằm trên cùng, tối đa 60 cuộc.
-3. Mỗi dòng cho biết: tên cuộc trò chuyện, engine đã dùng, số tin nhắn (ví dụ `12 tin`) và thời điểm cập nhật gần nhất.
-4. Nếu chưa có cuộc nào, bảng hiện dòng "Chưa có hội thoại nào được lưu."
+1. Mở chat phóng to (nút **⛶** hoặc **🕘 Lịch sử**).
+2. Danh sách bên trái hiện các cuộc thuộc bộ não đang chọn, nhóm theo thời gian, cuộc cập nhật gần nhất nằm trên cùng (tối đa 100 cuộc).
+3. Mỗi dòng cho biết: tên cuộc trò chuyện, giờ (hoặc ngày), engine đã dùng và số tin nhắn (ví dụ `12 tin`).
+4. Nếu chưa có cuộc nào, sidebar hiện dòng "Chưa có hội thoại nào."
 
 Cuộc chưa được đặt tên sẽ hiện tạm câu hỏi đầu tiên của bạn làm tên. Javis cũng tự đặt tên rút gọn từ câu hỏi đầu (khoảng 48 ký tự) ngay sau lượt trả lời đầu tiên.
 
 ### Tìm kiếm toàn văn
 
-1. Mở bảng **Lịch sử hội thoại**.
+1. Mở sidebar Lịch sử (trong chat phóng to).
 2. Bấm vào ô có chữ mờ **Tìm trong mọi hội thoại…** ở phía trên.
 3. Gõ từ khoá. Javis tự tìm sau khi bạn ngừng gõ một chút, không cần bấm Enter.
 4. Kết quả hiện các dòng khớp, kèm đoạn trích ngắn quanh từ khoá; phần trùng từ khoá được tô đậm màu vàng để dễ nhận ra.
@@ -62,20 +62,20 @@ Cuộc chưa được đặt tên sẽ hiện tạm câu hỏi đầu tiên củ
 6. Bấm vào một kết quả để mở thẳng cuộc trò chuyện chứa đoạn đó.
 7. Xoá hết chữ trong ô tìm kiếm để quay lại danh sách đầy đủ.
 
-Nếu không có dòng nào khớp, bảng hiện "Không tìm thấy." Tìm kiếm chỉ quét các cuộc thuộc bộ não đang chọn. Muốn tìm ở bộ não khác, đổi bộ não trước rồi tìm lại.
+Nếu không có dòng nào khớp, sidebar hiện "Không tìm thấy." Tìm kiếm chỉ quét các cuộc thuộc bộ não đang chọn. Muốn tìm ở bộ não khác, đổi bộ não trước rồi tìm lại.
 
 ### Mở lại và trò chuyện tiếp một cuộc cũ
 
 1. Trong danh sách (hoặc kết quả tìm kiếm), bấm vào cuộc bạn muốn mở.
-2. Bảng tự đóng, khung chat nạp lại toàn bộ lượt hỏi và đáp cũ.
+2. Khung chat bên phải nạp lại NGAY toàn bộ lượt hỏi và đáp cũ, dòng đó được tô sáng trong danh sách.
 3. Gõ câu mới như bình thường. Javis nối tiếp đúng mạch cuộc cũ, không bắt đầu lại từ đầu.
 
 Với engine Claude Code CLI, Javis nhớ cả phiên gốc của CLI để tiếp tục đúng ngữ cảnh công cụ đã dùng. Với các engine gọi qua API (ví dụ OpenRouter, OpenAI, Anthropic API), Javis nạp lại các lượt cũ từ cơ sở dữ liệu để giữ mạch. Xem thêm về engine ở [Models & engine](10-models-va-engine.md).
 
 ### Bắt đầu một cuộc trò chuyện mới
 
-1. Mở bảng **Lịch sử hội thoại**.
-2. Bấm nút **+ Mới** ở bên phải ô tìm kiếm.
+1. Mở sidebar Lịch sử.
+2. Bấm nút **＋ Hội thoại mới** trên cùng.
 3. Khung chat được dọn trống, bạn bắt đầu cuộc mới. Cuộc mới chỉ được lưu vào lịch sử sau khi bạn gửi câu đầu tiên.
 
 ### Đổi tên một cuộc trò chuyện
@@ -100,11 +100,12 @@ Lưu ý: xoá là vĩnh viễn, không có thùng rác khôi phục. Cân nhắc
 
 | Thao tác | Nút / phím | Vị trí |
 |---|---|---|
-| Mở bảng lịch sử | `🕘 Lịch sử` | Góc trên bên phải màn hình |
-| Đóng bảng | `✕`, phím `Esc`, hoặc bấm ra ngoài | Trên bảng |
-| Tìm toàn văn | Ô "Tìm trong mọi hội thoại…" | Đầu bảng |
-| Cuộc mới | `+ Mới` | Cạnh ô tìm kiếm |
-| Mở lại cuộc | Bấm vào dòng | Danh sách |
+| Mở chat phóng to + lịch sử | `🕘 Lịch sử` (góc phải màn hình) hoặc `⛶` | Khung Hội thoại |
+| Ẩn/hiện sidebar lịch sử | `🕘 Lịch sử` | Thanh tiêu đề khung chat phóng to |
+| Thu nhỏ chat | `✕ Thu nhỏ` hoặc phím `Esc` | Thanh tiêu đề |
+| Tìm toàn văn | Ô "Tìm trong mọi hội thoại…" | Đầu sidebar |
+| Cuộc mới | `＋ Hội thoại mới` | Đầu sidebar |
+| Mở lại cuộc | Bấm vào dòng | Danh sách (cuộc đang mở được tô sáng) |
 | Đổi tên | `✎` | Hiện khi rê chuột vào dòng |
 | Xoá | `🗑` | Hiện khi rê chuột vào dòng |
 
