@@ -384,6 +384,62 @@ Hai điều còn lại phải xử lý: (a) brain cũ có thể ĐÃ track `Javi
 server khởi động (chỉ `/learn/enable` và `/reflect` gọi), nên việc reconcile chỉ xảy ra khi
 một trong hai endpoint đó được gọi.
 
+## HOÃN: B4 (mirror_skills đệ quy) - cần spec riêng
+
+Ngày 2026-07-17, sau khi fan-out 6 reader lập bản đồ rủi ro, **B4 bị hoãn** (anh Quy quyết).
+Ghi lại đây vì ledger thi công bị gitignore, phát hiện sẽ mất theo.
+
+**Spec này đã SAI ba chỗ về B4:**
+
+1. *"Skill HỆ THỐNG vẫn một file SKILL.md"* - **sai**. `.claude/skills/html-to-webcake` đã
+   ship `tools/` (4 file) + `examples/` (9 file) ngay bây giờ.
+2. *"7 hot path"* - **sai**. Chỉ MỘT chỗ nóng thật: `main.py:184` trong `build_system_prompt`,
+   chạy mỗi lượt chat (dashboard, Telegram, Kanban task, loop, nhắc hẹn, learn spawn). Sáu chỗ
+   còn lại là endpoint do người bấm, cộng `system_sync.py:356` chạy 1 lần/brain/process.
+3. Cảnh báo symlink và file nhị phân - **không có cơ sở**. Đĩa không có symlink/reparse point
+   nào, không file nhị phân nào (kể cả `.pke` cũng là base64 ASCII).
+
+**Sáu blocker khiến B4 không làm được như đã viết:**
+
+- `main.py:184` KHÔNG có cổng chặn (khác `ensure_synced` ngay trên nó, vốn được gác bởi
+  `_SYNCED_ROOTS`). Cố ý như vậy để skill viết giữa phiên hiện ra không cần khởi động lại.
+  Làm đệ quy = rglob + băm mọi file trong mọi skill dir MỖI LƯỢT CHAT. Số thật đo được:
+  `brains/My Bullet Journal/skills` = 27 dir / 41 file / 496 KB. Và chi phí tăng theo đúng
+  thứ tính năng này khuyến khích thêm vào (`references/`, `scripts/`).
+- `build_system_prompt` là hàm ĐỒNG BỘ, gọi trần từ handler async (`main.py:4359`, `:4641`).
+  Đi bộ cây thư mục sẽ chặn event loop -> đứng mọi WebSocket, Telegram poller, scheduler loop,
+  tick nhắc hẹn. Không chỉ lượt chat đó. Repo biết dùng `asyncio.to_thread` ở chỗ khác.
+- `_LOCK` là `threading.Lock` KHÔNG reentrant. `sync_brain:356` gọi `mirror_skills` khi ĐANG
+  giữ lock, nhưng 7 chỗ ở `main.py` gọi nó mà KHÔNG giữ lock nào. Nên bản đệ quy không thể
+  lấy lock (deadlock) mà cũng không thể bỏ lock (copy cây không đồng bộ đua với bản đang khoá).
+  Cần thiết kế lại, không phải sửa vài dòng.
+- Lần gọi đầu cho mỗi brain, `mirror_skills` chạy HAI LẦN liền nhau (`sync_brain` bước 3, rồi
+  `main.py:184`). Rẻ hôm nay, nhưng nhân đôi băm-cả-cây đúng lúc khởi động.
+- KHÔNG một test nào trong repo chạm `mirror_skills`. `test_system_sync.py` mà spec giả định
+  là có thì KHÔNG TỒN TẠI. Rewrite không có lưới nào.
+- Lợi ích B4 hứa thì nó KHÔNG giao được: `html-to-webcake` hỏng vì `_system_items`
+  (`system_sync.py:142-160`) chỉ ship chuỗi SKILL.md, nằm PHÍA TRÊN `mirror_skills`.
+
+**Bug có thật phát hiện kèm (ghi nhận, xử sau - anh Quy quyết):**
+
+`html-to-webcake` **đang hỏng ở MỌI brain ngay bây giờ**. SKILL.md của nó bảo agent chạy
+`tools/` và đọc `examples/`, nhưng cây con chưa bao giờ tới brain nào vì `_system_items` chỉ
+ship SKILL.md và `_atomic_write` là text-only. Bug CÓ SẴN, không do kế hoạch này gây ra.
+Sửa đòi: `_system_items` ship cả cây + manifest chuyển từ per-item sang per-file (hiện là
+một chuỗi `hash` mỗi skill, dù khoá tên là `"files"`). Manifest quyết định app có tự cập nhật
+đè skill user đã sửa hay không, nên chạm vào nó cần cẩn trọng riêng.
+
+**Bug có thật thứ hai (cũng có sẵn):** cổng hash-skip của `mirror_skills` chỉ băm SKILL.md,
+nhưng vòng copy lại copy MỌI file top-level. Nên asset ngang hàng đổi mà SKILL.md không đổi
+thì bản mirror KHÔNG BAO GIỜ nhận. Đã đúng hôm nay, sẽ nặng hơn nếu có cây con.
+
+**Dữ liệu thật:** 11/59 skill dir đã có thư mục con (10 × `references/` trong brain, cộng
+`html-to-webcake`). Nên nhu cầu là THẬT, không tưởng tượng - chỉ là cách làm trong spec này sai.
+
+Việc còn lại khi làm spec riêng cho B4: gác chi phí ở `main.py:184` trước, giải bài toán lock,
+dựng `test_system_sync.py` từ số 0, rồi mới đụng tới đệ quy. Và sửa `_system_items` nếu muốn
+skill hệ thống ship được cây con.
+
 ## Ngoài phạm vi (cố ý)
 
 Curator gộp ô dù (C). `/learn` từ nguồn (D). Auto-archive và `.archive/`. `related_skills`
