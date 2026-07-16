@@ -147,10 +147,14 @@ for _slug in sorted(system_sync.system_skill_slugs()):
 # `desc_err`, nên bản đảo không khớp -> không tìm thấy chốt -> FAIL. Đó là chủ ý.
 #
 # GIỚI HẠN (nói thẳng để không ai tưởng đây là bất khả xâm phạm): đây là kiểm tra CẤU TRÚC
-# tĩnh. Nó chứng minh chốt chặn TỒN TẠI dưới dạng mã sống, rẽ nhánh trên kết quả
-# validate_description, trả 400, và đứng trước mkdir. Nó KHÔNG chạy endpoint nên không
-# chứng minh hành vi lúc chạy (vd validate_description bị mock/đổi ngữ nghĩa, hay có đường
-# ghi đĩa khác trước đó). Hành vi của chính validate_description do các check ở trên phủ.
+# tĩnh. Nó chứng minh chốt chặn CÓ HÌNH DẠNG đúng và ĐỨNG ĐÚNG CHỖ - là câu lệnh ở thân
+# save_skill, rẽ trên kết quả validate_description, trả 400, đặt trước mkdir. Nó KHÔNG chạy
+# endpoint nên KHÔNG chứng minh hành vi lúc chạy. Những thứ nó không thể thấy, kể tên cho
+# rõ: (1) MÃ CHẾT / không bao giờ chạy tới - hai luật "cấp một" ở dưới chặn được hai dạng
+# hay gặp (`if False:` và hàm con không ai gọi) nhưng phân tích tĩnh không thể quét hết mọi
+# đường mã chết; (2) validate_description bị mock hoặc đổi ngữ nghĩa nơi khác; (3) một
+# đường ghi đĩa khác chen vào trước chốt. Hành vi của chính validate_description do các
+# check ở trên phủ; đây chỉ canh hình dạng + vị trí.
 _main_tree = ast.parse((_SRC / "main.py").read_text(encoding="utf-8"))
 _save_node = next((n for n in ast.walk(_main_tree)
                    if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
@@ -159,15 +163,19 @@ check("tìm thấy hàm save_skill trong main.py (AST)", _save_node is not None)
 
 
 def _returns_400(if_node):
-    """Thân nhánh có return JSONResponse(..., status_code=400) không."""
+    """Thân nhánh có `return JSONResponse(..., status_code=400)` ngay ở CẤP MỘT không.
+
+    Chỉ soi if_node.body trực tiếp, CỐ Ý không ast.walk: một return chôn sâu trong
+    `if False:` hay trong hàm con là mã CHẾT - có mặt trong cây cú pháp nhưng không bao giờ
+    chạy, tức chốt chặn hình thức mà request xấu vẫn lọt xuống mkdir.
+    """
     for stmt in if_node.body:
-        for n in ast.walk(stmt):
-            if not isinstance(n, ast.Return) or not isinstance(n.value, ast.Call):
-                continue
-            for kw in n.value.keywords:
-                if (kw.arg == "status_code" and isinstance(kw.value, ast.Constant)
-                        and kw.value.value == 400):
-                    return True
+        if not isinstance(stmt, ast.Return) or not isinstance(stmt.value, ast.Call):
+            continue
+        for kw in stmt.value.keywords:
+            if (kw.arg == "status_code" and isinstance(kw.value, ast.Constant)
+                    and kw.value.value == 400):
+                return True
     return False
 
 
@@ -182,13 +190,18 @@ if _save_node is not None:
     check("POST /skills gọi validate_description và gán vào desc_err (AST, không tính "
           "chú thích)", bool(_vd_assign))
     # Chốt chặn: `if desc_err:` (tham chiếu TRẦN, bản đảo `if not desc_err` cố ý KHÔNG khớp)
-    # + thân có return 400.
-    _guards = [n for n in ast.walk(_save_node)
+    # + thân có return 400 ngay cấp một.
+    # Duyệt _save_node.body TRỰC TIẾP chứ KHÔNG ast.walk: walk chui vào mọi nhánh và mọi
+    # phạm vi con, không hề biết mã có chạy tới hay không. Chốt lồng trong `if False:` hoặc
+    # dời vào một hàm con không ai gọi vẫn "tồn tại" với walk, trong khi description xấu rơi
+    # thẳng xuống mkdir. Chốt thật buộc phải là câu lệnh ở THÂN HÀM, ngang cấp với mkdir.
+    _guards = [n for n in _save_node.body
                if isinstance(n, ast.If) and isinstance(n.test, ast.Name)
                and n.test.id == "desc_err" and _returns_400(n)]
-    check("POST /skills có chốt chặn SỐNG 'if desc_err: return ...400' (AST - chốt bị "
-          "comment lại hoặc đảo thành 'if not desc_err' sẽ trượt check này)",
-          bool(_guards))
+    check("POST /skills có chốt chặn SỐNG 'if desc_err: return ...400' ngay ở thân hàm "
+          "(AST - trượt check này nếu chốt bị comment lại, bị đảo thành 'if not desc_err', "
+          "return bị bọc trong nhánh chết như 'if False:', hoặc chốt bị dời vào hàm con "
+          "không ai gọi)", bool(_guards))
     _mkdirs = [n.lineno for n in ast.walk(_save_node)
                if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
                and n.func.attr == "mkdir"]
