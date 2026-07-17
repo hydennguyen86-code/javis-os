@@ -690,12 +690,16 @@ def _write_codex_profile():
     return None
 
 
-def _apply_mcp(cli, mode="full"):
+def _apply_mcp(cli, mode="full", brain=None):
     """Gắn MCP do Javis quản lý vào 1 engine Claude (registry rỗng → không đổi gì, dùng MCP sẵn của máy).
     Hub bật: config 1 entry trỏ hub kèm X-Javis-Mode - deny/perm/audit chặn TẠI hub (lớp cứng),
     không cần --disallowedTools. Hub tắt: per-server + --disallowedTools như cũ."""
     try:
         cli.javis_mode = mode   # engine SDK dùng để enforce min_mode plugin in-process
+        # Brain đang làm việc → engine truyền xuống ctx của plugin. KHÔNG suy từ cwd: chat chạy
+        # với cwd=CLAUDE_CWD (gốc project, main.py:318) chứ không phải thư mục brain, nên suy từ
+        # cwd là luôn trượt đúng ở đường chat - nơi bug thật sự xảy ra.
+        cli.javis_vault = _brain_root(brain) if brain else None
         if _hub_enabled():
             cli.mcp_config = mcp_hub.claude_config_path(mode)
             cli.mcp_strict = bool(cfgmod.read_settings().get("mcp", {}).get("strict")) and cli.mcp_config is not None
@@ -4298,7 +4302,7 @@ async def websocket_endpoint(ws: WebSocket):
                 # ===== PROVIDER anthropic-cli - qua Claude Code, đầy đủ MCP / skill / session =====
                 cli.system_prompt = sysprompt
                 cli.model = api_model or mcfg.get("claude_model") or None   # alias opus/sonnet/haiku/fable
-                _apply_mcp(cli)   # gắn MCP do Javis quản lý (nhiều shop POSCake...)
+                _apply_mcp(cli, brain=brain)   # gắn MCP do Javis quản lý (nhiều shop POSCake...)
                 async for event in cli.query(_cli_think(reasoning, user_message)):
                     etype = event["type"]
                     if etype == "tool_call":
@@ -4538,7 +4542,7 @@ async def _tg_answer(text, meta=None, progress=None):
         cli = sess["cli"]
         cli.system_prompt = sysprompt
         cli.model = api_model or mcfg.get("claude_model") or None
-        _apply_mcp(cli)
+        _apply_mcp(cli, brain=brain)
         t0 = time.time()
         written = []   # file agent ghi bằng tool Write trong lượt này (ứng viên auto-gửi)
         out = ""

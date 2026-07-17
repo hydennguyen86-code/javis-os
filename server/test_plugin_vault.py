@@ -72,15 +72,56 @@ check("plugin_tools: có tham số scope_vault", "scope_vault" in sig.parameters
 check("plugin_tools: scope_vault mặc định True (giữ hành vi cũ cho hub)",
       sig.parameters["scope_vault"].default is True)
 
+# ---- 5. HÀNH VI thật: engine SDK phải đưa ĐÚNG brain xuống plugin_tools, không suy từ cwd ----
+# Bug gốc: _plugins_server cũ suy vault_root từ self.cwd, mà chat chạy với cwd = gốc project
+# (CLAUDE_CWD, main.py:318) - không phải thư mục brain - nên vault_root luôn None ở đường chat.
+# Test này monkeypatch plugin_tools để BẮT tham số vault_root nó thực sự nhận, thay vì đọc
+# chuỗi trong source (giòn, không chứng minh hành vi).
 import claude_sdk_engine  # noqa: E402
-# Class THẬT tên ClaudeSDK (claude_sdk_engine.py:124), KHÔNG phải ClaudeSDKEngine.
-check("SDK: có helper _brain_root", hasattr(claude_sdk_engine.ClaudeSDK, "_brain_root"))
 
-src_sdk = (Path(__file__).parent / "claude_sdk_engine.py").read_text(encoding="utf-8")
-check("SDK: không còn truyền None mù vào plugin_tools",
-      "plugin_tools(mode, None)" not in src_sdk)
-check("SDK: truyền brain thật + scope_vault=False",
-      "scope_vault=False" in src_sdk)
+_seen = {}
+_orig_plugin_tools = plugins_host.plugin_tools
+
+
+def _spy_plugin_tools(mode, vault_root=None, *, scope_vault=True):
+    _seen["mode"] = mode
+    _seen["vault_root"] = vault_root
+    _seen["scope_vault"] = scope_vault
+    return [], {}   # danh sách tool rỗng -> _plugins_server dừng sớm, đủ để soi tham số
+
+
+plugins_host.plugin_tools = _spy_plugin_tools
+try:
+    # Engine dựng với cwd = một thư mục KHÔNG phải brain (mô phỏng đúng CLAUDE_CWD của chat:
+    # gốc project, không có Javis/ ở gốc) - đây chính là hiện trường của Critical.
+    _cwd_khong_phai_brain = str(Path(__file__).parent.parent)   # gốc project, không có Javis/
+    check("tiền đề: cwd mô phỏng KHÔNG phải một brain (không có Javis/ ở gốc)",
+          not (Path(_cwd_khong_phai_brain) / "Javis").is_dir())
+
+    eng = claude_sdk_engine.ClaudeSDK(cwd=_cwd_khong_phai_brain)
+    eng.javis_vault = _BRAIN   # _apply_mcp (main.py) đặt tường minh - KHÔNG suy từ cwd
+    eng._plugins_server()
+    check("hành vi: plugin_tools nhận đúng brain đã đặt qua javis_vault (không None)",
+          _seen.get("vault_root") == _BRAIN)
+
+    # ---- Hồi quy CHÍNH cho Critical: cwd không phải brain + chưa đặt javis_vault ----
+    # (vd engine mới dựng, _apply_mcp chưa chạy) -> vault_root PHẢI là None, không được suy
+    # ngầm từ cwd ra bất kỳ giá trị nào khác - đúng hành vi "chưa biết brain" thay vì "đoán sai".
+    eng2 = claude_sdk_engine.ClaudeSDK(cwd=_cwd_khong_phai_brain)
+    _seen.clear()
+    eng2._plugins_server()
+    check("hồi quy: chưa đặt javis_vault -> vault_root None (không suy mù từ cwd)",
+          _seen.get("vault_root") is None)
+
+    check("hành vi: scope_vault vẫn False (không nạp plugin riêng-của-vault)",
+          _seen.get("scope_vault") is False)
+finally:
+    plugins_host.plugin_tools = _orig_plugin_tools
+
+# _brain_root suy-từ-cwd đã bị xoá khỏi engine (main._brain_root module-level mới là nguồn
+# thật, main.py:1649) - đừng còn method trùng tên gây nhầm lẫn khi đọc code.
+check("SDK: đã xoá helper _brain_root suy-từ-cwd (trùng tên, vô dụng)",
+      not hasattr(claude_sdk_engine.ClaudeSDK, "_brain_root"))
 
 
 if _fails:

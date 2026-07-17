@@ -21,7 +21,6 @@ import os
 import sys
 import threading
 import time
-from pathlib import Path
 
 try:
     import claude_agent_sdk as _sdk   # noqa: F401
@@ -137,6 +136,7 @@ class ClaudeSDK:
         self.disallowed_tools = None
         self.max_wall_s = None
         self.javis_mode = None    # _apply_mcp đặt (suggest|auto|full) - enforce min_mode plugin in-process
+        self.javis_vault = None   # _apply_mcp đặt - brain đang làm việc, cho ctx của plugin
         self._tmp_files = []      # file tạm (system prompt) dọn sau mỗi query
 
     def is_available(self) -> bool:
@@ -160,15 +160,6 @@ class ClaudeSDK:
         return PermissionResultDeny(
             message=f"Tool '{tool_name}' bị chặn: phiên nền này chỉ được dùng {', '.join(allowed)}.")
 
-    def _brain_root(self):
-        """Brain đang làm việc, suy từ cwd. Trả None nếu cwd không phải một brain hợp lệ
-        (vd chat chạy với cwd = thư mục project) - khi đó plugin tự lo fallback như cũ."""
-        try:
-            root = Path(self.cwd)
-            return str(root) if (root / "Javis").is_dir() else None
-        except Exception:
-            return None
-
     def _plugins_server(self):
         """Phase 3: dựng MCP server IN-PROCESS từ tool plugin (plugins_host) - engine SDK gọi
         thẳng handler Python, không qua hub HTTP. Trả McpSdkServerConfig hoặc None (không plugin).
@@ -177,11 +168,11 @@ class ClaudeSDK:
         from claude_agent_sdk import tool as sdk_tool, create_sdk_mcp_server
         mode = (self.javis_mode or "full").strip().lower()
         # vault_root: CHỈ để ctx của plugin biết đang làm việc ở brain nào (vd image-chatgpt lưu
-        # ảnh vào đúng attachments/). Trước đây truyền None nên MỌI plugin gọi từ Claude Code đều
-        # có ctx.vault_root=None -> image_gen._resolve_vault rơi về "Brain Default" -> lưu SAI brain.
+        # ảnh vào đúng attachments/). self.javis_vault do _apply_mcp đặt TƯỜNG MINH (main.py) -
+        # KHÔNG suy từ cwd: chat chạy với cwd = gốc project (CLAUDE_CWD), không phải thư mục
+        # brain, nên suy từ cwd luôn trượt đúng ở đường chat - nơi bug thật sự xảy ra.
         # Vẫn KHÔNG nạp plugin riêng-của-vault (giữ nguyên hành vi cũ): scope_vault=False.
-        brain_root = self._brain_root()
-        p_tools, p_route = plugins_host.plugin_tools(mode, brain_root, scope_vault=False)
+        p_tools, p_route = plugins_host.plugin_tools(mode, self.javis_vault, scope_vault=False)
         if not p_tools:
             return None
         # has_tool_hooks/wrap_with_hooks chưa biết scope_vault (ngoài phạm vi task này) - giữ
