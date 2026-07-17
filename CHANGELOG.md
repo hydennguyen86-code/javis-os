@@ -4,6 +4,12 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.68] - 2026-07-17
+### Cải thiện
+- **Lịch sử hội thoại chỉ hiện 20 mục, có nút "Xem thêm 20"**: sidebar trước đây đổ thẳng 100 hội thoại ra một mạch, chat nhiều thì danh sách dài lê thê phải cuộn mãi mới hết. Nay mặc định 20 mục, mỗi lần bấm mở thêm 20 nữa, hết hội thoại thì nút tự ẩn. Không cần sửa server: endpoint `/sessions` vốn nhận `limit` tự do nên client chỉ việc xin dư đúng 1 mục (`limit = shown + 1`) để biết còn dữ liệu phía sau hay không.
+- Số mục đang mở được giữ nguyên khi danh sách tự làm mới lúc có tin nhắn mới (nếu không thì đang xem 60 mục lại bị thu về 20), và chỉ reset về 20 khi đổi brain. Lần render lại cũng giữ chỗ cuộn để bấm "Xem thêm" không bị nhảy vọt lên đầu.
+- **Tìm kiếm vẫn quét toàn bộ hội thoại** như cũ, không bị giới hạn 20 mục này chạm vào.
+
 ## [0.9.67] - 2026-07-17
 ### Sửa lỗi
 - **Xoá một bước làm MẤT TRẮNG chữ đang gõ dở ở các bước khác**: nút ✕ gọi thẳng `steps.splice(i, 1)` rồi `render()` mà quên gọi `captureSteps()` trước (nút "+ Bước" thì có gọi), nên `render()` vẽ đè mọi ô nhập bằng giá trị cũ trong mảng. Sửa vài bước, chưa Lưu, bấm xoá một bước bất kỳ là bay sạch, rất dễ tưởng mình gõ nhầm. Đã dựng lại đúng kịch bản trên cả bản cũ lẫn bản mới để đối chứng: bản cũ trả về chữ cũ, bản mới giữ nguyên chữ vừa gõ.
