@@ -42,7 +42,7 @@
     { id: "agents",      icon: ICON.agents,      label: "Agents" },
     { id: "skills",      icon: ICON.skills,      label: "Skills" },
     { id: "files",       icon: ICON.files,       label: "Tệp tin" },
-    { id: "selfimprove", icon: ICON.selfimprove, label: "Việc" },
+    { id: "selfimprove", icon: ICON.selfimprove, label: "Việc định kỳ" },
     { id: "learn",       icon: ICON.learn,       label: "Tự học" },
     { id: "kanban",      icon: ICON.kanban,      label: "Việc" },
     { id: "models",      icon: ICON.models,      label: "Models" },
@@ -89,7 +89,7 @@
     agents:      { icon: "🤖", label: "Agents", sub: "Trợ lý chuyên biệt" },
     skills:      { icon: "🧩", label: "Skills", sub: "Kỹ năng khả dụng" },
     files:       { icon: "🗂", label: "Tệp tin", sub: "Duyệt · sửa · tải file trong brain" },
-    selfimprove: { icon: "♻", label: "Việc", sub: "Việc định kỳ + nhắc hẹn đang chờ" },
+    selfimprove: { icon: "♻", label: "Việc định kỳ", sub: "Việc định kỳ + nhắc hẹn đang chờ" },
     learn:       { icon: "🧠", label: "Tự học", sub: "Rewire Memory · Wiki · Skill (an toàn, undo được)" },
     kanban:      { icon: "🗂", label: "Việc (Kanban)", sub: "Backlog + dispatcher tự làm task nền" },
     models:      { icon: "◈", label: "Models", sub: "Main model & providers" },
@@ -823,7 +823,7 @@
         const when = r.cron ? `cron ${r.cron}` : (r.due_human || "");
         const kind = MODE_LBL[r.mode] || "nhắc";
         const div = document.createElement("div");
-        div.className = "si-card";
+        div.className = "wf-card";
         div.innerHTML = `<b>${esc(title)}</b>
           <div class="dim" style="font-size:12px;color:#6b7894">${esc(when)} · ${esc(kind)}</div>
           <button class="s-btn-ghost rmCancel" style="margin-top:8px">Huỷ</button>`;
