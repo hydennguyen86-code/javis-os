@@ -62,19 +62,18 @@
   // ===== Workflows =====
   function renderPipeline(steps) {
     return (steps || []).map((s, i) => {
-      const preview = (s.task || "").replace(/\{\{[^}]+\}\}/g, "…").slice(0, 32);
-      return `${i > 0 ? '<div class="wf-parrow">→</div>' : ''}
-        <div class="wf-pstep" data-i="${i}">
-          <div class="wps-num">0${i + 1}</div>
+      const task = (s.task || "").replace(/\{\{[^}]+\}\}/g, "…");
+      return `<div class="wf-pstep" data-i="${i}">
+          <div class="wps-num">${String(i + 1).padStart(2, "0")}</div>
+          ${task ? `<div class="wps-task" title="${esc(task)}">${esc(task)}</div>` : ''}
           <div class="wps-name">${esc(s.agent)}</div>
-          ${preview ? `<div class="wps-task">${esc(preview)}…</div>` : ''}
         </div>`;
     }).join('');
   }
 
   async function loadWorkflows() {
     const panel = document.getElementById("panel-workflows");
-    panel.innerHTML = `<div class="panel-bar"><h3>Workflows</h3><div class="pb-actions"><button class="s-btn-ghost" id="wfImport">⤒ Nhập</button><button class="s-btn-ghost" id="seedBtn">Tạo mẫu</button><button class="s-btn" id="newWf">+ Workflow</button></div></div><div class="cards" id="wfCards">Đang tải...</div>`;
+    panel.innerHTML = `<div class="panel-bar"><h3>Workflows</h3><div class="pb-actions"><button class="s-btn-ghost" id="wfImport">⤒ Nhập</button><button class="s-btn-ghost" id="seedBtn">Tạo mẫu</button><button class="s-btn" id="newWf">+ Workflow</button></div></div><div class="wf-list" id="wfCards">Đang tải...</div>`;
     document.getElementById("newWf").onclick = () => editWorkflow(null);
     document.getElementById("wfImport").onclick = () => importItems(loadWorkflows);
     document.getElementById("seedBtn").onclick = async () => { await api("/studio/seed", { method: "POST", body: fd({ brain: brain() }) }); loadWorkflows(); };
@@ -87,22 +86,24 @@
     wfs.forEach(w => {
       const active = w.status === "active";
       const div = document.createElement("div");
-      div.className = "wf-card" + (active ? "" : " archived");
+      div.className = "wf-row" + (active ? "" : " archived");
       div.dataset.slug = w.slug;
       div.innerHTML = `
         <div class="wf-header">
           <div class="wf-name">${esc(w.name)}</div>
           <span class="wf-badge ${active ? "ready" : "off"}">${active ? "● Sẵn sàng" : "Lưu trữ"}</span>
+          <span class="wf-count">${(w.steps || []).length} bước</span>
+          <div class="wf-spacer"></div>
+          <div class="wf-actions">
+            <button class="s-btn run" ${active ? "" : "disabled"}>▶ Chạy</button>
+            <button class="s-btn-ghost edit">Sửa</button>
+            <button class="s-btn-ghost archive">${active ? "Lưu trữ" : "Kích hoạt"}</button>
+            <button class="s-btn-ghost exp" title="Xuất gói .zip (kèm agent + skill phụ thuộc) để chia sẻ">⤓ Xuất</button>
+            <button class="s-btn-ghost del">Xoá</button>
+          </div>
         </div>
         ${w.description ? `<div class="wf-desc">${esc(w.description)}</div>` : ''}
-        <div class="wf-pipeline">${renderPipeline(w.steps)}</div>
-        <div class="wf-actions">
-          <button class="s-btn run" ${active ? "" : "disabled"}>▶ Chạy</button>
-          <button class="s-btn-ghost edit">Sửa</button>
-          <button class="s-btn-ghost archive">${active ? "Lưu trữ" : "Kích hoạt"}</button>
-          <button class="s-btn-ghost exp" title="Xuất gói .zip (kèm agent + skill phụ thuộc) để chia sẻ">⤓ Xuất</button>
-          <button class="s-btn-ghost del">Xoá</button>
-        </div>`;
+        <div class="wf-pipeline">${renderPipeline(w.steps)}</div>`;
       div.querySelector(".exp").onclick = () => exportItem("workflow", w.slug);
       div.querySelector(".archive").onclick = async () => { await api("/workflows/toggle", { method: "POST", body: fd({ slug: w.slug, brain: brain() }) }); loadWorkflows(); };
       div.querySelector(".run").onclick = () => runWorkflow(w, div);

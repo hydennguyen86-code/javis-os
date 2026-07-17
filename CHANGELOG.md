@@ -4,6 +4,15 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.65] - 2026-07-17
+### Sửa lỗi
+- **Trang Workflows hiện các bước thành mấy cột cao lêu nghêu, rỗng ruột**: dải bước dùng `flex: 1` chia đều bề ngang, nên workflow 11 bước (viral-video-production) bị bóp mỗi ô còn khoảng 35px, trong khi tên agent `viral-video-director` có `white-space: nowrap` nên bị cắt sạch không còn chữ nào, chỉ trơ lại số thứ tự. Nay mỗi ô rộng tối thiểu 150px và tự xuống dòng khi hết chỗ, chữ luôn đọc được. Đo thật trên màn 1720px: 10 ô một hàng, ô thứ 11 xuống hàng dưới; 1280px được 7 ô; 900px được 5; 600px được 3; 380px được 2. Bề rộng ô luôn nằm trong 152 tới 173px ở mọi khổ và không khổ nào tràn ngang.
+- **Bước từ thứ 10 trở đi đánh số sai thành `010`, `011`**: mã nối chuỗi `0${i+1}` nên chỉ đúng với bước 1 tới 9. Thay bằng `padStart(2, "0")`.
+- **Thẻ workflow bị nhét vào lưới cột hẹp**: panel Workflows dùng chung lưới `.cards` (`auto-fill, minmax(280px, 1fr)`) với Agents và Lịch, mà pipeline lại nằm ngang nên hai thứ đánh nhau, và khi chỉ có một workflow thì phần còn lại của hàng bỏ trống. Nay Workflows có `.wf-list` và `.wf-row` riêng, mỗi workflow một hàng đầy chiều rộng; Agents, Lịch, plugin và loop giữ nguyên `.cards`/`.wf-card` cũ nên không bị ảnh hưởng.
+### Cải thiện
+- **Ô bước lấy việc làm làm chữ chính, tên agent hạ xuống chữ phụ**: nhiều workflow gọi cùng một agent ở mọi bước, lấy agent làm chữ chính thì 11 ô hiện chữ giống hệt nhau và không phân biệt được bước nào với bước nào. Nội dung task cắt gọn 2 dòng, di chuột vào xem đầy đủ.
+- **Cụm nút và số bước dồn lên cùng hàng với tên workflow**, thay vì nằm dưới cùng, nên quét nhanh hơn khi có nhiều workflow.
+
 ## [0.9.64] - 2026-07-17
 ### Sửa lỗi
 - **Javis tốn tới ~52ms mỗi lượt chat chỉ để đồng bộ skill, và nó chặn cả tiến trình**: hàm mirror skill đọc và băm lại `SKILL.md` của MỌI skill (cả bản nguồn lẫn bản đích) mỗi lần dựng system prompt, tức mỗi lượt chat, mỗi tin Telegram, mỗi task Kanban, mỗi vòng loop, mỗi nhắc hẹn. Đo thật trên 3 brain đang chạy, trước khi sửa: My Bullet Journal (27 skill/41 file) 52,48ms/lượt, Ngọc Thu Phạm (16 skill/30 file) 44,23ms/lượt, Brain Default (6 skill/9 file) 11,62ms/lượt - chạy đồng bộ trên event loop nên làm đứng luôn các kết nối khác. Nay thay bằng cổng chữ ký chỉ dùng `stat` (không đọc nội dung file nào), chỉ copy thật khi cây skill có thay đổi. Đo lại đúng 3 brain đó sau khi sửa: còn 8,30ms, 6,05ms, 2,28ms/lượt theo cùng thứ tự - nhanh hơn khoảng 5 tới 7 lần tuỳ brain (5,1x / 6,3x / 7,3x), không phải một con số cố định. Lỗi có sẵn, không ai biết cho tới khi đo.
