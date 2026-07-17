@@ -469,6 +469,23 @@ shutil.rmtree(_R8, ignore_errors=True)
 # ensure_synced). root là brain rỗng dựng bằng tempfile.mkdtemp - sync_brain sẽ cài các skill/
 # loop HỆ THỐNG thật của chính repo này vào đó (đọc từ .claude/skills + system/loops thật),
 # giống hệt lượt sync đầu tiên của một brain mới trong production.
+#
+# TIỀN ĐỀ PHẢI TỰ KHẲNG ĐỊNH, KHÔNG ĐƯỢC GIẢ ĐỊNH (bài học review, xém ship lỗi này):
+# "không treo" CHỈ có nghĩa khi cửa sổ deadlock THẬT SỰ được mở ra. mirror_skills trả về NGAY
+# nếu <root>/skills không tồn tại (system_sync.py:263-264), mà thư mục đó chỉ có nhờ
+# _system_items() (:143-161) đọc skill/loop từ .claude/skills + system/loops của CHÍNH REPO
+# NÀY - không phải từ root tạm. Nếu nguồn đó rỗng thì sync_brain không cài gì, <root>/skills
+# không sinh ra, mirror_skills thoát ở early-return và KHÔNG BAO GIỜ chạm tới chỗ có thể
+# deadlock -> check thời gian ở dưới báo "ok" trong ~0.5s trong khi deadlock vẫn nằm nguyên
+# trong code (đã tái hiện được: mutation còn sống + nguồn rỗng = xanh giả). Hôm nay repo ship
+# 5 skill + 1 loop nên may mà chạy đúng, nhưng một lần reorg repo / sparse checkout / dời
+# .claude/skills sẽ âm thầm THÁO NGÒI cái guard này mà không có tín hiệu đỏ nào - đúng kiểu
+# "cửa sổ không bao giờ mở ra mà vẫn xanh" mà dự án này đã dính một lần.
+# Nên: sau khi sync_brain trả về, BẮT BUỘC khẳng định vòng copy của mirror_skills đã CHẠY
+# THẬT - ít nhất 1 skill hệ thống có mặt ở CẢ <root>/skills/*/SKILL.md LẪN
+# <root>/.claude/skills/*/SKILL.md. Giao của hai tập chứng minh đúng điều đó: trên brain tạm
+# mới tinh, KHÔNG gì khác tạo ra .claude/skills (migrate_brain đi CHIỀU NGƯỢC LẠI - dời
+# .claude/skills -> skills/), nên slug nằm ở cả hai phía chỉ có thể do vòng copy sinh ra.
 def _kiem_sync_brain_khong_deadlock():
     root = Path(tempfile.mkdtemp(prefix="javis-syncbrain-deadlock-"))
     ket_qua = {}
@@ -492,6 +509,27 @@ def _kiem_sync_brain_khong_deadlock():
         # root (nhất là trên Windows). Để process thoát tự dọn - đây chính xác là lý do dùng
         # daemon=True thay vì cố join thêm hoặc cố dọn cho sạch.
         return
+
+    def _slug_co_skill(base: Path) -> set:
+        try:
+            return {p.parent.name for p in base.glob("*/SKILL.md") if p.is_file()}
+        except OSError:
+            return set()
+
+    _nguon = _slug_co_skill(root / "skills")
+    _guong = _slug_co_skill(root / ".claude" / "skills")
+    _da_chep = _nguon & _guong
+    # TÊN NÓI ĐÚNG THỦ PHẠM: check này đỏ nghĩa là TIỀN ĐỀ của check deadlock ở trên sụp
+    # (guard tự tháo ngòi), KHÔNG phải mirror_skills hỏng. Ai gặp đỏ ở đây sau một lần reorg
+    # repo thì đi tìm ở nguồn skill hệ thống (.claude/skills + system/loops), ĐỪNG đào
+    # mirror_skills. Lưu ý result["ok"] KHÔNG thay được check này: nó chỉ phản ánh lỗi từng
+    # item trong vòng manifest (system_sync.py:494-496), còn exception trong mirror_skills bị
+    # bắt và chỉ in ra stderr (:503-506) nên ok vẫn True.
+    check("TIỀN ĐỀ cho check deadlock ở trên: sync_brain phải cài skill hệ thống THẬT rồi "
+          "mirror_skills phải CHÉP sang .claude/skills - rỗng = cửa sổ deadlock chưa từng mở "
+          "ra, 'không treo' vô nghĩa, guard đã tự tháo ngòi (repo reorg / sparse checkout / "
+          f".claude/skills dời chỗ?), KHÔNG phải mirror hỏng (nguồn {sorted(_nguon)}, "
+          f"mirror {sorted(_guong)})", bool(_da_chep))
     check("sync_brain (đường thật, không giả lập) chạy xong không lỗi và trả ok=True",
           "loi" not in ket_qua and isinstance(ket_qua.get("r"), dict) and ket_qua["r"].get("ok") is True)
     shutil.rmtree(root, ignore_errors=True)
@@ -510,6 +548,17 @@ _kiem_sync_brain_khong_deadlock()
 #     thi). Ngược lại AST không chứng minh được HÀNH VI (vd nếu ai đó đổi _LOCK thành RLock,
 #     AST vẫn thấy tên _LOCK xuất hiện y hệt dù lúc đó không còn deadlock nữa - lúc đó check
 #     hành vi mới là trọng tài đúng). Hai check bù nhau, không cái nào thay được cái kia.
+#
+# GIỚI HẠN ĐÃ BIẾT CỦA CHECK AST - ĐỪNG QUÁ TIN NÓ RỒI BỎ CHECK HÀNH VI VÌ "CHẬM 15s":
+# nó chỉ soát tên `_LOCK` xuất hiện TRỰC TIẾP trong thân ĐÚNG 3 hàm kể trên, nên nó MÙ với:
+#   - gián tiếp qua hàm phụ: đẩy `with _LOCK:` vào một helper tên khác rồi gọi helper đó từ
+#     _mirror_lock (reviewer đã thử: AST báo sạch `phạm: []` trong khi deadlock vẫn nổ THẬT
+#     và chỉ check hành vi bắt được);
+#   - tra cứu động: globals()["_LOCK"], getattr(system_sync, "_LOCK") - không có ast.Name nào
+#     tên _LOCK để mà thấy.
+# Đó KHÔNG phải lỗi cần vá ở đây (soát hết mọi đường gián tiếp = phải phân tích liên thủ tục,
+# quá đắt và giòn cho một test) - chính xác là LÝ DO check hành vi ở trên phải tồn tại và
+# phải chạy đường thật: nó bắt mọi kiểu trên mà không cần hiểu code viết thế nào.
 def _kiem_ast_khong_lock_trong_mirror():
     src = Path(system_sync.__file__).read_text(encoding="utf-8")
     tree = ast.parse(src, filename=system_sync.__file__)
