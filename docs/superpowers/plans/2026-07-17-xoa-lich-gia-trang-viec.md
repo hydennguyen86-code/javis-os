@@ -253,7 +253,16 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 **Files:**
 - Modify: `dashboard/console.js:23, 46, 49, 64-65, 94, 97, 107` (rail + nhãn), `:683` (copy), `:708` (thêm host), `:809-826` (`loadLoops`: gọi render nhắc hẹn)
 - Modify: `dashboard/studio.js` (xoá loader + form + nút sync) - **neo bằng tên hàm, KHÔNG bằng số dòng**, xem cảnh báo dưới
-- **KHÔNG** đụng `dashboard/index.html` trong task này
+- Modify: `dashboard/index.html:113-116` (xoá ô thống kê ROUTINES) - **bổ sung lúc chạy**, xem dưới
+- Modify: `dashboard/app.js` `loadBrainStats()` (xoá fetch `/automations` + `_setStat("statRoutines"...)`) - **bổ sung lúc chạy**
+
+> **KHOẢNG HỞ PLAN BỎ SÓT (implementer Task 2 tìm ra, 2026-07-17):** plan chỉ grep `console.js`/`studio.js`/`index.html`, **chưa bao giờ grep `dashboard/app.js`**. Thực tế còn hai chỗ nữa:
+> - `index.html:113` có `<button class="bstat" data-tab="automations">` nhãn **ROUTINES**, bấm vào gọi `openStudio("automations")` (`app.js:1211-1214`) - tab vừa xoá, nên thành nút chết.
+> - `app.js:1201` trong `loadBrainStats()` vẫn `fetch('/automations?brain=')` để đếm số cho đúng ô đó. Route đã xoá ở Task 1 nên đây là 404 im lặng (bị `.catch(() => ({}))` nuốt), số ROUTINES vĩnh viễn = 0.
+>
+> Trớ trêu: ô ROUTINES chính là **badge nói dối** mà cả spec này sinh ra để giết (đếm "đang chạy" từ registry không chạy gì), mà plan lại bỏ sót nó. Quyết định: **xoá hẳn ô ROUTINES**, không thay bằng ô khác. Ba ô còn lại (AGENTS/SKILLS/WORKFLOWS) đều là studio page nên nhất quán; Việc là rail của console, không thuộc hàng đó nữa.
+>
+> Đính chính câu "KHÔNG đụng `dashboard/index.html`": nghĩa hẹp là đừng đi tìm `panel-automations` trong đó (nó không nằm ở đó) và đừng đụng panel loop chết `:160-192` (việc của Task 3). index.html KHÔNG bất khả xâm phạm.
 
 > **CẢNH BÁO TRANH CHẤP (đọc trước khi sửa `studio.js`):** một phiên khác đang sửa `dashboard/studio.js` song song. Lúc soạn plan này, commit `0fcb34f` (không thuộc plan này) đã sửa `studio.js` + `index.html` + `VERSION` + `CHANGELOG.md`, và working tree còn `M dashboard/studio.js` (+43/-10 dòng, vùng dòng 211-273) chưa commit. **Mọi số dòng của `studio.js` trong plan này đã trôi và không đáng tin.** Trước khi sửa, chạy `git status` và `grep -n` để lấy vị trí thật. Nếu working tree còn sửa dở của người khác, hỏi trước khi commit đè.
 >
