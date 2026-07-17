@@ -4,6 +4,14 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.67] - 2026-07-17
+### Sửa lỗi
+- **Xoá một bước làm MẤT TRẮNG chữ đang gõ dở ở các bước khác**: nút ✕ gọi thẳng `steps.splice(i, 1)` rồi `render()` mà quên gọi `captureSteps()` trước (nút "+ Bước" thì có gọi), nên `render()` vẽ đè mọi ô nhập bằng giá trị cũ trong mảng. Sửa vài bước, chưa Lưu, bấm xoá một bước bất kỳ là bay sạch, rất dễ tưởng mình gõ nhầm. Đã dựng lại đúng kịch bản trên cả bản cũ lẫn bản mới để đối chứng: bản cũ trả về chữ cũ, bản mới giữ nguyên chữ vừa gõ.
+- **Dòng "Kiểm chứng" vỡ thành ba dòng**: quy tắc gộp `.editor-box input { width: 100% }` có specificity (0,1,1), thắng `.st-retries { width: 48px }` chỉ (0,1,0), nên ô số lần bị kéo full-width và đẩy chữ "lần" xuống dòng riêng. Ý đồ ban đầu là ba thứ nằm gọn một dòng nhưng CSS chưa bao giờ chạy đúng ý đó. Nay đổi thành `.editor-box .st-retries` (0,2,0). Ô chọn agent kiểm chứng không dính lỗi này vì nó có `flex: 1`.
+### Cải thiện
+- **Form Sửa workflow gập bước lại để thấy toàn cảnh**: workflow 11 bước trước đây trải hết cỡ trong hộp cao 86vh nên chỉ thấy được một bước rưỡi mỗi lần, muốn nắm tổng thể phải cuộn liên tục. Nay mỗi bước là một dòng gọn gồm số, tên agent và trích nội dung việc; bấm vào thì mở ra sửa, mở bước khác thì bước cũ tự gập. Các ô nhập vẫn nằm trong DOM khi gập (chỉ ẩn bằng CSS) nên `captureSteps()` đọc đủ, bước đang gập vẫn giữ nguyên cấu hình kiểm chứng lúc Lưu.
+- **Thêm nút lên/xuống đổi thứ tự bước**: trước đây muốn chuyển bước 9 lên trước bước 4 phải chép tay qua lại. Nút ↑ ở bước đầu và ↓ ở bước cuối tự mờ đi.
+
 ## [0.9.66] - 2026-07-17
 ### Cải thiện
 - **Biến workflow trong ô bước đọc thành lời thay vì dấu ba chấm**: mã cũ thay mọi `{{...}}` bằng `…`, nên bước đầu của viral-video-production hiện ra "Nhận …, tạo project folder" đọc lên cụt nghĩa. Nay `{{input}}` thành "đầu vào", `{{prev}}` thành "kết quả bước trước", và biến lạ thì hiện thẳng tên biến chứ không nuốt mất. Xử đúng cả trường hợp có khoảng trắng trong ngoặc như `{{ input }}`.

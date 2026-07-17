@@ -209,6 +209,19 @@
     const steps = w ? JSON.parse(JSON.stringify(w.steps || [])) : [{ agent: agentsCache[0].slug, task: "" }];
     const opts = (sel) => agentsCache.map(a => `<option value="${a.slug}" ${a.slug === sel ? "selected" : ""}>${esc(a.name)}</option>`).join("");
     const optsV = (sel) => `<option value="">- không kiểm chứng -</option>` + agentsCache.map(a => `<option value="${a.slug}" ${a.slug === sel ? "selected" : ""}>${esc(a.name)}</option>`).join("");
+    const agentName = (slug) => { const a = agentsCache.find(x => x.slug === slug); return a ? a.name : (slug || "?"); };
+    // Bước gập lại để thấy toàn cảnh; bấm vào bước nào thì mở bước đó ra sửa. Workflow mới
+    // chỉ có 1 bước nên mở sẵn. Các ô input VẪN nằm trong DOM khi gập (chỉ ẩn bằng CSS) -
+    // captureSteps() đọc value của chúng, render kiểu chỉ-vẽ-bước-đang-mở sẽ làm nó vỡ.
+    let openIdx = w ? null : 0;
+    function move(i, d) {
+      const j = i + d;
+      if (j < 0 || j >= steps.length) return;
+      captureSteps();
+      const t = steps[i]; steps[i] = steps[j]; steps[j] = t;
+      if (openIdx === i) openIdx = j; else if (openIdx === j) openIdx = i;
+      render();
+    }
     function render() {
       box.innerHTML = `
         <h3>${w ? "Sửa" : "Tạo"} Workflow</h3>
@@ -220,24 +233,44 @@
         <div class="editor-actions"><button class="s-btn-ghost" id="cancelEd">Huỷ</button><button class="s-btn" id="saveWf">Lưu</button></div>`;
       const sl = box.querySelector("#stepList"); sl.innerHTML = "";
       steps.forEach((st, i) => {
-        const row = document.createElement("div"); row.className = "step-row";
+        const open = i === openIdx;
+        const row = document.createElement("div"); row.className = "step-row" + (open ? " open" : "");
+        const sum = (st.task || "").replace(/\s+/g, " ").trim();
         row.innerHTML = `
           <div class="step-header">
             <span class="step-num">${i + 1}</span>
+            <span class="step-sum">${esc(agentName(st.agent))}${sum ? ` · ${esc(sum)}` : ""}</span>
             <select class="st-agent">${opts(st.agent)}</select>
-            <button class="st-del">✕</button>
+            <button class="st-move" data-d="-1" title="Lên" ${i === 0 ? "disabled" : ""}>↑</button>
+            <button class="st-move" data-d="1" title="Xuống" ${i === steps.length - 1 ? "disabled" : ""}>↓</button>
+            <button class="st-del" title="Xoá bước">✕</button>
           </div>
-          <textarea class="st-task" rows="3" placeholder="Nhiệm vụ... dùng {{input}} = đầu vào, {{prev}} = kết quả bước trước">${esc(st.task)}</textarea>
-          <div class="st-verify">
-            <span class="stv-lbl">Kiểm chứng:</span>
-            <select class="st-verify-agent">${optsV(st.verify_agent || "")}</select>
-            <input class="st-retries" type="number" min="0" max="5" value="${st.max_retries != null ? st.max_retries : 1}">
-            <span class="stv-lbl">lần</span>
+          <div class="step-body">
+            <textarea class="st-task" rows="3" placeholder="Nhiệm vụ... dùng {{input}} = đầu vào, {{prev}} = kết quả bước trước">${esc(st.task)}</textarea>
+            <div class="st-verify">
+              <span class="stv-lbl">Kiểm chứng:</span>
+              <select class="st-verify-agent">${optsV(st.verify_agent || "")}</select>
+              <input class="st-retries" type="number" min="0" max="5" value="${st.max_retries != null ? st.max_retries : 1}">
+              <span class="stv-lbl">lần</span>
+            </div>
           </div>`;
-        row.querySelector(".st-del").onclick = () => { steps.splice(i, 1); if (!steps.length) steps.push({ agent: agentsCache[0].slug, task: "" }); render(); };
+        row.querySelector(".step-header").onclick = (e) => {
+          if (e.target.closest("button, select")) return;
+          captureSteps(); openIdx = open ? null : i; render();
+        };
+        row.querySelectorAll(".st-move").forEach(b => { b.onclick = () => move(i, parseInt(b.dataset.d, 10)); });
+        // captureSteps() TRƯỚC khi splice: thiếu nó thì chữ đang gõ dở ở các bước khác
+        // bị render() vẽ đè lại bằng giá trị cũ trong mảng steps, tức mất trắng.
+        row.querySelector(".st-del").onclick = () => {
+          captureSteps();
+          steps.splice(i, 1);
+          if (!steps.length) steps.push({ agent: agentsCache[0].slug, task: "" });
+          if (openIdx !== null) { if (openIdx === i) openIdx = null; else if (openIdx > i) openIdx--; }
+          render();
+        };
         sl.appendChild(row);
       });
-      box.querySelector("#addStep").onclick = () => { captureSteps(); steps.push({ agent: agentsCache[0].slug, task: "" }); render(); };
+      box.querySelector("#addStep").onclick = () => { captureSteps(); steps.push({ agent: agentsCache[0].slug, task: "" }); openIdx = steps.length - 1; render(); };
       box.querySelector("#cancelEd").onclick = () => editor.classList.remove("open");
       box.querySelector("#saveWf").onclick = async () => {
         const name = box.querySelector("#wfName").value.trim(); if (!name) return alert("Nhập tên");

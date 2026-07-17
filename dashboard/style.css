@@ -777,7 +777,20 @@ body {
 }
 .editor-box input:focus, .editor-box textarea:focus { border-color: var(--accent2); }
 .editor-box textarea { resize: vertical; }
-.step-row { background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 8px; }
+/* Bước gập lại để thấy toàn cảnh workflow dài; bấm header thì mở ra sửa.
+   Gập = ẩn bằng CSS chứ KHÔNG bỏ input khỏi DOM, vì captureSteps() đọc value của chúng. */
+.step-row { background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 8px; display: flex; flex-direction: column; gap: 8px; }
+.step-row:not(.open) { padding: 8px 10px; }
+.step-row.open { border-color: var(--accent2); background: rgba(139,92,246,0.06); }
+.step-row:not(.open) .step-header { cursor: pointer; }
+.step-row:not(.open) .step-header:hover .step-sum { color: var(--text); }
+.step-row:not(.open) .st-agent, .step-row:not(.open) .step-body { display: none; }
+.step-row.open .step-sum { display: none; }
+.step-body { display: flex; flex-direction: column; gap: 8px; }
+.step-sum { flex: 1; min-width: 0; font-size: 13px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-move { background: none; border: 1px solid var(--border); color: var(--text3); border-radius: 6px; cursor: pointer; height: 28px; width: 24px; flex-shrink: 0; font-size: 12px; line-height: 1; }
+.st-move:hover:not(:disabled) { border-color: var(--accent2); color: var(--accent2); }
+.st-move:disabled { opacity: 0.3; cursor: default; }
 .step-header { display: flex; align-items: center; gap: 8px; }
 .step-num { background: var(--accent2); color: #fff; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
 .st-agent { flex: 1; }
@@ -787,7 +800,10 @@ body {
 .st-verify { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.05); }
 .st-verify .stv-lbl { font-size: 13px; color: var(--text3); }
 .st-verify-agent { flex: 1; min-width: 120px; background: rgba(20,20,30,0.8); border: 1px solid var(--border); color: var(--text2); border-radius: 5px; padding: 3px 5px; font-size: 13px; }
-.st-retries { width: 48px; background: rgba(20,20,30,0.8); border: 1px solid var(--border); color: var(--text); border-radius: 5px; padding: 3px; font-size: 13px; text-align: center; }
+/* Phải là ".editor-box .st-retries" (0,2,0) chứ KHÔNG phải ".st-retries" (0,1,0): quy tắc
+   gộp ".editor-box input {width:100%}" ở trên có specificity (0,1,1) nên thắng, kéo ô số này
+   full-width làm nó rớt xuống dòng riêng và đẩy chữ "lần" xuống dòng thứ ba. */
+.editor-box .st-retries { width: 48px; flex: 0 0 48px; background: rgba(20,20,30,0.8); border: 1px solid var(--border); color: var(--text); border-radius: 5px; padding: 3px; font-size: 13px; text-align: center; }
 .st-del:hover { color: var(--red); border-color: var(--red); }
 .skill-pick { display: flex; flex-wrap: wrap; gap: 8px; background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 10px; }
 .skill-pick .sp { display: flex; align-items: center; gap: 5px; font-size: 14px; color: var(--text); width: auto; background: none; border: none; padding: 0; cursor: pointer; }
