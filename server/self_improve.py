@@ -608,7 +608,8 @@ class LoopFeature:
             "Mỗi việc 1 dòng '- [loại] mô tả → hành động'. Không có gì → 'Không có việc mới'."
         ), ""
 
-    def _make_cli(self, loop: dict, cwd: str, sysprompt: Optional[str], for_verify: bool = False):
+    def _make_cli(self, loop: dict, cwd: str, sysprompt: Optional[str], for_verify: bool = False,
+                  brain: str = ""):
         """Dựng CLI cho 1 vòng loop.
         - profile 'code' (nâng cao, chỉ đặt qua .md): Bash/Web + file, cwd=workspace, VẪN 0 MCP
           (fail-closed nếu không tạo được file MCP rỗng) - cho loop sửa mã repo.
@@ -638,8 +639,12 @@ class LoopFeature:
             # deny_tools per-server (apply_mcp đặt --disallowedTools) - chặn user đã chủ ý.
             cli = claude_engine(system_prompt=sysprompt, cwd=cwd, tag="loop", allowed_tools=None)
             if self.deps.apply_mcp:
+                # allowed_tools=None ở NHÁNH NÀY = ungated = plugin in-process CÓ nạp
+                # (claude_sdk_engine._mcp_servers: allowed_tools rỗng mới gọi _plugins_server()).
+                # PHẢI truyền brain để cli.javis_vault đúng brain đang chạy - thiếu brain thì
+                # plugin (vd javis_generate_image) không suy được vault, rơi về Brain Default.
                 try:
-                    self.deps.apply_mcp(cli, mode="full")   # hub nhận mode qua header X-Javis-Mode
+                    self.deps.apply_mcp(cli, mode="full", brain=brain)   # hub nhận mode qua header X-Javis-Mode
                 except TypeError:
                     self.deps.apply_mcp(cli)
             # KHÔNG _isolate: full mode chủ đích mở MCP + Bash. Không có apply_mcp (test) → vẫn None allowlist.
@@ -652,9 +657,11 @@ class LoopFeature:
             # như bản cũ - đây là đánh đổi user CHỦ ĐỘNG bật, không phải mặc định.
             cli = claude_engine(system_prompt=sysprompt, cwd=cwd, tag="loop", allowed_tools=None)
             if self.deps.apply_mcp:
+                # Cũng ungated (allowed_tools=None) như nhánh full ở trên - PHẢI truyền brain
+                # cùng lý do (plugin in-process cần javis_vault đúng).
                 hub_mode = "auto" if mode == "auto" else "suggest"
                 try:
-                    self.deps.apply_mcp(cli, mode=hub_mode)
+                    self.deps.apply_mcp(cli, mode=hub_mode, brain=brain)
                 except TypeError:
                     self.deps.apply_mcp(cli)
             base_deny = ["Bash", "WebFetch", "WebSearch", "Task"]
@@ -674,9 +681,12 @@ class LoopFeature:
             if self.deps.apply_mcp:
                 # Hub ENFORCE quyền theo mode: suggest → chỉ đọc, auto → chặn danger (lớp cứng,
                 # cộng thêm allowlist + prompt sẵn có). for_verify luôn coi như suggest.
+                # Nhánh này GATED (allowed_tools=tools) nên plugin in-process KHÔNG nạp (_mcp_servers
+                # trả sớm khi allowed_tools có giá trị) - truyền brain vẫn AN TOÀN + nhất quán,
+                # phòng trường hợp allowlist sau này mở thêm pattern plugin.
                 hub_mode = "suggest" if (for_verify or mode not in ("auto",)) else "auto"
                 try:
-                    self.deps.apply_mcp(cli, mode=hub_mode)
+                    self.deps.apply_mcp(cli, mode=hub_mode, brain=brain)
                 except TypeError:
                     self.deps.apply_mcp(cli)   # deps cũ (test) không nhận mode
             else:
@@ -785,7 +795,7 @@ class LoopFeature:
             return {"ok": True, "summary": skip}
 
         sysprompt = self.deps.build_system_prompt(brain)
-        gcli = self._make_cli(loop, cwd, sysprompt)
+        gcli = self._make_cli(loop, cwd, sysprompt, brain=brain)
         if gcli is None:
             return _finish("Lỗi: không tạo được file MCP rỗng để cô lập (profile code từ chối chạy)", "", True)
         if not gcli.is_available():
@@ -802,7 +812,7 @@ class LoopFeature:
                 and "không có việc mới" not in summary.lower():
             # Kiểm chứng độc lập: giả định kết quả SAI, kiểm tra thực tế
             vcli = self._make_cli(loop, cwd, "Bạn là người KIỂM CHỨNG độc lập, giả định kết quả vừa rồi SAI.",
-                                  for_verify=True)
+                                  for_verify=True, brain=brain)
             if vcli is not None:
                 if loop["tools_profile"] == "code":
                     criteria = ("thay đổi có đúng mục tiêu không, diff có NHỎ không (dưới ~80 dòng), có phá API hiện có "

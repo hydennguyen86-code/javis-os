@@ -119,6 +119,14 @@ updated: <YYYY-MM-DD>
 Nếu workflow tham chiếu agent chưa tồn tại -> TẠO agent đó trước.
 
 ### Loop -> `Javis/loops/<slug>.md`
+
+**Việc LẶP MỚI: ưu tiên GỌI TOOL `javis_schedule`** (op=create, name/prompt/schedule - vd
+schedule="120m" hoặc "mỗi 2 tiếng") thay vì tự ghi file. Tool tự đặt đúng slug, đúng frontmatter
+(kể cả `goal: custom` bên dưới - thiếu field này là lỗi thật đã xảy ra: self_improve.py mặc định
+`goal: business`, loop chỉ đọc số liệu MCP và BỎ QUA HOÀN TOÀN nhiệm vụ ở thân file), và chặn
+trùng tên. **CHỈ tự ghi file tay** (mẫu dưới) khi: (a) SỬA loop ĐÃ CÓ, hoặc (b) cần trường nâng
+cao mà tool chưa nhận - `quiet_hours`, `max_runs_per_day`, `workspace`, `ambient_mcp`, hoặc
+`goal` khác `custom` (`business`/`brain`/`product`).
 ```
 ---
 type: loop
@@ -126,7 +134,11 @@ name: <Tên>
 slug: <ascii>
 enabled: false            # LUÔN tạo ở trạng thái TẮT
 mode: suggest             # suggest=chỉ đọc/đề xuất | auto=tự ghi nháp an toàn | full=toàn quyền
+goal: custom              # BẮT BUỘC khi ghi tay - thiếu dòng này self_improve.py mặc định
+                           # 'business' (chỉ đọc số liệu MCP, bỏ qua hoàn toàn thân file dưới đây)
 interval_min: 120         # tối thiểu 5
+owner_chat: "<chat_id>"   # chat_id NGƯỜI YÊU CẦU (tạo qua chat Telegram) - để báo đúng người;
+                           # bỏ trống nếu tạo trên web (báo về ID Telegram đầu tiên)
 updated: <YYYY-MM-DD>
 ---
 <mô tả nhiệm vụ: mỗi vòng loop làm ĐÚNG việc này - đây chính là prompt của loop, viết tự-đủ>

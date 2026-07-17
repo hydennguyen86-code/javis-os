@@ -543,6 +543,9 @@ LEGACY_HASHES.update({
         "24081f68ed0152b09fc482dc79680e68e249e8153bc1c442f4a01af15b7f012f",
         # bản v0.9.32 (trước khi thêm khung metaprompt v0.9.33)
         "6f040dde409adf27ee69fed22c2c0490a5717c53a640d02d02fd670ee1bbfd76",
+        # bản v0.9.70 (trước khi vá I1 final-fix-gd2: mục Loop dạy gõ YAML tay, không gọi
+        # javis_schedule; thiếu owner_chat/goal trong template)
+        "b399b173c59b4a6c61fdf294944aec06e9cd6cdcd28d02cabaf1cbb424dc844b",
     },
     # ingest-source bản trước contextual-retrieval (v0.9.33) = 313675bc... đã có ở trên
     "skills/lint-wiki": {

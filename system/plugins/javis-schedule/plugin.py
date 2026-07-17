@@ -41,12 +41,19 @@ VN_TZ = timezone(timedelta(hours=7))
 # Frontmatter loop: ---\n<yaml>\n---\n<body> (khớp _FM_RE của self_improve.py)
 _FM_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n?(.*)$", re.DOTALL)
 
-# Đơn vị chu kỳ/thời lượng chấp nhận, đã bỏ dấu tiếng Việt. Thứ tự CÓ Ý NGHĨA: chuỗi dài/cụ thể
-# hơn phải đứng TRƯỚC chuỗi ngắn là tiền tố của nó (vd "phut" trước "p", "hour" trước "h",
-# "minute"/"min" trước "m") - regex alternation của Python khớp theo THỨ TỰ xuất hiện, không phải
-# khớp dài nhất.
-_UNIT_ALT = "phut|tieng|gio|hour|minute|min|p|h|m"
-_HOUR_UNITS = {"tieng", "gio", "hour", "h"}
+# Đơn vị chu kỳ/thời lượng chấp nhận, đã bỏ dấu tiếng Việt -> hệ số quy đổi ra PHÚT. Thứ tự
+# trong _UNIT_ALT CÓ Ý NGHĨA: chuỗi dài/cụ thể hơn phải đứng TRƯỚC chuỗi ngắn là tiền tố của nó
+# (vd "phut" trước "p", "hour" trước "h", "minute"/"min" trước "m") - regex alternation của
+# Python khớp theo THỨ TỰ xuất hiện, không phải khớp dài nhất. "ngay"/"tuan"/"thang" không phải
+# tiền tố của token nào khác nên chèn ở đâu cũng an toàn.
+_UNIT_MINUTES = {
+    "phut": 1, "minute": 1, "min": 1, "p": 1, "m": 1,
+    "tieng": 60, "hour": 60, "gio": 60, "h": 60,
+    "ngay": 1440, "tuan": 10080, "thang": 43200,
+}
+_UNIT_ALT = "phut|tieng|gio|hour|ngay|tuan|thang|minute|min|p|h|m"
+# Đơn vị đứng MỘT MÌNH không kèm số ("mỗi ngày", "mỗi tuần", "mỗi tháng") -> ngầm định số lượng 1.
+_BARE_UNIT_RE = re.compile(rf"\b({_UNIT_ALT})\b")
 
 _CRON_TOKEN_RE = re.compile(r"^[\dA-Za-z*/,\-]+$")
 # Chu kỳ THUẦN dạng "<số><đơn vị>" (không khoảng trắng, không chữ thừa) - vd "120m", "2h", "90phut".
@@ -55,6 +62,11 @@ _INTERVAL_FULL_RE = re.compile(rf"^\d+(?:[.,]\d+)?(?:{_UNIT_ALT})$")
 _INTERVAL_SEARCH_RE = re.compile(rf"(\d+(?:[.,]\d+)?)\s*({_UNIT_ALT})")
 # Mốc TƯƠNG ĐỐI kiểu "<số><đơn vị>[nữa|tới|sau]" (hậu tố tuỳ chọn) - dùng khi tạo nhắc một lần.
 _RELATIVE_DELAY_RE = re.compile(rf"^(\d+(?:[.,]\d+)?)({_UNIT_ALT})(?:nua|toi|sau)?$")
+
+# Mốc GIỜ CỐ ĐỊNH kiểu "7h", "7h30", "07:00" - dùng để dò lịch "mỗi sáng 7h" cần LẶP HẰNG NGÀY
+# ở đúng 1 giờ trong ngày (cron), khác hẳn "mỗi 7 tiếng" (duration thuần, lặp theo khoảng cách).
+_CLOCK_RE = re.compile(r"\b(\d{1,2})[h:](\d{2})?\b")
+_DAYPART_WORDS = ("sang", "trua", "chieu", "toi")
 
 
 def _port() -> int:
@@ -94,6 +106,36 @@ def _is_cron(schedule: str) -> bool:
     return len(parts) == 5 and all(_CRON_TOKEN_RE.match(p) for p in parts)
 
 
+def _daily_cron(schedule: str) -> Optional[str]:
+    """Dò lịch dạng MỐC GIỜ CỐ ĐỊNH lặp HẰNG NGÀY ('mỗi sáng 7h', 'mỗi ngày lúc 8h', '7h sáng
+    hằng ngày') -> cron 5 trường 'M H * * *'. Trả None nếu KHÔNG phải dạng này (vd 'mỗi 7 tiếng'
+    hay 'mỗi 2 tiếng' - duration thuần lặp theo KHOẢNG CÁCH, không có tín hiệu mốc-giờ-trong-ngày).
+
+    Phân biệt bằng 2 tín hiệu PHẢI CÓ CẢ HAI: (a) chuỗi có ý LẶP HẰNG NGÀY - từ "mỗi" + một
+    buổi trong ngày (sáng/trưa/chiều/tối) hoặc từ "ngày", hoặc cụm "hằng ngày"; VÀ (b) có một
+    mốc giờ đồng hồ (7h, 7h30, 07:00) trong chuỗi. Thiếu 1 trong 2 -> None, để chỗ gọi tự rơi về
+    nhánh cũ (duration/relative-delay) - KHÔNG đoán bừa."""
+    norm = _strip_diacritics(schedule or "")
+    has_moi = bool(re.search(r"\bmoi\b", norm))
+    has_hang_ngay = "hang ngay" in norm
+    if not (has_moi or has_hang_ngay):
+        return None
+    has_daypart = any(re.search(rf"\b{w}\b", norm) for w in _DAYPART_WORDS)
+    has_ngay = bool(re.search(r"\bngay\b", norm))
+    if not (has_daypart or has_ngay):
+        return None   # "mỗi 7h"/"mỗi 2 tiếng" - không có tín hiệu HẰNG NGÀY, để nguyên là duration
+    m = _CLOCK_RE.search(norm)
+    if not m:
+        return None   # có ý lặp hằng ngày nhưng KHÔNG có mốc giờ cụ thể ("mỗi sáng") -> chưa đủ để làm cron
+    hour = int(m.group(1))
+    minute = int(m.group(2)) if m.group(2) else 0
+    if re.search(r"\b(chieu|toi)\b", norm) and hour < 12:
+        hour += 12   # "7h tối"/"7h chiều" nói theo giờ 12h -> quy về giờ 24h
+    if not (0 <= hour <= 23 and 0 <= minute <= 59):
+        return None
+    return f"{minute} {hour} * * *"
+
+
 def _route_kind(schedule: str, notify_only: bool = False) -> str:
     """Phân loại 1 chuỗi lịch: 'loop' (lặp + bền, ghi file) hay 'reminder' (kho nhắc hẹn có sẵn).
 
@@ -103,6 +145,8 @@ def _route_kind(schedule: str, notify_only: bool = False) -> str:
     s = (schedule or "").strip()
     if _is_cron(s):
         return "reminder"          # cron đã có sẵn kho reminders lo, không cần ghi loop
+    if _daily_cron(s):
+        return "reminder"          # mốc giờ cố định lặp hằng ngày ("mỗi sáng 7h") -> cron ở kho reminders
     norm = _strip_diacritics(s)
     if re.search(r"\bmoi\b", norm):
         return "loop"               # "mỗi 2 tiếng" - từ "mỗi" tự thân đã là dấu hiệu LẶP ĐỊNH KỲ
@@ -112,19 +156,27 @@ def _route_kind(schedule: str, notify_only: bool = False) -> str:
     return "reminder"                # còn lại: mốc một lần ("30 phút nữa", "8h30", ISO...)
 
 
-def _interval_min(schedule: str) -> int:
-    """Rút số phút từ 1 chuỗi chu kỳ ('120m'->120, '2 tiếng'/'2h'->120). Tối thiểu 5 phút
-    (khớp trần cứng self_improve.py:257 - loop chạy dày hơn 5 phút coi như cấu hình sai)."""
+def _interval_min(schedule: str) -> Optional[int]:
+    """Rút số phút từ 1 chuỗi chu kỳ ('120m'->120, '2 tiếng'/'2h'->120, 'mỗi ngày'->1440,
+    'mỗi tuần'->10080, 'mỗi tháng'->43200 - đơn vị đứng một mình không kèm số thì ngầm định
+    số lượng 1). Tối thiểu 5 phút (khớp trần cứng self_improve.py:257).
+
+    Trả None khi KHÔNG rút được đơn vị/số nào rõ ràng (lịch mơ hồ, vd 'mỗi sáng' không kèm giờ
+    hay đơn vị). Nơi gọi BẮT BUỘC coi None là lỗi cần hỏi lại model - TUYỆT ĐỐI không tự rơi về
+    một số phút mặc định: chạy nhầm mỗi 5 phút là đốt tiền + spam Telegram thật (fail loudly)."""
     norm = _strip_diacritics(schedule)
     m = _INTERVAL_SEARCH_RE.search(norm)
-    if not m:
-        return 5
-    try:
-        num = float(m.group(1).replace(",", "."))
-    except ValueError:
-        return 5
-    factor = 60.0 if m.group(2) in _HOUR_UNITS else 1.0
-    return max(5, int(round(num * factor)))
+    if m:
+        try:
+            num = float(m.group(1).replace(",", "."))
+        except ValueError:
+            return None
+        factor = _UNIT_MINUTES.get(m.group(2), 1)
+        return max(5, int(round(num * factor)))
+    bare = _BARE_UNIT_RE.search(norm)
+    if bare:
+        return max(5, _UNIT_MINUTES.get(bare.group(1), 1))
+    return None
 
 
 def _yaml_scalar(s: str) -> str:
@@ -164,6 +216,10 @@ def _create_loop_file(vault_root: str, name: str, prompt: str, schedule: str,
         return (f"ERROR: đã có việc tên '{name}' (Javis/loops/{slug}.md) - "
                  f"sửa nó thay vì tạo bản sao (vd đổi lịch/nội dung của file đó)")
     interval = _interval_min(schedule)
+    if interval is None:
+        return (f"ERROR: không rõ chu kỳ '{schedule}' - nói rõ số + đơn vị (vd '120m', '2 tiếng', "
+                 f"'mỗi ngày', 'mỗi tuần', 'mỗi tháng'), hoặc nếu là mốc giờ cố định thì dùng cron "
+                 f"5 trường (vd '0 7 * * *' = 7h sáng mỗi ngày). TUYỆT ĐỐI không tự đoán 5 phút.")
     frontmatter = (
         "---\n"
         "type: loop\n"
@@ -171,6 +227,11 @@ def _create_loop_file(vault_root: str, name: str, prompt: str, schedule: str,
         f"slug: {slug}\n"
         "enabled: false\n"
         "mode: suggest\n"
+        # goal: custom - BẮT BUỘC, KHÔNG được để self_improve.py mặc định 'business' (đọc
+        # self_improve.py:250,546). goal='business' bỏ qua HOÀN TOÀN loop["body"] (chỉ đọc số
+        # liệu MCP), nên nếu thiếu dòng này, prompt user vừa gõ (thân file dưới đây) không bao
+        # giờ được loop đọc tới - loop tạo ra "thành công" nhưng KHÔNG làm đúng việc user yêu cầu.
+        "goal: custom\n"
         f"interval_min: {interval}\n"
         f"owner_chat: {_yaml_scalar((owner_chat or '').strip())}\n"
         f"updated: {_today()}\n"
@@ -241,13 +302,17 @@ def _cancel_loop_file(vault_root: str, slug: str) -> str:
 
 
 def _reminder_time_payload(schedule: str) -> dict:
-    """Suy tham số thời gian cho POST /reminders từ 1 chuỗi lịch. Cron -> {'cron'}. Mốc tương
-    đối kiểu '<n> <đơn vị> [nữa|tới|sau]' -> {'delay_min'}. Còn lại (HH:MM, '8h30', ngày giờ đầy
-    đủ) -> {'at': schedule nguyên văn}, để reminders.resolve_due tự hiểu (cùng định dạng nó vốn
-    chấp nhận khi engine gọi curl trực tiếp)."""
+    """Suy tham số thời gian cho POST /reminders từ 1 chuỗi lịch. Cron -> {'cron'}. Mốc giờ cố
+    định lặp hằng ngày ('mỗi sáng 7h') -> {'cron'} suy từ _daily_cron. Mốc tương đối kiểu
+    '<n> <đơn vị> [nữa|tới|sau]' -> {'delay_min'}. Còn lại (HH:MM, '8h30', ngày giờ đầy đủ) ->
+    {'at': schedule nguyên văn}, để reminders.resolve_due tự hiểu (cùng định dạng nó vốn chấp
+    nhận khi engine gọi curl trực tiếp)."""
     s = (schedule or "").strip()
     if _is_cron(s):
         return {"cron": s}
+    cron = _daily_cron(s)
+    if cron:
+        return {"cron": cron}
     norm = _strip_diacritics(s).replace(" ", "")
     m = _RELATIVE_DELAY_RE.match(norm)
     if m:
@@ -256,16 +321,25 @@ def _reminder_time_payload(schedule: str) -> dict:
         except ValueError:
             num = None
         if num is not None:
-            factor = 60.0 if m.group(2) in _HOUR_UNITS else 1.0
+            factor = _UNIT_MINUTES.get(m.group(2), 1)
             return {"delay_min": num * factor}
     return {"at": s}
 
 
-def _post_reminder(payload: dict) -> str:
+# C1 (bảo mật/ổn định server): 3 hàm gọi HTTP dưới đây BẮT BUỘC là async + httpx.AsyncClient.
+# Handler plugin chạy TRÊN event loop chính của uvicorn (plugins_host._make_call gọi
+# `res = handler(args, ctx)` rồi mới await - KHÔNG bọc asyncio.to_thread). httpx.post ĐỒNG BỘ ở
+# đây gọi vào CHÍNH server đang chạy nó (127.0.0.1:_port()) -> khoá luôn event loop đang cần
+# rảnh để tự trả lời request đó -> deadlock/ReadTimeout, treo TOÀN BỘ server (mọi user, mọi tool)
+# cho tới khi hết timeout. Xem mẫu async đúng: system/plugins/meta-ads-graph/plugin.py `_get()`,
+# system/plugins/image-chatgpt/plugin.py `_gen()`. test_javis_schedule.py có lưới hồi quy
+# (inspect.iscoroutinefunction) chặn ai đó quay lại lối sync.
+async def _post_reminder(payload: dict) -> str:
     """Tạo 1 nhắc hẹn/job qua HTTP POST /reminders trên localhost (miễn đăng nhập -
     main.py:70 _AUTH_LOCAL_EXACT, đúng đường agent vốn gọi bằng curl - reminders.py:17)."""
     try:
-        r = httpx.post(f"http://127.0.0.1:{_port()}/reminders", json=payload, timeout=10)
+        async with httpx.AsyncClient(timeout=10) as c:
+            r = await c.post(f"http://127.0.0.1:{_port()}/reminders", json=payload)
         data = r.json()
     except Exception as e:
         return f"ERROR: gọi kho nhắc hẹn lỗi: {type(e).__name__}: {e}"
@@ -276,19 +350,21 @@ def _post_reminder(payload: dict) -> str:
     return f"Đã đặt nhắc hẹn lúc {data.get('due_human') or '?'} (id {data.get('id')})."
 
 
-def _get_reminders(vault_root: str) -> dict:
+async def _get_reminders(vault_root: str) -> dict:
     try:
-        r = httpx.get(f"http://127.0.0.1:{_port()}/reminders", params={"brain": vault_root}, timeout=10)
+        async with httpx.AsyncClient(timeout=10) as c:
+            r = await c.get(f"http://127.0.0.1:{_port()}/reminders", params={"brain": vault_root})
         d = r.json()
         return d if isinstance(d, dict) else {"pending": [], "history": []}
     except Exception as e:
         return {"pending": [], "history": [], "error": f"{type(e).__name__}: {e}"}
 
 
-def _cancel_reminder(vault_root: str, rid: str) -> str:
+async def _cancel_reminder(vault_root: str, rid: str) -> str:
     try:
-        r = httpx.post(f"http://127.0.0.1:{_port()}/reminders/cancel",
-                       data={"id": rid, "brain": vault_root}, timeout=10)
+        async with httpx.AsyncClient(timeout=10) as c:
+            r = await c.post(f"http://127.0.0.1:{_port()}/reminders/cancel",
+                             data={"id": rid, "brain": vault_root})
         data = r.json()
     except Exception as e:
         return f"ERROR: huỷ nhắc hẹn lỗi: {type(e).__name__}: {e}"
@@ -297,7 +373,7 @@ def _cancel_reminder(vault_root: str, rid: str) -> str:
     return f"ERROR: không huỷ được ({data.get('error') or 'không rõ lý do (có thể id sai/đã xong)'})."
 
 
-def _do_create(vault_root: str, args: dict) -> str:
+async def _do_create(vault_root: str, args: dict) -> str:
     name = str(args.get("name") or "").strip()
     prompt = str(args.get("prompt") or "").strip()
     schedule = str(args.get("schedule") or "").strip()
@@ -309,13 +385,17 @@ def _do_create(vault_root: str, args: dict) -> str:
     if kind == "loop":
         return _create_loop_file(vault_root, name=name, prompt=prompt, schedule=schedule,
                                  owner_chat=chat_id)
-    payload = {"text": prompt, "label": name, "mode": "task", "brain": vault_root,
-               "chat_id": chat_id, "created_by": "javis_schedule"}
+    # I2: notify_only=True nghĩa là CHỈ nhắc bằng lời (mode "notify" - reminders.py:342 "⏰ Nhắc
+    # anh: ..."), KHÔNG dựng nguyên engine Claude + MCP để "làm hộ" (mode "task" - reminders.py:
+    # 418 _run_task, tốn tới max_wall_s=300). Trước đây hard-code "task" nên notify_only vô nghĩa -
+    # mọi nhắc đều chạy LLM dù model chỉ được yêu cầu NHẮC.
+    payload = {"text": prompt, "label": name, "mode": ("notify" if notify_only else "task"),
+               "brain": vault_root, "chat_id": chat_id, "created_by": "javis_schedule"}
     payload.update(_reminder_time_payload(schedule))
-    return _post_reminder(payload)
+    return await _post_reminder(payload)
 
 
-def _do_list(vault_root: str) -> str:
+async def _do_list(vault_root: str) -> str:
     lines = []
     loops = _list_loops(vault_root)
     if loops:
@@ -324,7 +404,7 @@ def _do_list(vault_root: str) -> str:
             trang = "bật" if lp["enabled"] else "tắt"
             lines.append(f"- [{lp['id']}] {lp['name']} - mỗi {lp['interval_min']} phút, "
                          f"đang {trang}, mode {lp['mode']}")
-    rem = _get_reminders(vault_root)
+    rem = await _get_reminders(vault_root)
     pending = rem.get("pending") or []
     if pending:
         lines.append("Nhắc hẹn / lịch (kho reminders):")
@@ -338,16 +418,16 @@ def _do_list(vault_root: str) -> str:
     return "\n".join(lines)
 
 
-def _do_cancel(vault_root: str, args: dict) -> str:
+async def _do_cancel(vault_root: str, args: dict) -> str:
     rid = str(args.get("id") or "").strip()
     if not rid:
         return "ERROR: cần 'id' để huỷ (lấy từ kết quả op=list)."
     if (_loops_dir(vault_root) / f"{rid}.md").is_file():
         return _cancel_loop_file(vault_root, rid)
-    return _cancel_reminder(vault_root, rid)
+    return await _cancel_reminder(vault_root, rid)
 
 
-def javis_schedule(args: dict, cctx) -> str:
+async def javis_schedule(args: dict, cctx) -> str:
     args = args or {}
     vault_root = getattr(cctx, "vault_root", None)
     # An toàn CỨNG: đây chính là bug Task 1 vừa vá ở nơi khác (image_gen._resolve_vault rơi về
@@ -356,11 +436,11 @@ def javis_schedule(args: dict, cctx) -> str:
         return "ERROR: không xác định được brain đang làm việc"
     op = str(args.get("op") or "create").strip().lower()
     if op == "create":
-        return _do_create(vault_root, args)
+        return await _do_create(vault_root, args)
     if op == "list":
-        return _do_list(vault_root)
+        return await _do_list(vault_root)
     if op == "cancel":
-        return _do_cancel(vault_root, args)
+        return await _do_cancel(vault_root, args)
     return f"ERROR: op không hợp lệ: {op!r} (dùng create|list|cancel)"
 
 

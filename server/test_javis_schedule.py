@@ -15,6 +15,8 @@ Phủ:
 - op=create nhắc -> KHÔNG ghi .md (phải đi đường reminders).
 - Tool đăng ký đúng tên + min_mode.
 """
+import asyncio
+import inspect
 import os
 import sys
 import tempfile
@@ -26,6 +28,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "system" / "plugins" / "ja
 
 import yaml  # noqa: E402
 import plugin as sched  # noqa: E402
+import self_improve  # noqa: E402 - dùng để chặn C2 bằng LƯỚI THẬT (self_improve._norm_loop qua get_loop)
 
 _fails = []
 
@@ -147,6 +150,152 @@ check("đăng ký: mô tả nói rõ KHI NÀO gọi", len(desc) > 60 and "op" in
 props = ((_regs[0].get("schema") or {}).get("properties") or {}) if _regs else {}
 check("đăng ký: schema có op/name/schedule/prompt",
       {"op", "name", "schedule", "prompt"}.issubset(set(props)))
+
+
+# ---- 7. Chặn C1 (hồi quy deadlock): handler + 3 hàm HTTP BẮT BUỘC là coroutine ----
+# Trước khi vá, javis_schedule là `def` thuần gọi httpx.post ĐỒNG BỘ vào chính server đang chạy
+# nó -> khoá event loop uvicorn (1 worker, main.py:5037) -> deadlock/ReadTimeout, treo TOÀN BỘ
+# server. Lưới này chặn ai đó quay lại lối sync ở lần sửa sau.
+check("C1: javis_schedule là coroutine (không còn def thuần đồng bộ)",
+      inspect.iscoroutinefunction(sched.javis_schedule))
+check("C1: _post_reminder là coroutine", inspect.iscoroutinefunction(sched._post_reminder))
+check("C1: _get_reminders là coroutine", inspect.iscoroutinefunction(sched._get_reminders))
+check("C1: _cancel_reminder là coroutine", inspect.iscoroutinefunction(sched._cancel_reminder))
+check("C1: _do_create/_do_list/_do_cancel cũng là coroutine (await được xuống httpx)",
+      inspect.iscoroutinefunction(sched._do_create)
+      and inspect.iscoroutinefunction(sched._do_list)
+      and inspect.iscoroutinefunction(sched._do_cancel))
+
+
+# ---- 8. Chặn C2 (LƯỚI THẬT, không chỉ kiểm tra chữ đã ghi) ----
+# Assert "MCP POS" in body (mục 3) chỉ chứng minh chữ đã được GHI ra file, KHÔNG chứng minh loop
+# sẽ ĐỌC nó. self_improve.py:250 `goal = fm.get("goal", "business")` - THIẾU dòng 'goal: custom'
+# trong frontmatter thì self_improve._norm_loop tự rơi về 'business', và goal=='business'
+# (self_improve.py:546) KHÔNG đọc loop["body"] một chữ nào - loop "tạo thành công" nhưng chạy
+# nhầm việc khác hoàn toàn (hoặc skip vô hạn nếu chưa có MCP số liệu). Test này đưa file loop qua
+# ĐÚNG hàm self_improve dùng thật (LoopFeature.get_loop -> _norm_loop) để chặn tận gốc.
+def _c2_atomic_write(path, text):
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(text, encoding="utf-8")
+
+
+_c2_deps = self_improve.LoopDeps(
+    build_system_prompt=lambda brain: "SYS",
+    metrics=lambda *a, **k: {"cards": []},
+    brain_root=lambda brain: brain,   # test dùng thẳng path vault làm "brain" - identity map
+    aux_model=lambda: None,
+    atomic_write_text=_c2_atomic_write,
+    project_root=Path("."),
+    state_dir=Path(os.environ["JAVIS_STATE_DIR"]),
+    safe_tools=[], readonly_tools=[],
+)
+_c2_feat = self_improve.LoopFeature(_c2_deps)
+
+_vault_c2 = tempfile.mkdtemp(prefix="javis-vault-c2-")
+_res_c2 = sched._create_loop_file(
+    _vault_c2, name="Doc source moi vong",
+    prompt="Moi vong doc 1 source unprocessed roi de xuat wiki.", schedule="120m")
+check("C2: tạo loop qua tool không lỗi", not str(_res_c2).startswith("ERROR"))
+_lp_c2 = _c2_feat.get_loop(_vault_c2, "doc-source-moi-vong")
+check("C2: self_improve (LoopFeature.get_loop -> _norm_loop) đọc lại được loop vừa tạo",
+      bool(_lp_c2))
+check("C2 LƯỚI THẬT: goal == 'custom' (KHÔNG rơi về mặc định 'business' của self_improve.py:250)",
+      bool(_lp_c2) and _lp_c2.get("goal") == "custom")
+check("C2 LƯỚI THẬT: thân file (prompt) TỚI ĐƯỢC self_improve - đúng chỗ sẽ chạy thật",
+      bool(_lp_c2) and "de xuat wiki" in _lp_c2.get("body", ""))
+
+
+# ---- 9. Chặn I2: notify_only phải đổi mode 'notify'/'task' thật trong payload gửi /reminders ----
+_captured_payload = {}
+
+
+async def _fake_post_reminder(payload):
+    _captured_payload.clear()
+    _captured_payload.update(payload)
+    return "Đã đặt nhắc hẹn lúc ? (id fake)."
+
+
+_real_post_reminder = sched._post_reminder
+sched._post_reminder = _fake_post_reminder
+try:
+    asyncio.run(sched._do_create(_vault_c2, {
+        "name": "Goi khach", "prompt": "Nhac goi khach X", "schedule": "30 phut nua",
+        "notify_only": True,
+    }))
+    check("I2: notify_only=True -> payload mode='notify' (không dựng engine chạy LLM)",
+          _captured_payload.get("mode") == "notify")
+
+    asyncio.run(sched._do_create(_vault_c2, {
+        "name": "Goi khach 2", "prompt": "Nhac goi khach Y", "schedule": "30 phut nua",
+        "notify_only": False,
+    }))
+    check("I2: notify_only=False -> payload mode='task' (đọc MCP + ghi nháp như trước)",
+          _captured_payload.get("mode") == "task")
+finally:
+    sched._post_reminder = _real_post_reminder
+
+
+# ---- 10. Chặn I3: đơn vị ngày/tuần/tháng + mốc giờ cố định -> cron + lịch mơ hồ -> ERROR ----
+# Trước khi vá, reviewer chạy thật: 'mỗi tuần'/'mỗi ngày'/'mỗi sáng'/'mỗi tháng' đều ra
+# interval_min=5 (sàn cứng, KHÔNG phải chu kỳ thật), và 'mỗi sáng 7h' ra interval_min=420
+# (hiểu nhầm thành "mỗi 7 tiếng" thay vì "7h sáng mỗi ngày").
+check("I3: _interval_min('mỗi tuần') == 10080 (7 ngày, không phải sàn 5 phút)",
+      sched._interval_min("mỗi tuần") == 10080)
+check("I3: _interval_min('mỗi ngày') == 1440", sched._interval_min("mỗi ngày") == 1440)
+check("I3: _interval_min('mỗi tháng') == 43200", sched._interval_min("mỗi tháng") == 43200)
+check("I3: _interval_min('120m') vẫn == 120 (không phá đường cũ)", sched._interval_min("120m") == 120)
+check("I3: _interval_min('2 tiếng') vẫn == 120", sched._interval_min("2 tiếng") == 120)
+
+# Lịch mơ hồ (không số, không đơn vị, không mốc giờ) -> None, KHÔNG ĐƯỢC là 5.
+check("I3 AN TOÀN: _interval_min('mỗi sáng') mơ hồ -> None (không âm thầm ra 5 phút)",
+      sched._interval_min("mỗi sáng") is None)
+check("I3 AN TOÀN: _interval_min('mỗi khi rảnh') mơ hồ -> None",
+      sched._interval_min("mỗi khi rảnh") is None)
+_vault_amb = tempfile.mkdtemp(prefix="javis-vault-amb-")
+_res_amb = sched._create_loop_file(_vault_amb, name="Việc mơ hồ", prompt="x", schedule="mỗi sáng")
+check("I3 AN TOÀN: tạo loop với lịch mơ hồ -> ERROR rõ ràng, KHÔNG tạo file",
+      str(_res_amb).startswith("ERROR"))
+check("I3 AN TOÀN: ERROR gợi ý cách sửa (số+đơn vị hoặc cron)",
+      "cron" in _res_amb.lower() or "đơn vị" in _res_amb)
+check("I3 AN TOÀN: không có file .md nào được ghi khi lịch mơ hồ",
+      not list((Path(_vault_amb) / "Javis" / "loops").glob("*.md")))
+
+# Mốc giờ cố định lặp hằng ngày -> route sang reminder + cron đúng giờ, KHÔNG phải interval 420.
+check("I3: 'mỗi sáng 7h' -> route 'reminder' (cron), không còn là loop interval=420 phút",
+      sched._route_kind("mỗi sáng 7h", False) == "reminder")
+check("I3: _reminder_time_payload('mỗi sáng 7h') == cron '0 7 * * *'",
+      sched._reminder_time_payload("mỗi sáng 7h") == {"cron": "0 7 * * *"})
+check("I3: 'mỗi ngày lúc 8h' -> cron '0 8 * * *'",
+      sched._reminder_time_payload("mỗi ngày lúc 8h") == {"cron": "0 8 * * *"})
+check("I3: '7h sáng hằng ngày' (không có từ 'mỗi') -> vẫn ra cron '0 7 * * *'",
+      sched._reminder_time_payload("7h sáng hằng ngày") == {"cron": "0 7 * * *"})
+# 'mỗi 2 tiếng'/'mỗi 7h' KHÔNG có buổi trong ngày -> vẫn là duration, không bị hiểu nhầm thành cron.
+check("I3: 'mỗi 2 tiếng' KHÔNG bị hiểu nhầm thành cron (route vẫn 'loop')",
+      sched._route_kind("mỗi 2 tiếng", False) == "loop")
+check("I3: 'mỗi 7h' (không buổi trong ngày) vẫn là duration, không thành cron",
+      sched._route_kind("mỗi 7h", False) == "loop" and sched._interval_min("mỗi 7h") == 420)
+
+
+# ---- 11. Dispatcher: op sai -> lỗi rõ; ctx.vault_root rỗng -> ERROR (không fallback Brain Default) ----
+class _EmptyVaultCtx:
+    vault_root = ""
+    slug = "javis-schedule"
+
+    def register_tool(self, **kw):
+        pass
+
+    def register_hook(self, *a, **k):
+        pass
+
+
+_res_novault = asyncio.run(sched.javis_schedule({"op": "list"}, _EmptyVaultCtx()))
+check("dispatcher: ctx.vault_root rỗng -> ERROR, không âm thầm rơi về Brain Default",
+      str(_res_novault).startswith("ERROR"))
+
+_res_badop = asyncio.run(sched.javis_schedule({"op": "khong-ton-tai"}, _FakeCtx()))
+check("dispatcher: op không hợp lệ -> báo lỗi rõ (không im lặng/crash)",
+      str(_res_badop).startswith("ERROR") and "khong-ton-tai" in _res_badop)
 
 
 if _fails:

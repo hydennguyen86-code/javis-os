@@ -2776,6 +2776,18 @@ async def execute_workflow(brain, slug, input="", tools=None):
                 c.mcp_config = _mcpf; c.mcp_strict = True
             c.disallowed_tools = ["Bash", "WebFetch", "WebSearch", "Task"]
             c.max_wall_s = 300
+        else:
+            # Ungated (allowed_tools=None, "chạy full quyền" - Studio bấm nút): plugin in-process
+            # CÓ nạp (claude_sdk_engine._mcp_servers gọi _plugins_server() khi allowed_tools rỗng)
+            # nên PHẢI gắn brain để ctx plugin (vd javis_generate_image) suy đúng vault - thiếu
+            # dòng này thì rơi về Brain Default y hệt bug 0.9.70 đã vá ở đường chat (Nợ 1,
+            # final-fix-gd2). KHÔNG gọi _apply_mcp() ở đây: nhánh này cố ý dựa vào setting_sources
+            # (claude_sdk_engine.py _options(): permission_mode=bypassPermissions +
+            # setting_sources=[user,project,local]) để kế thừa MCP/skill/auth có sẵn của máy như
+            # 1 phiên `claude` tương tác thật - đúng ý đầu file main.py "claude CLI đã cài trên
+            # máy → tự kế thừa MCP". Gọi apply_mcp sẽ ép gắn thêm cấu hình MCP hub, đổi hành vi
+            # ngoài phạm vi lỗi vault_root đang vá.
+            c.javis_vault = vault_root
         return c
 
     def _agent_sysprompt(aslug):

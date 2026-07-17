@@ -40,7 +40,10 @@ def _atomic_write(path, text):
     p.write_text(text, encoding="utf-8")
 
 
-def _apply_mcp(cli, mode="full"):
+def _apply_mcp(cli, mode="full", brain=None):
+    # brain=None trong chữ ký: khớp _apply_mcp thật (main.py) sau khi self_improve._make_cli
+    # được vá truyền brain=brain tường minh (Nợ 1, final-fix-gd2) - stub cũ thiếu tham số này
+    # sẽ TypeError ở call site thật, rơi vào nhánh except TypeError và làm rớt luôn 'mode'.
     _applied.append(mode)
     cli.mcp_config = "STUB_HUB"
     return cli
