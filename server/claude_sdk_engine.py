@@ -21,6 +21,7 @@ import os
 import sys
 import threading
 import time
+from pathlib import Path
 
 try:
     import claude_agent_sdk as _sdk   # noqa: F401
@@ -159,6 +160,15 @@ class ClaudeSDK:
         return PermissionResultDeny(
             message=f"Tool '{tool_name}' bị chặn: phiên nền này chỉ được dùng {', '.join(allowed)}.")
 
+    def _brain_root(self):
+        """Brain đang làm việc, suy từ cwd. Trả None nếu cwd không phải một brain hợp lệ
+        (vd chat chạy với cwd = thư mục project) - khi đó plugin tự lo fallback như cũ."""
+        try:
+            root = Path(self.cwd)
+            return str(root) if (root / "Javis").is_dir() else None
+        except Exception:
+            return None
+
     def _plugins_server(self):
         """Phase 3: dựng MCP server IN-PROCESS từ tool plugin (plugins_host) - engine SDK gọi
         thẳng handler Python, không qua hub HTTP. Trả McpSdkServerConfig hoặc None (không plugin).
@@ -166,9 +176,17 @@ class ClaudeSDK:
         import plugins_host
         from claude_agent_sdk import tool as sdk_tool, create_sdk_mcp_server
         mode = (self.javis_mode or "full").strip().lower()
-        p_tools, p_route = plugins_host.plugin_tools(mode, None)   # None = plugin toàn cục, như hub phục vụ CLI
+        # vault_root: CHỈ để ctx của plugin biết đang làm việc ở brain nào (vd image-chatgpt lưu
+        # ảnh vào đúng attachments/). Trước đây truyền None nên MỌI plugin gọi từ Claude Code đều
+        # có ctx.vault_root=None -> image_gen._resolve_vault rơi về "Brain Default" -> lưu SAI brain.
+        # Vẫn KHÔNG nạp plugin riêng-của-vault (giữ nguyên hành vi cũ): scope_vault=False.
+        brain_root = self._brain_root()
+        p_tools, p_route = plugins_host.plugin_tools(mode, brain_root, scope_vault=False)
         if not p_tools:
             return None
+        # has_tool_hooks/wrap_with_hooks chưa biết scope_vault (ngoài phạm vi task này) - giữ
+        # nguyên vault_root=None ở đây để KHÔNG vô tình nạp plugin riêng-của-vault qua nhánh
+        # _load_all(vault_root) mặc định scope_vault=True của chúng.
         use_hooks = plugins_host.has_tool_hooks(None)
         sdk_tools = []
         for t in p_tools:
