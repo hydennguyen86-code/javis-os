@@ -29,7 +29,7 @@ Spec: `docs/superpowers/specs/2026-07-17-hop-nhat-viec-dinh-ky-design.md`
 | `server/test_jobs.py` | **Mới.** Phủ: route cũ chết, route mới sống, helper đã xoá, caps sạch, union loop + nhắc hẹn, đếm `running`. |
 | `dashboard/studio.js` | Bỏ page `automations` (loader, form `editAutomation`, nút sync). |
 | `dashboard/console.js` | Bỏ rail `automations`. Rail `selfimprove` đổi nhãn "Loop" → "Việc", render thêm khối nhắc hẹn, sửa copy trỏ tới tab Lịch. |
-| `dashboard/index.html` | Bỏ `panel-automations`. Bỏ panel loop cũ đã chết (`:160-192`). |
+| `dashboard/index.html` | Chỉ bỏ panel loop cũ đã chết (`:160-192`, Task 4). **Không** có `panel-automations` ở đây - nó do `console.js:222` dựng động từ `STUDIO_PAGES`. |
 | `dashboard/app.js` | Bỏ fetch `/loop/config` của panel chết (`:1497`). |
 
 **Ghi chú decomposition:** khối registry + khối caps **phải cùng một task**. `_gather_capabilities` (`main.py:3352`) gọi `_read_automations`; xoá helper mà để lại lời gọi thì `rebuild_javis_index` ném `NameError` **mỗi tick scheduler** (`main.py:3650-3651`). Reviewer không thể duyệt cái này mà từ chối cái kia, nên chúng là một deliverable.
@@ -362,8 +362,14 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 **Files:**
 - Modify: `dashboard/console.js:23, 46, 49, 64-65, 94, 97, 107` (rail + nhãn), `:683` (copy), `:708` (thêm host), `:809-826` (`loadLoops`: gọi render nhắc hẹn)
-- Modify: `dashboard/studio.js:46, 55, 58, 306-380` (xoá loader + form + sync)
-- Modify: `dashboard/index.html` (xoá `panel-automations`)
+- Modify: `dashboard/studio.js` (xoá loader + form + nút sync) - **neo bằng tên hàm, KHÔNG bằng số dòng**, xem cảnh báo dưới
+- **KHÔNG** đụng `dashboard/index.html` trong task này
+
+> **CẢNH BÁO TRANH CHẤP (đọc trước khi sửa `studio.js`):** một phiên khác đang sửa `dashboard/studio.js` song song. Lúc soạn plan này, commit `0fcb34f` (không thuộc plan này) đã sửa `studio.js` + `index.html` + `VERSION` + `CHANGELOG.md`, và working tree còn `M dashboard/studio.js` (+43/-10 dòng, vùng dòng 211-273) chưa commit. **Mọi số dòng của `studio.js` trong plan này đã trôi và không đáng tin.** Trước khi sửa, chạy `git status` và `grep -n` để lấy vị trí thật. Nếu working tree còn sửa dở của người khác, hỏi trước khi commit đè.
+>
+> Vị trí đúng **tại thời điểm soát plan** (đã tự trôi so với bản nháp đầu): `loadAutomations` ở `:341` (nháp ghi 306), nút `/automations/sync` ở `:350` (nháp ghi 314), `editAutomation` ở `:395` (nháp ghi 358). Dùng `grep -n "function loadAutomations\|function editAutomation"` để lấy số hiện hành.
+>
+> `panel-automations` **không nằm trong `index.html`**. Nó do `console.js:222` dựng động (`el.innerHTML = '<div class="stab-panel" id="panel-${id}"></div>'`) từ `STUDIO_PAGES`. Bỏ `"automations"` khỏi `STUDIO_PAGES` (`:107`) là đủ. Hai file `dashboard/_wf_harness*.html` có chứa `panel-automations` nhưng chúng là harness test chưa track của phiên khác - **đừng đụng**.
 
 **Interfaces:**
 - Consumes: `GET /jobs`, `POST /jobs/cancel` (Task 1).
@@ -373,11 +379,19 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 **Nhắc lại ràng buộc helper:** console.js **chỉ** có `esc()` (`:116`) và `fbrain()` (`:363`). Dùng `fetch()` trần + `FormData` dựng tại chỗ. `api()`/`fd()`/`brain()` là của studio.js, gọi ở đây sẽ `ReferenceError`.
 
-- [ ] **Step 1: Chụp trạng thái trước (để so sau)**
+- [ ] **Step 1: Chụp trạng thái trước + kiểm tra tranh chấp**
 
-Run: `cd /d/Project/Javis-OS && grep -rc "automations" dashboard/console.js dashboard/studio.js dashboard/index.html`
+Run:
+
+```bash
+cd /d/Project/Javis-OS
+git status --short dashboard/
+grep -rc "automations" dashboard/console.js dashboard/studio.js dashboard/index.html
+```
 
 Ghi lại ba con số. Cuối task cả ba phải về **0**.
+
+Nếu `git status` cho thấy `dashboard/studio.js` (hoặc file dashboard khác trong task này) đang có sửa chưa commit **không phải của mình**, DỪNG và hỏi người review. Một phiên khác đang làm việc trên chính file này.
 
 - [ ] **Step 2: Xoá rail `automations` khỏi console.js**
 
@@ -467,19 +481,32 @@ Rồi gọi nó ở cuối `loadLoops` (`:809-826`), ngay trước dòng `clearT
 
 - [ ] **Step 6: Xoá studio page `automations`**
 
-Trong `dashboard/studio.js`:
+Trước tiên lấy vị trí thật (số dòng trong plan đã trôi, xem cảnh báo tranh chấp ở đầu task):
+
+```bash
+cd /d/Project/Javis-OS
+git status --short dashboard/studio.js
+grep -n "function loadAutomations\|function editAutomation\|automations" dashboard/studio.js
+```
+
+Nếu `git status` cho thấy `studio.js` đang có sửa dở của người khác, **dừng và hỏi** trước khi động vào.
+
+Trong `dashboard/studio.js` (ba chỗ đầu vẫn ở đúng dòng cũ vì nằm trên vùng trôi):
 - Bỏ `automations: loadAutomations` khỏi map (`:46`).
 - Bỏ `"automations"` khỏi mảng `["workflows", "agents", "skills", "automations"]` (`:55`).
 - Xoá nhánh `else if (tab === "automations") loadAutomations();` (`:58`).
-- Xoá nguyên hàm `loadAutomations` (`:306` tới hết) và `editAutomation` (`:358` tới hết), gồm cả nút gọi `/automations/sync` (`:314`).
+- Xoá nguyên hàm `loadAutomations` (neo: `async function loadAutomations() {`) tới hết thân hàm, gồm cả nút gọi `/automations/sync` bên trong nó.
+- Xoá nguyên hàm `editAutomation` (neo: `function editAutomation(a) {`) tới hết thân hàm.
 
-Trong `dashboard/index.html`: xoá `<div id="panel-automations">...</div>`.
+**Không** đụng `dashboard/index.html`: `panel-automations` do `console.js:222` dựng động từ `STUDIO_PAGES`, và Step 2.4 đã bỏ `"automations"` khỏi mảng đó rồi.
 
 - [ ] **Step 7: Xác nhận không còn tham chiếu**
 
-Run: `cd /d/Project/Javis-OS && grep -rn "automations" dashboard/*.js dashboard/*.html`
+Run: `cd /d/Project/Javis-OS && grep -rn "automations" dashboard/console.js dashboard/studio.js dashboard/index.html`
 
-Expected: **0 hit**. (So với ba con số ghi ở Step 1.)
+Expected: **0 hit** ở ba file này. (So với ba con số ghi ở Step 1.)
+
+Cố ý **không** grep cả `dashboard/*.js`: `_studio_old.js` và `_wf_harness*.html` là file cũ/harness chưa track, còn chứa `panel-automations`, và không thuộc phạm vi task này.
 
 - [ ] **Step 8: Kiểm tra bằng mắt trong app thật**
 
