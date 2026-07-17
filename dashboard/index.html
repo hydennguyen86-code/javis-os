@@ -8,7 +8,7 @@
   <link rel="icon" href="/brand-logo?v=5">
   <link rel="apple-touch-icon" href="/brand-logo?v=5">
   <link rel="stylesheet" href="/static/style.css?v=43">
-  <link rel="stylesheet" href="/static/console.css?v=15">
+  <link rel="stylesheet" href="/static/console.css?v=16">
 </head>
 <body>
   <div class="hud">
@@ -301,7 +301,8 @@
   </div>
 
   <!-- ===== Console layer: rail điều hướng + trang quản lý (Alpine-driven) ===== -->
-  <nav class="rail" x-data x-cloak>
+  <nav class="rail" x-data x-cloak :class="{ collapsed: $store.nav.collapsed }"
+       x-effect="document.body.classList.toggle('rail-collapsed', $store.nav.collapsed)">
     <!-- ĐỈNH cố định -->
     <div class="rail-top">
       <div class="rail-brand"><img src="/brand-logo" alt="Javis" style="width:30px;height:30px;border-radius:8px;display:block;object-fit:cover"></div>
@@ -309,22 +310,32 @@
     <!-- GIỮA cuộn được - gom theo nhóm; nhóm foot (Hệ thống) tự ghim xuống đáy -->
     <div class="rail-nav">
       <template x-for="g in $store.nav.groups" :key="g.label">
-        <div class="rail-group" :class="{ foot: g.foot }">
-          <div class="rail-grp-lbl" x-text="g.label"></div>
-          <template x-for="it in g.items" :key="it.id">
-            <button class="rail-item" :class="{ active: $store.nav.active === it.id }"
-                    @click="$store.nav.go(it.id)" :title="it.label">
-              <span class="rail-ico" x-html="it.icon"></span>
-              <span class="rail-lbl" x-text="it.label"></span>
-            </button>
-          </template>
+        <div class="rail-group" :class="{ foot: g.foot, open: $store.nav.isOpen(g.label), 'has-active': g.items.some(it => it.id === $store.nav.active) }">
+          <button class="rail-grp-lbl" @click="$store.nav.toggleGroup(g.label)" :title="g.label">
+            <span class="rail-grp-ico" x-html="g.icon"></span>
+            <span class="grp-name" x-text="g.label"></span>
+          </button>
+          <div class="rail-grp-items">
+            <template x-for="it in g.items" :key="it.id">
+              <button class="rail-item" :class="{ active: $store.nav.active === it.id }"
+                      @click="$store.nav.go(it.id)" :title="it.label">
+                <span class="rail-ico" x-html="it.icon"></span>
+                <span class="rail-lbl" x-text="it.label"></span>
+              </button>
+            </template>
+          </div>
         </div>
       </template>
     </div>
-    <!-- ĐÁY cố định: version + tác giả (luôn hiện) -->
+    <!-- ĐÁY cố định: nút thu/mở + version + tác giả -->
     <div class="rail-foot">
-      <div class="rf-ver" id="railVersion">v0.0.0</div>
-      <a class="rf-author" href="https://minhquy.vn" target="_blank" rel="noopener">by Minh Quý</a>
+      <button class="rail-collapse-btn" @click="$store.nav.toggleCollapsed()"
+              :title="$store.nav.collapsed ? 'Mở rộng thanh bên' : 'Thu gọn thanh bên'"
+              x-html="$store.nav.collapseIcon"></button>
+      <div class="rf-meta">
+        <div class="rf-ver" id="railVersion">v0.0.0</div>
+        <a class="rf-author" href="https://minhquy.vn" target="_blank" rel="noopener">by Minh Quý</a>
+      </div>
     </div>
   </nav>
 
@@ -565,7 +576,7 @@
   <script src="/static/sessions-ui.js?v=6"></script>
   <script src="/static/studio.js?v=23"></script>
   <!-- Console layer: console.js đăng ký store TRƯỚC khi Alpine khởi động (defer) -->
-  <script src="/static/console.js?v=66"></script>
+  <script src="/static/console.js?v=67"></script>
   <script defer src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>
 </body>
 </html>

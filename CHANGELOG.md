@@ -4,6 +4,16 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.72] - 2026-07-18
+Làm gọn thanh điều hướng bên trái (rail) theo góp ý trực tiếp: chữ khó đọc vì dùng font monospace, header nhóm trơ không icon, và rail chiếm quá nhiều bề ngang màn hình.
+### Thêm mới
+- **Nút thu/mở sidebar ở góc dưới**: bấm để thu rail còn 60px chỉ hiện cột icon dọc (tên mục hiện qua tooltip khi rê chuột), bấm lần nữa bung lại đầy chữ 160px. Phần nội dung bên phải tự giãn chiếm lại chỗ khi thu (mọi offset chạy qua biến `--rail-w`, thu chỉ đổi 1 biến trên `body.rail-collapsed`). Trạng thái nhớ qua `localStorage` nên lần sau vào giữ nguyên. Mũi tên nút xoay 180° báo trạng thái (xoay cả nút chứ không xoay riêng `<svg>` để né quirk transform-box của SVG root). Luật thu gọn bọc trong `@media (min-width: 861px)` nên KHÔNG chạm thanh dưới ngang trên mobile.
+### Cải thiện
+- **Rail thành 2 tầng gập/mở thay cho danh sách phẳng dài phải cuộn**: tầng 1 là tên nhóm bấm để xổ, tầng 2 là các mục con trượt ra dưới (max-height transition). Mỗi lúc chỉ 1 nhóm mở; nhóm chứa trang đang xem tự mở, nếu đang gập thì tên nhóm hé màu cam để biết mình ở đâu. Store `nav` thêm `openGroup`/`toggleGroup`/`collapsed`/`toggleCollapsed`.
+- **Sửa font sai + chữ to hơn**: nhãn rail trước dùng biến `--font` (monospace `SF Mono`/`Consolas`) làm chữ tiếng Việt có dấu cứng và lệch. Thêm biến `--font-ui` (Segoe UI sans-serif) cho riêng rail; cỡ chữ tên nhóm 12.5px, tên mục 13.5px (trước 11 và 12.5px).
+- **Thêm icon cho tên nhóm (tầng 1)**: 6 icon line-style đồng bộ với icon mục (`GICON`) cho Trợ lý/Bộ não/Năng lực/Việc/Kết nối/Hệ thống, hết trơ.
+- **Thu bề ngang rail 172→160px** ở chế độ mở rộng cho đỡ dư diện tích; đã đo không mục nào bị cắt chữ (kể cả "Việc định kỳ").
+
 ## [0.9.71] - 2026-07-17
 Bản 0.9.70 ship tool `javis_schedule` ra ngoài trong tình trạng KHÔNG dùng được thật - review độc lập (chạy code, không đoán) tìm ra 2 lỗi Critical, 3 lỗi Important và 1 khoản nợ kỹ thuật. Bản này vá toàn bộ. Cảm ơn review đã chỉ đúng: "cả hai nửa của tool đều không làm được việc nó hứa".
 ### Sửa lỗi

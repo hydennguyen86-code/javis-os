@@ -33,6 +33,18 @@
     settings:    _svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>'),
   };
 
+  // Icon cho TẦNG 1 (nhãn nhóm) - cùng phong cách line-style; chỉ dùng ở header nhóm rail.
+  const GICON = {
+    "Trợ lý":   _svg('<path d="M12 3l1.8 4.7L18.5 9.5 13.8 11.3 12 16l-1.8-4.7L5.5 9.5l4.7-1.8L12 3z"/><path d="M19 15l.7 1.8 1.8.7-1.8.7L19 20l-.7-1.8L16.5 17.5l1.8-.7L19 15z"/>'),
+    "Bộ não":   _svg('<path d="M8.5 4A3.5 3.5 0 0 0 5 7.5 3 3 0 0 0 4 13a3 3 0 0 0 2 4.5A3 3 0 0 0 12 19V5.5A2.5 2.5 0 0 0 8.5 4z"/><path d="M15.5 4A3.5 3.5 0 0 1 19 7.5 3 3 0 0 1 20 13a3 3 0 0 1-2 4.5A3 3 0 0 1 12 19"/>'),
+    "Năng lực": _svg('<path d="M12 2c3 1.2 5 4.2 5 8 0 2.2-1 4-2 5l-3 2-3-2c-1-1-2-2.8-2-5 0-3.8 2-6.8 5-8z"/><circle cx="12" cy="9" r="1.6"/><path d="M9 16l-2 4M15 16l2 4"/>'),
+    "Việc":     _svg('<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M8.5 11l2 2 4-4"/>'),
+    "Kết nối":  _svg('<path d="M9 15l6-6"/><path d="M10.5 7.5l1-1a3.5 3.5 0 0 1 5 5l-1 1M13.5 16.5l-1 1a3.5 3.5 0 0 1-5-5l1-1"/>'),
+    "Hệ thống": _svg('<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/><circle cx="4" cy="12" r="1.8"/><circle cx="12" cy="6" r="1.8"/><circle cx="20" cy="14" r="1.8"/>'),
+  };
+  // Icon nút thu/mở sidebar (mũi tên kép «; body.rail-collapsed sẽ xoay 180° thành »).
+  const COLLAPSE_ICON = _svg('<path d="M15 6l-6 6 6 6"/><path d="M20 6l-6 6 6 6"/>');
+
   const RAIL_ITEMS = [
     { id: "home",        icon: ICON.home,        label: "Javis" },
     { id: "chat",        icon: ICON.chat,        label: "Trò chuyện" },
@@ -57,12 +69,12 @@
   // Nhóm cuối (foot:true) được ghim xuống ĐÁY rail; các nhóm còn lại cuộn ở giữa.
   // Thứ tự & thành viên đổi ở đây; RAIL_ITEMS vẫn là nguồn icon/label + tra cứu cho go().
   const RAIL_GROUPS = [
-    { label: "Trợ lý",      ids: ["home", "chat", "overview"] },
-    { label: "Bộ não",      ids: ["files", "learn"] },
-    { label: "Năng lực",    ids: ["agents", "skills", "workflows", "plugins"] },
-    { label: "Việc",        ids: ["kanban", "selfimprove"] },
-    { label: "Kết nối",     ids: ["mcp", "channels", "models"] },
-    { label: "Hệ thống",    ids: ["settings", "logs", "account"], foot: true },
+    { label: "Trợ lý",      icon: GICON["Trợ lý"],   ids: ["home", "chat", "overview"] },
+    { label: "Bộ não",      icon: GICON["Bộ não"],   ids: ["files", "learn"] },
+    { label: "Năng lực",    icon: GICON["Năng lực"], ids: ["agents", "skills", "workflows", "plugins"] },
+    { label: "Việc",        icon: GICON["Việc"],     ids: ["kanban", "selfimprove"] },
+    { label: "Kết nối",     icon: GICON["Kết nối"],  ids: ["mcp", "channels", "models"] },
+    { label: "Hệ thống",    icon: GICON["Hệ thống"], ids: ["settings", "logs", "account"], foot: true },
   ];
   const RAIL_BY_ID = Object.fromEntries(RAIL_ITEMS.map(i => [i.id, i]));
   // Trả về [{label, foot, items:[...]}], bỏ id không tồn tại. Mục nào chưa xếp nhóm → dồn vào "Khác".
@@ -70,7 +82,7 @@
     const seen = new Set();
     const groups = RAIL_GROUPS.map(g => {
       const items = (g.ids || []).map(id => { seen.add(id); return RAIL_BY_ID[id]; }).filter(Boolean);
-      return { label: g.label, foot: !!g.foot, items };
+      return { label: g.label, icon: g.icon || "", foot: !!g.foot, items };
     }).filter(g => g.items.length);
     const rest = RAIL_ITEMS.filter(i => !seen.has(i.id));
     if (rest.length) {
@@ -78,6 +90,11 @@
       if (foot) foot.items.push(...rest); else groups.push({ label: "Khác", foot: false, items: rest });
     }
     return groups;
+  }
+  // Nhãn nhóm chứa một mục id (cho accordion: mở đúng nhóm của trang đang xem).
+  function groupLabelOf(id) {
+    const g = RAIL_GROUPS.find(gr => (gr.ids || []).includes(id));
+    return g ? g.label : (RAIL_GROUPS[0] && RAIL_GROUPS[0].label) || "";
   }
 
   const VIEW_META = {
@@ -2464,11 +2481,21 @@
     Alpine.store("nav", {
       active: "home",
       items: RAIL_ITEMS,
+      openGroup: groupLabelOf("home"),   // accordion 2 tầng: nhóm đang mở (mặc định nhóm chứa trang đầu)
+      collapsed: (() => { try { return localStorage.getItem("javis_rail_collapsed") === "1"; } catch (e) { return false; } })(),
+      collapseIcon: COLLAPSE_ICON,
       get groups() { return railGroups(); },
       get meta() { return VIEW_META[this.active] || VIEW_META.home; },
+      isOpen(label) { return this.openGroup === label; },
+      toggleGroup(label) { this.openGroup = (this.openGroup === label) ? null : label; },   // 1 nhóm mở 1 lúc; bấm lại để đóng
+      toggleCollapsed() {   // thu/mở sidebar: thu → chỉ còn icon; mở → đầy chữ. Nhớ lựa chọn qua localStorage.
+        this.collapsed = !this.collapsed;
+        try { localStorage.setItem("javis_rail_collapsed", this.collapsed ? "1" : "0"); } catch (e) {}
+      },
       go(id) {
         const item = RAIL_ITEMS.find(i => i.id === id);
         if (item && item.launch) { item.launch(); recomputeGraph(); return; }  // launcher: không đổi view
+        const gl = groupLabelOf(id); if (gl) this.openGroup = gl;   // giữ nhóm chứa mục vừa mở luôn bung ra
         navigateTo(id);
       },
     });
