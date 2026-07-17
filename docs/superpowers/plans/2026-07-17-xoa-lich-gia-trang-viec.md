@@ -4,7 +4,11 @@
 
 **Goal:** Xoá registry Lịch (không executor nào đọc nó), bịt lỗ `bypassPermissions` của `/automations/sync`, và gộp loop + nhắc hẹn về một trang "Việc" duy nhất.
 
-**Architecture:** Thuần xoá + đổi tên, không đổi hành vi thực thi. `automations.json` chưa từng được scheduler đọc (`main.py:3613-3656` không có nhánh nào), và 0 file `automations.json` tồn tại trên cả 4 brain, nên phía dữ liệu user không có gì để migrate. Endpoint `/automations` GET được thay bằng `/jobs` trả union loop + nhắc hẹn (đúng thứ nó vốn đã trả qua `builtin`), phần registry tay bị bỏ. Studio page Lịch bị xoá, rail `selfimprove` đổi nhãn thành "Việc" và render thêm nhắc hẹn - nếu không, xoá rail Lịch sẽ làm user **mất chỗ nhìn nhắc hẹn**, vì `pending_as_automations` hiện chỉ hiện ở đó.
+**Architecture:** Thuần xoá + đổi tên, **không thêm endpoint nào**. `automations.json` chưa từng được scheduler đọc (`main.py:3613-3656` không có nhánh nào), và 0 file `automations.json` tồn tại trên cả 4 brain, nên phía dữ liệu user không có gì để migrate.
+
+Điểm mấu chốt (tìm ra ở pre-flight, đã sửa plan theo): `_loops_as_routines` (`main.py:3169`) và `pending_as_automations` (`reminders.py:278`) **không phải helper dùng chung** - chúng là **lớp chiếu vào hình dạng Lịch giả**, và caller duy nhất của cả hai là `main.py:3199`, tức chính `/automations` GET sắp xoá. Lịch chết thì chúng chết theo. Trang Việc dùng thẳng **endpoint thật đã có sẵn**: loop từ `GET /loops` (`console.js:812` đang dùng), nhắc hẹn từ `GET /reminders` (`reminders.py:498`, trả `{pending, history, counts}` với `_view()` giàu hơn bản chiếu) và huỷ qua `POST /reminders/cancel` (`reminders.py:551`). Bản nháp plan đầu đã bịa ra một lớp API `/jobs` mới chỉ để bảo tồn lớp chiếu vốn chỉ tồn tại vì cái giả - đó là YAGNI, đã bỏ.
+
+Vẫn giữ nguyên yêu cầu: xoá rail Lịch mà không gộp nhắc hẹn vào trang Việc = user **mất chỗ nhìn nhắc hẹn**, vì hiện chúng chỉ hiện ở tab Lịch.
 
 **Tech Stack:** Python 3.12, FastAPI, vanilla JS (dashboard), test script thuần (không pytest).
 
@@ -25,8 +29,9 @@ Spec: `docs/superpowers/specs/2026-07-17-hop-nhat-viec-dinh-ky-design.md`
 
 | File | Trách nhiệm sau giai đoạn 1 |
 |---|---|
-| `server/main.py` | Bỏ 5 route `/automations*` + 3 helper registry + khối caps. Thêm `_jobs_payload` + route `/jobs`, `/jobs/toggle`, `/jobs/cancel`. |
-| `server/test_jobs.py` | **Mới.** Phủ: route cũ chết, route mới sống, helper đã xoá, caps sạch, union loop + nhắc hẹn, đếm `running`. |
+| `server/main.py` | Bỏ 5 route `/automations*`, 3 helper registry, lớp chiếu `_loops_as_routines`, khối caps. **Không thêm endpoint nào.** |
+| `server/reminders.py` | Bỏ lớp chiếu `pending_as_automations` (caller duy nhất là `/automations` GET). Phần còn lại nguyên vẹn. |
+| `server/test_jobs.py` | **Mới.** Phủ: route + helper + lớp chiếu đã chết, caps sạch và còn chạy, và các endpoint THẬT mà trang Việc dựa vào (`/loops`, `/reminders`, `/reminders/cancel`) vẫn còn. |
 | `dashboard/studio.js` | Bỏ page `automations` (loader, form `editAutomation`, nút sync). |
 | `dashboard/console.js` | Bỏ rail `automations`. Rail `selfimprove` đổi nhãn "Loop" → "Việc", render thêm khối nhắc hẹn, sửa copy trỏ tới tab Lịch. |
 | `dashboard/index.html` | Chỉ bỏ panel loop cũ đã chết (`:160-192`, Task 4). **Không** có `panel-automations` ở đây - nó do `console.js:222` dựng động từ `STUDIO_PAGES`. |
@@ -36,36 +41,39 @@ Spec: `docs/superpowers/specs/2026-07-17-hop-nhat-viec-dinh-ky-design.md`
 
 ---
 
-### Task 1: Xoá registry Lịch, thay bằng `/jobs`
+### Task 1: Xoá registry Lịch + hai lớp chiếu + khối caps (xoá thuần)
 
 **Files:**
-- Modify: `server/main.py:3140-3262` (xoá `_automations_path`/`_read_automations`/`_write_automations`, 4 route `/automations*`; thêm `_jobs_payload` + 3 route mới)
+- Modify: `server/main.py:3140-3262` (xoá `_automations_path`/`_read_automations`/`_write_automations`, `_loops_as_routines`, 4 route `/automations*`)
 - Modify: `server/main.py:3324, 3352-3354, 3411-3413` (xoá khối caps chết)
+- Modify: `server/reminders.py:278-296` (xoá `pending_as_automations`)
 - Test: `server/test_jobs.py` (tạo mới)
 
 **Interfaces:**
-- Consumes: `_loops_as_routines(brain) -> list[dict]` (`main.py:3169`, giữ nguyên), `reminders_feature.pending_as_automations(brain) -> list[dict]` (`reminders.py:278`, giữ nguyên), `reminders_feature.cancel(brain, rid) -> bool` (`reminders.py:300`), `loop_feature.toggle(brain, slug) -> dict|None`.
-- Produces: `_jobs_payload(brain: str) -> dict` trả `{"jobs": list[dict], "running": int, "total": int}`. Route `GET /jobs`, `POST /jobs/toggle`, `POST /jobs/cancel`. Task 3 (UI) tiêu thụ đúng ba route này. `_gather_capabilities(brain)` trả dict **không còn** key `"automations"`.
+- Consumes: không. Đây là task **xoá thuần, không thêm endpoint nào**.
+- Produces: `_gather_capabilities(brain)` trả dict **không còn** key `"automations"`. Task 3 (UI) **không** tiêu thụ gì từ task này - nó dùng các endpoint thật đã có sẵn: `GET /loops`, `GET /reminders`, `POST /reminders/cancel`.
+
+**Vì sao xoá cả hai lớp chiếu:** `grep -rn "_loops_as_routines\|pending_as_automations" server/` cho thấy caller **duy nhất** của cả hai là `main.py:3199` (`/automations` GET). Chúng là bản chiếu loop/nhắc hẹn vào hình dạng dòng-Lịch (`{id: "__loop__:<slug>", schedule: "mỗi N phút", ...}`), trong đó chuỗi `schedule` là **bịa ra lúc GET** (`main.py:3187`). Hết Lịch thì hết lý do tồn tại. Giữ lại = code chết.
 
 - [ ] **Step 1: Viết test thất bại**
 
 Tạo `server/test_jobs.py`:
 
 ```python
-"""Test trang Việc (/jobs) sau khi xoá registry Lịch giả. Chạy tay / CI:
+"""Test: registry Lịch giả đã xoá sạch, nguồn thật của trang Việc còn nguyên. Chạy tay / CI:
 
     cd server && python test_jobs.py
 
 Bối cảnh: automations.json CHƯA TỪNG có executor - _scheduler_loop (main.py:3613-3656) không
-có nhánh nào đọc nó, và 0 file automations.json tồn tại trên cả 4 brain. Giai đoạn 1 xoá nó và
-thay /automations GET bằng /jobs = union loop (việc bền) + nhắc hẹn (việc phù du).
+có nhánh nào đọc nó, và 0 file automations.json tồn tại trên cả 4 brain. Giai đoạn 1 xoá nó,
+KHÔNG thêm endpoint nào: trang Việc dùng thẳng /loops + /reminders đã có sẵn.
 
 Phủ:
-- 5 route /automations* đã biến mất khỏi app.routes; /jobs + /jobs/toggle + /jobs/cancel có mặt.
-- 3 helper registry đã xoá khỏi module (không còn đường ghi automations.json).
+- 4 path /automations* đã biến mất khỏi app.routes.
+- 3 helper registry + 2 lớp chiếu đã xoá (caller duy nhất của chúng là /automations GET).
 - caps: key 'automations' đã xoá, và _gather_capabilities/_render_javis_index còn chạy được
   (nếu xoá helper mà để lại lời gọi thì rebuild_javis_index NameError MỖI tick scheduler).
-- _jobs_payload gộp đúng 2 nguồn và đếm running đúng.
+- Các endpoint THẬT mà trang Việc dựa vào vẫn còn sống.
 """
 import os
 import sys
@@ -89,17 +97,26 @@ def check(name, cond):
 src = (Path(__file__).parent / "main.py").read_text(encoding="utf-8")
 paths = {getattr(r, "path", "") for r in main.app.routes}
 
-# ---- 1. Route: cũ chết, mới sống ----
+# ---- 1. Route Lịch đã chết ----
 check("route: mọi /automations* đã xoá", not any(p.startswith("/automations") for p in paths))
-check("route: GET /jobs có mặt", "/jobs" in paths)
-check("route: POST /jobs/toggle có mặt", "/jobs/toggle" in paths)
-check("route: POST /jobs/cancel có mặt", "/jobs/cancel" in paths)
 
 # ---- 2. Helper registry đã xoá hẳn (không còn đường ghi automations.json) ----
 check("helper: _read_automations đã xoá", not hasattr(main, "_read_automations"))
 check("helper: _write_automations đã xoá", not hasattr(main, "_write_automations"))
 check("helper: _automations_path đã xoá", not hasattr(main, "_automations_path"))
-check("nguồn: không còn chuỗi 'automations.json'", "automations.json" not in src)
+# Assert CHÍNH XÁC vào biểu thức dựng đường dẫn, KHÔNG assert chuỗi trần "automations.json":
+# main.py:121 có nhắc tên file đó trong một comment không liên quan (bàn về ghi file nguyên
+# tử), và comment mới ở đầu khối cũng nhắc nó để giải thích vì sao đã xoá. Assert trần sẽ
+# BẤT KHẢ THI dù code đã đúng.
+check("nguồn: không còn code dựng đường dẫn tới automations.json",
+      '"Javis" / "automations.json"' not in src)
+
+# ---- 2b. Hai lớp chiếu vào hình dạng Lịch giả cũng chết theo ----
+# Caller duy nhất của cả hai là /automations GET (main.py:3199). Chúng chiếu loop/nhắc hẹn
+# vào dòng-Lịch với chuỗi schedule BỊA RA lúc GET (main.py:3187). Hết Lịch thì hết lý do.
+check("chiếu: _loops_as_routines đã xoá", not hasattr(main, "_loops_as_routines"))
+check("chiếu: pending_as_automations đã xoá",
+      not hasattr(main.reminders_feature, "pending_as_automations"))
 
 # ---- 3. caps sạch VÀ còn chạy được ----
 # Đây là assert quan trọng nhất của task: xoá _read_automations mà để lại lời gọi ở
@@ -111,25 +128,12 @@ check("caps: _render_javis_index vẫn chạy", isinstance(main._render_javis_in
 check("caps: index không còn mục 'Lịch (automations)'",
       "Lịch (automations)" not in main._render_javis_index(caps))
 
-# ---- 4. _jobs_payload gộp 2 nguồn + đếm running ----
-main._loops_as_routines = lambda brain: [
-    {"id": "__loop__:a", "name": "Loop A", "status": "active"},
-    {"id": "__loop__:b", "name": "Loop B", "status": "paused"},
-]
-main.reminders_feature.pending_as_automations = lambda brain: [
-    {"id": "__reminder__:r1", "name": "Uống thuốc", "status": "active"},
-]
-
-p = main._jobs_payload("brain")
-check("jobs: gộp loop + nhắc hẹn thành 1 danh sách", len(p["jobs"]) == 3)
-check("jobs: total = 3", p["total"] == 3)
-check("jobs: running đếm đúng status active (2)", p["running"] == 2)
-check("jobs: loop đứng trước nhắc hẹn", p["jobs"][0]["id"] == "__loop__:a")
-
-main._loops_as_routines = lambda brain: []
-main.reminders_feature.pending_as_automations = lambda brain: []
-p0 = main._jobs_payload("brain")
-check("jobs: rỗng → total 0, running 0", p0["total"] == 0 and p0["running"] == 0)
+# ---- 4. Endpoint THẬT mà trang Việc dựa vào phải còn sống ----
+# Xoá Lịch KHÔNG được kéo theo hai nguồn thật. Task 3 (UI) gọi đúng ba cái này; nếu task này
+# xoá nhầm thì trang Việc trắng và test UI mới phát hiện - bắt ngay tại đây rẻ hơn nhiều.
+check("route: GET /loops còn (trang Việc lấy loop từ đây)", "/loops" in paths)
+check("route: GET /reminders còn (trang Việc lấy nhắc hẹn từ đây)", "/reminders" in paths)
+check("route: POST /reminders/cancel còn (nút Huỷ nhắc hẹn)", "/reminders/cancel" in paths)
 
 
 if _fails:
@@ -142,73 +146,37 @@ print("\nOK - test_jobs: tất cả pass")
 
 Run: `cd server && ../.venv/Scripts/python.exe test_jobs.py`
 
-Expected: FAIL. Cụ thể: `route: mọi /automations* đã xoá` fail (4 route còn sống), `helper: _read_automations đã xoá` fail, `caps: không còn key 'automations'` fail, rồi đổ ở `main._jobs_payload` với `AttributeError: module 'main' has no attribute '_jobs_payload'`.
+Expected: FAIL. Cụ thể: `route: mọi /automations* đã xoá` fail (4 path còn sống), ba assert `helper: *` fail, hai assert `chiếu: *` fail, `caps: không còn key 'automations'` fail. Bốn assert cuối (`route: GET /loops còn`, `/reminders`, `/reminders/cancel`) **phải PASS ngay từ đầu** - chúng khẳng định thứ đã có sẵn và không được xoá nhầm.
 
-- [ ] **Step 3: Xoá 3 helper registry + 4 route cũ**
+- [ ] **Step 3: Xoá 3 helper registry + lớp chiếu + 4 route cũ**
 
-Trong `server/main.py`, xoá nguyên khối từ `def _automations_path(brain):` (`:3145`) tới hết `_write_automations` (`:3166`), và xoá 4 route: `automations_list` (`:3196-3202`), `automations_save` (`:3205-3221`), `automations_toggle` (`:3224-3249`), `automations_delete` (`:3251-3261`).
-
-Giữ nguyên `_loops_as_routines` (`:3169-3193`).
+Trong `server/main.py`, xoá:
+- Nguyên khối từ `def _automations_path(brain):` (`:3145`) tới hết `_write_automations` (`:3166`).
+- Nguyên hàm `_loops_as_routines` (`:3169-3193`) - lớp chiếu, caller duy nhất là route sắp xoá.
+- 4 route: `automations_list` (`:3196-3202`), `automations_save` (`:3205-3221`), `automations_toggle` (`:3224-3249`), `automations_delete` (`:3251-3261`).
 
 Sửa comment đầu khối (`:3140-3144`) thành:
 
 ```python
 # ============================================================
-# Trang Việc: loop (việc bền, chạy engine theo chu kỳ) + nhắc hẹn (việc phù du, 1 lần).
-# KHÔNG còn registry tay: automations.json cũ chưa từng có executor (_scheduler_loop không
-# đọc nó) nên đã bị xoá cùng 5 route /automations*. Xem spec 2026-07-17-hop-nhat-viec-dinh-ky.
+# Trang Việc = loop (việc bền, chạy engine theo chu kỳ) + nhắc hẹn (việc phù du, 1 lần).
+# KHÔNG có registry tay và KHÔNG có endpoint gộp: dashboard đọc thẳng hai nguồn thật là
+# GET /loops và GET /reminders. Tab Lịch cũ (5 route /automations*) đã xoá vì nó chưa từng
+# có executor - _scheduler_loop không đọc nó. Xem spec 2026-07-17-hop-nhat-viec-dinh-ky.
 # ============================================================
 ```
 
-- [ ] **Step 4: Thêm `_jobs_payload` + 3 route mới**
+- [ ] **Step 4: Xoá lớp chiếu `pending_as_automations` trong reminders.py**
 
-Thêm ngay sau `_loops_as_routines` trong `server/main.py`:
+Trong `server/reminders.py`, xoá nguyên method `pending_as_automations` (`:278-296`, neo: `def pending_as_automations(self, brain: str) -> List[dict]:`).
 
-```python
-def _jobs_payload(brain: str) -> dict:
-    """Union hai kho: loop (Javis/loops/*.md) + nhắc hẹn (reminders store).
-    Cố ý KHÔNG gộp kho: loop là tài liệu user sửa trong Obsidian, nhắc hẹn là thứ phù du."""
-    jobs = _loops_as_routines(brain) + reminders_feature.pending_as_automations(brain)
-    running = sum(1 for j in jobs if j.get("status") == "active")
-    return {"jobs": jobs, "running": running, "total": len(jobs)}
+Giữ nguyên mọi thứ khác trong file, đặc biệt là `cancel` (`:300`), `_view` (`:263`), và các route `/reminders*` (`:498+`) - trang Việc dựa vào chúng.
 
+Kiểm tra `List` còn được dùng chỗ khác không trước khi động vào import:
 
-@app.get("/jobs")
-async def jobs_list(brain: str = Query("brain")):
-    return _jobs_payload(brain)
+Run: `cd /d/Project/Javis-OS && grep -c "List\[" server/reminders.py`
 
-
-@app.post("/jobs/toggle")
-async def jobs_toggle(id: str = Form(...), brain: str = Form("brain")):
-    """Gạt 1 việc. Nhắc hẹn chỉ có 1 nút gạt → coi như HUỶ (nhắc là 1-lần, không tạm dừng)."""
-    if id.startswith("__reminder__:"):
-        async with reminders_feature._io:
-            hit = reminders_feature.cancel(brain, id.split(":", 1)[1])
-        return {"ok": hit, "status": "paused", "error": ("" if hit else "not found")}
-    if id == "__loop__" or id.startswith("__loop__:"):
-        # "__loop__" trần (client cũ) = loop legacy vong-lap-goc.
-        slug = id.split(":", 1)[1] if ":" in id else self_improve.LEGACY_SLUG
-        lp = loop_feature.toggle(brain, slug)
-        if not lp and ":" not in id:
-            legacy_brain = _read_loop_config().get("brain") or "brain"
-            lp = loop_feature.toggle(legacy_brain, slug)
-        if not lp:
-            return {"ok": False, "error": "not found"}
-        return {"ok": True, "status": "active" if lp["enabled"] else "paused"}
-    return {"ok": False, "error": "id không hợp lệ"}
-
-
-@app.post("/jobs/cancel")
-async def jobs_cancel(id: str = Form(...), brain: str = Form("brain")):
-    """Huỷ 1 nhắc hẹn. Loop xoá bằng nút xoá của loop (/loops/delete), không xoá từ đây."""
-    if id.startswith("__reminder__:"):
-        async with reminders_feature._io:
-            hit = reminders_feature.cancel(brain, id.split(":", 1)[1])
-        return {"ok": hit, "error": ("" if hit else "not found")}
-    if id == "__loop__" or id.startswith("__loop__:"):
-        return {"ok": False, "error": "Xoá loop bằng nút xoá của loop, không xoá từ đây"}
-    return {"ok": False, "error": "id không hợp lệ"}
-```
+Nếu kết quả > 0 thì **giữ** `from typing import ... List`. Không xoá import đang có người dùng.
 
 - [ ] **Step 5: Xoá khối caps chết (bắt buộc cùng task, xem ghi chú decomposition)**
 
@@ -245,26 +213,31 @@ Run: `cd server && ../.venv/Scripts/python.exe test_jobs.py`
 
 Expected: PASS, in `OK - test_jobs: tất cả pass`.
 
-- [ ] **Step 7: Xác nhận không còn ai gọi route cũ trong server/**
+- [ ] **Step 7: Xác nhận không còn ai gọi thứ đã xoá trong server/**
 
-Run: `cd /d/Project/Javis-OS && grep -rn "/automations\|_read_automations" server/ --include=*.py`
+Run: `cd /d/Project/Javis-OS && grep -rn "/automations\|_read_automations\|_loops_as_routines\|pending_as_automations" server/ --include=*.py`
 
-Expected: **0 hit** (trừ `server/test_jobs.py` là chuỗi trong assert). Nếu còn hit code thật, xoá nốt trước khi commit.
+Expected: **0 hit** (trừ `server/test_jobs.py`, nơi chúng là chuỗi trong assert). Nếu còn hit code thật, xoá nốt trước khi commit.
 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add server/main.py server/test_jobs.py
-git commit -m "refactor(jobs): thay /automations bang /jobs, xoa registry Lich gia
+git add server/main.py server/reminders.py server/test_jobs.py
+git commit -m "refactor(jobs): xoa registry Lich gia + hai lop chieu cua no
 
 automations.json chua tung co executor: _scheduler_loop (main.py:3613-3656)
 khong co nhanh nao doc no, va 0 file automations.json ton tai tren ca 4 brain.
-Tab Lich phan lon dang chieu chinh loop vao qua _loops_as_routines.
 
-Xoa 3 helper registry + 4 route /automations* + khoi caps chet (caps phai xoa
+Xoa 3 helper registry + 4 route /automations* + khoi caps chet. Caps phai xoa
 CUNG dot: _gather_capabilities:3352 goi _read_automations, de lai la NameError
-moi tick scheduler). Them /jobs = union loop (viec ben) + nhac hen (viec phu du),
-/jobs/toggle, /jobs/cancel.
+moi tick scheduler.
+
+Xoa luon _loops_as_routines + pending_as_automations: caller duy nhat cua ca hai
+la /automations GET. Chung khong phai helper dung chung ma la lop CHIEU vao hinh
+dang Lich gia (chuoi schedule 'moi N phut' bia ra luc GET, main.py:3187). Het
+Lich thi het ly do ton tai.
+
+KHONG them endpoint nao: trang Viec doc thang /loops + /reminders da co san.
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
@@ -335,9 +308,9 @@ print('routes:', len({getattr(r,'path','') for r in main.app.routes}))
 "
 ```
 
-Expected: **157**.
+Expected: **154**.
 
-Cẩn thận số học ở đây, dễ đếm nhầm: có **5 endpoint** `/automations*` nhưng chỉ **4 path duy nhất** (`/automations`, `/automations/delete`, `/automations/sync`, `/automations/toggle`) - vì GET và POST `/automations` dùng **chung một path**, và lệnh trên đếm path bằng `set`. Nên: 158 - 4 + 3 = **157**. Nếu ra số khác, có gì đó xoá thừa hoặc thiếu - dừng và rà lại.
+Cẩn thận số học ở đây, dễ đếm nhầm: có **5 endpoint** `/automations*` nhưng chỉ **4 path duy nhất** (`/automations`, `/automations/delete`, `/automations/sync`, `/automations/toggle`) - vì GET và POST `/automations` dùng **chung một path**, và lệnh trên đếm path bằng `set`. Task 1 + 2 xoá 4 path và **không thêm path nào**. Nên: 158 - 4 = **154**. Nếu ra số khác, có gì đó xoá thừa hoặc thiếu - dừng và rà lại.
 
 - [ ] **Step 6: Commit**
 
@@ -372,8 +345,10 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 > `panel-automations` **không nằm trong `index.html`**. Nó do `console.js:222` dựng động (`el.innerHTML = '<div class="stab-panel" id="panel-${id}"></div>'`) từ `STUDIO_PAGES`. Bỏ `"automations"` khỏi `STUDIO_PAGES` (`:107`) là đủ. Hai file `dashboard/_wf_harness*.html` có chứa `panel-automations` nhưng chúng là harness test chưa track của phiên khác - **đừng đụng**.
 
 **Interfaces:**
-- Consumes: `GET /jobs`, `POST /jobs/cancel` (Task 1).
+- Consumes: `GET /reminders?brain=` → `{"pending": [...], "history": [...], "counts": {...}}`, mỗi phần tử `pending` có `_view()` shape (`reminders.py:263`): `{id, text, label, mode, due_at, due_human, chat_id, repeat_min, cron, script, result, error}`. Và `POST /reminders/cancel` với form `{id, brain}` → `{ok, error}`. **Cả hai đã tồn tại sẵn**, Task 1 không tạo gì.
 - Produces: không có API mới. Rail `automations` biến mất; rail `selfimprove` **giữ nguyên id** (không đổi id để khỏi vỡ deep-link/localStorage) nhưng đổi nhãn thành "Việc".
+
+**Lưu ý `id`:** `_view()` trả `id` **thô** (không có tiền tố `__reminder__:` như bản chiếu cũ), và `POST /reminders/cancel` nhận đúng `id` thô đó. Đừng thêm/bóc tiền tố.
 
 **Vì sao không xoá trơn rail Lịch:** nhắc hẹn **chỉ** hiện ở tab Lịch, qua `pending_as_automations` (`reminders.py:278`). Xoá rail mà không gộp = user mất chỗ nhìn nhắc hẹn đang chờ. Đây là hồi quy dễ lọt nhất của cả plan.
 
@@ -444,28 +419,33 @@ Thêm hàm này vào `renderSelfImprove`, ngay trước `async function loadLoop
 ```js
     // Nhắc hẹn đang chờ: trước đây CHỈ hiện ở tab Lịch (đã xoá). Không gộp vào đây thì user
     // mất chỗ nhìn chúng. Loop = việc bền (.md, sửa trong Obsidian); nhắc = việc phù du.
+    // Đọc thẳng /reminders (nguồn thật), KHÔNG qua lớp chiếu: lớp đó chỉ tồn tại vì tab Lịch.
     async function loadReminders() {
       if (myGen !== _renderGen) return;
       const box = el.querySelector("#lpReminders");
       if (!box) return;
-      let d = { jobs: [] };
-      try { d = await (await fetch(`/jobs?brain=${encodeURIComponent(fbrain())}`)).json(); } catch (e) {}
+      let d = { pending: [] };
+      try { d = await (await fetch(`/reminders?brain=${encodeURIComponent(fbrain())}`)).json(); } catch (e) {}
       if (myGen !== _renderGen) return;
-      const rem = (d.jobs || []).filter(j => String(j.id || "").startsWith("__reminder__:"));
+      const rem = d.pending || [];
       if (!rem.length) { box.innerHTML = ""; return; }
+      const MODE_LBL = { notify: "nhắc", task: "tự làm + báo", script: "script" };
       box.innerHTML = `<h3 style="font-size:15px;color:#cdd8ee;margin:18px 0 8px">Nhắc hẹn đang chờ</h3>`;
       rem.forEach(r => {
+        const title = r.label || r.text || "Nhắc hẹn";
+        const when = r.cron ? `cron ${r.cron}` : (r.due_human || "");
+        const kind = MODE_LBL[r.mode] || "nhắc";
         const div = document.createElement("div");
         div.className = "si-card";
-        div.innerHTML = `<b>${esc(r.name)}</b>
-          <div class="dim" style="font-size:12px;color:#6b7894">${esc(r.schedule)} · ${esc(r.note || "")}</div>
+        div.innerHTML = `<b>${esc(title)}</b>
+          <div class="dim" style="font-size:12px;color:#6b7894">${esc(when)} · ${esc(kind)}</div>
           <button class="s-btn-ghost rmCancel" style="margin-top:8px">Huỷ</button>`;
         div.querySelector(".rmCancel").onclick = async () => {
-          if (!confirm(`Huỷ "${r.name}"?`)) return;
+          if (!confirm(`Huỷ "${title}"?`)) return;
           const f = new FormData();
-          f.append("id", r.id);
+          f.append("id", r.id);        // id THÔ, /reminders/cancel nhận đúng dạng này
           f.append("brain", fbrain());
-          await fetch("/jobs/cancel", { method: "POST", body: f });
+          await fetch("/reminders/cancel", { method: "POST", body: f });
           loadReminders();
         };
         box.appendChild(div);
@@ -649,7 +629,7 @@ Nếu có hit, sửa theo cùng cách Step 4. Nếu không có hit, bỏ qua ste
 
 - Xoá tab Lịch: registry `automations.json` chưa từng có executor (scheduler không đọc nó), 0 file tồn tại trên mọi brain. Thay bằng một trang **Việc** duy nhất hiện loop + nhắc hẹn đang chờ.
 - Bảo mật: xoá `/automations/sync`, route gọi engine không truyền `allowed_tools` nên chạy `bypassPermissions` + nạp `setting_sources`; bảo đảm "chỉ liệt kê" của nó chỉ là chữ trong prompt.
-- Endpoint mới `/jobs`, `/jobs/toggle`, `/jobs/cancel` thay 5 route `/automations*`.
+- Xoá 5 route `/automations*` mà **không** thêm endpoint nào: trang Việc đọc thẳng `GET /loops` và `GET /reminders` vốn đã có. Xoá kèm hai lớp chiếu `_loops_as_routines` + `pending_as_automations` (chúng chỉ tồn tại để dựng hình dạng dòng-Lịch).
 ```
 
 - [ ] **Step 7: Commit + push**
