@@ -126,11 +126,20 @@ ctx = plugins_host.PluginContext(slug="thu-nghiem", source="bundled",
 check("ctx: giữ đúng vault_root được truyền", ctx.vault_root == _BRAIN)
 check("ctx: data_dir là property, không phải field gán tay", isinstance(ctx.data_dir, Path))
 
-# ---- 3. plugin_tools dựng ctx thấy vault (đây là chỗ bug sống) ----
-# Gọi với vault thật -> mọi plugin bundled phải nhận ctx.vault_root = vault đó.
-_tools, _route = plugins_host.plugin_tools("full", _BRAIN)
-seen = plugins_host.last_ctx_vault_roots() if hasattr(plugins_host, "last_ctx_vault_roots") else None
-check("plugin_tools: nạp được tool bundled với vault thật", isinstance(_tools, list))
+# ---- 3. _load_all dựng ctx THẤY vault (đây là chỗ bug sống) ----
+# Assert vào ctx THẬT của plugin đã nạp, không assert kiểu trả về. LoadedPlugin giữ ctx
+# (plugins_host.py:257 __slots__ có "ctx"), nên đọc thẳng được. Assert kiểu
+# `isinstance(tools, list)` là TAUTOLOGY: luôn đúng kể cả khi ctx mù vault.
+ent = plugins_host._load_all(_BRAIN)
+loaded = ent["plugins"]
+check("nạp: có ít nhất 1 plugin bundled để soi ctx", len(loaded) > 0)
+check("ctx: MỌI plugin đã nạp thấy đúng brain (không None, không Brain Default)",
+      all(lp.ctx.vault_root == _BRAIN for lp in loaded))
+
+# Chứng minh bug: truyền None thì ctx mù -> đây chính là thứ đường SDK đang làm.
+ent_none = plugins_host._load_all(None)
+check("bug: _load_all(None) -> ctx.vault_root là None (tiền đề của lỗi lưu nhầm brain)",
+      all(lp.ctx.vault_root is None for lp in ent_none["plugins"]))
 
 
 if _fails:
