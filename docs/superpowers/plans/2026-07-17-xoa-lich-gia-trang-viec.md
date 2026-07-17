@@ -21,7 +21,7 @@ Spec: `docs/superpowers/specs/2026-07-17-hop-nhat-viec-dinh-ky-design.md`
 - Test là **script thuần, không pytest**. Quy ước nhà: `server/test_*.py`, có `def check(name, cond)`, gom `_fails`, `sys.exit(1)` khi có lỗi. CI chạy `for f in test_*.py; do python "$f"; done` (`.github/workflows/ci.yml:35-37`), nên mọi file `server/test_*.py` tự động vào CI.
 - Chạy test bằng venv: `.venv/Scripts/python.exe` (python hệ thống thiếu lib).
 - Test phải tự cô lập: `os.environ.setdefault("JAVIS_STATE_DIR", tempfile.mkdtemp(prefix="..."))` **trước** khi import module Javis.
-- **Helper của `dashboard/console.js`** (dùng cho Task 3): chỉ có `esc(s)` (`:116`) và `fbrain()` (`:363`), gọi HTTP bằng `fetch()` trần với `FormData` dựng tại chỗ. **KHÔNG** có `api()`, `fd()`, `brain()` - đó là helper của `studio.js`, không dùng được ở console.js.
+- **Helper của `dashboard/console.js`** (dùng cho Task 2): chỉ có `esc(s)` (`:116`) và `fbrain()` (`:363`), gọi HTTP bằng `fetch()` trần với `FormData` dựng tại chỗ. **KHÔNG** có `api()`, `fd()`, `brain()` - đó là helper của `studio.js`, không dùng được ở console.js.
 - Không chạm `Javis/loops/*.md`, `loop-state.json`, hay `system_sync.LEGACY_HASHES` trong giai đoạn này. Loop giữ nguyên hành vi.
 - Không sửa `self_improve.py:105-113` (`_isolate`). Nó là nhánh chết trong production (`main.py:3029` luôn inject `apply_mcp`) nhưng `test_loop_ambient.py` đang dựa vào nó.
 
@@ -34,26 +34,30 @@ Spec: `docs/superpowers/specs/2026-07-17-hop-nhat-viec-dinh-ky-design.md`
 | `server/test_jobs.py` | **Mới.** Phủ: route + helper + lớp chiếu đã chết, caps sạch và còn chạy, và các endpoint THẬT mà trang Việc dựa vào (`/loops`, `/reminders`, `/reminders/cancel`) vẫn còn. |
 | `dashboard/studio.js` | Bỏ page `automations` (loader, form `editAutomation`, nút sync). |
 | `dashboard/console.js` | Bỏ rail `automations`. Rail `selfimprove` đổi nhãn "Loop" → "Việc", render thêm khối nhắc hẹn, sửa copy trỏ tới tab Lịch. |
-| `dashboard/index.html` | Chỉ bỏ panel loop cũ đã chết (`:160-192`, Task 4). **Không** có `panel-automations` ở đây - nó do `console.js:222` dựng động từ `STUDIO_PAGES`. |
+| `dashboard/index.html` | Chỉ bỏ panel loop cũ đã chết (`:160-192`, Task 3). **Không** có `panel-automations` ở đây - nó do `console.js:222` dựng động từ `STUDIO_PAGES`. |
 | `dashboard/app.js` | Bỏ fetch `/loop/config` của panel chết (`:1497`). |
 
 **Ghi chú decomposition:** khối registry + khối caps **phải cùng một task**. `_gather_capabilities` (`main.py:3352`) gọi `_read_automations`; xoá helper mà để lại lời gọi thì `rebuild_javis_index` ném `NameError` **mỗi tick scheduler** (`main.py:3650-3651`). Reviewer không thể duyệt cái này mà từ chối cái kia, nên chúng là một deliverable.
 
 ---
 
-### Task 1: Xoá registry Lịch + hai lớp chiếu + khối caps (xoá thuần)
+### Task 1: Xoá registry Lịch + sync + hai lớp chiếu + khối caps (xoá thuần)
 
 **Files:**
-- Modify: `server/main.py:3140-3262` (xoá `_automations_path`/`_read_automations`/`_write_automations`, `_loops_as_routines`, 4 route `/automations*`)
+- Modify: `server/main.py:3140-3262` (xoá `_automations_path`/`_read_automations`/`_write_automations`, `_loops_as_routines`, và CẢ 5 route `/automations*` gồm `/automations/sync` ở `:3264-3313`)
 - Modify: `server/main.py:3324, 3352-3354, 3411-3413` (xoá khối caps chết)
 - Modify: `server/reminders.py:278-296` (xoá `pending_as_automations`)
 - Test: `server/test_jobs.py` (tạo mới)
 
 **Interfaces:**
 - Consumes: không. Đây là task **xoá thuần, không thêm endpoint nào**.
-- Produces: `_gather_capabilities(brain)` trả dict **không còn** key `"automations"`. Task 3 (UI) **không** tiêu thụ gì từ task này - nó dùng các endpoint thật đã có sẵn: `GET /loops`, `GET /reminders`, `POST /reminders/cancel`.
+- Produces: `_gather_capabilities(brain)` trả dict **không còn** key `"automations"`. Task 2 (UI) **không** tiêu thụ gì từ task này - nó dùng các endpoint thật đã có sẵn: `GET /loops`, `GET /reminders`, `POST /reminders/cancel`.
 
 **Vì sao xoá cả hai lớp chiếu:** `grep -rn "_loops_as_routines\|pending_as_automations" server/` cho thấy caller **duy nhất** của cả hai là `main.py:3199` (`/automations` GET). Chúng là bản chiếu loop/nhắc hẹn vào hình dạng dòng-Lịch (`{id: "__loop__:<slug>", schedule: "mỗi N phút", ...}`), trong đó chuỗi `schedule` là **bịa ra lúc GET** (`main.py:3187`). Hết Lịch thì hết lý do tồn tại. Giữ lại = code chết.
+
+**GỘP TASK 2 VÀO ĐÂY (sửa lúc chạy, 2026-07-17):** bản plan trước tách `/automations/sync` thành Task 2 riêng với lý do "reviewer có thể từ chối phần này mà vẫn duyệt Task 1". Lý do đó SAI: `automations_sync` (`:3264-3313`) đọc/ghi chính `automations.json` (`:3299`, `:3308`), nên nó **không thể sống sót** khi registry bị xoá. Hai task chưa bao giờ độc lập, và assert `not any(p.startswith("/automations"))` của Task 1 sẽ FAIL nếu sync còn sống. Xoá cả 5 endpoint trong một task.
+
+Muốn giữ tính năng đồng bộ routine claude.ai thì phải **viết lại** (nút riêng ở trang Model, có `allowed_tools`), không có đường giữ nguyên trạng - vì cái kho nó ghi vào đã biến mất.
 
 - [ ] **Step 1: Viết test thất bại**
 
@@ -129,7 +133,7 @@ check("caps: index không còn mục 'Lịch (automations)'",
       "Lịch (automations)" not in main._render_javis_index(caps))
 
 # ---- 4. Endpoint THẬT mà trang Việc dựa vào phải còn sống ----
-# Xoá Lịch KHÔNG được kéo theo hai nguồn thật. Task 3 (UI) gọi đúng ba cái này; nếu task này
+# Xoá Lịch KHÔNG được kéo theo hai nguồn thật. Task 2 (UI) gọi đúng ba cái này; nếu task này
 # xoá nhầm thì trang Việc trắng và test UI mới phát hiện - bắt ngay tại đây rẻ hơn nhiều.
 check("route: GET /loops còn (trang Việc lấy loop từ đây)", "/loops" in paths)
 check("route: GET /reminders còn (trang Việc lấy nhắc hẹn từ đây)", "/reminders" in paths)
@@ -244,94 +248,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 ---
 
-### Task 2: Xoá `/automations/sync` (bịt lỗ `bypassPermissions`)
-
-**Files:**
-- Modify: `server/main.py:3264-3300` (xoá route `automations_sync`)
-- Test: `server/test_jobs.py` (thêm khối)
-
-**Interfaces:**
-- Consumes: không.
-- Produces: không. Đây là task xoá thuần.
-
-**Vì sao tách task riêng:** một reviewer có thể muốn giữ tính năng đồng bộ routine claude.ai trong khi vẫn đồng ý xoá registry ở Task 1. Nếu muốn giữ, viết lại thành nút riêng ở trang Model **có `allowed_tools`**, đừng khôi phục nguyên trạng.
-
-**Bối cảnh bảo mật:** `main.py:3269` gọi `claude_engine(system_prompt=None, cwd=CLAUDE_CWD, tag="routines")` không truyền `allowed_tools`. Theo `claude_sdk_engine.py:290-301`, nhánh `else` khi `allowed_tools` rỗng đặt `permission_mode="bypassPermissions"` **và** nạp `setting_sources=["user","project","local"]`. Bảo đảm "CHỈ LIỆT KÊ, KHÔNG tạo/sửa/xoá/chạy gì" (`main.py:3273`) chỉ là chữ trong prompt.
-
-- [ ] **Step 1: Viết test thất bại**
-
-Thêm vào `server/test_jobs.py`, ngay trước khối `if _fails:`:
-
-```python
-# ---- 5. /automations/sync đã xoá: không còn engine call bypassPermissions ----
-# main.py:3269 cũ gọi claude_engine(..., tag="routines") KHÔNG truyền allowed_tools →
-# claude_sdk_engine.py:290-301 đặt permission_mode="bypassPermissions" + nạp setting_sources.
-# Đây là engine call ít rào nhất codebase; "CHỈ LIỆT KÊ" của nó chỉ là chữ trong prompt.
-check("sync: route /automations/sync đã xoá", "/automations/sync" not in paths)
-check("sync: không còn engine call tag='routines'", 'tag="routines"' not in src)
-check("sync: không còn prompt RemoteTrigger list", "RemoteTrigger" not in src)
-```
-
-- [ ] **Step 2: Chạy test để xác nhận nó FAIL**
-
-Run: `cd server && ../.venv/Scripts/python.exe test_jobs.py`
-
-Expected: FAIL ở `sync: không còn engine call tag='routines'` và `sync: không còn prompt RemoteTrigger list`. (Assert route đã pass sẵn nhờ Task 1 xoá theo prefix; hai assert nguồn thì chưa.)
-
-- [ ] **Step 3: Xoá route sync**
-
-Trong `server/main.py`, xoá nguyên hàm `automations_sync` từ decorator `@app.post("/automations/sync")` (`:3264`) tới hết thân hàm (kết thúc ngay trước định nghĩa tiếp theo).
-
-Kiểm tra `re` có còn dùng chỗ khác không trước khi động vào import:
-
-Run: `cd /d/Project/Javis-OS && grep -c "re\." server/main.py`
-
-Nếu kết quả > 0 thì **giữ** `import re`. Không xoá import đang có người dùng.
-
-- [ ] **Step 4: Chạy test để xác nhận PASS**
-
-Run: `cd server && ../.venv/Scripts/python.exe test_jobs.py`
-
-Expected: PASS.
-
-- [ ] **Step 5: Xác nhận app vẫn import được và đếm route đúng**
-
-Run:
-
-```bash
-cd server && ../.venv/Scripts/python.exe -c "
-import os, sys, tempfile
-os.environ.setdefault('JAVIS_STATE_DIR', tempfile.mkdtemp())
-sys.path.insert(0, '.')
-import main
-print('routes:', len({getattr(r,'path','') for r in main.app.routes}))
-"
-```
-
-Expected: **154**.
-
-Cẩn thận số học ở đây, dễ đếm nhầm: có **5 endpoint** `/automations*` nhưng chỉ **4 path duy nhất** (`/automations`, `/automations/delete`, `/automations/sync`, `/automations/toggle`) - vì GET và POST `/automations` dùng **chung một path**, và lệnh trên đếm path bằng `set`. Task 1 + 2 xoá 4 path và **không thêm path nào**. Nên: 158 - 4 = **154**. Nếu ra số khác, có gì đó xoá thừa hoặc thiếu - dừng và rà lại.
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add server/main.py server/test_jobs.py
-git commit -m "fix(security): xoa /automations/sync - engine call bypassPermissions khong rao
-
-main.py:3269 goi claude_engine khong truyen allowed_tools -> theo
-claude_sdk_engine.py:290-301 no chay permission_mode=bypassPermissions VA nap
-setting_sources user/project/local. Bao dam 'CHI LIET KE' chi la chu trong prompt.
-
-Route nay dong bo routine chay tren ha tang Anthropic, mot khai niem khac han
-lich cuc bo, nen no khong thuoc cuoc hop nhat nay. Can lai thi viet lai thanh
-nut rieng o trang Model, co allowed_tools tu te.
-
-Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
-```
-
----
-
-### Task 3: Một trang "Việc" - xoá studio page Lịch, gộp nhắc hẹn vào rail selfimprove
+### Task 2: Một trang "Việc" - xoá studio page Lịch, gộp nhắc hẹn vào rail selfimprove
 
 **Files:**
 - Modify: `dashboard/console.js:23, 46, 49, 64-65, 94, 97, 107` (rail + nhãn), `:683` (copy), `:708` (thêm host), `:809-826` (`loadLoops`: gọi render nhắc hẹn)
@@ -515,7 +432,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 ---
 
-### Task 4: Dọn panel loop chết trong index.html
+### Task 3: Dọn panel loop chết trong index.html
 
 **Files:**
 - Modify: `dashboard/index.html:160-192` (xoá panel `display:none`)
@@ -573,7 +490,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 ---
 
-### Task 5: Chạy toàn bộ test + cập nhật tài liệu
+### Task 4: Chạy toàn bộ test + cập nhật tài liệu
 
 **Files:**
 - Modify: `CLAUDE.md` (bỏ nhắc tab Lịch ở mục điều phối)
