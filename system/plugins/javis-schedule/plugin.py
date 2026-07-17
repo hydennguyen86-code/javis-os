@@ -33,6 +33,7 @@ from pathlib import Path
 from typing import Optional
 
 import httpx
+import json
 import yaml
 
 VN_TZ = timezone(timedelta(hours=7))
@@ -127,13 +128,17 @@ def _interval_min(schedule: str) -> int:
 
 
 def _yaml_scalar(s: str) -> str:
-    """Escape 1 dòng cho giá trị YAML nếu chứa ký tự có thể vỡ cú pháp (: # ' " hoặc thừa
-    khoảng trắng 2 đầu). Đa số tên việc không cần escape nên giữ dạng thuần cho dễ đọc trong
-    Obsidian."""
-    s = str(s or "")
-    if s == "" or s != s.strip() or re.search(r'[:#\'"\n]', s):
-        return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'
-    return s
+    """Trích dẫn 1 giá trị chuỗi thành scalar YAML AN TOÀN TUYỆT ĐỐI, dùng cho MỌI giá trị chuỗi
+    do người/model nhập (tên việc, owner_chat...). KHÔNG liệt kê ký tự chỉ-thị cần escape (đó là
+    trò đuổi bắt không bao giờ hết - bỏ sót 1 ký tự như '-' đầu chuỗi, '@', '*', '!', '%', '?',
+    '|', '&', '>' là ghi ra frontmatter vỡ, yaml.safe_load ném ScannerError/ConstructorError, và
+    self_improve.list_loops() nuốt lỗi bằng try/except nên loop CHẾT ÂM THẦM, biến mất khỏi tab
+    Việc mà tool vẫn báo "đã tạo thành công").
+
+    Thay vào đó LUÔN trả về chuỗi nháy kép kiểu JSON: YAML 1.2 là superset của JSON nên chuỗi
+    nháy kép JSON LUÔN là scalar YAML hợp lệ trong mọi trường hợp, và json.dumps tự lo escape
+    dấu ngoặc kép, dấu gạch chéo ngược, xuống dòng - không cần tự viết regex escape."""
+    return json.dumps(str(s or ""), ensure_ascii=False)
 
 
 def _loops_dir(vault_root: str) -> Path:
@@ -167,7 +172,7 @@ def _create_loop_file(vault_root: str, name: str, prompt: str, schedule: str,
         "enabled: false\n"
         "mode: suggest\n"
         f"interval_min: {interval}\n"
-        f'owner_chat: "{(owner_chat or "").strip()}"\n'
+        f"owner_chat: {_yaml_scalar((owner_chat or '').strip())}\n"
         f"updated: {_today()}\n"
         "---\n"
         "\n"

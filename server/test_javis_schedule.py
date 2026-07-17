@@ -24,6 +24,7 @@ os.environ.setdefault("JAVIS_STATE_DIR", tempfile.mkdtemp(prefix="javis-schedtes
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, str(Path(__file__).parent.parent / "system" / "plugins" / "javis-schedule"))
 
+import yaml  # noqa: E402
 import plugin as sched  # noqa: E402
 
 _fails = []
@@ -70,7 +71,56 @@ res2 = sched._create_loop_file(_vault, name="Quét đơn mỗi 2 tiếng", promp
 check("loop: trùng slug -> báo lỗi rõ, không đẻ bản sao",
       str(res2).startswith("ERROR:") or "đã có" in str(res2).lower())
 
-# ---- 5. Tool đăng ký đúng ----
+# ---- 5. Hồi quy Lỗi 1: tên việc chứa ký tự chỉ-thị YAML không được làm loop CHẾT ÂM THẦM ----
+# Trước khi vá, _yaml_scalar chỉ escape [:#'"\n], bỏ sót '-' đầu chuỗi, '@', '*', '!', '%', '?',
+# '|', '&', '>' - ghi ra frontmatter vỡ, yaml.safe_load ném ScannerError/ConstructorError, rồi
+# self_improve.list_loops() nuốt lỗi bằng try/except nên loop biến mất khỏi tab Việc dù tool đã
+# báo "đã tạo thành công". Lưới thật: yaml.safe_load ĐỌC LẠI ĐƯỢC và name khớp NGUYÊN VĂN - không
+# chỉ tìm chuỗi con "name:" trong file (test đó không phát hiện được frontmatter vỡ).
+_boundary_names = [
+    "- rm -rf test",
+    "@weird",
+    "!weird",
+    "*sao",
+    "%phantram",
+    "tên: có hai chấm",
+    'tên "có nháy"',
+]
+for _nm in _boundary_names:
+    _v = tempfile.mkdtemp(prefix="javis-vault-yaml-")  # vault riêng: tránh 2 tên trùng slug ("@weird"/"!weird")
+    _res = sched._create_loop_file(_v, name=_nm, prompt="x", schedule="120m")
+    check(f"yaml-safe tên {_nm!r}: tạo không lỗi", not str(_res).startswith("ERROR"))
+    _files = list((Path(_v) / "Javis" / "loops").glob("*.md"))
+    check(f"yaml-safe tên {_nm!r}: ghi đúng 1 file", len(_files) == 1)
+    if _files:
+        _body = _files[0].read_text(encoding="utf-8")
+        _fm_text = _body.split("---")[1] if _body.count("---") >= 2 else ""
+        try:
+            _fm = yaml.safe_load(_fm_text) or {}
+            _parse_ok = True
+        except yaml.YAMLError:
+            _fm = {}
+            _parse_ok = False
+        check(f"yaml-safe tên {_nm!r}: yaml.safe_load đọc lại được", _parse_ok)
+        check(f"yaml-safe tên {_nm!r}: name khớp NGUYÊN VĂN", isinstance(_fm, dict) and _fm.get("name") == _nm)
+
+# owner_chat cũng nối chuỗi tay trước khi vá (f'owner_chat: "{...}"') - phải qua _yaml_scalar y hệt name.
+_v_owner = tempfile.mkdtemp(prefix="javis-vault-yaml-")
+sched._create_loop_file(_v_owner, name="Việc test owner", prompt="x", schedule="120m",
+                        owner_chat='chat"tiem-an-loi')
+_f_owner = list((Path(_v_owner) / "Javis" / "loops").glob("*.md"))
+if _f_owner:
+    _fm_owner_text = _f_owner[0].read_text(encoding="utf-8").split("---")[1]
+    try:
+        _fm_owner = yaml.safe_load(_fm_owner_text) or {}
+        check("yaml-safe owner_chat chứa dấu nháy kép: đọc lại được",
+              _fm_owner.get("owner_chat") == 'chat"tiem-an-loi')
+    except yaml.YAMLError:
+        check("yaml-safe owner_chat chứa dấu nháy kép: đọc lại được", False)
+else:
+    check("yaml-safe owner_chat chứa dấu nháy kép: ghi được file", False)
+
+# ---- 6. Tool đăng ký đúng ----
 _regs = []
 
 
