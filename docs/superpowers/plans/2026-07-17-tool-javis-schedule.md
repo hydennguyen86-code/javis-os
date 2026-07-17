@@ -66,7 +66,7 @@ Hậu quả đang xảy ra HÔM NAY (không phải giả thuyết): `image-chatg
 
 **Interfaces:**
 - Consumes: chữ ký HIỆN TẠI đã verify: `plugin_tools(mode: str = "full", vault_root: Optional[str] = None) -> Tuple[List[dict], Dict[str, dict]]` (`plugins_host.py:415`). Task này THÊM keyword-only `scope_vault: bool = True`.
-- Produces: `ctx.vault_root` **không còn là None** khi engine SDK có `cwd` là một brain hợp lệ. Task 2 dựa vào điều này.
+- Produces: `ctx.vault_root` **không còn là None** ở đường chat. **Cơ chế THẬT (đã sửa lúc chạy, khác bản nháp plan):** brain đi TƯỜNG MINH qua `_apply_mcp(cli, mode="full", brain=None)` (`main.py:693`) đặt `cli.javis_vault = _brain_root(brain) if brain else None`, y khuôn `cli.javis_mode` sẵn có; `_plugins_server` đọc `self.javis_vault`. Bản nháp plan bảo suy từ `cwd` (`_brain_root()` kiểm `(cwd/"Javis").is_dir()`) - **SAI và đã xoá hẳn**: `CLAUDE_CWD` (`main.py:318`) là gốc project, không có `Javis/`, mà chat (`main.py:4213`, `:4537`) dùng đúng cwd đó, nên suy-từ-cwd luôn trượt ở chính đường chat.
 
 **Vì sao task riêng:** đây là bug có sẵn, độc lập với `javis_schedule`, và một reviewer có thể duyệt/từ chối nó riêng. Nó cũng sửa `image-chatgpt` (đang lưu ảnh nhầm brain) mà không cần đụng file plugin đó.
 
@@ -286,7 +286,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 - Test: `server/test_javis_schedule.py` (tạo mới)
 
 **Interfaces:**
-- Consumes: `ctx.vault_root` thấy đúng brain (Task 1). `reminders` HTTP API `POST /reminders` (`server/reminders.py:507`, localhost-exempt qua `_AUTH_LOCAL_EXACT` ở `main.py:70`), `GET /reminders`, `POST /reminders/cancel`.
+- Consumes: `ctx.vault_root` thấy đúng brain khi gọi từ **chat** (Task 1, cơ chế: `_apply_mcp(cli, brain=...)` → `cli.javis_vault` → `plugin_tools(mode, self.javis_vault, scope_vault=False)`). **Lưu ý:** loop nền gọi `apply_mcp` KHÔNG truyền brain nên `javis_vault=None` ở đó - nhưng loop suggest/auto vốn gated nên không có plugin, còn loop `mode: full` thì có. Vì vậy handler PHẢI báo lỗi rõ khi `ctx.vault_root` rỗng, TUYỆT ĐỐI không fallback về Brain Default. `reminders` HTTP API `POST /reminders` (`server/reminders.py:507`, localhost-exempt qua `_AUTH_LOCAL_EXACT` ở `main.py:70`), `GET /reminders`, `POST /reminders/cancel`.
 - Produces: tool `javis_schedule(op, ...)`. Không task nào sau dựa vào nó.
 
 **Quyết định wiring, đọc kỹ trước khi code:**
