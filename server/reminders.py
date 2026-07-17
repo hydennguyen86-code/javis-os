@@ -268,36 +268,8 @@ class RemindersFeature:
                 "cron": r.get("cron", ""), "script": r.get("script", ""),
                 "result": (r.get("result") or "")[:500], "error": r.get("error", "")}
 
-    def _sched_text(self, r: dict) -> str:
-        due = _fmt_vn(r.get("due_at", 0))
-        if r.get("cron"):
-            return f"cron {r['cron']} · kế tiếp {due}"
-        rep = int(r.get("repeat_min") or 0)
-        return f"lặp mỗi {rep} phút · kế tiếp {due}" if rep else f"lúc {due}"
-
-    def pending_as_automations(self, brain: str) -> List[dict]:
-        """Nhắc hẹn/job đang chờ → hiện trong tab Lịch (read-only, id '__reminder__:<id>').
-        Toggle/xoá từ Lịch = huỷ."""
-        out = []
-        try:
-            for r in self._load(brain).get("reminders", []):
-                if r.get("status") != "pending":
-                    continue
-                mode = r.get("mode")
-                kind = {"task": "tự làm+báo", "script": f"script {r.get('script', '')}"}.get(mode, "nhắc")
-                out.append({
-                    "id": "__reminder__:" + str(r.get("id", "")), "builtin": True,
-                    "name": (r.get("label") or r.get("text") or "Nhắc hẹn")[:80],
-                    "type": "script" if mode == "script" else "reminder",
-                    "schedule": self._sched_text(r), "status": "active",
-                    "note": f"{kind} · {(r.get('text') or '')[:120]}",
-                })
-        except Exception as e:
-            print(f"[reminders automations] {type(e).__name__}: {e}", file=sys.stderr)
-        return out
-
     def cancel(self, brain: str, rid: str) -> bool:
-        """Huỷ 1 nhắc (đồng bộ - dùng cho route Lịch). Trả True nếu có đổi."""
+        """Huỷ 1 nhắc (đồng bộ). Trả True nếu có đổi."""
         data = self._load(brain)
         hit = False
         for r in data.get("reminders", []):

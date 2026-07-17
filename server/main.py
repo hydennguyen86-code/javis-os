@@ -3030,7 +3030,7 @@ loop_feature = self_improve.register(app, self_improve.LoopDeps(
     mcp_allow_patterns=_loop_mcp_allow,
 ))
 
-_LOOP_LOCK = loop_feature.lock   # shim: giữ tên cũ cho code phía dưới (scheduler/automations)
+_LOOP_LOCK = loop_feature.lock   # shim: giữ tên cũ cho code phía dưới (scheduler)
 
 
 def _read_loop_config():
@@ -3138,190 +3138,22 @@ async def lint(brain: str = Query("brain")):
 
 
 # ============================================================
-# Automations registry (Hướng 1) - lịch tự động: cron / trigger / routine
-# Backend KHÔNG query được CronList/RemoteTrigger của Claude Code → ta lưu file registry
-# trong vault (Javis/automations.json) + chèn sẵn "Vòng lặp tự cải thiện" (loop nội bộ).
+# Trang Việc = loop (việc bền, chạy engine theo chu kỳ) + nhắc hẹn (việc phù du, 1 lần).
+# KHÔNG có registry tay và KHÔNG có endpoint gộp: dashboard đọc thẳng hai nguồn thật là
+# GET /loops và GET /reminders. Tab Lịch cũ (5 route /automations*) đã xoá vì nó chưa từng
+# có executor - _scheduler_loop không đọc nó. Xem spec 2026-07-17-hop-nhat-viec-dinh-ky.
 # ============================================================
-def _automations_path(brain):
-    return Path(_brain_root(brain)) / "Javis" / "automations.json"
-
-
-def _read_automations(brain):
-    p = _automations_path(brain)
-    try:
-        if p.exists():
-            data = json.loads(p.read_text(encoding="utf-8"))
-            if isinstance(data, list):
-                return data
-    except Exception:
-        pass
-    return []
-
-
-def _write_automations(brain, items):
-    p = _automations_path(brain)
-    try:
-        _atomic_write_text(p, json.dumps(items, ensure_ascii=False, indent=2))
-    except Exception as e:
-        print(f"[automations write] {e}", file=__import__('sys').stderr)
-
-
-def _loops_as_routines(brain):
-    """MỌI loop của brain hiện ra trong tab Lịch như routine builtin (id __loop__:<slug>).
-    Toggle được từ Lịch; xoá thì phải sang trang Tự cải thiện (tab Loop)."""
-    out = []
-    try:
-        loop_feature.ensure_migrated()
-        st_all = loop_feature.read_state(brain)
-        for lp in loop_feature.list_loops(brain):
-            v = loop_feature.loop_view(brain, lp, st_all)
-            paused = bool(v["auto_paused_reason"])
-            mode_lbl = "⚠ TOÀN QUYỀN" if v["mode"] == "full" else v["mode"]
-            note = f"{v['goal']} · {mode_lbl}"
-            if v["last_status"]:
-                note += f" · {v['last_status'][:80]}"
-            if paused:
-                note += " · ⚠ tự tạm dừng"
-            out.append({
-                "id": f"__loop__:{v['slug']}", "builtin": True, "name": f"{v['name']}",
-                "type": "routine", "schedule": f"mỗi {v['interval_min']} phút",
-                "status": "active" if (v["enabled"] and not paused) else "paused",
-                "note": note, "last_run": v["last_run"],
-            })
-    except Exception as e:
-        print(f"[automations loops] {type(e).__name__}: {e}", file=__import__('sys').stderr)
-    return out
-
-
-@app.get("/automations")
-async def automations_list(brain: str = Query("brain")):
-    items = _read_automations(brain)
-    builtin = _loops_as_routines(brain) + reminders_feature.pending_as_automations(brain)
-    allitems = builtin + items
-    running = sum(1 for a in allitems if a.get("status") == "active")
-    return {"automations": items, "builtin": builtin, "running": running, "total": len(allitems)}
-
-
-@app.post("/automations")
-async def automations_save(
-    name: str = Form(...), type: str = Form("cron"), schedule: str = Form(""),
-    status: str = Form("active"), note: str = Form(""), id: str = Form(""),
-    brain: str = Form("brain"),
-):
-    items = _read_automations(brain)
-    aid = id or (_slugify(name) + "-" + str(int(time.time()))[-5:])
-    entry = {"id": aid, "name": name, "type": type, "schedule": schedule, "status": status, "note": note}
-    found = False
-    for i, a in enumerate(items):
-        if a.get("id") == aid:
-            items[i] = {**a, **entry}; found = True; break
-    if not found:
-        items.append(entry)
-    _write_automations(brain, items)
-    return {"ok": True, "id": aid}
-
-
-@app.post("/automations/toggle")
-async def automations_toggle(id: str = Form(...), brain: str = Form("brain")):
-    if id.startswith("__reminder__:"):
-        # Tab Lịch chỉ có 1 nút gạt → coi như HUỶ nhắc hẹn (nhắc là 1-lần, không "tạm dừng").
-        async with reminders_feature._io:
-            hit = reminders_feature.cancel(brain, id.split(":", 1)[1])
-        return {"ok": hit, "status": "paused", "error": ("" if hit else "not found")}
-    if id == "__loop__" or id.startswith("__loop__:"):
-        # Toggle loop từ tab Lịch. "__loop__" trần (client cũ) = loop legacy vong-lap-goc.
-        slug = id.split(":", 1)[1] if ":" in id else self_improve.LEGACY_SLUG
-        lp = loop_feature.toggle(brain, slug)
-        if not lp and ":" not in id:
-            # client cũ có thể đang ở brain khác brain legacy → thử brain legacy
-            legacy_brain = _read_loop_config().get("brain") or "brain"
-            lp = loop_feature.toggle(legacy_brain, slug)
-        if not lp:
-            return {"ok": False, "error": "not found"}
-        return {"ok": True, "status": "active" if lp["enabled"] else "paused"}
-    items = _read_automations(brain)
-    for a in items:
-        if a.get("id") == id:
-            a["status"] = "paused" if a.get("status") == "active" else "active"
-            _write_automations(brain, items)
-            return {"ok": True, "status": a["status"]}
-    return {"ok": False, "error": "not found"}
-
-
-@app.post("/automations/delete")
-async def automations_delete(id: str = Form(...), brain: str = Form("brain")):
-    if id.startswith("__reminder__:"):
-        async with reminders_feature._io:
-            hit = reminders_feature.cancel(brain, id.split(":", 1)[1])
-        return {"ok": hit, "error": ("" if hit else "not found")}
-    if id == "__loop__" or id.startswith("__loop__:"):
-        return {"ok": False, "error": "Xóa loop trong tab Loop (trang Tự cải thiện), không xoá từ Lịch"}
-    items = [a for a in _read_automations(brain) if a.get("id") != id]
-    _write_automations(brain, items)
-    return {"ok": True}
-
-
-@app.post("/automations/sync")
-async def automations_sync(brain: str = Form("brain")):
-    """Đồng bộ THẬT (Hướng 2): gọi Claude CLI dùng CronList / list_scheduled_tasks để lấy
-    routine/cron đang chạy trên cloud, upsert vào registry (mục source=cloud)."""
-    try:
-        cli = claude_engine(system_prompt=None, cwd=CLAUDE_CWD, tag="routines")
-        if not cli.is_available():
-            return {"ok": False, "error": "Claude CLI chưa cài"}
-        prompt = (
-            "CHỈ LIỆT KÊ, KHÔNG tạo/sửa/xoá/chạy gì. Gọi tool RemoteTrigger với action='list' "
-            "để lấy danh sách triggers (routines cloud trên claude.ai, endpoint /v1/code/triggers). "
-            "Với mỗi phần tử trong data[], map: id=id, name=name, schedule=cron_expression, "
-            "status=(enabled ? 'active' : 'paused'), type='trigger', next=next_run_at. "
-            'Trả ĐÚNG JSON 1 dòng bọc trong <RESULT>...</RESULT>, không markdown: '
-            '<RESULT>{"routines":[{"id":"","name":"","schedule":"","status":"active|paused","type":"trigger","next":""}]}</RESULT>. '
-            'Không có cái nào → <RESULT>{"routines":[]}</RESULT>.'
-        )
-        final = ""
-        err = ""
-        async for ev in cli.query(prompt):
-            if ev["type"] == "final":
-                final = ev.get("content", "") or final
-            elif ev["type"] == "error":
-                err = ev.get("content", "") or err
-        if not final and err:
-            return {"ok": False, "error": "Claude CLI: " + err[:250]}
-        # Ưu tiên lấy trong <RESULT>...</RESULT>, fallback object JSON ngoài cùng
-        rm = re.search(r"<RESULT>\s*(\{.*?\})\s*</RESULT>", final, re.DOTALL) or re.search(r"\{.*\}", final, re.DOTALL)
-        if not rm:
-            return {"ok": False, "error": "Claude không trả JSON. Có thể CLI nền chưa thấy MCP lịch.",
-                    "raw": (final or err)[:400]}
-        try:
-            routines = json.loads(rm.group(1) if rm.lastindex else rm.group(0)).get("routines", []) or []
-        except (json.JSONDecodeError, AttributeError):
-            return {"ok": False, "error": "Không parse được JSON", "raw": final[:400]}
-        items = [a for a in _read_automations(brain) if a.get("source") != "cloud"]
-        for r in routines:
-            rid = (r.get("id") or _slugify(r.get("name", "routine")))
-            nxt = r.get("next", "")
-            items.append({
-                "id": rid, "name": r.get("name", "(routine)"), "type": r.get("type", "trigger"),
-                "schedule": r.get("schedule", ""), "status": r.get("status", "active"),
-                "note": ("☁ cloud" + (f" · kế tiếp {nxt}" if nxt else "")), "source": "cloud",
-            })
-        _write_automations(brain, items)
-        return {"ok": True, "found": len(routines)}
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
 
 
 # ============================================================
-# JAVIS INDEX - chỉ mục tầng vận hành (agents/skills/workflows/loops/automations).
+# JAVIS INDEX - chỉ mục tầng vận hành (agents/skills/workflows/loops/plugins).
 # Song song wiki/index.md: để MỌI engine (Claude/Codex/OpenRouter) đọc 1 chỗ là hiểu Javis
 # có năng lực gì. SINH TỪ FILE (không sửa tay) → không bao giờ lệch. Ghi Javis/index.md CHỈ KHI
 # nội dung đổi (change-gated → không churn git). Bản LIVE gọn được chèn vào system prompt.
 # ============================================================
 def _gather_capabilities(brain: str) -> dict:
     root = Path(_brain_root(brain))
-    caps = {"agents": [], "skills": [], "workflows": [], "loops": [], "automations": [], "plugins": []}
+    caps = {"agents": [], "skills": [], "workflows": [], "loops": [], "plugins": []}
     ad = _agents_dir(brain)
     if ad.is_dir():
         for f in sorted(ad.glob("*.md")):
@@ -3349,9 +3181,6 @@ def _gather_capabilities(brain: str) -> dict:
                 "paused": bool(st.get(lp["slug"], {}).get("auto_paused_reason"))})
     except Exception:
         pass
-    for a in _read_automations(brain):
-        caps["automations"].append({"id": a.get("id"), "name": a.get("name"), "type": a.get("type"),
-            "schedule": a.get("schedule", ""), "status": a.get("status", "active")})
     try:
         for p in plugins_host.describe(str(root)):
             caps["plugins"].append({"slug": p["slug"], "name": p["name"], "source": p["source"],
@@ -3373,7 +3202,7 @@ def _render_javis_index(caps: dict) -> str:
          "AI/engine đọc 1 chỗ là hiểu Javis làm được gì. Song song `wiki/index.md` (tri thức).", "",
          f"**Tổng quan:** {len(caps['agents'])} agents · {len(caps['skills'])} skills · "
          f"{len(caps['workflows'])} workflows ({n_on_wf} bật) · {len(caps['loops'])} loops ({n_on_loops} bật) · "
-         f"{len(caps['automations'])} lịch · {len(plugins)} plugins ({n_on_plugins} chạy)", ""]
+         f"{len(plugins)} plugins ({n_on_plugins} chạy)", ""]
     L.append("## Agents")
     if caps["agents"]:
         for a in caps["agents"]:
@@ -3408,10 +3237,6 @@ def _render_javis_index(caps: dict) -> str:
             L.append(f"- **{l['name']}** (`{l['slug']}`) - {stt} · {l['goal']}/{l['mode']} · mỗi {l['interval_min']} phút")
     else:
         L.append("_(chưa có)_")
-    if caps["automations"]:
-        L.append("\n## Lịch (automations)")
-        for a in caps["automations"]:
-            L.append(f"- **{a['name']}** - {a['type']} · {a['schedule']} · {a['status']}")
     if plugins:
         L.append("\n## Plugins (tool/hook native cho mọi engine)")
         for p in plugins:
