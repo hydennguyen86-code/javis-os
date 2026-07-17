@@ -22,7 +22,7 @@ Khi nhận một nhiệm vụ qua chat, Javis KHÔNG chỉ trả lời. Quy trì
 3. **Tạo Skill** - tri thức CÁCH-LÀM tái dùng được → `skills/<slug>/SKILL.md` (format ở mục "Tạo/sửa Agent & Workflow qua chat").
 4. **Tạo Agent** - VAI chuyên môn lặp lại → `Javis/agents/<slug>.md`.
 5. **Tạo Workflow** - CHUỖI nhiều bước nhiều agent → `Javis/workflows/<slug>.md`.
-6. **Tạo Nhắc hẹn** - nhắc nhở / job có MỐC GIỜ cố định → `POST /reminders` (xem ở trang Việc).
+6. **Tạo Nhắc hẹn** - nhắc nhở / job có MỐC GIỜ cố định → gọi tool `javis_schedule` (op=create, notify_only=true nếu chỉ nhắc). Xem lại ở trang Việc định kỳ.
 7. **Tạo Loop** - nhiệm vụ LẶP VÔ HẠN theo chu kỳ, có kiểm chứng → ghi file `Javis/loops/<slug>.md` đúng format dưới đây.
 8. **Tạo Plugin** - cần một CÔNG CỤ (tool) NATIVE mới mà mọi engine gọi được: tính toán, đọc/gọi thứ Python làm được nhưng chưa có MCP, hook chạy tự động quanh mỗi tool call → thư mục `plugins/<slug>/` (format ở mục "Tạo Plugin (tool/hook native)"). KHÁC skill (skill = tri thức cách-làm, plugin = code chạy thật).
 
@@ -32,6 +32,8 @@ Khi nhận một nhiệm vụ qua chat, Javis KHÔNG chỉ trả lời. Quy trì
 - Chỉ khi "cứ mỗi X phút lại tự tìm và làm 1 đơn vị việc" mới là Loop.
 - Cần TOOL mới (một hành động Python cụ thể, tái dùng, mọi engine gọi được) mà chưa có MCP phù hợp → Plugin. Nếu chỉ là HƯỚNG DẪN cách làm bằng tool sẵn có → Skill. Nếu là một nguồn dữ liệu ngoài có sẵn server → đấu MCP, đừng viết plugin.
 - TRƯỚC khi tạo mới bất kỳ thứ gì: kiểm tra TRÙNG. Đọc `Javis/index.md` (chỉ mục tầng vận hành, tự sinh) để biết đã có agent/skill/workflow/loop/plugin nào; trùng thì cập nhật cái cũ thay vì đẻ bản sao.
+
+**Ưu tiên gọi tool `javis_schedule` (op=create) thay vì tự ghi file** - tool tự đặt đúng slug, đúng frontmatter, chặn trùng tên, và tự chọn kho (việc lặp → file .md; nhắc/cron → kho nhắc hẹn). Chỉ ghi file tay khi cần trường nâng cao mà tool chưa nhận (quiet_hours, max_runs_per_day, workspace, ambient_mcp).
 
 **Format file Loop** (`Javis/loops/<slug>.md`):
 ```yaml
