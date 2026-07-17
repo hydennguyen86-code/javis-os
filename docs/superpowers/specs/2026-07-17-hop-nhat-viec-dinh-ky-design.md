@@ -148,9 +148,12 @@ Xoá:
 - 5 endpoint: `/automations` GET (`main.py:3196`), POST (`:3205`), `/automations/toggle`
   (`:3224`), `/automations/delete` (`:3251`), `/automations/sync` (`:3264`).
 - `_automations_path` (`:3145`), `_read_automations` (`:3149`), `_write_automations` (`:3161`).
-- Khối `caps["automations"]` (`main.py:3352-3354`) và mục "## Lịch (automations)" trong system
-  prompt (`main.py:3411-3413`). Đây là chỗ dễ sót: nó đang bơm một danh sách rỗng-vĩnh-viễn
-  vào prompt mỗi lượt chat.
+- Khối `caps["automations"]` (`_gather_capabilities`, `main.py:3324, 3352-3354`) và mục "##
+  Lịch (automations)" trong `_render_javis_index` (`main.py:3411-3413`). Đính chính khi soát
+  plan: khối này **không** rác vào system prompt. Nó đi vào `Javis/index.md` qua
+  `rebuild_javis_index` (`main.py:3462`), và vì list luôn rỗng nên `if caps["automations"]:`
+  luôn falsy, section không bao giờ render. Là code chết, dọn cho sạch chứ không phải sửa bug.
+  (`_javis_capability_summary` tại `main.py:3477` không hề nhắc automations.)
 - Form `editAutomation` (`dashboard/studio.js:358-370`), rail `automations`
   (`dashboard/console.js:49, 65, 97, 107`).
 
