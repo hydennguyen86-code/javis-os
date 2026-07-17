@@ -716,7 +716,6 @@ graphSource.addEventListener("change", () => {
   connectGraphWatch();   // theo dõi realtime trên nguồn mới
   loadMemStats();   // bộ nhớ theo vault → đổi vault thì đổi số ký ức
   loadBrainStats(); // agent/skill/workflow theo vault
-  loadLoopLog();    // nhật ký loop theo vault
   // Nếu panel số liệu đang ở fallback Agentic → cập nhật số theo vault mới (không gọi lại MCP)
   if (savedMetrics && savedMetrics.agentic) {
     agenticFallbackCards().then(fb => {
@@ -1463,101 +1462,6 @@ document.addEventListener("click", resumeAudio, { once: true });
 document.addEventListener("keydown", resumeAudio, { once: true });
 
 // ============================================
-// Vòng lặp tự cải thiện (Beta)
-// ============================================
-const loopEnabled = document.getElementById("loopEnabled");
-const loopGoal = document.getElementById("loopGoal");
-const loopCustomGoal = document.getElementById("loopCustomGoal");
-const loopMode = document.getElementById("loopMode");
-const loopInterval = document.getElementById("loopInterval");
-function _syncCustomGoalVis() { if (loopCustomGoal) loopCustomGoal.style.display = (loopGoal.value === "custom") ? "block" : "none"; }
-const loopStatus = document.getElementById("loopStatus");
-const loopLog = document.getElementById("loopLog");
-const loopRunNow = document.getElementById("loopRunNow");
-const lintBtn = document.getElementById("lintBtn");
-
-function fmtClock(ts) {
-  if (!ts) return "-";
-  return new Date(ts * 1000).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
-}
-function renderLoopStatus(c) {
-  loopStatus.className = "loop-status";
-  if (c.running) { loopStatus.classList.add("running"); loopStatus.textContent = "⏳ Đang chạy một vòng..."; return; }
-  if (!c.enabled) { loopStatus.textContent = "Tắt - bật để Javis tự chạy nền"; return; }
-  loopStatus.classList.add("on");
-  const goalTxt = c.goal === "brain" ? "bộ não" : "chỉ số KD";
-  const last = c.last_run ? `lần cuối ${fmtClock(c.last_run)}` : "chưa chạy";
-  const next = c.next_run ? ` · kế tiếp ~${fmtClock(c.next_run)}` : "";
-  loopStatus.textContent = `● Bật · ${goalTxt} · ${c.mode === "auto" ? "tự làm" : "đề xuất"} · ${last}${next}`;
-}
-async function loadLoopConfig() {
-  try {
-    const c = await (await fetch("/loop/config")).json();
-    loopEnabled.checked = !!c.enabled;
-    if (c.goal) loopGoal.value = c.goal;
-    if (loopCustomGoal) loopCustomGoal.value = c.custom_goal || "";
-    _syncCustomGoalVis();
-    if (c.mode) loopMode.value = c.mode;
-    if (c.interval_min) loopInterval.value = c.interval_min;
-    renderLoopStatus(c);
-  } catch (e) {}
-}
-async function saveLoopConfig() {
-  const fd = new FormData();
-  fd.append("enabled", loopEnabled.checked ? "1" : "0");
-  fd.append("goal", loopGoal.value);
-  fd.append("custom_goal", loopCustomGoal ? loopCustomGoal.value : "");
-  fd.append("mode", loopMode.value);
-  fd.append("interval_min", loopInterval.value || "60");
-  fd.append("brain", currentBrainPath());   // scheduler chạy trên vault đang chọn
-  try { await fetch("/loop/config", { method: "POST", body: fd }); } catch (e) {}
-  loadLoopConfig();
-}
-async function loadLoopLog() {
-  try {
-    const d = await (await fetch(`/loop/log?brain=${encodeURIComponent(currentBrainPath())}&limit=8`)).json();
-    loopLog.innerHTML = "";
-    (d.entries || []).forEach(e => {
-      const div = document.createElement("div");
-      div.className = "loop-log-item";
-      const m = e.match(/^##\s*\[([^\]]+)\]\s*(.*)/);
-      const head = m ? `<span class="lli-time">${escapeHtml(m[1])}</span> ${escapeHtml(m[2])}` : "";
-      const body = e.replace(/^##.*\n?/, "").trim().slice(0, 400);
-      div.innerHTML = head + (body ? "<br>" + escapeHtml(body) : "");
-      loopLog.appendChild(div);
-    });
-  } catch (e) {}
-}
-if (loopEnabled) {
-  loopEnabled.addEventListener("change", saveLoopConfig);
-  loopGoal.addEventListener("change", () => { _syncCustomGoalVis(); saveLoopConfig(); });
-  if (loopCustomGoal) loopCustomGoal.addEventListener("change", saveLoopConfig);
-  loopMode.addEventListener("change", saveLoopConfig);
-  loopInterval.addEventListener("change", saveLoopConfig);
-  loopRunNow.addEventListener("click", async () => {
-    loopRunNow.disabled = true;
-    loopStatus.className = "loop-status running"; loopStatus.textContent = "⏳ Đang chạy một vòng...";
-    try { await fetch("/loop/run-now", { method: "POST" }); } catch (e) {}
-    const poll = setInterval(async () => {
-      try {
-        const c = await (await fetch("/loop/config")).json();
-        if (!c.running) { clearInterval(poll); loopRunNow.disabled = false; renderLoopStatus(c); loadLoopLog(); loadMemStats(); loadBrainStats(); }
-      } catch (e) { clearInterval(poll); loopRunNow.disabled = false; }
-    }, 3000);
-  });
-  lintBtn.addEventListener("click", async () => {
-    const old = lintBtn.textContent; lintBtn.disabled = true; lintBtn.textContent = "🩺 Đang quét...";
-    try {
-      const d = await (await fetch(`/lint?brain=${encodeURIComponent(currentBrainPath())}`)).json();
-      appendJavisMessage(d.ok ? ("🩺 **LINT Wiki**\n\n" + d.report) : ("⚠ " + (d.error || "lỗi LINT")));
-    } catch (e) { appendJavisMessage("⚠ LINT lỗi mạng"); }
-    lintBtn.textContent = old; lintBtn.disabled = false;
-  });
-  // Tự cập nhật trạng thái khi loop đang bật (nhẹ)
-  setInterval(() => { if (loopEnabled.checked) { loadLoopConfig(); } }, 20000);
-}
-
-// ============================================
 // Badge engine+model (sự thật, không hỏi model)
 // ============================================
 function setEngineBadge(engine, model) {
@@ -1903,8 +1807,6 @@ initGraph().then(connectGraphWatch).catch(connectGraphWatch);
 pumpAudioLevel();
 loadMemStats();
 loadBrainStats();
-loadLoopConfig();
-loadLoopLog();
 checkVault();
 // Khôi phục phiên gần nhất (hội thoại + số liệu) để hiện ngay
 restoreSession();

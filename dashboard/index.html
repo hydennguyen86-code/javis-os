@@ -147,46 +147,6 @@
              hoàn tác ở trang sidebar "Tự học" (console.js renderLearn). Widget cũ vốn là UI chết,
              không còn JS nào gắn vào (autoLearnToggle/learnBtn/memCount không có handler). -->
 
-        <!-- Vòng lặp tự cải thiện ĐÃ DỜI sang trang sidebar "Tự cải thiện" (console.js renderSelfImprove).
-             Giữ DOM ẩn để app.js cũ vẫn gắn handler không lỗi. -->
-        <div class="panel-label" style="margin-top:10px;display:none">
-          VÒNG LẶP TỰ CẢI THIỆN <span class="beta-tag">BETA</span>
-        </div>
-        <div class="loop-box" style="display:none">
-          <div class="loop-desc">Javis tự đánh thức theo lịch, tìm đòn bẩy cải thiện rồi tự kiểm chứng. An toàn: chỉ soạn nháp/ghi file trong vault - KHÔNG tự gọi MCP tạo đơn, đốt tiền, đăng bài.</div>
-          <label class="loop-row">
-            <span>Bật tự chạy nền</span>
-            <label class="toggle"><input type="checkbox" id="loopEnabled"><span></span></label>
-          </label>
-          <label class="loop-row">
-            <span>Mục tiêu</span>
-            <select id="loopGoal" class="loop-sel">
-              <option value="business">Cải thiện chỉ số kinh doanh</option>
-              <option value="brain">Làm dày bộ não (Wiki)</option>
-              <option value="product">Cải thiện Javis hữu dụng hơn</option>
-              <option value="custom">Tự định nghĩa…</option>
-            </select>
-          </label>
-          <textarea id="loopCustomGoal" class="loop-custom" placeholder="Mô tả mục tiêu tự cải thiện của riêng anh…" style="display:none"></textarea>
-          <label class="loop-row">
-            <span>Chế độ</span>
-            <select id="loopMode" class="loop-sel">
-              <option value="suggest">Chỉ đề xuất (an toàn)</option>
-              <option value="auto">Tự làm (ghi nháp vào vault)</option>
-            </select>
-          </label>
-          <label class="loop-row">
-            <span>Chu kỳ (phút)</span>
-            <input type="number" id="loopInterval" class="loop-num" min="5" value="60">
-          </label>
-          <div class="loop-actions">
-            <button class="loop-btn" id="loopRunNow">▶ Chạy ngay</button>
-            <button class="loop-btn ghost" id="lintBtn">🩺 LINT Wiki</button>
-          </div>
-          <div class="loop-status" id="loopStatus">Tắt</div>
-          <div class="loop-log" id="loopLog"></div>
-        </div>
-
         <!-- HỆ THỐNG + MCP ĐANG DÙNG đã DỜI xuống thanh model-bar (ngang hàng ô chọn model). -->
 
 
