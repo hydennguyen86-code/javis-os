@@ -4,6 +4,10 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.66] - 2026-07-17
+### Cải thiện
+- **Biến workflow trong ô bước đọc thành lời thay vì dấu ba chấm**: mã cũ thay mọi `{{...}}` bằng `…`, nên bước đầu của viral-video-production hiện ra "Nhận …, tạo project folder" đọc lên cụt nghĩa. Nay `{{input}}` thành "đầu vào", `{{prev}}` thành "kết quả bước trước", và biến lạ thì hiện thẳng tên biến chứ không nuốt mất. Xử đúng cả trường hợp có khoảng trắng trong ngoặc như `{{ input }}`.
+
 ## [0.9.65] - 2026-07-17
 ### Sửa lỗi
 - **Trang Workflows hiện các bước thành mấy cột cao lêu nghêu, rỗng ruột**: dải bước dùng `flex: 1` chia đều bề ngang, nên workflow 11 bước (viral-video-production) bị bóp mỗi ô còn khoảng 35px, trong khi tên agent `viral-video-director` có `white-space: nowrap` nên bị cắt sạch không còn chữ nào, chỉ trơ lại số thứ tự. Nay mỗi ô rộng tối thiểu 150px và tự xuống dòng khi hết chỗ, chữ luôn đọc được. Đo thật trên màn 1720px: 10 ô một hàng, ô thứ 11 xuống hàng dưới; 1280px được 7 ô; 900px được 5; 600px được 3; 380px được 2. Bề rộng ô luôn nằm trong 152 tới 173px ở mọi khổ và không khổ nào tràn ngang.

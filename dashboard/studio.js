@@ -60,9 +60,12 @@
   }
 
   // ===== Workflows =====
+  // Biến workflow đọc thành lời cho ô bước: thay "…" (cũ) vì "Nhận …, tạo project folder"
+  // đọc lên cụt nghĩa. Biến lạ thì hiện thẳng tên biến, đừng nuốt thành dấu ba chấm.
+  const WF_VARS = { input: "đầu vào", prev: "kết quả bước trước" };
   function renderPipeline(steps) {
     return (steps || []).map((s, i) => {
-      const task = (s.task || "").replace(/\{\{[^}]+\}\}/g, "…");
+      const task = (s.task || "").replace(/\{\{\s*([\w.-]+)\s*\}\}/g, (m, v) => WF_VARS[v] || v);
       return `<div class="wf-pstep" data-i="${i}">
           <div class="wps-num">${String(i + 1).padStart(2, "0")}</div>
           ${task ? `<div class="wps-task" title="${esc(task)}">${esc(task)}</div>` : ''}
