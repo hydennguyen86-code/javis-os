@@ -820,7 +820,8 @@
       box.innerHTML = `<h3 style="font-size:15px;color:#cdd8ee;margin:18px 0 8px">Nhắc hẹn đang chờ</h3>`;
       rem.forEach(r => {
         const title = r.label || r.text || "Nhắc hẹn";
-        const when = r.cron ? `cron ${r.cron}` : (r.due_human || "");
+        const when = r.cron ? `cron ${r.cron}`
+          : (r.repeat_min ? `lặp mỗi ${r.repeat_min} phút · kế tiếp ${r.due_human || ""}` : (r.due_human || ""));
         const kind = MODE_LBL[r.mode] || "nhắc";
         const div = document.createElement("div");
         div.className = "wf-card";

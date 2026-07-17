@@ -14,7 +14,7 @@ Những điều đồ thị thể hiện:
 - **Mỗi sợi nối = một wikilink `[[...]]`** giữa hai ghi chú. Đây là cách Javis đọc quan hệ, chứ không phải bạn tự vẽ.
 - **Màu sắc theo nhóm thư mục**: các ghi chú ở cùng một thư mục gốc (ví dụ nhóm Sources, nhóm Wiki, thư mục brain) có tông màu tím khác nhau, giúp phân vùng bằng mắt.
 - **Node cô đơn bị ẩn**: ghi chú không có bất kỳ kết nối nào (không link tới ai, cũng không ai link tới) sẽ không hiện, để đồ thị gọn. Số ghi chú bị ẩn được đếm riêng (xem mục thống kê bên dưới).
-- **Lớp agentic ở đáy**: ngay dưới đồ thị là dải chỉ số AGENTS · SKILLS · WORKFLOWS · ROUTINES. Đây là "phần cứng" của bộ não (số agent, skill, workflow, lịch tự động đang chạy), tách khỏi phần "tri thức" là các node phía trên. Bấm vào một chỉ số sẽ mở Studio đúng tab đó. Chi tiết ở [Agents & Workflows](07-agents-va-workflows.md), [Skills](06-skills.md), [Lịch & tự động hoá](12-lich-tu-dong-hoa.md).
+- **Lớp agentic ở đáy**: ngay dưới đồ thị là dải chỉ số AGENTS · SKILLS · WORKFLOWS. Đây là "phần cứng" của bộ não (số agent, skill, workflow đang có), tách khỏi phần "tri thức" là các node phía trên. Bấm vào một chỉ số sẽ mở Studio đúng tab đó. Chi tiết ở [Agents & Workflows](07-agents-va-workflows.md), [Skills](06-skills.md).
 
 ### Đồ thị phản ứng theo giọng nói và theo suy nghĩ
 
