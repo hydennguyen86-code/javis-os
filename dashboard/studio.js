@@ -43,7 +43,7 @@
   // cho nút header & dải số liệu .bstat ở đáy graph). Console gọi loader qua window.JavisStudio.
   window.openStudio = (tab) => { if (window.Alpine) Alpine.store("nav").go(tab || "workflows"); };
   window.JavisStudio = {
-    workflows: loadWorkflows, agents: loadAgents, skills: loadSkills, automations: loadAutomations,
+    workflows: loadWorkflows, agents: loadAgents, skills: loadSkills,
   };
   const _studioBtn = document.getElementById("studioOpenBtn");
   if (_studioBtn) _studioBtn.addEventListener("click", () => window.openStudio("workflows"));
@@ -52,10 +52,9 @@
 
   function switchTab(tab) {
     document.querySelectorAll(".stab").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
-    ["workflows", "agents", "skills", "automations"].forEach(t => document.getElementById("panel-" + t).hidden = (t !== tab));
+    ["workflows", "agents", "skills"].forEach(t => document.getElementById("panel-" + t).hidden = (t !== tab));
     if (tab === "workflows") loadWorkflows();
     else if (tab === "agents") loadAgents();
-    else if (tab === "automations") loadAutomations();
     else loadSkills();
   }
 
@@ -333,85 +332,6 @@
       const sk = [...box.querySelectorAll("#skillPick input:checked")].map(c => c.value).join(",");
       await api("/agents", { method: "POST", body: fd({ name, role: box.querySelector("#agRole").value, prompt: box.querySelector("#agPrompt").value, skills: sk, model: box.querySelector("#agModel").value, slug: a ? a.slug : "", brain: brain() }) });
       editor.classList.remove("open"); loadAgents();
-    };
-    editor.classList.add("open");
-  }
-
-  // ===== Lịch tự động (cron / trigger / routine) =====
-  async function loadAutomations() {
-    const panel = document.getElementById("panel-automations");
-    panel.innerHTML = `<div class="panel-bar"><h3>Lịch tự động <span class="dim" id="autoRunning"></span></h3><div class="pb-actions"><button class="s-btn-ghost" id="syncAuto">↻ Đồng bộ cloud</button><button class="s-btn" id="newAuto">+ Lịch</button></div></div>`
-      + `<div class="auto-hint">Bấm <b>↻ Đồng bộ cloud</b> để Javis hỏi Claude (CronList / scheduled tasks) lấy routine THẬT đang chạy trên cloud. Mục ☁ là tự đồng bộ; mục ghi tay vẫn giữ. Các loop 🔁 (trang Tự cải thiện) bật/tắt được ngay tại đây.</div>`
-      + `<div class="cards" id="autoCards">Đang tải...</div>`;
-    document.getElementById("newAuto").onclick = () => editAutomation(null);
-    document.getElementById("syncAuto").onclick = async (e) => {
-      const btn = e.target; btn.disabled = true; const old = btn.textContent; btn.textContent = "↻ Đang hỏi Claude...";
-      try {
-        const r = await api("/automations/sync", { method: "POST", body: fd({ brain: brain() }) });
-        if (!r.ok) alert("Đồng bộ lỗi: " + (r.error || r.detail || "không rõ") + (r.raw ? "\n\nClaude trả về:\n" + r.raw : ""));
-        else if (r.found === 0) alert("Không tìm thấy routine/cron nào (Claude CLI nền có thể chưa truy cập được danh sách lịch cloud).");
-        else alert(`Đã đồng bộ ${r.found} routine từ cloud.`);
-      } catch (e) { alert("Lỗi mạng khi đồng bộ"); }
-      btn.textContent = old; btn.disabled = false;
-      loadAutomations(); if (window.loadBrainStats) window.loadBrainStats();
-    };
-    const d = await api(`/automations?brain=${encodeURIComponent(brain())}`);
-    refreshStats();
-    document.getElementById("autoRunning").textContent = `· ${d.running} đang chạy`;
-    const cards = document.getElementById("autoCards");
-    const all = (d.builtin || []).concat(d.automations || []);
-    if (!all.length) { cards.innerHTML = `<div class="empty">Chưa có lịch nào. Bấm <b>+ Lịch</b> ghi lại cron/trigger/routine đã tạo (vd Morning Briefing 7h).</div>`; return; }
-    cards.innerHTML = "";
-    all.forEach(a => {
-      const active = a.status === "active";
-      const isRem = a.type === "reminder" || a.type === "script";
-      const typeLabel = a.type === "script" ? "Script (không AI)" : a.type === "reminder" ? "Nhắc hẹn" : a.type === "trigger" ? "Trigger" : a.type === "routine" ? "Routine" : "Cron";
-      const prefix = a.type === "script" ? "🖥 " : isRem ? "⏰ " : a.builtin ? "🔁 " : (a.source === "cloud" ? "☁ " : "");
-      const div = document.createElement("div");
-      div.className = "wf-card" + (active ? "" : " off");
-      div.innerHTML = `
-        <div class="wf-top">
-          <div class="wf-name">${prefix}${esc(a.name)} <span class="wf-status ${active ? "on" : "off"}">${active ? "ĐANG CHẠY" : "TẮT"}</span></div>
-          <label class="toggle"><input type="checkbox" ${active ? "checked" : ""}><span></span></label>
-        </div>
-        <div class="wf-desc">⏰ ${esc(a.schedule || "-")} · <span class="dim">${typeLabel}</span></div>
-        ${a.note ? `<div class="wf-steps">${esc(a.note)}</div>` : ""}
-        <div class="wf-actions">${isRem
-          ? `<span class="dim" style="font-size:13px">${a.type === "script" ? "Job script" : "Nhắc hẹn"} - gạt công tắc để huỷ</span>`
-          : a.builtin
-          ? `<span class="dim" style="font-size:13px">Loop - cấu hình/xoá ở trang Tự cải thiện</span>`
-          : `<button class="s-btn-ghost edit">Sửa</button><button class="s-btn-ghost del">Xoá</button>`}</div>`;
-      div.querySelector(".toggle input").onchange = async () => {
-        await api("/automations/toggle", { method: "POST", body: fd({ id: a.id, brain: brain() }) }); loadAutomations();
-      };
-      if (!a.builtin) {
-        div.querySelector(".edit").onclick = () => editAutomation(a);
-        div.querySelector(".del").onclick = async () => { if (confirm(`Xoá "${a.name}"?`)) { await api("/automations/delete", { method: "POST", body: fd({ id: a.id, brain: brain() }) }); loadAutomations(); } };
-      }
-      cards.appendChild(div);
-    });
-  }
-
-  function editAutomation(a) {
-    const box = document.getElementById("editorBox");
-    box.innerHTML = `<h3>${a ? "Sửa" : "Thêm"} lịch tự động</h3>
-      <label>Tên</label><input id="auName" value="${esc(a ? a.name : "")}">
-      <label>Loại</label><select id="auType">
-        <option value="cron">Cron - lịch giờ cố định</option>
-        <option value="trigger">Trigger - RemoteTrigger / sự kiện</option>
-        <option value="routine">Routine - scheduled agent</option>
-      </select>
-      <label>Lịch / mô tả (vd "7h sáng hằng ngày")</label><input id="auSched" value="${esc(a ? a.schedule : "")}">
-      <label>Ghi chú / ID (vd trig_01A9...)</label><input id="auNote" value="${esc(a ? a.note : "")}">
-      <div class="editor-actions"><button class="s-btn-ghost" id="cancelEd">Huỷ</button><button class="s-btn" id="saveAu">Lưu</button></div>`;
-    if (a && a.type) box.querySelector("#auType").value = a.type;
-    box.querySelector("#cancelEd").onclick = () => editor.classList.remove("open");
-    box.querySelector("#saveAu").onclick = async () => {
-      const name = box.querySelector("#auName").value.trim(); if (!name) return alert("Nhập tên");
-      await api("/automations", { method: "POST", body: fd({
-        name, type: box.querySelector("#auType").value, schedule: box.querySelector("#auSched").value,
-        note: box.querySelector("#auNote").value, status: a ? a.status : "active", id: a ? a.id : "", brain: brain() }) });
-      editor.classList.remove("open"); loadAutomations();
     };
     editor.classList.add("open");
   }

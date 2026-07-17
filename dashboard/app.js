@@ -1194,16 +1194,14 @@ function _setStat(id, n) {
 async function loadBrainStats() {
   const b = encodeURIComponent(currentBrainPath());
   try {
-    const [a, s, w, au] = await Promise.all([
+    const [a, s, w] = await Promise.all([
       fetch(`/agents?brain=${b}`).then(r => r.json()).catch(() => ({})),
       fetch(`/skills?brain=${b}`).then(r => r.json()).catch(() => ({})),
       fetch(`/workflows?brain=${b}`).then(r => r.json()).catch(() => ({})),
-      fetch(`/automations?brain=${b}`).then(r => r.json()).catch(() => ({})),
     ]);
     _setStat("statAgents", (a.agents || []).length);
     _setStat("statSkills", (s.skills || []).length);
     _setStat("statWorkflows", (w.workflows || []).length);
-    _setStat("statRoutines", au.running != null ? au.running : 0);   // routines đang chạy
   } catch (e) {}
 }
 window.loadBrainStats = loadBrainStats;   // Studio gọi lại sau khi tạo/xoá

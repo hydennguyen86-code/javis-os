@@ -20,7 +20,6 @@
     workflows:   _svg('<path d="M13 2L4.5 13.5H11l-1 8.5L19.5 10H13l0-8z"/>'),
     agents:      _svg('<rect x="5" y="7" width="14" height="13" rx="2"/><path d="M12 7V3M8 3h8"/><circle cx="9.2" cy="13" r="1.1"/><circle cx="14.8" cy="13" r="1.1"/>'),
     skills:      _svg('<path d="M12 3l2.4 5.6L20 11l-5.6 2.4L12 19l-2.4-5.6L4 11l5.6-2.4L12 3z"/>'),
-    automations: _svg('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
     models:      _svg('<path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/>'),
     channels:    _svg('<path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/>'),
     mcp:         _svg('<path d="M9 2v6M15 2v6"/><path d="M7 8h10v3a5 5 0 0 1-10 0V8z"/><path d="M12 16v6"/>'),
@@ -43,10 +42,9 @@
     { id: "agents",      icon: ICON.agents,      label: "Agents" },
     { id: "skills",      icon: ICON.skills,      label: "Skills" },
     { id: "files",       icon: ICON.files,       label: "Tệp tin" },
-    { id: "selfimprove", icon: ICON.selfimprove, label: "Loop" },
+    { id: "selfimprove", icon: ICON.selfimprove, label: "Việc" },
     { id: "learn",       icon: ICON.learn,       label: "Tự học" },
     { id: "kanban",      icon: ICON.kanban,      label: "Việc" },
-    { id: "automations", icon: ICON.automations, label: "Lịch" },
     { id: "models",      icon: ICON.models,      label: "Models" },
     { id: "channels",    icon: ICON.channels,    label: "Kênh" },
     { id: "mcp",         icon: ICON.mcp,         label: "Kết nối" },
@@ -61,8 +59,8 @@
   const RAIL_GROUPS = [
     { label: "Trợ lý",      ids: ["home", "chat", "overview"] },
     { label: "Bộ não",      ids: ["files", "learn"] },
-    { label: "Năng lực",    ids: ["agents", "skills", "workflows", "selfimprove", "plugins"] },
-    { label: "Việc & lịch", ids: ["kanban", "automations"] },
+    { label: "Năng lực",    ids: ["agents", "skills", "workflows", "plugins"] },
+    { label: "Việc",        ids: ["kanban", "selfimprove"] },
     { label: "Kết nối",     ids: ["mcp", "channels", "models"] },
     { label: "Hệ thống",    ids: ["settings", "logs", "account"], foot: true },
   ];
@@ -91,10 +89,9 @@
     agents:      { icon: "🤖", label: "Agents", sub: "Trợ lý chuyên biệt" },
     skills:      { icon: "🧩", label: "Skills", sub: "Kỹ năng khả dụng" },
     files:       { icon: "🗂", label: "Tệp tin", sub: "Duyệt · sửa · tải file trong brain" },
-    selfimprove: { icon: "♻", label: "Loop", sub: "Nhiệm vụ lặp tự động chạy nền" },
+    selfimprove: { icon: "♻", label: "Việc", sub: "Việc định kỳ + nhắc hẹn đang chờ" },
     learn:       { icon: "🧠", label: "Tự học", sub: "Rewire Memory · Wiki · Skill (an toàn, undo được)" },
     kanban:      { icon: "🗂", label: "Việc (Kanban)", sub: "Backlog + dispatcher tự làm task nền" },
-    automations: { icon: "⏰", label: "Lịch tự động", sub: "Cron · trigger · routine" },
     models:      { icon: "◈", label: "Models", sub: "Main model & providers" },
     channels:    { icon: "✉", label: "Kênh kết nối", sub: "Telegram & hơn nữa" },
     mcp:         { icon: "🔌", label: "Kết nối", sub: "Nguồn dữ liệu & công cụ" },
@@ -104,7 +101,7 @@
   };
 
   // 4 trang tách từ Studio cũ - render container rồi gọi loader trong studio.js (window.JavisStudio).
-  const STUDIO_PAGES = ["workflows", "agents", "skills", "automations"];
+  const STUDIO_PAGES = ["workflows", "agents", "skills"];
 
   let _settings = null;
   let _renderGen = 0;         // token chống race: mỗi lần đổi trang tăng 1; render async cũ tự bỏ
@@ -680,7 +677,7 @@
     const fmtT = ts => ts ? new Date(ts * 1000).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : "-";
 
     el.innerHTML = `<div class="cview-section">
-      <p style="color:#9fb0cf;font-size:15px;max-width:680px;margin:0 0 14px">Nhiều <b>loop</b> chạy ngầm: mỗi loop tự thức theo chu kỳ, làm <b>một việc</b> anh mô tả, tự kiểm chứng rồi ghi log. Thực thi <b>tuần tự</b> (1 vòng/lúc). Loop <b>đọc được dữ liệu thật qua MCP</b> (POS, quảng cáo, lịch...) để làm việc, nhưng KHÔNG tự tạo đơn/tiêu tiền/đăng bài - chỉ ghi nháp để anh duyệt. Loop bật sẽ hiện ở tab <b>Lịch</b>.</p>
+      <p style="color:#9fb0cf;font-size:15px;max-width:680px;margin:0 0 14px">Nhiều <b>loop</b> chạy ngầm: mỗi loop tự thức theo chu kỳ, làm <b>một việc</b> anh mô tả, tự kiểm chứng rồi ghi log. Thực thi <b>tuần tự</b> (1 vòng/lúc). Loop <b>đọc được dữ liệu thật qua MCP</b> (POS, quảng cáo, lịch...) để làm việc, nhưng KHÔNG tự tạo đơn/tiêu tiền/đăng bài - chỉ ghi nháp để anh duyệt.</p>
       <div class="si-actions" style="margin-bottom:14px">
         <button class="s-btn" id="lpNew">+ Loop mới</button>
         <button class="s-btn-ghost" id="lpStop">■ Dừng vòng đang chạy</button>
@@ -706,6 +703,7 @@
         </div>
       </div>
       <div id="lpCards">Đang tải...</div>
+      <div id="lpReminders"></div>
       <div class="si-log"><h3 style="font-size:15px;color:#cdd8ee">Nhật ký gần đây · <select id="lpLogFilter" class="loop-sel" style="font-size:13px"><option value="">Tất cả loop</option></select></h3><div id="lpLog">Đang tải...</div></div>
     </div>`;
 
@@ -806,6 +804,41 @@
       return div;
     }
 
+    // Nhắc hẹn đang chờ: trước đây CHỈ hiện ở tab Lịch (đã xoá). Không gộp vào đây thì user
+    // mất chỗ nhìn chúng. Loop = việc bền (.md, sửa trong Obsidian); nhắc = việc phù du.
+    // Đọc thẳng /reminders (nguồn thật), KHÔNG qua lớp chiếu: lớp đó chỉ tồn tại vì tab Lịch.
+    async function loadReminders() {
+      if (myGen !== _renderGen) return;
+      const box = el.querySelector("#lpReminders");
+      if (!box) return;
+      let d = { pending: [] };
+      try { d = await (await fetch(`/reminders?brain=${encodeURIComponent(fbrain())}`)).json(); } catch (e) {}
+      if (myGen !== _renderGen) return;
+      const rem = d.pending || [];
+      if (!rem.length) { box.innerHTML = ""; return; }
+      const MODE_LBL = { notify: "nhắc", task: "tự làm + báo", script: "script" };
+      box.innerHTML = `<h3 style="font-size:15px;color:#cdd8ee;margin:18px 0 8px">Nhắc hẹn đang chờ</h3>`;
+      rem.forEach(r => {
+        const title = r.label || r.text || "Nhắc hẹn";
+        const when = r.cron ? `cron ${r.cron}` : (r.due_human || "");
+        const kind = MODE_LBL[r.mode] || "nhắc";
+        const div = document.createElement("div");
+        div.className = "si-card";
+        div.innerHTML = `<b>${esc(title)}</b>
+          <div class="dim" style="font-size:12px;color:#6b7894">${esc(when)} · ${esc(kind)}</div>
+          <button class="s-btn-ghost rmCancel" style="margin-top:8px">Huỷ</button>`;
+        div.querySelector(".rmCancel").onclick = async () => {
+          if (!confirm(`Huỷ "${title}"?`)) return;
+          const f = new FormData();
+          f.append("id", r.id);        // id THÔ, /reminders/cancel nhận đúng dạng này
+          f.append("brain", fbrain());
+          await fetch("/reminders/cancel", { method: "POST", body: f });
+          loadReminders();
+        };
+        box.appendChild(div);
+      });
+    }
+
     async function loadLoops() {
       if (myGen !== _renderGen) return;   // đã rời trang
       let d = { loops: [] };
@@ -823,6 +856,7 @@
       const cur = sel.value;
       sel.innerHTML = `<option value="">Tất cả loop</option>` +
         (d.loops || []).map(lp => `<option value="${esc(lp.slug)}" ${lp.slug === cur ? "selected" : ""}>${esc(lp.name)}</option>`).join("");
+      loadReminders();
       clearTimeout(pollTimer);
       if (d.running) pollTimer = setTimeout(loadLoops, 5000);   // đang có vòng chạy → tự refresh (1 chuỗi)
     }
