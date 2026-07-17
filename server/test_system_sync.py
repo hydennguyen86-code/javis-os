@@ -12,7 +12,15 @@ THÂN cái khoá (2 luồng không copy đè nhau cùng lúc - check này tắt 
 phủ 3 bẫy của cache chữ ký: nguồn đổi GIỮA CHỪNG lượt copy không được mất cập nhật, skill copy
 lỗi phải được thử lại lượt sau, và skill hỏng VĨNH VIỄN chỉ được tốn rglob của riêng nó chứ
 không kéo cả brain vào full copy mỗi lượt chat.
+
+Cuối file: rào chống DEADLOCK cho sync_brain (gọi thẳng đường thật, không mô phỏng) - `_LOCK`
+của module là threading.Lock KHÔNG reentrant, `sync_brain` giữ nó rồi gọi mirror_skills bên
+trong; nếu mirror_skills/_mirror_lock/_mirror_signature lỡ lấy lại đúng khoá đó thì treo VĨNH
+VIỄN, không exception. Check này chạy sync_brain trên luồng daemon với join có hạn giờ, biến
+hết-giờ thành một dòng FAIL rõ tên, không phải một lần chạy treo CI. Kèm 1 kiểm AST tĩnh độc
+lập (không chạy code, chỉ đọc token) soát đúng 3 hàm đó không nhắc tên _LOCK.
 """
+import ast
 import os
 import shutil
 import sys
@@ -428,6 +436,95 @@ system_sync.mirror_skills(_R8)
 check("toggle: TẮT rồi BẬT lại -> mirror PHẢI được tạo lại (CRITICAL 1)", _mir8.is_file())
 
 shutil.rmtree(_R8, ignore_errors=True)
+
+# ---- REGRESSION GUARD: sync_brain không được DEADLOCK (mirror_skills lỡ lấy lại _LOCK) ----
+# VÌ SAO CHECK NÀY TỒN TẠI - ĐỪNG XOÁ VÌ TƯỞNG TRÙNG VỚI SOÁT AST Ở DƯỚI:
+# `_LOCK` (system_sync.py, module-level) là threading.Lock THƯỜNG - KHÔNG PHẢI RLock, nên
+# KHÔNG reentrant. `sync_brain` giữ nó suốt (`with _LOCK:`) rồi, NGAY BÊN TRONG khối đó, gọi
+# `mirror_skills(root)`. Bản 0.9.64 cố tình cho mirror_skills một khoá RIÊNG (_MIRROR_LOCKS,
+# canh bởi _MIRROR_LOCKS_GUARD) đúng để nó KHÔNG BAO GIỜ đụng _LOCK - xem lời giải ở
+# docs/superpowers/specs/2026-07-17-mirror-skills-tree-design.md, mục "Sáu blocker cũ...",
+# blocker 3. Điều đó hôm nay chỉ được xác nhận MỘT LẦN bằng mắt lúc review (đọc code, đếm
+# 2 chỗ _LOCK bị lấy). Không gì NGĂN một sửa sau này (vô tình) thêm một lượt acquire _LOCK
+# vào mirror_skills/_mirror_lock/_mirror_signature - lúc đó luồng đang giữ _LOCK tự xin lại
+# CHÍNH khoá đó -> tự khoá mình -> TREO VĨNH VIỄN, không ném exception, không log gì cả. Vì
+# sync_brain/ensure_synced chạy ở ĐƯỜNG NÓNG (build_system_prompt, mỗi lượt chat dashboard/
+# Telegram/Kanban/loop/nhắc hẹn), lỗi này treo NGAY LƯỢT CHAT ĐẦU TIÊN CỦA MỌI BRAIN trong
+# production - và trước bản vá này, KHÔNG MỘT TEST NÀO trong server/ gọi sync_brain hay
+# ensure_synced (đã grep xác nhận), nên một sửa như vậy sẽ đi qua trót lọt: 13 file test khác
+# xanh hết, byte-compile qua, và chỉ lộ ra khi người dùng thật báo "app treo".
+#
+# CÁI KHÓ: test một cái TREO mà không được tự treo theo. Gọi sync_brain thẳng trên luồng
+# chính sẽ chặn vô thời hạn nếu deadlock thật xảy ra -> CI timeout sau hàng chục phút, không
+# có tín hiệu gì hữu ích (không rõ vì sao đỏ, có khi tưởng nhầm máy CI chậm). Giải: chạy
+# sync_brain trên MỘT LUỒNG DAEMON, join với thời hạn. Hết hạn mà luồng còn sống = hết-giờ
+# biến thành một FAIL có TÊN RÕ RÀNG ngay lập tức - không phải một lần chạy treo, không phải
+# một lần pass ngầm (im lặng bỏ qua thì chính là cái bẫy dự án này đã dính một lần: một cửa
+# sổ-thời-gian không bao giờ mở ra phải in ra FAIL, không phải xanh). daemon=True nghĩa là dù
+# luồng có thật sự kẹt, tiến trình vẫn thoát được ngay khi script kết thúc (không cần kill tay).
+#
+# Đi ĐƯỜNG THẬT, không mô phỏng: gọi thẳng system_sync.sync_brain(root) (không phải
+# ensure_synced - hàm đó memo theo _SYNCED_ROOTS nên gọi lần hai trên cùng root sẽ no-op, và
+# đằng nào _LOCK cũng bị giữ ngay trong sync_brain chứ không phải ở lớp memo của
+# ensure_synced). root là brain rỗng dựng bằng tempfile.mkdtemp - sync_brain sẽ cài các skill/
+# loop HỆ THỐNG thật của chính repo này vào đó (đọc từ .claude/skills + system/loops thật),
+# giống hệt lượt sync đầu tiên của một brain mới trong production.
+def _kiem_sync_brain_khong_deadlock():
+    root = Path(tempfile.mkdtemp(prefix="javis-syncbrain-deadlock-"))
+    ket_qua = {}
+
+    def _chay():
+        try:
+            ket_qua["r"] = system_sync.sync_brain(root)
+        except Exception as e:  # noqa: BLE001 - muốn thấy MỌI lỗi, kể cả lỗi lạ
+            ket_qua["loi"] = e
+
+    t = threading.Thread(target=_chay, name="sync_brain_deadlock_probe", daemon=True)
+    t.start()
+    t.join(timeout=15)
+    con_treo = t.is_alive()
+    check("REGRESSION mirror_skills/_mirror_lock/_mirror_signature lấy lại _LOCK (không "
+          "reentrant) trong lúc sync_brain đang giữ -> treo production ngay lượt chat đầu "
+          f"(đã chờ 15s, luồng {'CÒN SỐNG - TREO THẬT' if con_treo else 'đã xong'})",
+          not con_treo)
+    if con_treo:
+        # KHÔNG rmtree khi còn treo: luồng daemon có thể vẫn đang cầm handle file bên trong
+        # root (nhất là trên Windows). Để process thoát tự dọn - đây chính xác là lý do dùng
+        # daemon=True thay vì cố join thêm hoặc cố dọn cho sạch.
+        return
+    check("sync_brain (đường thật, không giả lập) chạy xong không lỗi và trả ok=True",
+          "loi" not in ket_qua and isinstance(ket_qua.get("r"), dict) and ket_qua["r"].get("ok") is True)
+    shutil.rmtree(root, ignore_errors=True)
+
+
+_kiem_sync_brain_khong_deadlock()
+
+# ---- Soát tĩnh AST bổ sung: không hàm nào trong 3 hàm đó NHẮC TÊN _LOCK ----
+# Check này CHẾT VÌ LÝ DO KHÁC với check hành vi ở trên - giữ CẢ HAI, đừng rút gọn về một:
+#   - Check hành vi (trên) CHỈ đỏ khi deadlock THẬT SỰ xảy ra lúc chạy - bằng chứng mạnh nhất
+#     (đường thật) nhưng phải trả giá 15s chờ mỗi khi ai đó thật sự gây ra deadlock.
+#   - Check AST (đây) đỏ NGAY LẬP TỨC (đọc token, không chạy), và bắt được cả kiểu sửa mà may
+#     rủi khiến check hành vi KHÔNG kích hoạt được đường thi hành có lỗi (vd nhắc _LOCK trong
+#     một nhánh if hiếm khi True lúc test chạy, hoặc gán _LOCK cho biến khác rồi .acquire()
+#     tên biến đó - AST vẫn thấy tên `_LOCK` xuất hiện trong thân hàm dù chưa chắc luôn thực
+#     thi). Ngược lại AST không chứng minh được HÀNH VI (vd nếu ai đó đổi _LOCK thành RLock,
+#     AST vẫn thấy tên _LOCK xuất hiện y hệt dù lúc đó không còn deadlock nữa - lúc đó check
+#     hành vi mới là trọng tài đúng). Hai check bù nhau, không cái nào thay được cái kia.
+def _kiem_ast_khong_lock_trong_mirror():
+    src = Path(system_sync.__file__).read_text(encoding="utf-8")
+    tree = ast.parse(src, filename=system_sync.__file__)
+    ten_can_soat = {"mirror_skills", "_mirror_lock", "_mirror_signature"}
+    pham = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name in ten_can_soat:
+            for con in ast.walk(node):
+                if isinstance(con, ast.Name) and con.id == "_LOCK":
+                    pham.append(f"{node.name}:{con.lineno}")
+    check(f"AST tĩnh: mirror_skills/_mirror_lock/_mirror_signature không nhắc tên _LOCK "
+          f"(phạm: {pham})", not pham)
+
+
+_kiem_ast_khong_lock_trong_mirror()
 
 # ---- dọn ----
 for _d in (_ROOT, _R2, _R3, _R4, _R5, _R6, _R7):
