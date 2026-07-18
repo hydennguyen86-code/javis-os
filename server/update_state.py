@@ -2,7 +2,6 @@
 quyết định rollback. Không phụ thuộc FastAPI/main - import được từ cả main.py lẫn updater.py."""
 import json
 import re
-from pathlib import Path
 
 import config as cfgmod
 

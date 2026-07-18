@@ -41,6 +41,21 @@ check("health xanh + đúng target - success", us.update_outcome(True, "0.9.79",
 check("health xanh + version tiến (target rỗng) - success", us.update_outcome(True, "0.9.79", "0.9.78", None) == "success")
 check("health xanh nhưng version chưa đổi - version_mismatch", us.update_outcome(True, "0.9.78", "0.9.78", "0.9.79") == "version_mismatch")
 
+# --- update_state: phủ thêm hợp đồng hàm ---
+check("ver_tuple số hợp lệ -> tuple 3 phần", us.ver_tuple("1.2.3") == (1, 2, 3))
+check("ver_tuple bỏ tiền tố v", us.ver_tuple("v2.0.0") == (2, 0, 0))
+# health xanh + version tiến qua old nhưng CHƯA tới target (main nhích trong lúc pull):
+# vẫn coi là success - KHÔNG rollback một bản đang chạy khoẻ chỉ vì chưa phải bản mới nhất.
+check("outcome: khoẻ + tiến qua old dù chưa tới target -> success",
+      us.update_outcome(True, "0.9.79", "0.9.78", "0.9.80") == "success")
+us.STATE_FILE.unlink(missing_ok=True)
+us.record_boot_version("1.0.0")
+us.record_boot_version("1.0.0")
+check("boot lại cùng phiên bản -> không đặt previous", us.read_state().get("previous_version") is None)
+us.STATE_FILE.write_text("{khong-phai-json", encoding="utf-8")
+check("read_state gặp JSON hỏng -> trả {}", us.read_state() == {})
+us.STATE_FILE.unlink(missing_ok=True)
+
 print()
 if _fails:
     print(f"{len(_fails)} FAIL: {_fails}"); sys.exit(1)
