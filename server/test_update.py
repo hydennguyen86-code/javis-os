@@ -66,6 +66,12 @@ _v = asyncio.run(main.version_info())
 check("/version có khoá previous_version", "previous_version" in _v)
 check("/version previous_version đúng giá trị", _v.get("previous_version") == "0.9.77")
 
+# --- hook boot dùng ĐÚNG cặp hàm (bắt lỗi đổi tên/chữ ký làm hook fail âm thầm) ---
+us.STATE_FILE.unlink(missing_ok=True)
+_bs = main._record_boot_version(main._read_version())
+check("hook boot: _record_boot_version(_read_version()) chạy + đặt last_good = bản hiện tại",
+      _bs.get("last_good_version") == main._read_version())
+
 print()
 if _fails:
     print(f"{len(_fails)} FAIL: {_fails}"); sys.exit(1)
