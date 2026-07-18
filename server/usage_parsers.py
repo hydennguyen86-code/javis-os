@@ -83,3 +83,61 @@ def parse_claude_line(obj: dict, chat_sessions: set) -> dict | None:
         "source": source, "activity": activity,
         "input": inp, "output": out, "cache_read": cread, "cache_create": ccreate,
     }
+
+
+def parse_codex_file(path: str) -> dict | None:
+    """Mot file rollout Codex (~/.codex/sessions/**/rollout-*.jsonl) -> mot UsageEvent
+    la TONG CA PHIEN, hoac None neu khong tim thay token_count.
+
+    total_token_usage la CONG DON theo phien: lay ban ghi co total_tokens LON NHAT
+    (= trang thai cuoi) lam tong. input_tokens da GOM cached, nen input moi = input - cached.
+    Codex la engine phu: source='javis', activity='chat' (best-effort, chua tach nen).
+    """
+    cwd = ""
+    model = "codex"
+    best = None            # (total_tokens, info_dict, ts_line)
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                except Exception:
+                    continue
+                if not isinstance(obj, dict):
+                    continue
+                payload = obj.get("payload") if isinstance(obj.get("payload"), dict) else {}
+                if obj.get("type") == "session_meta":
+                    cwd = payload.get("cwd") or cwd
+                m = obj.get("model") or payload.get("model")
+                if m:
+                    model = m
+                if payload.get("type") == "token_count":
+                    info = payload.get("info") or {}
+                    ttu = info.get("total_token_usage") or {}
+                    tot = int(ttu.get("total_tokens") or 0)
+                    if ttu and (best is None or tot >= best[0]):
+                        best = (tot, ttu, obj.get("timestamp"))
+    except Exception:
+        return None
+    if best is None:
+        return None
+    _, ttu, ts_line = best
+    inp_all = int(ttu.get("input_tokens") or 0)
+    cread = int(ttu.get("cached_input_tokens") or 0)
+    out = int(ttu.get("output_tokens") or 0)
+    inp = max(0, inp_all - cread)
+    if inp + out + cread <= 0:
+        return None
+    parsed = _parse_ts(ts_line)
+    ts, day = parsed if parsed else (0, "")
+    session_id = _basename(path).rsplit(".", 1)[0]
+    return {
+        "ts": ts, "day": day, "provider": "codex",
+        "engine": "codex", "model": model,
+        "project": _basename(cwd), "session_id": session_id,
+        "source": "javis", "activity": "chat",
+        "input": inp, "output": out, "cache_read": cread, "cache_create": 0,
+    }

@@ -66,6 +66,39 @@ check("claude: 0 token -> None",
                             "message": {"model": "claude-opus-4-8", "usage": {"input_tokens": 0, "output_tokens": 0}}}, set()) is None)
 
 
+# ============================================================
+# Task 2: parse_codex_file
+# ============================================================
+_CODEX_LINES = [
+    {"timestamp": "2026-07-05T02:00:00.000Z", "type": "session_meta",
+     "payload": {"id": "abc", "cwd": "D:\\Project\\Demo", "model_provider": "openai"}},
+    {"timestamp": "2026-07-05T02:00:05.000Z", "type": "turn_context", "payload": {"model": "gpt-5.5"}},
+    # token_count CONG DON (cumulative) - lay dong CUOI lam tong phien, KHONG cong het.
+    {"timestamp": "2026-07-05T02:01:00.000Z", "type": "event_msg", "payload": {"type": "token_count",
+     "info": {"total_token_usage": {"input_tokens": 1000, "cached_input_tokens": 200, "output_tokens": 50, "total_tokens": 1050}}}},
+    {"timestamp": "2026-07-05T18:30:00.000Z", "type": "event_msg", "payload": {"type": "token_count",
+     "info": {"total_token_usage": {"input_tokens": 3000, "cached_input_tokens": 800, "output_tokens": 150, "total_tokens": 3150}}}},
+]
+_tmp = Path(tempfile.mkdtemp(prefix="javis-codextest-"))
+_rollout = _tmp / "rollout-2026-07-05T02-00-00-abc.jsonl"
+_rollout.write_text("\n".join(json.dumps(x) for x in _CODEX_LINES), encoding="utf-8")
+
+cev = up.parse_codex_file(str(_rollout))
+check("codex: provider=codex", bool(cev) and cev["provider"] == "codex")
+check("codex: lay tong phien = dong cuoi (khong cong don)", cev["output"] == 150)
+check("codex: input moi = input - cached", cev["input"] == 2200)
+check("codex: cache_read = cached", cev["cache_read"] == 800)
+check("codex: cache_create = 0", cev["cache_create"] == 0)
+check("codex: model tu payload", cev["model"] == "gpt-5.5")
+check("codex: project tu session_meta cwd", cev["project"] == "Demo")
+check("codex: day UTC+7 (18:30Z -> hom sau)", cev["day"] == "2026-07-06")
+check("codex: source=javis", cev["source"] == "javis")
+
+_no = _tmp / "rollout-empty.jsonl"
+_no.write_text(json.dumps({"type": "session_meta", "payload": {"id": "x"}}), encoding="utf-8")
+check("codex: khong co token_count -> None", up.parse_codex_file(str(_no)) is None)
+
+
 if _fails:
     print("\n%d FAIL" % len(_fails))
     sys.exit(1)
