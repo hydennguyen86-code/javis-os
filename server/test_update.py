@@ -56,6 +56,16 @@ us.STATE_FILE.write_text("{khong-phai-json", encoding="utf-8")
 check("read_state gặp JSON hỏng -> trả {}", us.read_state() == {})
 us.STATE_FILE.unlink(missing_ok=True)
 
+# --- main.py dùng update_state + /version có previous_version ---
+import asyncio  # noqa: E402
+import main  # noqa: E402
+check("main alias _ver_newer chạy", main._ver_newer("0.9.79", "0.9.78") is True)
+us.STATE_FILE.unlink(missing_ok=True)
+us.write_state({"previous_version": "0.9.77"})
+_v = asyncio.run(main.version_info())
+check("/version có khoá previous_version", "previous_version" in _v)
+check("/version previous_version đúng giá trị", _v.get("previous_version") == "0.9.77")
+
 print()
 if _fails:
     print(f"{len(_fails)} FAIL: {_fails}"); sys.exit(1)

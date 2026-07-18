@@ -27,6 +27,13 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 from claude_cli import CodexCLI, claude_engine, find_claude_cli, find_codex_cli, cancel_all, _empty_mcp_file, auth_status as claude_auth_status, auth_login as claude_auth_login, auth_logout as claude_auth_logout, auth_login_ui_start, auth_login_ui_code, mcp_native_add, mcp_native_remove, mcp_native_status, mcp_open_auth_terminal, mcp_native_list
 from graph_builder import build_graph, _color_for, _top_folder, WIKILINK_RE
 import config as cfgmod
+import update_state
+_ver_tuple = update_state.ver_tuple
+_ver_newer = update_state.ver_newer
+_read_update_state = update_state.read_state
+_write_update_state = update_state.write_state
+_record_boot_version = update_state.record_boot_version
+_update_outcome = update_state.update_outcome
 import git_brain
 import engine
 import openai_oauth
@@ -3467,6 +3474,10 @@ async def _start_scheduler():
     _migrate_legacy_brain()   # dữ liệu brain cũ → <BRAINS_DIR>/Brain Default (không mất data)
     _ensure_default_brain()   # brain mặc định có sẵn cấu trúc chuẩn (ghi được trên mount /brains)
     _sync_system_all_brains() # năng lực hệ thống → mọi brain (update theo phiên bản app)
+    try:
+        _record_boot_version(_read_version())   # duy trì last_good/previous cho tính năng lùi bản
+    except Exception:
+        pass
     cfgmod.apply_tool_env()   # secret Cài đặt (key ElevenLabs...) → env cho tool ngoài (video-use)
     try:
         loop_feature.ensure_migrated()   # loop_config.json cũ → Javis/loops/vong-lap-goc.md (1 lần)
@@ -3623,25 +3634,6 @@ def _read_version() -> str:
     return "0.0.0"
 
 
-def _ver_tuple(s):
-    try:
-        parts = [int(x) for x in re.split(r"[.\-]", (s or "").strip().lstrip("vV"))[:3] if x.isdigit()]
-        while len(parts) < 3:
-            parts.append(0)
-        return tuple(parts[:3])
-    except Exception:
-        return None
-
-
-def _ver_newer(latest, cur) -> bool:
-    """So sánh KIỂU SEMVER (không phải string != ) → tránh báo 'có bản mới' nhầm khi local ahead
-    hoặc lệch định dạng, và để tín hiệu 'cập nhật xong' của poll chính xác."""
-    lt, ct = _ver_tuple(latest), _ver_tuple(cur)
-    if lt is None or ct is None:
-        return False
-    return lt > ct
-
-
 def _deploy_mode() -> str:
     """docker | windows | native - quyết định cách cập nhật."""
     if os.path.exists("/.dockerenv") or os.getenv("JAVIS_STATE_DIR", "").startswith("/data"):
@@ -3705,8 +3697,10 @@ async def version_info():
     # docker: chỉ tự cập nhật tại chỗ được nếu Watchtower ĐANG chạy (ping thật). Không có →
     # frontend chuyển sang hướng dẫn REDEPLOY. native/windows: git pull tự lo.
     can = mode in ("native", "windows") or (mode == "docker" and await _watchtower_reachable())
+    st = _read_update_state()
     return {"current": cur, "latest": latest, "update_available": avail,
-            "mode": mode, "can_self_update": can, "error": err}
+            "mode": mode, "can_self_update": can, "error": err,
+            "previous_version": st.get("previous_version")}
 
 
 @app.post("/update")
