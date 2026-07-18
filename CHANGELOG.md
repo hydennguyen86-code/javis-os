@@ -4,6 +4,15 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.75] - 2026-07-18
+Sửa lỗi dropdown chọn não giữ lại "folder ngoài" (📁) đã xoá khỏi ổ đĩa hoặc trùng với một não thật - chúng sống dai qua cả xoá folder, xoá não, lẫn update lên bản mới. **Cần khởi động lại server** để có endpoint `/path/exists`; phần giao diện tự nạp lại nhờ bump `?v=6`.
+### Sửa lỗi
+- **Menu chọn não hiện lại não cũ đã xoá**: dropdown gộp option từ 2 nguồn ĐỘC LẬP. Loại 🧠 (`data-brain`) do `brains-ui.js` nạp tươi từ `GET /brains` (đọc đĩa thật) nên xoá folder/xoá não là tự biến mất khi tải lại. Nhưng loại 📁 (`data-custom`) do `app.js` nạp từ `localStorage["javis.brains"]` (folder ngoài tự chọn qua nút duyệt) thì KHÔNG BAO GIỜ được kiểm tra tồn tại, không dọn, không có nút gỡ. `localStorage` sống theo origin trình duyệt nên trụ qua cả xoá folder, xoá não lẫn update app - đúng triệu chứng. Nút thùng rác khi chọn 📁 còn báo "folder ngoài thì bỏ khỏi danh sách" nhưng không cung cấp cách bỏ nào → entry kẹt vĩnh viễn.
+- **`brains-ui.js` giờ tự dọn danh sách 📁 mỗi lần nạp**: sau khi có danh sách não thật, hàm `pruneCustomBrains` bỏ khỏi `localStorage` những entry TRÙNG path một não thật (tránh hiện 2 lần) và entry mà path KHÔNG còn là thư mục (đã xoá khỏi đĩa), GIỮ lại folder ngoài hợp lệ khác path. Dọn ngay nguồn `localStorage` nên lần `app.js` render sau vẫn đúng, không "sống lại" qua update. Chạy TRƯỚC bước khôi phục lựa chọn để không khôi phục về một path đã chết.
+- **Nút thùng rác gỡ được folder ngoài 📁**: chọn một 📁 rồi bấm xoá giờ hỏi xác nhận và gỡ khỏi menu + `localStorage` (KHÔNG đụng dữ liệu trên ổ đĩa), thay vì chỉ báo lỗi rồi bó tay như trước.
+### Thêm mới
+- **Endpoint `GET /path/exists?path=`** (đọc-only, chỉ `os.path`, nhẹ): trả `{exists, is_dir}` cho một đường dẫn tuyệt đối. Dùng để dropdown kiểm tra folder ngoài còn tồn tại không. FAIL-SAFE: lỗi truy cập trả `exists=null` → frontend hiểu là "chưa xác định" và GIỮ entry, chỉ dọn khi server xác nhận rõ path đã mất (endpoint thiếu/404 vì server chưa restart, hay lỗi mạng, đều không làm mất entry hợp lệ). Kèm test `server/test_path_exists.py` + `dashboard/test_brains_ui.mjs` (mock DOM, chạy thẳng logic dọn đúng kịch bản bug thật).
+
 ## [0.9.74] - 2026-07-18
 Gom phần "mức dùng" thành một trang riêng có đồ thị, bỏ widget nổi vướng víu, và tinh chỉnh nốt nút thu/mở rail. **Cần khởi động lại server** để đồ thị mức dùng có dữ liệu (thêm field ở endpoint `/usage`); phần còn lại chỉ cần tải lại trang.
 ### Thêm mới

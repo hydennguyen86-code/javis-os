@@ -3547,6 +3547,22 @@ async def browse(path: str = Query("", description="Thư mục cần liệt kê;
         return {"error": str(e), "path": path, "parent": None, "dirs": []}
 
 
+@app.get("/path/exists")
+async def path_exists(path: str = Query("", description="Đường dẫn tuyệt đối cần kiểm tra")):
+    """Kiểm tra RẺ (chỉ os.path) 1 đường dẫn có còn là thư mục không. Dùng cho dropdown chọn
+    brain dọn folder ngoài (📁) đã bị xoá khỏi ổ đĩa khỏi localStorage. Read-only, không liệt kê
+    nội dung (khác /browse) nên nhẹ, gọi được cho nhiều entry lúc nạp trang."""
+    p = (path or "").strip()
+    if not p:
+        return {"path": p, "exists": False, "is_dir": False}
+    try:
+        return {"path": p, "exists": os.path.exists(p), "is_dir": os.path.isdir(p)}
+    except Exception:
+        # Lỗi truy cập (path lạ/ổ đĩa rút) → coi như KHÔNG xác định được, báo exists=None để
+        # frontend GIỮ entry (không tự xoá khi chưa chắc chắn là đã mất).
+        return {"path": p, "exists": None, "is_dir": None}
+
+
 @app.get("/config")
 async def config():
     s = cfgmod.read_settings()
