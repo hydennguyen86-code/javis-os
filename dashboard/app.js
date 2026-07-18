@@ -1822,8 +1822,10 @@ pumpAudioLevel();
 loadMemStats();
 loadBrainStats();
 checkVault();
-// Khôi phục phiên gần nhất (hội thoại + số liệu) để hiện ngay
-restoreSession();
+// Mặc định: mỗi lần tải trang là VÀO HỘI THOẠI MỚI (không khôi phục phiên cũ vào khung chat).
+// Hội thoại cũ KHÔNG mất - vẫn nằm trong panel Lịch sử (lưu ở server), bấm để mở lại.
+try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
+savedSessionId = null;
 // Mặc định: TỰ tải số liệu kinh doanh khi vào.
 // Có số liệu phiên trước → hiện ngay rồi refresh ngầm (silent) cho đỡ nháy.
 loadMetrics({ silent: !!(savedMetrics && (savedMetrics.cards || []).length) });
