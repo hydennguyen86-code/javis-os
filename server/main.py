@@ -2060,7 +2060,14 @@ async def delete_brain(name: str = Form(...), confirm: str = Form("")):
 
     def _trash_and_mark():
         dest = git_brain.move_to_trash(str(root), trash_dir, safe)   # có retry cho Windows
-        git_brain.write_tombstone(BRAINS_DIR, safe)                  # giấy báo tử -> lan việc xoá
+        try:
+            git_brain.write_tombstone(BRAINS_DIR, safe)              # giấy báo tử -> lan việc xoá
+        except Exception:
+            # Nguyên tử: ghi giấy báo tử lỗi thì ĐƯA brain trở lại - tránh trạng thái "mất mà không
+            # có tombstone" (lần sync sau _restore_missing_brains sẽ hồi sinh nó).
+            if dest:
+                shutil.move(dest, str(root))
+            raise
         return dest
 
     try:

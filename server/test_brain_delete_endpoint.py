@@ -19,7 +19,6 @@ foo = BR / "Foo"; foo.mkdir(parents=True); (foo / "n.md").write_text("hi", encod
 
 # Xóa Foo hợp lệ (confirm khớp) -> vào thùng rác + tombstone, không còn trong brains
 r = asyncio.run(main.delete_brain(name="Foo", confirm="Foo"))
-ok = getattr(r, "body", None) is None  # JSONResponse lỗi mới có .body; dict thành công thì không
 check("xóa Foo trả ok", isinstance(r, dict) and r.get("ok"))
 check("Foo biến khỏi brains", not foo.exists())
 check("tombstone Foo được ghi", (BR / gb.TOMBSTONE_DIR / "Foo.json").exists())
@@ -35,6 +34,21 @@ check("chặn xóa não mặc định", hasattr(r2, "status_code") and r2.status
 bar = BR / "Bar"; bar.mkdir(parents=True)
 r3 = asyncio.run(main.delete_brain(name="Bar", confirm="sai"))
 check("confirm sai -> chặn, Bar còn nguyên", hasattr(r3, "status_code") and bar.exists())
+
+# Nguyên tử: write_tombstone lỗi SAU KHI move_to_trash thành công -> phải HOÀN TÁC move (đưa não
+# trở lại brains), không được để lại trạng thái "mất mà không tombstone" (dễ bị hồi sinh oan).
+roll = BR / "Roll"; roll.mkdir(parents=True); (roll / "n.md").write_text("hi", encoding="utf-8")
+_orig_write_tombstone = gb.write_tombstone
+def _boom(*a, **kw):
+    raise RuntimeError("boom giả lập lỗi ghi tombstone")
+gb.write_tombstone = _boom
+try:
+    r5 = asyncio.run(main.delete_brain(name="Roll", confirm="Roll"))
+finally:
+    gb.write_tombstone = _orig_write_tombstone
+check("tombstone lỗi -> trả lỗi 500", hasattr(r5, "status_code") and r5.status_code == 500)
+check("tombstone lỗi -> Roll được hoàn tác, còn nguyên trong brains", roll.is_dir())
+check("tombstone lỗi -> không để lại tombstone cho Roll", not (BR / gb.TOMBSTONE_DIR / "Roll.json").exists())
 
 # /brains/new gỡ tombstone cùng tên (dựng lại Foo)
 gb.write_tombstone(str(BR), "Foo")
