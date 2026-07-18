@@ -4,6 +4,13 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.76] - 2026-07-18
+Giãn thanh header cho hết dồn cục, và thêm nút đổi tông tối-đậm / tối-nhạt. Có brainstorm + spec ở `docs/superpowers/specs/2026-07-18-header-theme-toggle-design.md`.
+### Thêm mới
+- **Nút đổi tông giao diện ở góc phải header**: lật giữa tối-đậm (mặc định, nền `#0e0e16`) và tối-nhạt (nền xám `#282a37`, chữ dịu cho đỡ chói). KHÔNG có light mode nền trắng - giữ cả app tông tối nên cockpit 3D không bị phá. Đặt `data-theme="dim"` trên `<html>` override ~9 biến CSS (màu nền/chữ + nền rail); graph 3D dùng màu hard-code nên giữ nền tối, nhưng hai tông đều tối nên nhìn liền. Nhớ lựa chọn qua `localStorage["javis.theme"]`, có inline script đầu `<head>` áp trước khi vẽ để không nháy.
+### Cải thiện
+- **Header hết "díu dít", giãn đều 3 cột**: `.hud-top` (grid `1fr auto 1fr`) trước đây có 4 con phẳng; ở trang quản lý `.brand` + `.hud-actions` bị ẩn khiến 2 con còn lại dồn vào cột 1-2, cột 3 (~414px) trống hoác. Nay gói thành 3 nhóm cố định cột: trái (brand + chọn brain + số liệu), giữa (tên + ngày), phải (nút theme + cụm nút cockpit). Con ẩn chỉ tự co, nhóm vẫn giữ cột nên cân ở CẢ home lẫn trang quản lý; nút theme là con trực tiếp nhóm phải nên luôn hiện, lấp đúng cột phải từng bỏ trống.
+
 ## [0.9.75] - 2026-07-18
 Sửa lỗi dropdown chọn não giữ lại "folder ngoài" (📁) đã xoá khỏi ổ đĩa hoặc trùng với một não thật - chúng sống dai qua cả xoá folder, xoá não, lẫn update lên bản mới. **Cần khởi động lại server** để có endpoint `/path/exists`; phần giao diện tự nạp lại nhờ bump `?v=6`.
 ### Sửa lỗi

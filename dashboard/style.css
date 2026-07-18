@@ -13,6 +13,19 @@
   --yellow: #f0c020;
   --font: 'SF Mono', 'Fira Code', 'Consolas', monospace;
 }
+/* Tông TỐI NHẠT (dim): nút đổi tông đặt data-theme="dim" trên <html>. Chỉ override biến màu nền/chữ
+   + biến nền rail (console.css) cho liền tông. Graph 3D cockpit dùng màu hard-code nên giữ nền tối. */
+:root[data-theme="dim"] {
+  --bg: #282a37;
+  --bg2: #343646;
+  --bg3: #414353;
+  --border: #545872;
+  --text: #eef0f7;
+  --text2: #c2c5d6;
+  --text3: #9498ad;
+  --rail-bg: rgba(40, 42, 55, 0.86);
+  --glass: rgba(52, 54, 70, 0.6);
+}
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
   background: var(--bg);
@@ -43,10 +56,14 @@ body {
   border-bottom: 1px solid var(--border);
   background: var(--bg2);
 }
+/* 3 nhóm header bám 3 cột: trái (brand + chọn brain), giữa (tên + ngày), phải (nút theme + cụm nút).
+   Con bị ẩn (.brand, .hud-actions khi in-console) chỉ tự co, nhóm vẫn giữ cột → cân ở mọi chế độ. */
+.hud-top-left { display: flex; align-items: center; gap: 14px; justify-self: start; min-width: 0; }
+.hud-top-right { display: flex; align-items: center; gap: 8px; justify-self: end; }
 .brand { display: flex; align-items: center; gap: 8px; }
 .brand-icon { color: var(--accent); font-size: 18px; }
 .brand-text { font-family: var(--font); font-size: 15px; font-weight: 700; letter-spacing: 3px; }
-.hud-center-title { text-align: center; }
+.hud-center-title { text-align: center; justify-self: center; }
 .ws-name { font-weight: 600; font-size: 16px; }
 .ws-date { margin-left: 10px; font-size: 13px; color: var(--text2); font-family: var(--font); }
 .hud-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
