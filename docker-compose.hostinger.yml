@@ -38,7 +38,6 @@ services:
       BRAINS_DIR: /brains
       OBSIDIAN_VAULT_PATH: /data/vault
       CLAUDE_CWD: /app
-      WATCHTOWER_TOKEN: ${WATCHTOWER_TOKEN:-javis-update}   # để nút "Cập nhật ngay" gọi được Watchtower
     ports:
       - "7777:7777"                 # đường vào dự phòng (nút Open / http://<ip>:7777)
     labels:
@@ -66,23 +65,10 @@ services:
       retries: 3
       start_period: 25s
 
-  # Cập nhật 1-CLICK từ trong app (nút "Cập nhật ngay"). App KHÔNG có quyền Docker (an toàn), nên nhờ
-  # Watchtower kéo image mới + dựng lại container javis khi nhận trigger. CHỈ update khi có HTTP trigger
-  # (không tự polling), nên không tự ý cập nhật lung tung. Cùng project => javis gọi được host "watchtower".
-  # LƯU Ý: Watchtower mount docker.sock nên Hostinger Docker Manager có thể hiện "Partially running" -
-  # đó chỉ là NHÃN trạng thái (Watchtower không mở cổng/healthcheck), container vẫn chạy và nút vẫn hoạt động.
-  # KHÔNG muốn nút này (giữ deploy sạch) thì xoá nguyên khối watchtower dưới đây + biến WATCHTOWER_TOKEN ở trên.
-  watchtower:
-    image: containrrr/watchtower
-    container_name: javis-watchtower
-    restart: unless-stopped
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    environment:
-      WATCHTOWER_HTTP_API_UPDATE: "true"                    # chỉ cập nhật khi có HTTP trigger (không tự polling)
-      WATCHTOWER_HTTP_API_TOKEN: ${WATCHTOWER_TOKEN:-javis-update}
-      WATCHTOWER_CLEANUP: "true"                            # dọn image cũ sau khi update
-    command: javis                                          # chỉ theo dõi/cập nhật container javis
+# GHI CHÚ: bản Hostinger CỐ TÌNH không kèm Watchtower. Đã thử (2026-07-18): trên Hostinger Docker
+# Manager, container Watchtower bị Restarting liên tục (không đụng được Docker socket), nên nút
+# "Cập nhật ngay" trong app KHÔNG chạy được ở đây. Bản Hostinger cập nhật bằng REDEPLOY.
+# Muốn nút bấm-là-chạy: dùng VPS tự quản (docker-compose.yml, profile update) hoặc bản Windows/native.
 
 volumes:
   javis-data:
