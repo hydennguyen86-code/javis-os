@@ -1493,6 +1493,7 @@
           if (res === "rolled_back") { clearInterval(poll); renderProgress("done", stashNote); st.innerHTML = "↩ Bản mới lỗi, đã <b>tự quay về bản cũ</b>. Xem <code>update.log</code>."; verUpd.disabled = false; return; }
           if (res === "pull_failed" || res === "rollback_failed" || res === "error") {
             clearInterval(poll);
+            const pb = document.getElementById("ovVerProgress"); if (pb) pb.style.display = "none";
             st.innerHTML = "⚠ " + esc(s.state.error || "Cập nhật lỗi.") + " Xem <code>update.log</code>.";
             verUpd.disabled = false; return;
           }
@@ -1500,7 +1501,8 @@
         // 2) fallback: dò /version (docker qua Watchtower - updater.py không chạy)
         try {
           const v = await (await fetch("/version", { cache: "no-store" })).json();
-          if (v && v.update_available === false && v.current && v.current !== oldCur) {
+          const flipOk = (window._ovVerMode === "docker") || !(s && s.state && s.state.phase);
+          if (flipOk && v && v.update_available === false && v.current && v.current !== oldCur) {
             clearInterval(poll); st.textContent = "✅ Đã cập nhật xong. Đang tải lại trang…"; setTimeout(() => location.reload(), 1500); return;
           }
           // docker bản mới có thể lỗi: server vẫn còn bản cũ sau khá lâu → hiện cách lùi
