@@ -161,6 +161,33 @@ s_cl = ui.summary("today", provider="claude", today=_T)
 check("summary loc provider=claude: chi 1500", s_cl["kpi"]["tokens"] == 1500)
 
 
+# ============================================================
+# Task 7: insights()
+# ============================================================
+def _codes(period, t):
+    return {i["code"] for i in ui.insights(period, today=t)}
+
+
+# May: cache_low + background_heavy + expensive_model (opus, khong cache, ngam nhieu)
+_seed("p_may_bg", "2026-05-15", "claude", "claude-opus-4-8", 500000, 10000, cread=0, activity="background")
+_seed("p_may_chat", "2026-05-15", "claude", "claude-opus-4-8", 100000, 5000, cread=0, activity="chat")
+_cm = _codes("this_month", _date(2026, 5, 15))
+check("insight May: co cache_low", "cache_low" in _cm)
+check("insight May: co background_heavy", "background_heavy" in _cm)
+check("insight May: co expensive_model (opus)", "expensive_model" in _cm)
+
+# Sep: sach (sonnet, cache cao, toan chat, prev thang 8 rong)
+_seed("p_sep", "2026-09-15", "claude", "claude-sonnet-4-6", 10000, 5000, cread=90000, activity="chat")
+_cs = _codes("this_month", _date(2026, 9, 15))
+check("insight Sep: khong canh bao nao (sach)", len(_cs) == 0)
+
+# Oct: session_bloat + spike (1 phien 2M input, prev Sep nho)
+_seed("p_oct", "2026-10-15", "claude", "claude-sonnet-4-6", 2000000, 10000, cread=0, activity="chat")
+_co = _codes("this_month", _date(2026, 10, 15))
+check("insight Oct: co session_bloat", "session_bloat" in _co)
+check("insight Oct: co spike", "spike" in _co)
+
+
 if _fails:
     print("\n%d FAIL" % len(_fails))
     sys.exit(1)

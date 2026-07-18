@@ -28,6 +28,14 @@ _TZ = timezone(timedelta(hours=7))
 PERIODS = ("today", "yesterday", "this_week", "last_week",
            "this_month", "last_month", "last_3_months", "this_year")
 
+# Nguong sinh insight (chinh duoc)
+CACHE_LOW = 0.5                 # cache hit duoi nguong = dang nap lai context nhieu
+MIN_BILLABLE_FOR_CACHE = 200_000   # chi canh bao cache khi ky du lon (tranh nhieu)
+BACKGROUND_SHARE = 0.25         # hoat dong ngam chiem qua % token
+EXPENSIVE_SHARE = 0.5           # opus chiem qua % token
+SESSION_BLOAT = 1_000_000       # 1 phien nap qua ngan nay token input
+SPIKE_RATIO = 1.5               # token/ngay ky nay gap prev qua ngan nay lan
+
 DB_PATH = STATE_DIR / "usage_index.db"
 _EVENTS_PATH = STATE_DIR / "usage-events.jsonl"
 
@@ -404,6 +412,68 @@ def summary(period: str = "this_month", provider: str = None, project: str = Non
         "by_project": _group(rows, "project", prices),
         "timeseries": [series[k] for k in sorted(series)],
     }
+
+
+def _fmt_tok(n: int) -> str:
+    n = int(n or 0)
+    if n >= 1_000_000:
+        return "%.1fM" % (n / 1_000_000)
+    if n >= 1_000:
+        return "%.0fk" % (n / 1_000)
+    return str(n)
+
+
+def insights(period: str = "this_month", today: date = None) -> list:
+    """Sinh danh sach de xuat hanh dong tu du lieu ky. Moi item {code, level, title, detail}.
+    warn (can lam) xep truoc info (goi y)."""
+    s = summary(period, today=today)
+    k = s["kpi"]
+    total = k["tokens"]
+    billable = k["input"] + k["cache_read"] + k["cache_create"]
+    out = []
+
+    if billable >= MIN_BILLABLE_FOR_CACHE and k["cache_hit"] < CACHE_LOW:
+        out.append({"code": "cache_low", "level": "warn",
+                    "title": "Cache hit thap (%.0f%%)" % (k["cache_hit"] * 100),
+                    "detail": "Dang nap lai context nhieu, ton token. Can nhac /compact hoac chia phien de tan dung cache."})
+
+    bg = next((x["tokens"] for x in s["by_activity"] if x["key"] == "background"), 0)
+    if total > 0 and bg / total >= BACKGROUND_SHARE:
+        out.append({"code": "background_heavy", "level": "warn",
+                    "title": "Hoat dong ngam chiem %.0f%% token" % (bg / total * 100),
+                    "detail": "Loop/lich chay nen dang ngon nhieu (%s). Xem lai tan suat cac loop hoac tat bot." % _fmt_tok(bg)})
+
+    opus = sum(x["tokens"] for x in s["by_model"] if str(x["key"]).startswith("claude-opus"))
+    if total > 0 and opus / total >= EXPENSIVE_SHARE:
+        out.append({"code": "expensive_model", "level": "info",
+                    "title": "Opus chiem %.0f%% token" % (opus / total * 100),
+                    "detail": "Opus dat gap nhieu lan sonnet/haiku. Viec nhe can nhac ha model o trang Model."})
+
+    cs, ce = s["range"]
+    conn = _connect()
+    try:
+        row = conn.execute("SELECT path, SUM(input+cache_read+cache_create) t FROM file_daily "
+                           "WHERE day BETWEEN ? AND ? GROUP BY path ORDER BY t DESC LIMIT 1", (cs, ce)).fetchone()
+    finally:
+        conn.close()
+    if row and (row[1] or 0) >= SESSION_BLOAT:
+        out.append({"code": "session_bloat", "level": "warn",
+                    "title": "Co phien phinh to (%s token vao)" % _fmt_tok(row[1]),
+                    "detail": "Mot phien nap %s token input. Can nhac tach phien de giam chi phi context." % _fmt_tok(row[1])})
+
+    prev = k["tokens_prev"]
+    if prev > 0 and total > 0:
+        cs_d, ce_d = date.fromisoformat(s["range"][0]), date.fromisoformat(s["range"][1])
+        ps_d, pe_d = date.fromisoformat(s["range_prev"][0]), date.fromisoformat(s["range_prev"][1])
+        cur_pd = total / max(1, (ce_d - cs_d).days + 1)
+        prev_pd = prev / max(1, (pe_d - ps_d).days + 1)
+        if prev_pd > 0 and cur_pd / prev_pd >= SPIKE_RATIO:
+            out.append({"code": "spike", "level": "warn",
+                        "title": "Token/ngay tang %.0f%% so ky truoc" % ((cur_pd / prev_pd - 1) * 100),
+                        "detail": "Muc tieu thu tang dot bien. Kiem tra nguon tang chinh o phan breakdown."})
+
+    out.sort(key=lambda x: 0 if x["level"] == "warn" else 1)
+    return out
 
 
 def totals_by(dim: str, provider: str = None) -> dict:
