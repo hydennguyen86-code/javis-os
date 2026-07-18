@@ -434,20 +434,20 @@ def insights(period: str = "this_month", today: date = None) -> list:
 
     if billable >= MIN_BILLABLE_FOR_CACHE and k["cache_hit"] < CACHE_LOW:
         out.append({"code": "cache_low", "level": "warn",
-                    "title": "Cache hit thap (%.0f%%)" % (k["cache_hit"] * 100),
-                    "detail": "Dang nap lai context nhieu, ton token. Can nhac /compact hoac chia phien de tan dung cache."})
+                    "title": "Cache hit thấp (%.0f%%)" % (k["cache_hit"] * 100),
+                    "detail": "Đang nạp lại ngữ cảnh nhiều, tốn token. Cân nhắc /compact hoặc chia phiên để tận dụng cache."})
 
     bg = next((x["tokens"] for x in s["by_activity"] if x["key"] == "background"), 0)
     if total > 0 and bg / total >= BACKGROUND_SHARE:
         out.append({"code": "background_heavy", "level": "warn",
-                    "title": "Hoat dong ngam chiem %.0f%% token" % (bg / total * 100),
-                    "detail": "Loop/lich chay nen dang ngon nhieu (%s). Xem lai tan suat cac loop hoac tat bot." % _fmt_tok(bg)})
+                    "title": "Hoạt động ngầm chiếm %.0f%% token" % (bg / total * 100),
+                    "detail": "Loop/lịch chạy nền đang ngốn nhiều (%s). Xem lại tần suất các loop hoặc tắt bớt." % _fmt_tok(bg)})
 
     opus = sum(x["tokens"] for x in s["by_model"] if str(x["key"]).startswith("claude-opus"))
     if total > 0 and opus / total >= EXPENSIVE_SHARE:
         out.append({"code": "expensive_model", "level": "info",
-                    "title": "Opus chiem %.0f%% token" % (opus / total * 100),
-                    "detail": "Opus dat gap nhieu lan sonnet/haiku. Viec nhe can nhac ha model o trang Model."})
+                    "title": "Opus chiếm %.0f%% token" % (opus / total * 100),
+                    "detail": "Opus đắt gấp nhiều lần sonnet/haiku. Việc nhẹ cân nhắc hạ model ở trang Model."})
 
     cs, ce = s["range"]
     conn = _connect()
@@ -458,8 +458,8 @@ def insights(period: str = "this_month", today: date = None) -> list:
         conn.close()
     if row and (row[1] or 0) >= SESSION_BLOAT:
         out.append({"code": "session_bloat", "level": "warn",
-                    "title": "Co phien phinh to (%s token vao)" % _fmt_tok(row[1]),
-                    "detail": "Mot phien nap %s token input. Can nhac tach phien de giam chi phi context." % _fmt_tok(row[1])})
+                    "title": "Có phiên phình to (%s token vào)" % _fmt_tok(row[1]),
+                    "detail": "Một phiên nạp %s token đầu vào. Cân nhắc tách phiên để giảm chi phí ngữ cảnh." % _fmt_tok(row[1])})
 
     prev = k["tokens_prev"]
     if prev > 0 and total > 0:
@@ -469,8 +469,8 @@ def insights(period: str = "this_month", today: date = None) -> list:
         prev_pd = prev / max(1, (pe_d - ps_d).days + 1)
         if prev_pd > 0 and cur_pd / prev_pd >= SPIKE_RATIO:
             out.append({"code": "spike", "level": "warn",
-                        "title": "Token/ngay tang %.0f%% so ky truoc" % ((cur_pd / prev_pd - 1) * 100),
-                        "detail": "Muc tieu thu tang dot bien. Kiem tra nguon tang chinh o phan breakdown."})
+                        "title": "Token/ngày tăng %.0f%% so kỳ trước" % ((cur_pd / prev_pd - 1) * 100),
+                        "detail": "Mức tiêu thụ tăng đột biến. Kiểm tra nguồn tăng chính ở phần breakdown."})
 
     out.sort(key=lambda x: 0 if x["level"] == "warn" else 1)
     return out
