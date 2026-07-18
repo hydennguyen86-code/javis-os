@@ -4,6 +4,11 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.85] - 2026-07-18
+Bản đánh dấu để kiểm tra luồng tự cập nhật 1-click (nút "Cập nhật ngay") chạy end-to-end trên bản Docker có Watchtower. Không đổi tính năng, không cần thao tác gì thêm.
+### Cải thiện
+- **Thử nút "Cập nhật ngay"**: bump phiên bản để xác nhận app phát hiện bản mới, gọi Watchtower kéo image + dựng lại container, rồi tự tải lại trang. Không ảnh hưởng dữ liệu hay cấu hình.
+
 ## [0.9.84] - 2026-07-18
 ### Sửa lỗi
 - **Đề xuất trong Dashboard Token thiếu dấu tiếng Việt**: các câu insight (cache thấp, hoạt động ngầm ngốn nhiều, opus chiếm nhiều, phiên phình, spike) viết trong `usage_index.py` bị gõ không dấu nên hiện ra "Hoat dong ngam chiem...", lệch với phần còn lại của app. Nay sửa thành tiếng Việt có dấu đầy đủ. CẦN KHỞI ĐỘNG LẠI SERVER (đổi ở backend) để đề xuất hiện đúng.
