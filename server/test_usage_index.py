@@ -113,6 +113,54 @@ ui.refresh()
 check("api: dong codex trong events bi bo qua", ui.totals_by("provider")["api"]["input"] == 110)
 
 
+# ============================================================
+# Task 6: summary() - ky + so sanh + breakdowns
+# ============================================================
+import sqlite3 as _sq  # noqa: E402
+from datetime import date as _date  # noqa: E402
+
+
+def _seed(path, day, provider, model, inp, out, cread=0, ccreate=0, source="javis", activity="chat", project="Demo"):
+    c = _sq.connect(str(ui.DB_PATH))
+    c.execute("INSERT INTO file_daily(path,day,provider,source,activity,model,project,input,output,cache_read,cache_create)"
+              " VALUES(?,?,?,?,?,?,?,?,?,?,?)", (path, day, provider, source, activity, model, project, inp, out, cread, ccreate))
+    c.commit()
+    c.close()
+
+
+# Seed thang 3/thang 2 (tach biet fixture thang 7) voi today co dinh = 2026-03-15.
+_seed("p_mar_cl", "2026-03-15", "claude", "claude-opus-4-8", 1000, 500)
+_seed("p_mar_api", "2026-03-15", "api", "?", 200, 100)
+_seed("p_mar_y", "2026-03-14", "claude", "claude-opus-4-8", 400, 200)
+_seed("p_feb", "2026-02-10", "claude", "claude-opus-4-8", 300, 0)
+_T = _date(2026, 3, 15)
+
+s_today = ui.summary("today", today=_T)
+check("summary today: tokens = 1800 (claude 1500 + api 300)", s_today["kpi"]["tokens"] == 1800)
+check("summary today: tokens_prev = 600 (hom qua)", s_today["kpi"]["tokens_prev"] == 600)
+check("summary today: delta = 200%", s_today["kpi"]["delta_pct"] == 200.0)
+check("summary today: sessions = 2 file", s_today["kpi"]["sessions"] == 2)
+_prov = {x["key"]: x for x in s_today["by_provider"]}
+check("summary today: by_provider claude=1500", _prov["claude"]["tokens"] == 1500)
+check("summary today: by_provider api=300", _prov["api"]["tokens"] == 300)
+check("summary today: cost opus > 0 (quy doi)", s_today["kpi"]["cost_est"] > 0)
+
+s_month = ui.summary("this_month", today=_T)
+check("summary this_month: gom 14+15 = 2400", s_month["kpi"]["tokens"] == 2400)
+check("summary this_month: prev = thang 2 (02-10 = 300)", s_month["kpi"]["tokens_prev"] == 300)
+check("summary this_month: timeseries 15 ngay", len(s_month["timeseries"]) == 15)
+
+s_lastm = ui.summary("last_month", today=_T)
+check("summary last_month: thang 2 = 300", s_lastm["kpi"]["tokens"] == 300)
+
+# bien ky: 'today' KHONG gom hom qua
+check("summary today: khong lan hom qua (1800 != 2400)", s_today["kpi"]["tokens"] == 1800)
+
+# loc provider
+s_cl = ui.summary("today", provider="claude", today=_T)
+check("summary loc provider=claude: chi 1500", s_cl["kpi"]["tokens"] == 1500)
+
+
 if _fails:
     print("\n%d FAIL" % len(_fails))
     sys.exit(1)

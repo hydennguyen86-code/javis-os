@@ -18,10 +18,15 @@ import glob
 import json
 import os
 import sqlite3
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from config import STATE_DIR
 import usage_parsers as up
+
+_TZ = timezone(timedelta(hours=7))
+PERIODS = ("today", "yesterday", "this_week", "last_week",
+           "this_month", "last_month", "last_3_months", "this_year")
 
 DB_PATH = STATE_DIR / "usage_index.db"
 _EVENTS_PATH = STATE_DIR / "usage-events.jsonl"
@@ -219,6 +224,186 @@ def refresh() -> dict:
     finally:
         conn.close()
     return res
+
+
+# ============================================================
+# Truy van: giai ky + so sanh + summary (Task 6)
+# ============================================================
+def _today_local() -> date:
+    return datetime.now(_TZ).date()
+
+
+def _month_first(d: date) -> date:
+    return d.replace(day=1)
+
+
+def _month_last(d: date) -> date:
+    nxt = (d.replace(day=28) + timedelta(days=4)).replace(day=1)
+    return nxt - timedelta(days=1)
+
+
+def _prev_month_first(d: date) -> date:
+    return (d.replace(day=1) - timedelta(days=1)).replace(day=1)
+
+
+def resolve_period(period: str, today: date = None):
+    """Tra ((cur_start, cur_end), (prev_start, prev_end)) - cac object date, theo gio dia phuong.
+    prev = ky tuong duong lien truoc de so sanh."""
+    d = today or _today_local()
+    if period == "today":
+        return (d, d), (d - timedelta(days=1), d - timedelta(days=1))
+    if period == "yesterday":
+        y = d - timedelta(days=1)
+        return (y, y), (y - timedelta(days=1), y - timedelta(days=1))
+    if period == "this_week":
+        mon = d - timedelta(days=d.weekday())
+        return (mon, d), (mon - timedelta(days=7), d - timedelta(days=7))
+    if period == "last_week":
+        mon = d - timedelta(days=d.weekday())
+        ls, le = mon - timedelta(days=7), mon - timedelta(days=1)
+        return (ls, le), (ls - timedelta(days=7), le - timedelta(days=7))
+    if period == "this_month":
+        f = _month_first(d)
+        off = (d - f).days
+        pf = _prev_month_first(d)
+        pe = min(pf + timedelta(days=off), _month_last(pf))
+        return (f, d), (pf, pe)
+    if period == "last_month":
+        pf = _prev_month_first(d)
+        pl = _month_last(pf)
+        ppf = _prev_month_first(pf)
+        return (pf, pl), (ppf, _month_last(ppf))
+    if period == "last_3_months":
+        s = d - timedelta(days=89)
+        return (s, d), (s - timedelta(days=90), s - timedelta(days=1))
+    if period == "this_year":
+        jan = date(d.year, 1, 1)
+        try:
+            pd = d.replace(year=d.year - 1)
+        except ValueError:
+            pd = d.replace(year=d.year - 1, day=28)
+        return (jan, d), (date(d.year - 1, 1, 1), pd)
+    raise ValueError("period khong hop le: %s" % period)
+
+
+_ROW_COLS = "day,provider,source,activity,model,project,input,output,cache_read,cache_create,path"
+_DIM_IDX = {"day": 0, "provider": 1, "source": 2, "activity": 3, "model": 4, "project": 5}
+
+
+def _tot(r) -> int:
+    return (r[6] or 0) + (r[7] or 0) + (r[8] or 0) + (r[9] or 0)
+
+
+def _fetch_rows(conn, start, end, provider=None, project=None):
+    where = ["day BETWEEN ? AND ?"]
+    args = [start, end]
+    if provider:
+        where.append("provider=?")
+        args.append(provider)
+    if project:
+        where.append("project=?")
+        args.append(project)
+    return conn.execute("SELECT %s FROM file_daily WHERE %s" % (_ROW_COLS, " AND ".join(where)), args).fetchall()
+
+
+def _sum_tokens(conn, start, end, provider=None, project=None) -> int:
+    where = ["day BETWEEN ? AND ?"]
+    args = [start, end]
+    if provider:
+        where.append("provider=?")
+        args.append(provider)
+    if project:
+        where.append("project=?")
+        args.append(project)
+    q = "SELECT COALESCE(SUM(input+output+cache_read+cache_create),0) FROM file_daily WHERE " + " AND ".join(where)
+    return conn.execute(q, args).fetchone()[0] or 0
+
+
+def _group(rows, dim, prices):
+    """Gop rows theo mot chieu -> list {key,tokens,input,output,cache_read,cache_create,sessions,cost} desc."""
+    idx = _DIM_IDX[dim]
+    agg = {}
+    for r in rows:
+        key = r[idx] or "(?)"
+        e = agg.setdefault(key, {"key": key, "tokens": 0, "input": 0, "output": 0,
+                                 "cache_read": 0, "cache_create": 0, "cost": 0.0, "_paths": set()})
+        e["tokens"] += _tot(r)
+        e["input"] += r[6] or 0
+        e["output"] += r[7] or 0
+        e["cache_read"] += r[8] or 0
+        e["cache_create"] += r[9] or 0
+        e["cost"] += up.estimate_cost({"model": r[4], "input": r[6] or 0, "output": r[7] or 0,
+                                        "cache_read": r[8] or 0, "cache_create": r[9] or 0}, prices)
+        e["_paths"].add(r[10])
+    out = []
+    for e in agg.values():
+        e["sessions"] = len(e.pop("_paths"))
+        e["cost"] = round(e["cost"], 4)
+        out.append(e)
+    out.sort(key=lambda x: -x["tokens"])
+    return out
+
+
+def summary(period: str = "this_month", provider: str = None, project: str = None, today: date = None) -> dict:
+    """Bao cao token cho mot ky: KPI + breakdowns + timeseries, kem so sanh ky truoc."""
+    (cs, ce), (ps, pe) = resolve_period(period, today)
+    cs_s, ce_s, ps_s, pe_s = cs.isoformat(), ce.isoformat(), ps.isoformat(), pe.isoformat()
+    prices = up.load_prices()
+    conn = _connect()
+    try:
+        rows = _fetch_rows(conn, cs_s, ce_s, provider, project)
+        tokens_prev = _sum_tokens(conn, ps_s, pe_s, provider, project)
+    finally:
+        conn.close()
+
+    tokens = sum(_tot(r) for r in rows)
+    inp = sum(r[6] or 0 for r in rows)
+    out = sum(r[7] or 0 for r in rows)
+    cread = sum(r[8] or 0 for r in rows)
+    ccreate = sum(r[9] or 0 for r in rows)
+    billable_in = inp + cread + ccreate
+    sessions = len({r[10] for r in rows})
+    cost = round(sum(up.estimate_cost({"model": r[4], "input": r[6] or 0, "output": r[7] or 0,
+                                       "cache_read": r[8] or 0, "cache_create": r[9] or 0}, prices) for r in rows), 4)
+    n_days = (ce - cs).days + 1
+    delta = None
+    if tokens_prev > 0:
+        delta = round((tokens - tokens_prev) * 100.0 / tokens_prev, 1)
+
+    # timeseries: lap day tu cs -> ce, tach theo provider
+    series = {}
+    dd = cs
+    while dd <= ce:
+        series[dd.isoformat()] = {"day": dd.isoformat(), "claude": 0, "codex": 0, "api": 0, "total": 0}
+        dd += timedelta(days=1)
+    for r in rows:
+        cell = series.get(r[0])
+        if cell is None:
+            continue
+        prov = r[1] if r[1] in ("claude", "codex", "api") else "api"
+        cell[prov] += _tot(r)
+        cell["total"] += _tot(r)
+
+    return {
+        "period": period, "range": [cs_s, ce_s], "range_prev": [ps_s, pe_s],
+        "filter": {"provider": provider, "project": project},
+        "kpi": {
+            "tokens": tokens, "tokens_prev": tokens_prev, "delta_pct": delta,
+            "per_day_avg": round(tokens / n_days, 1) if n_days else 0,
+            "sessions": sessions,
+            "avg_per_session": round(tokens / sessions) if sessions else 0,
+            "cache_hit": round(cread / billable_in, 4) if billable_in else 0,
+            "out_in_ratio": round(out / inp, 3) if inp else None,
+            "cost_est": cost,
+            "input": inp, "output": out, "cache_read": cread, "cache_create": ccreate,
+        },
+        "by_provider": _group(rows, "provider", prices),
+        "by_source": _group(rows, "source", prices),
+        "by_activity": _group(rows, "activity", prices),
+        "by_model": _group(rows, "model", prices),
+        "by_project": _group(rows, "project", prices),
+        "timeseries": [series[k] for k in sorted(series)],
+    }
 
 
 def totals_by(dim: str, provider: str = None) -> dict:
