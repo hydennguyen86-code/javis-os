@@ -4,6 +4,19 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.80] - 2026-07-18
+Nút "Cập nhật ngay" làm chắc lại toàn diện: kiểm tra sức khoẻ sau khi cập nhật, bản git (Windows/native) lỗi thì TỰ QUAY VỀ bản cũ, có thanh tiến trình theo bước và xem trước "bản mới có gì" trước khi bấm; bản Docker có hướng dẫn lùi rõ ràng. **Cần khởi động lại server** (đổi luồng cập nhật + thêm endpoint). Có spec + plan ở `docs/superpowers/specs/2026-07-18-update-triet-de-design.md` và `docs/superpowers/plans/2026-07-18-update-triet-de.md`.
+### Thêm mới
+- **Updater đa nền tự rollback (bản git)**: thêm `server/updater.py` chạy tách rời, chỉ dùng thư viện chuẩn (vẫn chạy được cả khi bản mới làm hỏng dependency). Chuỗi: dừng server -> (git stash nếu cây bẩn) -> `git pull` -> `pip install` -> khởi động lại -> chờ `/health` khoảng 90 giây. Bản mới không lên được thì `git reset --hard` về commit cũ + cài lại lib + khởi động lại (tự rollback). Mọi bước ghi trạng thái vào `update_state.json` (sống qua restart).
+- **Thanh tiến trình + xem trước bản mới trong panel Phiên bản**: dashboard hiện changelog của bản mới trước khi bấm, và khi cập nhật hiện các bước Chuẩn bị -> Tải code -> Cài thư viện -> Khởi động lại -> Kiểm tra sức khoẻ -> Xong; lỗi thì báo đã tự quay về bản cũ (git) hoặc hiện cách lùi (Docker), kèm thông báo khi có sửa đổi cục bộ được cất vào git stash.
+- **Endpoint `GET /update/status` + `previous_version` trong `/version`**: UI theo dõi tiến trình qua trạng thái có cấu trúc + đuôi `update.log`, và biết bản cũ để lùi.
+- **CI xuất tag phiên bản GHCR**: image thêm tag `:x.y.z` (đọc từ VERSION) cạnh `:latest` và `:<sha>`, để luôn có bản cũ cố định mà pin khi cần lùi trên Docker.
+### Sửa lỗi
+- **Bản Windows thiếu bước cài thư viện khi cập nhật**: updater cũ chỉ `git pull` rồi bật lại, không `pip install`, nên bản mới thêm thư viện là app crash. Nay mọi bản git đều cài lib khi cập nhật.
+- **`git pull` chết khi cây làm việc bẩn**: có sửa đổi cục bộ ở file tracked là pull abort im lặng, cập nhật thất bại mà không rõ lý do. Nay tự `git stash` (giữ lại, không mất, không tự pop để tránh xung đột) trước khi pull và báo cho người dùng.
+### Bảo mật
+- **Chống double-click spawn 2 updater**: `POST /update` claim trạng thái ngay sau guard (không có await ở giữa) và chỉ chặn khi lần cập nhật đang dở BẮT ĐẦU gần đây, nên bấm hai lần không tạo hai tiến trình cập nhật chồng nhau, đồng thời không kẹt "đang cập nhật" vĩnh viễn nếu một lần cập nhật bị gián đoạn.
+
 ## [0.9.79] - 2026-07-18
 Trong khung chat giờ bấm được link, và file .md/text bấm là bung ngay khung sửa giữa màn hình để xem và chỉnh sửa. Thuần giao diện, KHÔNG cần khởi động lại server (chỉ tải lại trang - đã bump `?v` để nạp bản mới). Có brainstorm + spec ở `docs/superpowers/specs/2026-07-18-chat-link-va-sua-md-design.md`.
 ### Thêm mới
