@@ -4,6 +4,14 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.79] - 2026-07-18
+Trong khung chat giờ bấm được link, và file .md/text bấm là bung ngay khung sửa giữa màn hình để xem và chỉnh sửa. Thuần giao diện, KHÔNG cần khởi động lại server (chỉ tải lại trang - đã bump `?v` để nạp bản mới). Có brainstorm + spec ở `docs/superpowers/specs/2026-07-18-chat-link-va-sua-md-design.md`.
+### Thêm mới
+- **Bấm file .md/text trong chat bung khung sửa giữa màn hình**: thêm `dashboard/file-editor.js` dựng một modal độc lập gắn thẳng vào `<body>` nên chạy được từ mọi trang. Với `.md` và file text hiện `<textarea>` sửa được (riêng `.md` có nút gạt "Nguồn / Xem", bản Xem render bằng `mdToHtml` sẵn có); ảnh/PDF xem trước; file khác cho tải. Lưu qua `/files/write` có ghép sẵn tiền tố "nhà" của brain nên ghi ĐÚNG chỗ kể cả trên localhost (trần duyệt = cả ổ đĩa). Đóng bằng Esc / ✕ / bấm nền mờ, lưu nhanh Ctrl+S. Bấm link thư mục vẫn nhảy trang Tệp tin như cũ; ảnh inline giữ nguyên.
+- **URL trần trong chat tự thành link mở tab mới**: URL `http(s)://...` Javis gõ thẳng (không bọc markdown) nay tự nhận thành link bấm được. Chạy sau khi code block / inline code / ảnh / link markdown đã cất vào placeholder nên không đụng vào chúng; dấu câu ở đuôi URL nằm ngoài link.
+### Sửa lỗi
+- **Link file có khoảng trắng hoặc dấu ngoặc bị cắt cụt đường dẫn**: regex link/ảnh markdown cũ (`[chữ](đường-dẫn)`) chỉ bắt tới khoảng trắng đầu tiên rồi dừng ở dấu `)` đầu tiên, nên đường dẫn kiểu `06 - Sources/Tên (Tư Duy Ngược).md` bị cắt còn `06` và phần đuôi rớt ra thành chữ. Nay bắt cả cặp ngoặc cân bằng 1 tầng và cho phép khoảng trắng, đồng thời cắt title markdown tùy chọn (`( "tiêu đề" )`). Nhờ vậy bấm đúng file cần mở.
+
 ## [0.9.78] - 2026-07-18
 ### Sửa lỗi
 - **Số liệu trên header ("N note · N kết nối") không còn ngắt xuống 2 dòng**: `.graph-stats` thiếu `white-space: nowrap` nên chữ tự xuống dòng khi cụm trái thiếu chỗ; và grid `.hud-top` là `1fr auto 1fr` ép cột trái bằng cột phải, trong khi cụm trái (chọn brain + nút + số liệu) rộng hơn hẳn. Nay: (1) `nowrap` cho `.graph-stats`; (2) grid đổi thành `auto minmax(0,1fr) auto` để cụm trái/phải bám theo nội dung, cụm giữa (tên + ngày) co giãn phần còn lại và cắt gọn bằng `…` khi màn hình quá hẹp thay vì đè lên nhau. Đã đo ở 1000px (một dòng, không đè, giữa tự cắt) và 1280px (đủ chỗ, hiện đầy đủ).

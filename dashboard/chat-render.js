@@ -263,15 +263,25 @@
       name = name.trim();
       return put(imgHtml(resolveSrc(name), name, name));
     });
-    raw = raw.replace(/!\[([^\]]*)\]\(([^)\s]+)[^)]*\)/g, function (_m, alt, src) {
+    // Duong dan trong () co the CO KHOANG TRANG + DAU NGOAC (vd "06 - Sources/Ten (Tu Duy Nguoc).md").
+    // Bat ca cap ngoac can bang 1 tang, roi cat title markdown tuy chon o duoi ( "tieu de" / 'tieu de').
+    raw = raw.replace(/!\[([^\]]*)\]\(([^()]*(?:\([^()]*\)[^()]*)*)\)/g, function (_m, alt, src) {
+      src = src.replace(/\s+(["']).*\1\s*$/, "").trim();
       return put(imgHtml(resolveSrc(src), alt, src));
     });
     // 4) link []() : URL ngoai -> tab moi; file/thu muc vault -> mo dung vi tri trong Tep tin; con lai giu cu
-    raw = raw.replace(/\[([^\]]+)\]\(([^)\s]+)[^)]*\)/g, function (_m, t, href) {
-      href = href.trim();
+    raw = raw.replace(/\[([^\]]+)\]\(([^()]*(?:\([^()]*\)[^()]*)*)\)/g, function (_m, t, href) {
+      href = href.replace(/\s+(["']).*\1\s*$/, "").trim();
       if (/^(https?:|mailto:)/i.test(href)) return put('<a href="' + esc(href) + '" target="_blank" rel="noopener">' + esc(t) + "</a>");
       if (isVaultRel(href)) return put('<a ' + vaultLoc(href) + ">" + esc(t) + "</a>");
       return put('<a href="' + esc(resolveSrc(href)) + '" target="_blank" rel="noopener">' + esc(t) + "</a>");
+    });
+    // 4b) URL tran (AI go thang, khong boc markdown) -> tu thanh link mo tab moi. Chay SAU khi link/anh/
+    //     code da cat vao placeholder (sentinel) nen khong dung vao chung; loai dau cau/ngoac o duoi URL.
+    raw = raw.replace(new RegExp("(^|[^\\]\"'=/])(\\bhttps?:\\/\\/[^\\s<>()\\[\\]" + OPEN + CLOSE + "]+)", "g"), function (_m, pre, url) {
+      var trail = "", tm = /[.,;:!?)\]}'"]+$/.exec(url);
+      if (tm) { trail = tm[0]; url = url.slice(0, url.length - trail.length); }
+      return pre + put('<a href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(url) + "</a>") + trail;
     });
     // 5) bang markdown
     raw = raw.replace(/(^\|.+\|[ \t]*\n\|[ \t:|-]+\|[ \t]*\n(?:\|.*\|[ \t]*\n?)*)/gm, function (tbl) {
@@ -460,7 +470,14 @@
       if (loc && loc.getAttribute("data-vault-path") != null) {
         if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || e.button > 0) return;
         e.preventDefault();
-        if (typeof window.JavisOpenFiles === "function") window.JavisOpenFiles(loc.getAttribute("data-vault-path"));
+        var vp = loc.getAttribute("data-vault-path") || "";
+        var isImg = !!(loc.querySelector && loc.querySelector("img"));   // anh inline -> giu hanh vi cu
+        var trimmed = vp.replace(/\/+$/, "");
+        var base = trimmed.split("/").pop();
+        var isDir = /\/$/.test(vp) || base === "" || base.indexOf(".") < 0;   // co duoi -> FILE (nhu openFilesAt)
+        // FILE co duoi -> bung khung sua giua man hinh; THU MUC / anh inline -> mo trang Tep tin dung vi tri.
+        if (!isImg && !isDir && typeof window.JavisEditFile === "function") { window.JavisEditFile(trimmed); return; }
+        if (typeof window.JavisOpenFiles === "function") window.JavisOpenFiles(vp);
         else window.open(loc.href, "_blank");   // du phong: mo tab moi neu console.js chua san sang
         return;
       }
