@@ -3749,6 +3749,7 @@ async def do_update():
     # Claim NGAY sau guard (KHÔNG có await ở giữa → nguyên tử với event loop) để chặn double-click:
     # request thứ 2 đọc phase="preparing" (thuộc _UPDATE_ACTIVE) sẽ bị 409.
     _write_update_state({"phase": "preparing", "result": None, "error": None,
+                         "old_version": None, "old_sha": None, "target_version": None,
                          "started_at": now(), "finished_at": None})
 
     mode = _deploy_mode()

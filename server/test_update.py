@@ -59,6 +59,25 @@ us.STATE_FILE.unlink(missing_ok=True)
 # --- main.py dùng update_state + /version có previous_version ---
 import asyncio  # noqa: E402
 import main  # noqa: E402
+
+# Stub httpx để suite KHÔNG chạm mạng: fetch VERSION/CHANGELOG từ GitHub là best-effort,
+# ta ép nó "không có" (404) nên version_info -> latest=None, do_update -> latest=None.
+import httpx as _httpx  # noqa: E402
+class _FakeResp:
+    def __init__(self, status_code=404, text=""):
+        self.status_code = status_code
+        self.text = text
+class _FakeClient:
+    def __init__(self, *a, **k):
+        pass
+    async def __aenter__(self):
+        return self
+    async def __aexit__(self, *a):
+        return False
+    async def get(self, *a, **k):
+        return _FakeResp(404, "")
+_httpx.AsyncClient = _FakeClient
+
 check("main alias _ver_newer chạy", main._ver_newer("0.9.79", "0.9.78") is True)
 us.STATE_FILE.unlink(missing_ok=True)
 us.write_state({"previous_version": "0.9.77"})
