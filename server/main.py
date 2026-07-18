@@ -2036,10 +2036,13 @@ async def new_brain(name: str = Form(...)):
     return {"ok": True, "name": safe, "path": str(root)}
 
 
+_DELETE_SYNC_TASKS = set()   # giữ ref mạnh cho eager-sync sau khi xóa não (tránh GC nuốt task)
+
+
 @app.post("/brains/delete")
 async def delete_brain(name: str = Form(...), confirm: str = Form("")):
-    """Xoá HẲN 1 brain (cả thư mục) - toàn bộ tri thức trong não đó. Yêu cầu confirm == name (gõ tay).
-    CHẶN xoá brain mặc định + chỉ xoá folder NẰM TRONG BRAINS_DIR (không đụng folder ngoài)."""
+    """Xoá 1 brain: CHUYỂN vào thùng rác cục bộ (giữ 30 ngày) + ghi giấy báo tử để lan việc xoá
+    sang mọi máy đồng bộ. Yêu cầu confirm == name. Chặn xoá não mặc định + chỉ trong BRAINS_DIR."""
     safe = _safe_brain_name(name)
     if not safe:
         return JSONResponse({"ok": False, "error": "Tên brain không hợp lệ"}, status_code=400)
@@ -2053,11 +2056,30 @@ async def delete_brain(name: str = Form(...), confirm: str = Form("")):
         return JSONResponse({"ok": False, "error": "Không thể xoá Brain mặc định"}, status_code=400)
     if not root.is_dir():
         return JSONResponse({"ok": False, "error": "Brain không tồn tại"}, status_code=404)
+    trash_dir = str(cfgmod.STATE_DIR / "brain-trash")
+
+    def _trash_and_mark():
+        dest = git_brain.move_to_trash(str(root), trash_dir, safe)   # có retry cho Windows
+        git_brain.write_tombstone(BRAINS_DIR, safe)                  # giấy báo tử -> lan việc xoá
+        return dest
+
     try:
-        shutil.rmtree(str(root))
+        dest = await asyncio.to_thread(_trash_and_mark)
     except Exception as e:
-        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
-    return {"ok": True, "name": safe}
+        return JSONResponse({"ok": False, "error": f"Không xoá được (brain đang bận?): {e}"},
+                            status_code=500)
+
+    # Eager sync (nền, best-effort): đẩy lệnh xoá + tombstone lên remote NGAY thay vì chờ chu kỳ 6h.
+    try:
+        _b = cfgmod.read_settings().get("backup", {}) or {}
+        if _b.get("enabled") and _b.get("repo_url") and _b.get("token") and git_brain.has_git():
+            _t = asyncio.create_task(asyncio.to_thread(_do_backup))
+            _DELETE_SYNC_TASKS.add(_t)
+            _t.add_done_callback(_DELETE_SYNC_TASKS.discard)
+    except Exception:
+        pass
+
+    return {"ok": True, "name": safe, "trashed": bool(dest)}
 
 # ============================================================
 # STUDIO - Agents / Skills / Workflows
