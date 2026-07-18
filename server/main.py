@@ -2033,6 +2033,7 @@ async def new_brain(name: str = Form(...)):
         _ensure_brain_scaffold(root)
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+    git_brain.clear_tombstone(BRAINS_DIR, safe)   # dựng lại não cùng tên -> gỡ giấy báo tử để không bị xoá oan
     return {"ok": True, "name": safe, "path": str(root)}
 
 
