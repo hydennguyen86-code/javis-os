@@ -18,6 +18,7 @@ Stdlib-only. Không thêm dependency.
 """
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -693,6 +694,72 @@ def _sync_brains_locked(brains_dir: str, mirror_dir: str, repo_url: str, token: 
             continue
         return {**rep, "error": _redact(("push: " + (err or "lỗi"))[:300], token)}
     return {**rep, "error": "push liên tục bị vượt - thử lại sau"}
+
+
+# ============================================================
+# GIẤY BÁO TỬ (tombstone) - đánh dấu não bị xóa CÓ CHỦ ĐÍCH để lan việc xóa sang mọi máy.
+# Một file cho mỗi não trong <brains_dir>/.javis-tombstones/<tên não>.json. Đồng bộ theo repo
+# (không nằm trong _backup_skip), KHÔNG hiện thành não (/brains bỏ tên bắt đầu bằng '.').
+# ============================================================
+TOMBSTONE_DIR = ".javis-tombstones"
+_TOMBSTONE_TTL = 180 * 86400   # giữ 180 ngày: lâu hơn thùng rác để máy offline lâu quay lại không hồi sinh
+
+
+def _tombstone_path(brains_dir: str, name: str) -> Path:
+    return Path(brains_dir) / TOMBSTONE_DIR / (name + ".json")
+
+
+def write_tombstone(brains_dir: str, name: str) -> None:
+    """Ghi giấy báo tử cho não <name> (đã bị xóa có chủ đích). Ghi nguyên tử (.tmp -> replace)."""
+    if not name:
+        return
+    p = _tombstone_path(brains_dir, name)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    data = {"name": name, "deleted_at": int(time.time()), "host": _host_tag(), "v": 1}
+    tmp = Path(str(p) + ".tmp")   # đuôi .tmp -> nằm trong _backup_skip, không lọt vào backup
+    tmp.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    os.replace(str(tmp), str(p))
+
+
+def clear_tombstone(brains_dir: str, name: str) -> None:
+    """Gỡ giấy báo tử của não <name> (khi tạo lại não cùng tên) để không bị xóa oan."""
+    try:
+        _tombstone_path(brains_dir, name).unlink()
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        print(f"[tombstone clear] {name}: {e}", file=__import__('sys').stderr)
+
+
+def _read_tombstones(root: str) -> List[dict]:
+    """Đọc mọi giấy báo tử trong <root>/.javis-tombstones/. Bỏ file hỏng. Gắn _file = tên file."""
+    d = Path(root) / TOMBSTONE_DIR
+    out: List[dict] = []
+    if not d.is_dir():
+        return out
+    for f in sorted(d.glob("*.json")):
+        try:
+            j = json.loads(f.read_text(encoding="utf-8"))
+            if isinstance(j, dict) and j.get("name"):
+                j["_file"] = f.name
+                out.append(j)
+        except Exception:
+            continue
+    return out
+
+
+def gc_tombstones(brains_dir: str, ttl: int = _TOMBSTONE_TTL) -> int:
+    """Xóa giấy báo tử quá hạn (mặc định 180 ngày). Trả số file đã xóa."""
+    now = int(time.time())
+    n = 0
+    for t in _read_tombstones(brains_dir):
+        if now - int(t.get("deleted_at", now)) > ttl:
+            try:
+                (Path(brains_dir) / TOMBSTONE_DIR / t["_file"]).unlink()
+                n += 1
+            except Exception:
+                pass
+    return n
 
 
 # ============================================================
