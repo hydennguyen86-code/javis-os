@@ -242,6 +242,10 @@ ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
 # Google Gemini qua endpoint TƯƠNG THÍCH OpenAI → dùng lại nguyên logic Chat Completions
 # (stream, usage, tool-calling) như OpenAI, chỉ khác base URL + auth Bearer bằng Gemini API key.
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+# Provider local OpenAI-compatible (Ollama, và sau này LM Studio/llama.cpp...) - keyless,
+# chạy trên máy user, không qua mạng. Mỗi provider chỉ cần 1 base URL, dùng chung local_stream().
+OLLAMA_BASE   = "http://127.0.0.1:11434/v1"
+OLLAMA_MODELS = f"{OLLAMA_BASE}/models"
 
 # Model Anthropic hỗ trợ adaptive thinking + output_config.effort (khỏi budget_tokens).
 _ADAPTIVE_THINKING = ("opus-4-8", "opus-4-7", "opus-4-6", "opus-4-5", "sonnet-4-6", "fable-5", "mythos-5")
@@ -340,6 +344,11 @@ async def local_stream(base_url, label, model, messages, reasoning="off"):
     forward reasoning_effort: model local rất đa dạng, nhiều bản không nhận field này."""
     async for ev in _openai_compat_stream(f"{base_url}/chat/completions", label, "local",
                                           model, messages, reasoning, False):
+        yield ev
+
+
+async def ollama_stream(model, messages, reasoning="off"):
+    async for ev in local_stream(OLLAMA_BASE, "Ollama", model or "llama3", messages, reasoning):
         yield ev
 
 

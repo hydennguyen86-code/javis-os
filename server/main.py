@@ -480,7 +480,13 @@ PROVIDER_DEFS = [   # thứ tự = thứ tự hiển thị card ở trang Models
      "default_models": ["gpt-4o", "gpt-4o-mini", "o3-mini"]},
     {"id": "gemini",        "label": "Google Gemini (API)",     "kind": "api", "key_field": "gemini_api_key",    "catalog_key": "gemini",
      "default_models": ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"]},
+    {"id": "ollama",        "label": "Ollama (Local)",          "kind": "api", "key_field": None,               "catalog_key": "ollama",
+     "default_models": []},   # keyless (local) - model lấy từ discovery (ollama pull), không hardcode
 ]
+
+# Provider "api" nhưng KHÔNG cần key (chạy local trên máy user) - vẫn được coi là "sẵn sàng"
+# dù api_key rỗng. Thêm provider local mới (vd LM Studio) chỉ cần thêm id vào đây.
+KEYLESS_PROVIDERS = {"ollama"}
 
 def _provider_def(pid):
     return next((p for p in PROVIDER_DEFS if p["id"] == pid), None)
@@ -540,6 +546,8 @@ def _set_main_model(cfg, provider, model):
         m["engine"] = "openai-oauth"
     elif provider == "gemini":
         m["engine"] = "gemini"
+    elif provider == "ollama":
+        m["engine"] = "ollama"
     else:  # anthropic-cli
         m["engine"] = "cli"; m["claude_model"] = model
 
@@ -585,6 +593,8 @@ def _api_stream(prov, key, model, messages, reasoning="off"):
         return engine.openai_stream(key, model, messages, reasoning)
     if prov == "gemini":
         return engine.gemini_stream(key, model, messages, reasoning)
+    if prov == "ollama":
+        return engine.ollama_stream(model, messages, reasoning)
     if prov == "openai-oauth":
         creds = openai_oauth.valid_creds() or {}
         return engine.openai_responses_stream(creds.get("access_token", ""), creds.get("account_id", ""),
@@ -632,7 +642,7 @@ async def _api_stream_mcp(prov, key, model, messages, reasoning="off", brain=Non
 
 def _api_label(prov):
     return {"openrouter": "OpenRouter", "openai": "OpenAI", "anthropic-api": "Anthropic API",
-            "openai-oauth": "ChatGPT (OAuth)", "gemini": "Google Gemini"}.get(prov, prov)
+            "openai-oauth": "ChatGPT (OAuth)", "gemini": "Google Gemini", "ollama": "Ollama (Local)"}.get(prov, prov)
 
 def _reasoning_level(mcfg):
     r = (mcfg or {}).get("reasoning", "off")
@@ -1357,6 +1367,17 @@ async def _fetch_provider_models(provider, m):
         return sorted(i for i in ids if i.startswith("gemini")) or None
     if provider == "openai-oauth":
         return openai_oauth.list_models(openai_oauth.valid_creds())   # None nếu backend không có endpoint → fallback
+    if provider == "ollama":
+        # Local, keyless - trả đúng format OpenAI ở /v1/models nên không cần parser riêng.
+        # Lỗi (chưa `ollama serve`) → None, caller fallback catalog rỗng (không hardcode model).
+        try:
+            async with httpx.AsyncClient(timeout=5) as c:
+                r = await c.get(engine.OLLAMA_MODELS)
+                r.raise_for_status()
+                data = r.json().get("data", [])
+        except Exception:
+            return None
+        return sorted(x.get("id") for x in data if x.get("id")) or None
     return None   # anthropic-cli: alias CLI, không list được → fallback catalog
 
 
@@ -4385,8 +4406,8 @@ async def websocket_endpoint(ws: WebSocket):
                         elif et == "error":
                             await ws.send_text(json.dumps({"type": "error", "content": ev["content"]}))
                     await ws.send_text(json.dumps({"type": "response", "content": final_text, "engine": "codex", "model": actual_model, "session_id": conv_sid}))
-            elif (kind == "api" and api_key) or kind == "oauth":
-                # ===== PROVIDER API/OAuth (openrouter | openai | anthropic-api) - chat thuần (MCP đa-model cho openrouter/openai) =====
+            elif (kind == "api" and (api_key or prov in KEYLESS_PROVIDERS)) or kind == "oauth":
+                # ===== PROVIDER API/OAuth (openrouter | openai | anthropic-api | ollama) - chat thuần (MCP đa-model cho openrouter/openai) =====
                 label = _api_label(prov)
                 actual_model = api_model or "?"
                 _ident = (
@@ -4452,7 +4473,7 @@ async def websocket_endpoint(ws: WebSocket):
                 log_conversation(brain, user_message, final_text)
                 # Nén NỀN phần lịch sử cũ sắp rơi khỏi cửa sổ (chỉ engine API - CLI tự quản
                 # context). Lỗi nén không ảnh hưởng lượt chat; lượt sau vẫn còn fallback trim.
-                if kind == "api" and api_key and prov in ("openrouter", "openai", "anthropic-api", "gemini"):
+                if kind == "api" and (api_key or prov in KEYLESS_PROVIDERS) and prov in ("openrouter", "openai", "anthropic-api", "gemini", "ollama"):
                     try:
                         asyncio.create_task(compaction.maybe_compact(
                             store, conv_sid, prov, api_key, api_model, _api_stream))
@@ -4496,7 +4517,7 @@ async def websocket_endpoint(ws: WebSocket):
             mcfg = cfgmod.read_settings().get("model", {})
             prov, kind, api_key, api_model = _chat_provider(mcfg)
             engine_label = ("codex" if prov == "openai-oauth"
-                            else prov if ((kind == "api" and api_key) or kind == "oauth")
+                            else prov if ((kind == "api" and (api_key or prov in KEYLESS_PROVIDERS)) or kind == "oauth")
                             else "cli")
             conv_sid = store.get_or_create(
                 payload.get("session_id"), brain=brain, engine=engine_label,
@@ -4633,7 +4654,7 @@ async def _tg_answer(text, meta=None, progress=None):
     # ai đang nhắn, và cách gửi file trả về (auto-attach + endpoint send-file).
     sysprompt = build_system_prompt(brain) + channel_context.build_channel_block(
         "telegram", meta, telegram_running=True, port=_javis_port())
-    if (kind == "api" and api_key) or kind == "oauth":
+    if (kind == "api" and (api_key or prov in KEYLESS_PROVIDERS)) or kind == "oauth":
         label = _api_label(prov)
         if sess["or"] is None:
             ident = (f"\n\n[Sự thật hệ thống: bạn chạy qua {label}, model '{api_model}'. "

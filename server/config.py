@@ -71,6 +71,7 @@ _DEFAULT = {
             "gemini": ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"],  # Google Gemini API (picker load động)
             "openai-oauth": ["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex"],  # ChatGPT OAuth (Codex; chỉ fallback - picker load động)
             "openrouter": ["openai/gpt-4o-mini", "anthropic/claude-3.5-sonnet", "google/gemini-2.0-flash-001", "deepseek/deepseek-chat"],
+            "ollama": [],   # keyless, local - picker load động qua /provider/models (ollama pull gì hiện đó)
         },
     },
     "telegram": {"enabled": False, "token": "", "chat_id": ""},
