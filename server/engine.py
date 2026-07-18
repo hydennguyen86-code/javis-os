@@ -334,6 +334,15 @@ async def gemini_stream(api_key, model, messages, reasoning="off"):
         yield ev
 
 
+async def local_stream(base_url, label, model, messages, reasoning="off"):
+    """Dùng chung cho mọi provider local OpenAI-compatible (Ollama, LM Studio, llama.cpp...).
+    Keyless - api_key chỉ là placeholder, provider local không kiểm tra giá trị này. Không
+    forward reasoning_effort: model local rất đa dạng, nhiều bản không nhận field này."""
+    async for ev in _openai_compat_stream(f"{base_url}/chat/completions", label, "local",
+                                          model, messages, reasoning, False):
+        yield ev
+
+
 async def anthropic_stream(api_key, model, messages, reasoning="off"):
     """Anthropic Messages API (provider 'anthropic-api') - chat THUẦN, không MCP/skill.
     Tách system ra field riêng (Anthropic không nhận role=system trong messages)."""
