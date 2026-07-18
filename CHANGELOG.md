@@ -4,6 +4,10 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.78] - 2026-07-18
+### Sửa lỗi
+- **Số liệu trên header ("N note · N kết nối") không còn ngắt xuống 2 dòng**: `.graph-stats` thiếu `white-space: nowrap` nên chữ tự xuống dòng khi cụm trái thiếu chỗ; và grid `.hud-top` là `1fr auto 1fr` ép cột trái bằng cột phải, trong khi cụm trái (chọn brain + nút + số liệu) rộng hơn hẳn. Nay: (1) `nowrap` cho `.graph-stats`; (2) grid đổi thành `auto minmax(0,1fr) auto` để cụm trái/phải bám theo nội dung, cụm giữa (tên + ngày) co giãn phần còn lại và cắt gọn bằng `…` khi màn hình quá hẹp thay vì đè lên nhau. Đã đo ở 1000px (một dòng, không đè, giữa tự cắt) và 1280px (đủ chỗ, hiện đầy đủ).
+
 ## [0.9.77] - 2026-07-18
 Xoá não giờ LAN sang mọi máy đồng bộ (không còn bị "hồi sinh"), và giữ bản sao trong thùng rác cục bộ 30 ngày. **Cần khởi động lại server** (đổi luồng sync + endpoint xoá); giao diện tự nạp lại nhờ bump `?v=7`. Có brainstorm + spec + plan ở `docs/superpowers/specs/2026-07-18-brain-delete-sync-propagation-design.md` và `docs/superpowers/plans/2026-07-18-brain-delete-sync-propagation.md`.
 ### Thêm mới
