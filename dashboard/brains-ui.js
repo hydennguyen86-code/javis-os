@@ -160,7 +160,7 @@
     // Xác nhận KỸ: gõ đúng tên - vì đây là TOÀN BỘ tri thức trong não này, mất là không lấy lại được.
     const typed = window.prompt(
       "⚠️ XOÁ BRAIN \"" + name + "\"\n\n" +
-      "Toàn bộ tri thức (sources, wiki, agents, workflows, bộ nhớ...) trong não này sẽ bị XOÁ VĨNH VIỄN, KHÔNG khôi phục được.\n\n" +
+      "Não này sẽ được chuyển vào THÙNG RÁC (giữ 30 ngày rồi tự xoá hẳn), và việc xoá sẽ ĐỒNG BỘ sang mọi máy khác.\n\n" +
       "Gõ CHÍNH XÁC tên brain để xác nhận:"
     );
     if (typed === null) return;
@@ -177,7 +177,7 @@
     localStorage.setItem("javis.graphSource", "brain");
     await loadBrains(null, false);
     sel.dispatchEvent(new Event("change"));
-    alert('Đã xoá brain "' + name + '".');
+    alert('Đã xoá brain "' + name + '" (đưa vào thùng rác 30 ngày, đồng bộ xoá sang các máy khác).');
   }
 
   const nb = document.getElementById("newBrainBtn");
