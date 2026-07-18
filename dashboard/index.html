@@ -8,7 +8,7 @@
   <link rel="icon" href="/brand-logo?v=5">
   <link rel="apple-touch-icon" href="/brand-logo?v=5">
   <link rel="stylesheet" href="/static/style.css?v=43">
-  <link rel="stylesheet" href="/static/console.css?v=17">
+  <link rel="stylesheet" href="/static/console.css?v=18">
 </head>
 <body>
   <div class="hud">
@@ -111,11 +111,7 @@
           </button>
         </div>
 
-        <!-- MỨC DÙNG token: dời từ cột phải xuống góc dưới-phải khung giữa (giải phóng chỗ cho chat). -->
-        <div class="usage-float" id="usageFloat">
-          <div class="uf-label"><span>MỨC DÙNG <span class="dim" style="font-weight:400">· hôm nay</span></span><button class="uf-toggle" id="usageToggle" type="button" title="Thu nhỏ / mở rộng">▾</button></div>
-          <div id="usagePanel" class="usage-panel"><div class="mcp-item dim">Chưa có lượt nào hôm nay</div></div>
-        </div>
+        <!-- MỨC DÙNG token đã chuyển thành trang riêng "Mức dùng" trong rail (nhóm Hệ thống) - có đồ thị 14 ngày. -->
 
         <!-- Popup sửa note: neo absolute BÊN TRONG .hud-center → đè lên visual não, cây trái & chat phải vẫn sống.
              Nội dung (toolbar + thân) do console.js openNote() dựng theo loại file. -->
@@ -572,11 +568,11 @@
   <script src="/static/branding.js?v=7"></script>
   <script src="/static/quick-settings.js?v=4"></script>
   <script src="/static/chat-zoom.js?v=5"></script>
-  <script src="/static/brains-ui.js?v=4"></script>
+  <script src="/static/brains-ui.js?v=5"></script>
   <script src="/static/sessions-ui.js?v=6"></script>
   <script src="/static/studio.js?v=23"></script>
   <!-- Console layer: console.js đăng ký store TRƯỚC khi Alpine khởi động (defer) -->
-  <script src="/static/console.js?v=68"></script>
+  <script src="/static/console.js?v=69"></script>
   <script defer src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>
 </body>
 </html>

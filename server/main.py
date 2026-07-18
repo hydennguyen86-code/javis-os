@@ -2716,6 +2716,7 @@ async def usage_stats():
     """Token/chi phí Javis TỰ ĐO theo nhà cung cấp (hôm nay + tổng). Kèm số dư THẬT của OpenRouter
     nếu có key (provider duy nhất lộ số dư qua API); các provider còn lại API không cho lấy hạn mức."""
     out = usage_store.summary()
+    out["daily"] = usage_store.daily(14)   # chuỗi 14 ngày cho đồ thị trang Mức dùng
     orb = None
     try:
         key = (cfgmod.read_settings().get("model", {}) or {}).get("openrouter_key")

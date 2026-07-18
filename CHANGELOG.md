@@ -4,6 +4,15 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.74] - 2026-07-18
+Gom phần "mức dùng" thành một trang riêng có đồ thị, bỏ widget nổi vướng víu, và tinh chỉnh nốt nút thu/mở rail. **Cần khởi động lại server** để đồ thị mức dùng có dữ liệu (thêm field ở endpoint `/usage`); phần còn lại chỉ cần tải lại trang.
+### Thêm mới
+- **Trang "Mức dùng" trong rail (nhóm Hệ thống) có đồ thị 14 ngày**: thay cho hộp mức dùng nhỏ trước đây, giờ là một trang đầy đủ gồm 3 thẻ tổng (hôm nay, tổng tích luỹ, số dư OpenRouter), đồ thị cột token/ngày 14 ngày gần nhất, và bảng chi tiết theo nhà cung cấp/model (token vào/ra, số lượt, chi phí). Endpoint `/usage` thêm field `daily` (hàm `usage_store.daily(14)` gộp per-day, lấp cả ngày trống cho trục liền mạch). Số liệu vẫn do Javis tự đo, giữ 30 ngày.
+### Cải thiện
+- **Bỏ widget "MỨC DÙNG" nổi ở góc dưới khung giữa**: user thấy vướng. Gỡ khối HTML + CSS; hàm `refreshUsage`/`initUsageToggle` trong app.js tự thành no-op (đã có guard khi không thấy element) nên không cần đụng tới, không còn fetch `/usage` mỗi lượt chat.
+- **Nút thu/mở rail dời sang PHẢI, version/tác giả sang trái**: `.rail-foot` xếp `space-between` (dùng `order`), icon nút to lên chút (18px) cho cân với icon nav; khi thu gọn chỉ còn nút, căn giữa.
+- **Tooltip nhãn khi rê chuột lúc thu gọn hiện nhanh hơn**: native `title` trễ ~500ms, thay bằng tooltip tự vẽ (1 node body-level, thoát mọi overflow của rail) hiện sau 90ms, đặt cạnh phải icon; tạm gỡ `title` lúc hover để không lòi thêm tooltip native chậm, trả lại khi rời chuột (giữ cho screen-reader).
+
 ## [0.9.73] - 2026-07-18
 Tinh chỉnh nút thu/mở rail (bản 0.9.72) theo góp ý: đổi icon, dời vị trí, và sửa link tác giả.
 ### Cải thiện

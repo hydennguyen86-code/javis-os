@@ -30,6 +30,7 @@
     plugins:     _svg('<path d="M14 4a2 2 0 1 0-4 0v2H6a1 1 0 0 0-1 1v3H4a2 2 0 1 0 0 4h1v3a1 1 0 0 0 1 1h3v-1a2 2 0 1 1 4 0v1h3a1 1 0 0 0 1-1v-4h1a2 2 0 1 0 0-4h-1V7a1 1 0 0 0-1-1h-3V4z"/>'),
     learn:       _svg('<path d="M12 3v18"/><path d="M5 7h14"/><path d="M4 12h16"/><circle cx="12" cy="12" r="9"/>'),
     kanban:      _svg('<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="10" rx="1"/><rect x="17" y="4" width="4" height="13" rx="1"/>'),
+    usage:       _svg('<path d="M3 3v18h18"/><rect x="7" y="11" width="3" height="6" rx="0.5"/><rect x="12" y="7" width="3" height="10" rx="0.5"/><rect x="17" y="13" width="3" height="4" rx="0.5"/>'),
     settings:    _svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>'),
   };
 
@@ -63,6 +64,7 @@
     { id: "plugins",     icon: ICON.plugins,     label: "Plugins" },
     { id: "logs",        icon: ICON.logs,        label: "Cập nhật" },
     { id: "account",     icon: ICON.account,     label: "Tài khoản" },
+    { id: "usage",       icon: ICON.usage,       label: "Mức dùng" },
   ];
 
   // ---- Gom rail thành nhóm theo chức năng (dễ tìm hơn danh sách phẳng 18 mục) ----
@@ -74,7 +76,7 @@
     { label: "Năng lực",    icon: GICON["Năng lực"], ids: ["agents", "skills", "workflows", "plugins"] },
     { label: "Việc",        icon: GICON["Việc"],     ids: ["kanban", "selfimprove"] },
     { label: "Kết nối",     icon: GICON["Kết nối"],  ids: ["mcp", "channels", "models"] },
-    { label: "Hệ thống",    icon: GICON["Hệ thống"], ids: ["settings", "logs", "account"], foot: true },
+    { label: "Hệ thống",    icon: GICON["Hệ thống"], ids: ["usage", "settings", "logs", "account"], foot: true },
   ];
   const RAIL_BY_ID = Object.fromEntries(RAIL_ITEMS.map(i => [i.id, i]));
   // Trả về [{label, foot, items:[...]}], bỏ id không tồn tại. Mục nào chưa xếp nhóm → dồn vào "Khác".
@@ -115,6 +117,7 @@
     plugins:     { icon: "🧰", label: "Plugins", sub: "Tool/hook native cho mọi engine" },
     logs:        { icon: "🗒", label: "Nhật ký cập nhật", sub: "Phiên bản & tính năng mới" },
     account:     { icon: "⚙", label: "Tài khoản", sub: "Đăng nhập & workspace" },
+    usage:       { icon: "📊", label: "Mức dùng", sub: "Token & chi phí theo ngày, theo nhà cung cấp" },
   };
 
   // 4 trang tách từ Studio cũ - render container rồi gọi loader trong studio.js (window.JavisStudio).
@@ -228,6 +231,7 @@
     if (id === "learn")    return renderLearn(el);
     if (id === "kanban")   return renderKanban(el);
     if (id === "logs")     return renderLogs(el);
+    if (id === "usage")    return renderUsage(el);
     el.innerHTML = placeholder(id);
   }
 
@@ -245,6 +249,86 @@
       <div class="ph-ico">${m.icon || "✦"}</div>
       <div><b>${esc(m.label || id)}</b> - đang phát triển</div>
       <div style="max-width:380px;font-size:14px;opacity:.7">${esc(note || "Trang này là chỗ cắm chức năng mở rộng sau. Khung điều hướng đã sẵn sàng.")}</div>
+    </div>`;
+  }
+
+  // ============================================
+  // Trang Mức dùng (token & chi phí Javis tự đo, có đồ thị 14 ngày)
+  // ============================================
+  let _uzCss = false;
+  function _injectUsageCss() {
+    if (_uzCss) return; _uzCss = true;
+    const css = `
+    .uz-wrap{max-width:840px}
+    .uz-cards{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:24px}
+    .uz-card{flex:1 1 150px;background:var(--glass);border:1px solid var(--glass-brd);border-radius:12px;padding:14px 16px}
+    .uz-card .uz-k{font-size:12px;color:var(--text3);letter-spacing:.3px}
+    .uz-card .uz-v{font-size:23px;font-weight:700;color:var(--text);margin-top:4px;font-variant-numeric:tabular-nums}
+    .uz-card .uz-sub{font-size:12px;color:var(--text2);margin-top:4px}
+    .uz-card.accent .uz-v{color:var(--accent)}
+    .uz-sec-h{font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin:0 0 12px;font-weight:600}
+    .uz-chart{display:flex;align-items:flex-end;gap:5px;height:150px;padding:6px 2px 0}
+    .uz-bar-col{flex:1 1 0;display:flex;align-items:flex-end;justify-content:center;height:100%;min-width:0;cursor:default}
+    .uz-bar{width:64%;max-width:24px;background:linear-gradient(180deg,var(--accent),#a2360f);border-radius:4px 4px 0 0;transition:opacity .15s;min-height:3px}
+    .uz-bar.empty{background:rgba(255,255,255,.07)}
+    .uz-bar-col:hover .uz-bar{opacity:.75}
+    .uz-xlabels{display:flex;gap:5px;border-top:1px solid var(--glass-brd);padding-top:5px;margin-bottom:26px}
+    .uz-xl{flex:1 1 0;text-align:center;font-size:9.5px;color:var(--text3);white-space:nowrap;overflow:hidden}
+    .uz-tbl{width:100%;border-collapse:collapse;font-size:13.5px}
+    .uz-tbl th{text-align:left;color:var(--text3);font-weight:600;font-size:12px;padding:6px 10px;border-bottom:1px solid var(--glass-brd)}
+    .uz-tbl td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.05);font-variant-numeric:tabular-nums}
+    .uz-tbl td.num{text-align:right;color:#8fb4ff}
+    .uz-tbl .uz-prov{color:var(--text)}
+    .uz-tbl .uz-mdl{color:var(--text3);font-size:12px}
+    .uz-note{margin-top:20px;font-size:12px;color:var(--text3);line-height:1.55;max-width:640px}`;
+    const s = document.createElement("style"); s.textContent = css; document.head.appendChild(s);
+  }
+  const _uzTok = (n) => { n = +n || 0; if (n >= 1e6) return (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + "M"; if (n >= 1e3) return (n / 1e3).toFixed(n >= 1e4 ? 0 : 1) + "k"; return "" + n; };
+  const _uzCost = (c) => (+c > 0 ? "$" + (+c).toFixed(+c < 0.01 ? 4 : 2) : "-");
+  const _UZ_PROV = { cli: "Claude Code", codex: "ChatGPT", openrouter: "OpenRouter", openai: "OpenAI", "anthropic-api": "Anthropic" };
+  const _uzModel = (m) => (m || "").split("/").pop().replace(/^(claude-|gpt-)/, "").slice(0, 26);
+
+  async function renderUsage(el) {
+    _injectUsageCss();
+    el.innerHTML = `<div class="uz-wrap"><div class="cview-placeholder" style="min-height:200px"><div class="ph-ico">📊</div><div class="dim">Đang tải mức dùng...</div></div></div>`;
+    let d;
+    try { d = await (await fetch("/usage")).json(); }
+    catch (e) { el.innerHTML = `<div class="uz-wrap"><div class="cview-placeholder"><div class="ph-ico">📊</div><div>Không tải được dữ liệu mức dùng.</div></div></div>`; return; }
+    const daily = d.daily || [];
+    const today = d.today || { items: [], total: { in: 0, out: 0, cost: 0, turns: 0 } };
+    const all = d.all_time || { items: [], total: { in: 0, out: 0, cost: 0, turns: 0 } };
+    const tt = today.total, at = all.total;
+
+    const orCard = (d.openrouter && d.openrouter.remaining != null)
+      ? `<div class="uz-card"><div class="uz-k">OpenRouter còn</div><div class="uz-v" style="color:#8fd0a0">$${(+d.openrouter.remaining).toFixed(2)}</div><div class="uz-sub">đã dùng $${(+(d.openrouter.used || 0)).toFixed(2)}</div></div>` : "";
+    const cards = `<div class="uz-cards">
+      <div class="uz-card accent"><div class="uz-k">Hôm nay</div><div class="uz-v">${_uzTok(tt.in + tt.out)}</div><div class="uz-sub">${_uzTok(tt.in)}↑ ${_uzTok(tt.out)}↓ · ${tt.turns || 0} lượt${tt.cost > 0 ? " · $" + tt.cost.toFixed(2) : ""}</div></div>
+      <div class="uz-card"><div class="uz-k">Tổng tích luỹ</div><div class="uz-v">${_uzTok(at.in + at.out)}</div><div class="uz-sub">${_uzTok(at.in)}↑ ${_uzTok(at.out)}↓${at.cost > 0 ? " · $" + at.cost.toFixed(2) : ""}</div></div>
+      ${orCard}
+    </div>`;
+
+    const maxv = Math.max(1, ...daily.map(x => x.in + x.out));
+    const bars = daily.map(x => {
+      const v = x.in + x.out, h = v > 0 ? Math.max(3, Math.round(v / maxv * 100)) : 0;
+      const tip = `${x.day}: ${_uzTok(v)} token${x.cost > 0 ? " · $" + x.cost.toFixed(2) : ""} · ${x.turns || 0} lượt`;
+      return `<div class="uz-bar-col" title="${esc(tip)}"><div class="uz-bar ${v > 0 ? "" : "empty"}" style="height:${h}%"></div></div>`;
+    }).join("");
+    const xlabels = daily.map(x => `<div class="uz-xl">${esc(x.day.slice(8))}</div>`).join("");
+    const chart = daily.length ? `<div class="uz-sec-h">${daily.length} ngày gần nhất · token/ngày</div>
+      <div class="uz-chart">${bars}</div><div class="uz-xlabels">${xlabels}</div>` : "";
+
+    const scope = today.items.length ? "hôm nay" : "tổng tích luỹ";
+    const items = today.items.length ? today.items : all.items;
+    const rows = items.length ? items.map(i => `<tr>
+        <td><span class="uz-prov">${esc(_UZ_PROV[i.provider] || i.provider)}</span> <span class="uz-mdl">${esc(_uzModel(i.model))}</span></td>
+        <td class="num">${_uzTok(i.in)}</td><td class="num">${_uzTok(i.out)}</td>
+        <td class="num">${i.turns || 0}</td><td class="num">${_uzCost(i.cost)}</td></tr>`).join("")
+      : `<tr><td colspan="5" style="padding:16px;color:var(--text3)">Chưa có lượt nào.</td></tr>`;
+    const table = `<div class="uz-sec-h">Theo nhà cung cấp · ${scope}</div>
+      <table class="uz-tbl"><thead><tr><th>Nhà cung cấp / model</th><th style="text-align:right">Token vào</th><th style="text-align:right">Token ra</th><th style="text-align:right">Lượt</th><th style="text-align:right">Chi phí</th></tr></thead><tbody>${rows}</tbody></table>`;
+
+    el.innerHTML = `<div class="uz-wrap">${cards}${chart}${table}
+      <div class="uz-note">Số liệu do Javis tự đo từ token vào/ra của mọi engine (Claude Code, ChatGPT/Codex, OpenRouter...), không phụ thuộc nhà cung cấp có lộ hạn mức hay không. Chi phí chỉ hiện khi nhà cung cấp trả về giá thật (vd Claude Code CLI); còn lại chỉ đếm token. Lưu 30 ngày gần nhất.</div>
     </div>`;
   }
 
@@ -2963,6 +3047,36 @@
     _neRenderDownload(body, actions, rel, it); _vtMarkActive(null);
   }
 
+  // Tooltip NHANH cho rail khi thu gọn (native title trễ ~500ms). 1 node body-level, thoát mọi overflow clip.
+  function initRailTooltip() {
+    const nav = document.querySelector(".rail-nav"); if (!nav) return;
+    let tip = document.getElementById("railTip");
+    if (!tip) { tip = document.createElement("div"); tip.id = "railTip"; tip.className = "rail-tip"; document.body.appendChild(tip); }
+    let timer = null, cur = null;
+    const collapsed = () => document.body.classList.contains("rail-collapsed");
+    nav.addEventListener("mouseover", (e) => {
+      const btn = e.target.closest(".rail-item"); if (!btn || !collapsed() || btn === cur) return;
+      cur = btn;
+      if (btn.hasAttribute("title")) { btn.dataset.tip = btn.getAttribute("title"); btn.removeAttribute("title"); }  // chặn tooltip native chậm
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const label = btn.dataset.tip || ""; if (!label) return;
+        const r = btn.getBoundingClientRect();
+        tip.textContent = label;
+        tip.style.top = (r.top + r.height / 2) + "px";
+        tip.style.left = (r.right + 8) + "px";
+        tip.classList.add("show");
+      }, 90);
+    });
+    nav.addEventListener("mouseout", (e) => {
+      const btn = e.target.closest(".rail-item"); if (!btn) return;
+      if (e.relatedTarget && btn.contains(e.relatedTarget)) return;
+      clearTimeout(timer); tip.classList.remove("show");
+      if (btn.dataset.tip && !btn.hasAttribute("title")) btn.setAttribute("title", btn.dataset.tip);   // trả title cho accessibility
+      if (btn === cur) cur = null;
+    });
+  }
+
   function boot() {
     document.body.classList.add("has-rail");
     const ver = document.getElementById("railVersion");
@@ -2989,6 +3103,7 @@
 
     // Cột trái = Vault explorer (luôn có trong DOM ở màn home) → nạp cây ngay khi khởi động
     renderVaultTree();
+    initRailTooltip();   // tooltip nhanh cho rail thu gọn
 
     freshSettings().then(s => {
       graphEnabled = !(s.dashboard && s.dashboard.graph_enabled === false);
