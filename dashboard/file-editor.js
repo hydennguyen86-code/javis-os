@@ -184,39 +184,13 @@
     return a;
   }
 
-  function renderEditor(b, ceil, brainRel, d) {
-    var isMd = extOf(brainRel) === ".md";
-    elActions.innerHTML = "";
-    elBody.innerHTML =
-      '<textarea class="jvfe-text" spellcheck="false"></textarea>' +
-      '<div class="jvfe-prev" hidden></div>';
-    var ta = elBody.querySelector(".jvfe-text");
-    var prev = elBody.querySelector(".jvfe-prev");
-    ta.value = d.content || "";
-
-    // .md: nut gat Nguon / Xem (Xem = render doc bang window.mdToHtml san co)
-    if (isMd && typeof window.mdToHtml === "function") {
-      var seg = document.createElement("span"); seg.className = "jvfe-seg";
-      var bSrc = document.createElement("button"); bSrc.className = "jvfe-btn active"; bSrc.textContent = "Nguon";
-      var bView = document.createElement("button"); bView.className = "jvfe-btn"; bView.textContent = "Xem";
-      bSrc.onclick = function () {
-        prev.hidden = true; ta.hidden = false;
-        bSrc.classList.add("active"); bView.classList.remove("active");
-      };
-      bView.onclick = function () {
-        prev.innerHTML = window.mdToHtml(ta.value);
-        ta.hidden = true; prev.hidden = false;
-        bView.classList.add("active"); bSrc.classList.remove("active");
-      };
-      seg.appendChild(bSrc); seg.appendChild(bView); elActions.appendChild(seg);
-    }
-
+  // Nut Luu (dung getContent de lay noi dung THAT theo che do dang mo) + Tai + Dong.
+  function appendSaveAndClose(b, ceil, getContent) {
     var save = document.createElement("button");
     save.className = "jvfe-btn"; save.textContent = "💾 Luu"; save.title = "Luu (Ctrl+S)";
     curSave = function () {
-      // textarea la nguon that; ban Xem chi render doc tu no nen ta.value luon la moi nhat
       var fd = new FormData();
-      fd.append("brain", b); fd.append("path", ceil); fd.append("content", ta.value);
+      fd.append("brain", b); fd.append("path", ceil); fd.append("content", getContent());
       save.textContent = "…"; save.disabled = true;
       fetch("/files/write", { method: "POST", body: fd })
         .then(function (r) { return r.json().catch(function () { return {}; }); })
@@ -233,7 +207,71 @@
     elActions.appendChild(save);
     elActions.appendChild(dlLink(b, ceil));
     elActions.appendChild(closeBtn());
+  }
+
+  function renderEditor(b, ceil, brainRel, d) {
+    var isMd = extOf(brainRel) === ".md";
+    // .md + du bo may WYSIWYG (mdToHtml + JavisNoteEditor) -> soan nhu Word; con lai -> textarea nguon.
+    if (isMd && typeof window.mdToHtml === "function" && window.JavisNoteEditor) renderMdEditor(b, ceil, d);
+    else renderPlainEditor(b, ceil, d);
+  }
+
+  // File text thuong (khong phai .md): textarea nguon don gian.
+  function renderPlainEditor(b, ceil, d) {
+    elActions.innerHTML = "";
+    elBody.innerHTML = '<textarea class="jvfe-text" spellcheck="false"></textarea>';
+    var ta = elBody.querySelector(".jvfe-text");
+    ta.value = d.content || "";
+    appendSaveAndClose(b, ceil, function () { return ta.value; });
     setTimeout(function () { try { ta.focus(); } catch (e) {} }, 30);
+  }
+
+  // .md: WYSIWYG 2 khung (ban render sua truc tiep + nguon markdown) dung LAI bo may editor cay.
+  function renderMdEditor(b, ceil, d) {
+    var NE = window.JavisNoteEditor;
+    elActions.innerHTML = "";
+    elBody.innerHTML =
+      '<div class="ne-body ne-md mode-source" id="jvfeNe">' +
+        '<div class="ne-fmt"></div>' +
+        '<div class="ne-panes">' +
+          '<div class="ne-prev ne-wys" contenteditable="true" spellcheck="false"></div>' +
+          '<div class="ne-src"><textarea spellcheck="false"></textarea></div>' +
+        "</div>" +
+      "</div>";
+    var neBody = elBody.querySelector("#jvfeNe");
+    var wys = neBody.querySelector(".ne-wys");
+    var ta = neBody.querySelector(".ne-src textarea");
+    ta.value = d.content || "";
+    wys.innerHTML = window.mdToHtml(ta.value);
+
+    var curMode = "source";
+    function srcToWys() { wys.innerHTML = window.mdToHtml(ta.value); }
+    function wysToSrc() { var md = NE.mdFromHtml(wys.innerHTML); if (md != null) ta.value = md; }
+    function mdGetter() {
+      if (curMode === "wys") { var md = NE.mdFromHtml(wys.innerHTML); return md != null ? md : ta.value; }
+      return ta.value;
+    }
+
+    var seg = document.createElement("span"); seg.className = "ne-seg";
+    var bWys = document.createElement("button"); bWys.className = "jvfe-btn"; bWys.textContent = "Sua";
+    var bSrc = document.createElement("button"); bSrc.className = "jvfe-btn active"; bSrc.textContent = "Nguon";
+    function setMode(m) {
+      if (m === curMode) return;
+      if (m === "source") wysToSrc(); else srcToWys();
+      curMode = m;
+      neBody.className = "ne-body ne-md " + (m === "wys" ? "mode-wys" : "mode-source");
+      bWys.classList.toggle("active", m === "wys"); bSrc.classList.toggle("active", m === "source");
+    }
+    bWys.onclick = function () { setMode("wys"); try { wys.focus(); } catch (e) {} };
+    bSrc.onclick = function () { setMode("source"); try { ta.focus(); } catch (e) {} };
+    seg.appendChild(bWys); seg.appendChild(bSrc); elActions.appendChild(seg);
+
+    NE.buildToolbar(neBody.querySelector(".ne-fmt"), { mode: function () { return curMode; }, ta: ta, wys: wys });
+    appendSaveAndClose(b, ceil, mdGetter);
+
+    // Vao che do Sua (WYSIWYG) khi Turndown san sang; offline khong nap duoc thi o lai Nguon (van sua tot).
+    if (window.TurndownService) { setMode("wys"); try { wys.focus(); } catch (e) {} }
+    else NE.ensureTurndown().then(function () { if (isOpen() && window.TurndownService) { setMode("wys"); try { wys.focus(); } catch (e) {} } });
   }
 
   if (typeof window !== "undefined") {

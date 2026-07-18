@@ -464,6 +464,9 @@
   // ---------------------------------------------------------------- wiring (chi khi co DOM)
   if (typeof document !== "undefined") {
     document.addEventListener("click", function (e) {
+      // Dang SOAN trong editor (contenteditable/.ne-wys) hoac trong khung sua file -> khong mo gi ca,
+      // de nguoi dung bam link/anh ma sua binh thuong (tranh bung editor long nhau).
+      if (e.target.closest && e.target.closest('[contenteditable="true"], .jvfe-modal, .note-editor')) return;
       // Link file/thu muc vault: bam thuong -> mo trang Tep tin dung vi tri. Ctrl/Cmd/Shift/giua chuot
       // -> de trinh duyet dung deep-link href (#open=..) mo tab moi (chat van con o tab cu).
       var loc = e.target.closest ? e.target.closest("a.jv-floc") : null;

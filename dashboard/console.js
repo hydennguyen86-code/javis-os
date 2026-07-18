@@ -3054,6 +3054,16 @@
     });
   }
 
+  // Cho khung sua file trong chat (file-editor.js) dung LAI dung bo may WYSIWYG cua editor cay:
+  // nap Turndown, doi HTML<->markdown (giu [[wikilink]]/![[anh]]), va thanh cong cu markdown.
+  if (typeof window !== "undefined") {
+    window.JavisNoteEditor = {
+      ensureTurndown: _ensureTurndown,
+      mdFromHtml: _mdFromHtml,
+      buildToolbar: _neBuildToolbar,
+    };
+  }
+
   async function openNote(rel, it) {
     const ed = document.getElementById("noteEditor"); if (!ed) return;
     it = it || {}; const ext = (it.ext || "").toLowerCase();

@@ -4,6 +4,12 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.81] - 2026-07-18
+Nâng khung sửa file .md trong chat lên WYSIWYG (soạn như Word), dùng lại đúng bộ máy của editor cây. Thuần giao diện, KHÔNG cần khởi động lại server (chỉ tải lại trang, đã bump `?v`).
+### Cải thiện
+- **Khung sửa .md trong chat giờ là WYSIWYG 2 khung**: gõ trực tiếp trên bản render (đậm, nghiêng, tiêu đề, danh sách, trích dẫn, link, kẻ ngang qua thanh công cụ), gạt "Sửa / Nguồn" để xem markdown thô. Dùng lại Turndown + thanh công cụ + đổi HTML sang markdown của editor cây (`window.JavisNoteEditor` mới expose từ `console.js`), giữ nguyên `[[wikilink]]` và `![[ảnh]]`. File text không phải `.md` vẫn là textarea nguồn như cũ. Turndown nạp lazy từ CDN; offline thì tự ở lại chế độ Nguồn (vẫn sửa tốt). Đã kiểm chứng trên trình duyệt thật với Turndown thật: mở ra vào chế độ Sửa, gõ thêm nội dung, lưu ra markdown đúng (giữ tiêu đề, in đậm, danh sách), gạt Sửa/Nguồn đổi qua lại đúng.
+- **Bấm link/ảnh khi đang soạn không bung editor lồng nhau**: handler click trong chat nay bỏ qua khi click rơi vào vùng đang soạn (`[contenteditable]` / `.jvfe-modal` / `.note-editor`).
+
 ## [0.9.80] - 2026-07-18
 Nút "Cập nhật ngay" làm chắc lại toàn diện: kiểm tra sức khoẻ sau khi cập nhật, bản git (Windows/native) lỗi thì TỰ QUAY VỀ bản cũ, có thanh tiến trình theo bước và xem trước "bản mới có gì" trước khi bấm; bản Docker có hướng dẫn lùi rõ ràng. **Cần khởi động lại server** (đổi luồng cập nhật + thêm endpoint). Có spec + plan ở `docs/superpowers/specs/2026-07-18-update-triet-de-design.md` và `docs/superpowers/plans/2026-07-18-update-triet-de.md`.
 ### Thêm mới
