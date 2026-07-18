@@ -158,8 +158,52 @@ def _scan_codex(conn) -> int:
 
 
 def _ingest_api_events(conn) -> int:
-    """Nap nhanh API tu usage-events.jsonl (append-only, doc tu offset). Task 5."""
-    return 0
+    """Nap nhanh API tu usage-events.jsonl (append-only). Doc tu offset (so DONG da nap,
+    luu trong files_seen.offset). CHI lay provider API (openrouter/openai/anthropic) - dong
+    claude/codex bi bo qua vi da co log tho (tranh dem trung). Tra so event API moi nap."""
+    path = str(_EVENTS_PATH)
+    if not _EVENTS_PATH.exists():
+        return 0
+    try:
+        raw = _EVENTS_PATH.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return 0
+    lines = raw.splitlines()
+    complete = len(lines)
+    if raw and not raw.endswith("\n"):
+        complete -= 1                       # dong cuoi con dang ghi do -> de lan sau
+
+    row = conn.execute("SELECT offset FROM files_seen WHERE path=?", (path,)).fetchone()
+    start = row[0] if row else 0
+    if start > complete:                    # file bi cat/xoay -> nap lai tu dau
+        conn.execute("DELETE FROM file_daily WHERE path=?", (path,))
+        start = 0
+
+    events = []
+    for ln in lines[start:complete]:
+        ln = ln.strip()
+        if not ln:
+            continue
+        try:
+            e = json.loads(ln)
+        except Exception:
+            continue
+        prov = (e.get("provider") or "").lower()
+        if prov not in _API_PROVIDERS:
+            continue
+        tin = int(e.get("in") or 0)
+        tout = int(e.get("out") or 0)
+        if tin + tout <= 0:
+            continue
+        events.append({"day": e.get("day") or "", "provider": "api", "source": "javis",
+                       "activity": "chat", "model": e.get("model") or "?", "project": "(api)",
+                       "input": tin, "output": tout, "cache_read": 0, "cache_create": 0})
+    if events:
+        _insert_events(conn, path, events)
+    conn.execute("INSERT INTO files_seen(path,size,mtime,offset) VALUES(?,?,?,?) "
+                 "ON CONFLICT(path) DO UPDATE SET offset=excluded.offset",
+                 (path, 0, 0, complete))
+    return len(events)
 
 
 def refresh() -> dict:

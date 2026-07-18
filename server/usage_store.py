@@ -20,12 +20,30 @@ from datetime import datetime, timezone, timedelta
 from config import STATE_DIR
 
 _PATH = STATE_DIR / "usage.json"
+_EVENTS_PATH = STATE_DIR / "usage-events.jsonl"   # append-only, forward-log cho dashboard token
 _LOCK = threading.Lock()
 _KEEP_DAYS = 30
 
 
 def _today() -> str:
     return datetime.now(timezone(timedelta(hours=7))).strftime("%Y-%m-%d")
+
+
+def _append_event(provider: str, model: str, tin: int, tout: int, cost: float) -> None:
+    """Ghi them 1 dong vao usage-events.jsonl (append-only) cho indexer dashboard token doc.
+    Best-effort: loi thi bo qua, KHONG duoc lam hong luong chat. Nhanh API (openrouter/openai/
+    anthropic) khong co log tho nen day la nguon DUY NHAT cho chung; claude/codex indexer lay
+    tu log tho nen dong claude/codex o day chi bi indexer bo qua (tranh dem trung)."""
+    try:
+        now = datetime.now(timezone.utc)
+        line = json.dumps({"ts": int(now.timestamp()), "day": _today(),
+                           "provider": provider or "?", "model": model or "?",
+                           "in": int(tin or 0), "out": int(tout or 0), "cost": float(cost or 0.0)},
+                          ensure_ascii=False)
+        with open(_EVENTS_PATH, "a", encoding="utf-8") as fh:
+            fh.write(line + "\n")
+    except Exception:
+        pass
 
 
 def _load() -> dict:
@@ -69,6 +87,7 @@ def record(provider: str, model: str, tin=0, tout=0, cost=0.0) -> None:
         for old in sorted(d["days"])[:-_KEEP_DAYS]:   # dọn ngày cũ
             d["days"].pop(old, None)
         _save(d)
+    _append_event(provider, model, tin, tout, cost)   # forward-log rieng (khong prune) cho dashboard token
 
 
 def _rollup(bucket: dict) -> dict:

@@ -85,6 +85,34 @@ check("refresh3: claude tang dung phan moi (150+10)", ui.totals_by("provider")["
 check("refresh3: van 1 phien (cung file)", ui.totals_by("provider")["claude"]["sessions"] == 1)
 
 
+# ============================================================
+# Task 5: usage_store forward-log + nap nhanh API (khong dem trung)
+# ============================================================
+import usage_store  # noqa: E402  (dung chung JAVIS_STATE_DIR temp)
+
+_evp = Path(os.environ["JAVIS_STATE_DIR"]) / "usage-events.jsonl"
+usage_store.record("openrouter", "deepseek/x", 100, 50, 0)
+check("events: record ghi 1 dong usage-events.jsonl", _evp.exists() and len(_evp.read_text(encoding="utf-8").strip().splitlines()) >= 1)
+
+r_api = ui.refresh()
+_api = ui.totals_by("provider").get("api", {})
+check("api: xuat hien sau refresh (100/50)", _api.get("input") == 100 and _api.get("output") == 50)
+check("api: refresh dem api_events", r_api["api_events"] >= 1)
+
+usage_store.record("openrouter", "deepseek/x", 10, 5, 0)
+ui.refresh()
+_api2 = ui.totals_by("provider")["api"]
+check("api: chi cong phan moi (110/55)", _api2["input"] == 110 and _api2["output"] == 55)
+
+ui.refresh()
+check("api: idempotent (offset khong nap lai)", ui.totals_by("provider")["api"]["input"] == 110)
+
+# dong codex trong events KHONG duoc dem vao api (da co log tho codex -> tranh double count)
+usage_store.record("codex", "gpt-5.5", 999, 999, 0)
+ui.refresh()
+check("api: dong codex trong events bi bo qua", ui.totals_by("provider")["api"]["input"] == 110)
+
+
 if _fails:
     print("\n%d FAIL" % len(_fails))
     sys.exit(1)
