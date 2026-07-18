@@ -4,6 +4,15 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.83] - 2026-07-18
+Dashboard Token: nâng trang **Mức dùng** thành bảng theo dõi tiêu thụ token thật, đọc từ log của Claude Code và Codex trên máy (không cần API riêng). CẦN KHỞI ĐỘNG LẠI SERVER (thêm module `usage_index` + route `/usage/*`); sau đó tải lại trang.
+### Thêm mới
+- **Lọc theo kỳ**: hôm nay, hôm qua, tuần này, tuần trước, tháng này, tháng trước, 3 tháng gần nhất, năm nay - mỗi kỳ tự so với kỳ tương đương liền trước (delta %).
+- **Bóc tách nguồn tiêu**: theo provider (Claude Code / ChatGPT-Codex / API), theo nguồn (bạn gõ tay vs Javis tự chạy qua SDK), theo hoạt động (chat / nền loop-lịch / subagent), theo model, theo dự án. Phát hiện nhanh chỗ ngốn token nhất.
+- **Chỉ số hiệu quả**: tổng token, token/ngày, cache hit (tái dùng ngữ cảnh), số phiên + token trung bình mỗi phiên, và chi phí QUY ĐỔI theo giá API (với gói thuê bao là "tiết kiệm được bao nhiêu", chỉ OpenRouter là tiền thật).
+- **Đề xuất tự động**: cache thấp gợi ý /compact, hoạt động nền ngốn nhiều gợi ý giảm loop, opus dùng nhiều gợi ý hạ model, phiên phình gợi ý tách, spike bất thường cảnh báo sớm.
+- Backend: `usage_index.py` quét tăng dần `~/.claude/projects` + `~/.codex/sessions` (bỏ file chưa đổi), phân loại chat/nền qua `conversations.db`, gộp vào SQLite. Nhánh API ghi log tiến tới qua `usage_store`. Route `/usage/summary|insights|refresh`. Bump `console.js?v=71`, thêm `usage.js?v=1`.
+
 ## [0.9.82] - 2026-07-18
 ### Sửa lỗi
 - **Nhãn nút trong khung sửa file thiếu dấu tiếng Việt**: các nút của `file-editor.js` viết không dấu ("Sua / Nguon / Luu / Da luu / Loi / Tai ve / Dong / Mo tab moi"), lệch với phần còn lại của app. Nay sửa thành "Sửa / Nguồn / Lưu / Đã lưu / Lỗi / Tải về / Đóng / Mở tab mới". Nội dung tiếng Việt gõ vào vẫn hiển thị đúng như trước, chỉ nhãn nút thiếu dấu. Bump `file-editor.js?v=3`, chỉ cần tải lại trang.
