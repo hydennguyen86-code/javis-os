@@ -3703,6 +3703,22 @@ async def version_info():
             "previous_version": st.get("previous_version")}
 
 
+@app.get("/update/status")
+async def update_status():
+    """Trạng thái cập nhật (UI poll để vẽ tiến trình). Đọc update_state.json + ~50 dòng cuối
+    update.log. File sống qua restart nên sau khi server lên lại vẫn báo được kết quả."""
+    st = _read_update_state()
+    tail = ""
+    try:
+        logf = cfgmod.STATE_DIR / "update.log"
+        if logf.exists():
+            lines = logf.read_text(encoding="utf-8", errors="replace").splitlines()
+            tail = "\n".join(lines[-50:])
+    except Exception:
+        tail = ""
+    return {"state": st, "log_tail": tail}
+
+
 @app.post("/update")
 async def do_update():
     """Cập nhật lên bản mới nhất. Docker → nhờ Watchtower (chỉ nó có quyền Docker, app KHÔNG).

@@ -72,6 +72,13 @@ _bs = main._record_boot_version(main._read_version())
 check("hook boot: _record_boot_version(_read_version()) chạy + đặt last_good = bản hiện tại",
       _bs.get("last_good_version") == main._read_version())
 
+# --- /update/status ---
+us.write_state({"phase": "health_check", "result": None})
+(us.STATE_DIR / "update.log").write_text("dong 1\ndong 2\ndong 3\n", encoding="utf-8")
+_s = asyncio.run(main.update_status())
+check("/update/status trả state.phase", _s["state"].get("phase") == "health_check")
+check("/update/status trả log_tail", "dong 3" in _s["log_tail"])
+
 print()
 if _fails:
     print(f"{len(_fails)} FAIL: {_fails}"); sys.exit(1)
