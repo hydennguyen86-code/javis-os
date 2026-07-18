@@ -1319,14 +1319,17 @@
     el.innerHTML = `
       <div class="cview-section">
         <h3>Phiên bản</h3>
-        <div class="gcard" style="max-width:560px">
+        <div class="gcard" style="max-width:640px">
           <div class="gcard-top"><span class="gcard-name">Javis OS</span><span class="gcard-tag" id="ovVerTag">…</span></div>
           <div class="gcard-meta" id="ovVerMeta">Đang kiểm tra bản mới…</div>
+          <div id="ovVerChangelog" style="display:none;margin:8px 0;padding:8px 10px;border-left:3px solid var(--accent,#6aa);background:rgba(120,140,160,.08);border-radius:6px;font-size:13px;line-height:1.6"></div>
           <div class="js-actions">
             <button class="gcard-btn ghost" id="ovVerCheck">Kiểm tra lại</button>
             <button class="gcard-btn" id="ovVerUpdate" style="display:none">⬆ Cập nhật ngay</button>
           </div>
+          <div id="ovVerProgress" style="display:none;margin-top:10px"></div>
           <div class="gcard-meta" id="ovVerStatus"></div>
+          <div id="ovVerRollback" style="display:none;margin-top:10px;padding:10px;border:1px solid #c55;border-radius:8px;background:rgba(200,80,80,.08);font-size:13px;line-height:1.6"></div>
         </div>
       </div>
       <div class="cview-section">
@@ -1376,26 +1379,59 @@
       </div>`;
     // ---- Phiên bản + cập nhật trong UI ----
     const MODE_LBL = { docker: "Docker / VPS", native: "Linux (systemd)", windows: "Windows" };
+    const UPD_STEPS = [
+      { key: "preparing", label: "Chuẩn bị" },
+      { key: "pulling", label: "Tải code" },
+      { key: "installing", label: "Cài thư viện" },
+      { key: "restarting", label: "Khởi động lại" },
+      { key: "health_check", label: "Kiểm tra sức khoẻ" },
+      { key: "done", label: "Xong" },
+    ];
+    function updStepIndex(phase) {
+      if (phase === "rolling_back") return 4;        // vẫn ở giai đoạn kiểm tra/khôi phục
+      const i = UPD_STEPS.findIndex(s => s.key === phase);
+      return i < 0 ? 0 : i;
+    }
+    function renderProgress(phase, extra) {
+      const box = document.getElementById("ovVerProgress");
+      if (!box) return;
+      box.style.display = "";
+      const at = updStepIndex(phase);
+      const dots = UPD_STEPS.map((s, i) => {
+        const mark = i < at ? "✅" : (i === at ? "⏳" : "○");
+        const w = i === at ? "font-weight:600" : "opacity:.7";
+        return `<span style="${w}">${mark} ${esc(s.label)}</span>`;
+      }).join('<span style="opacity:.4"> → </span>');
+      box.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px">${dots}</div>`
+        + (phase === "rolling_back" ? `<div style="margin-top:6px;color:#c55">↩ Bản mới lỗi, đang tự quay về bản cũ…</div>` : "")
+        + (extra ? `<div style="margin-top:6px;opacity:.85">${esc(extra)}</div>` : "");
+    }
     async function ovLoadVersion() {
       const tag = document.getElementById("ovVerTag");
       const meta = document.getElementById("ovVerMeta");
       const upd = document.getElementById("ovVerUpdate");
+      const cl = document.getElementById("ovVerChangelog");
       if (!tag) return;
       meta.textContent = "Đang kiểm tra bản mới…";
       let j = {};
       try { j = await (await fetch("/version", { cache: "no-store" })).json(); }
       catch (e) { meta.textContent = "⚠ Không kiểm tra được (mạng)."; return; }
       tag.textContent = "v" + (j.current || "?");
+      window._ovVerCur = j.current || "";
+      window._ovVerPrev = j.previous_version || "";
+      window._ovVerMode = j.mode || "";
       const ml = MODE_LBL[j.mode] || j.mode || "";
+      if (cl) { cl.style.display = "none"; cl.innerHTML = ""; }
       if (j.update_available) {
         const base = "🆕 Có bản mới <b>v" + esc(j.latest) + "</b> (đang chạy v" + esc(j.current) + ") · " + esc(ml);
         if (j.can_self_update) {
           meta.innerHTML = base;
           upd.style.display = "";
+          ovLoadChangelogSnippet(j.current);
         } else {
-          // Docker không có Watchtower: cập nhật bằng REDEPLOY (kéo lại image mới nhất).
-          meta.innerHTML = base + '<div style="margin-top:8px;line-height:1.55">↻ Cập nhật bằng cách <b>Redeploy</b>: trên Hostinger bấm nút <b>Redeploy</b> trong Docker Manager; trên VPS chạy <code>docker compose up -d --pull always</code>.</div>';
+          meta.innerHTML = base + '<div style="margin-top:8px;line-height:1.55">↻ Cập nhật bằng cách <b>Redeploy</b>: trên Hostinger bấm nút <b>Redeploy</b> trong Docker Manager; trên VPS chạy <code>docker compose up -d --pull always</code>. Bản mới lỗi thì pin tag <code>:' + esc(j.previous_version || "bản-cũ") + '</code> rồi Redeploy để lùi.</div>';
           upd.style.display = "none";
+          ovLoadChangelogSnippet(j.current);
         }
       } else if (j.latest) {
         meta.innerHTML = "✅ Đang dùng bản mới nhất (v" + esc(j.current) + ") · " + esc(ml);
@@ -1405,42 +1441,84 @@
         upd.style.display = "none";
       }
     }
+    async function ovLoadChangelogSnippet(current) {
+      const cl = document.getElementById("ovVerChangelog");
+      if (!cl) return;
+      let d = {};
+      try { d = await (await fetch("/changelog", { cache: "no-store" })).json(); }
+      catch (e) { return; }
+      const fresh = (d.releases || []).filter(r => !r.installed).slice(0, 3);
+      if (!fresh.length) return;
+      cl.style.display = "";
+      cl.innerHTML = "<b>Bản mới có gì:</b><br>" + fresh.map(r => {
+        const items = (r.sections || []).flatMap(s => s.items || []).slice(0, 4);
+        return "<div style='margin-top:4px'>v" + esc(r.version) + (r.date ? " · " + esc(r.date) : "") + "</div>"
+          + "<ul style='margin:2px 0 0 16px;padding:0'>" + items.map(it => "<li>" + esc(it) + "</li>").join("") + "</ul>";
+      }).join("");
+    }
     const verCheck = document.getElementById("ovVerCheck");
     if (verCheck) verCheck.onclick = ovLoadVersion;
     const verUpd = document.getElementById("ovVerUpdate");
     if (verUpd) verUpd.onclick = async () => {
-      if (!confirm("Cập nhật Javis lên bản mới nhất?\nApp sẽ tự khởi động lại (~20-40 giây), trang sẽ tự tải lại.")) return;
+      if (!confirm("Cập nhật Javis lên bản mới nhất?\nApp sẽ tự khởi động lại. Nếu bản mới lỗi, hệ thống sẽ tự quay về bản cũ (bản git) hoặc hiện cách lùi (Docker).")) return;
       const st = document.getElementById("ovVerStatus");
+      const rb = document.getElementById("ovVerRollback");
+      const oldCur = window._ovVerCur || "";
       verUpd.disabled = true;
-      st.textContent = "⏳ Đang chuẩn bị cập nhật…";
+      if (rb) { rb.style.display = "none"; rb.innerHTML = ""; }
+      renderProgress("preparing", "Đang chuẩn bị cập nhật…");
+      st.textContent = "";
       let resp;
       try { resp = await (await fetch("/update", { method: "POST" })).json(); }
-      catch (e) { resp = { ok: true, _dropped: true }; }   // kết nối đứt = server đang restart, bình thường
+      catch (e) { resp = { ok: true, _dropped: true }; }   // đứt kết nối = server đang restart
       if (resp && resp.ok === false) {
         verUpd.disabled = false;
+        renderProgress("preparing", "");
+        document.getElementById("ovVerProgress").style.display = "none";
         st.innerHTML = "⚠ " + esc(resp.error || "Không cập nhật được.") + (resp.manual ? " Chạy: <code>" + esc(resp.manual) + "</code>" : "");
         return;
       }
-      st.textContent = "⏳ Đang tải bản mới + khởi động lại… (đừng tắt trang)";
-      let tries = 0, backButOld = 0;
+      st.textContent = "⏳ Đang cập nhật… đừng tắt trang.";
+      let tries = 0;
       const poll = setInterval(async () => {
         tries++;
+        // 1) ưu tiên trạng thái chi tiết từ updater (bản git)
+        let s = null;
+        try { s = await (await fetch("/update/status", { cache: "no-store" })).json(); } catch (e) { s = null; }
+        if (s && s.state && s.state.phase) {
+          const ph = s.state.phase, res = s.state.result;
+          const stashNote = s.state.stashed ? "📦 Sửa đổi cục bộ đã được cất vào git stash (dùng 'git stash list' để xem lại)." : "";
+          renderProgress(ph, stashNote);
+          if (res === "success") { clearInterval(poll); st.textContent = "✅ Đã cập nhật xong. Đang tải lại trang…"; setTimeout(() => location.reload(), 1500); return; }
+          if (res === "rolled_back") { clearInterval(poll); renderProgress("done", stashNote); st.innerHTML = "↩ Bản mới lỗi, đã <b>tự quay về bản cũ</b>. Xem <code>update.log</code>."; verUpd.disabled = false; return; }
+          if (res === "pull_failed" || res === "rollback_failed" || res === "error") {
+            clearInterval(poll);
+            st.innerHTML = "⚠ " + esc(s.state.error || "Cập nhật lỗi.") + " Xem <code>update.log</code>.";
+            verUpd.disabled = false; return;
+          }
+        }
+        // 2) fallback: dò /version (docker qua Watchtower - updater.py không chạy)
         try {
-          const j = await (await fetch("/version", { cache: "no-store" })).json();
-          if (j && j.update_available === false) {          // đã lên bản mới → xong
-            clearInterval(poll);
-            st.textContent = "✅ Đã cập nhật xong. Đang tải lại trang…";
-            setTimeout(() => location.reload(), 1500);
-            return;
+          const v = await (await fetch("/version", { cache: "no-store" })).json();
+          if (v && v.update_available === false && v.current && v.current !== oldCur) {
+            clearInterval(poll); st.textContent = "✅ Đã cập nhật xong. Đang tải lại trang…"; setTimeout(() => location.reload(), 1500); return;
           }
-          backButOld++;                                     // server sống lại nhưng vẫn bản cũ
-          if (backButOld >= 3) {
+          // docker bản mới có thể lỗi: server vẫn còn bản cũ sau khá lâu → hiện cách lùi
+          if ((window._ovVerMode === "docker") && tries >= 12 && v && v.current === oldCur) {
             clearInterval(poll);
-            st.innerHTML = "⚠ Server đã lên lại nhưng phiên bản chưa đổi - cập nhật có thể thất bại. Xem <code>update.log</code> / <code>docker compose logs</code>.";
+            const prev = window._ovVerPrev || (v.previous_version || "");
+            st.innerHTML = "⚠ Bản mới chưa lên sau một lúc - có thể lỗi.";
+            if (rb) {
+              rb.style.display = "";
+              rb.innerHTML = "<b>Cách lùi về bản cũ (Docker):</b><br>Pin tag phiên bản cũ rồi kéo lại:"
+                + "<br><code>docker compose pull && docker compose up -d</code>"
+                + (prev ? "<br>Hoặc sửa image thành <code>ghcr.io/blogminhquy/javis-os:" + esc(prev) + "</code> rồi Redeploy." : "");
+            }
+            verUpd.disabled = false; return;
           }
-        } catch (e) { backButOld = 0; /* server đang restart - tiếp tục chờ */ }
-        if (tries > 45) { clearInterval(poll); st.innerHTML = "Server chưa lên lại sau ~3 phút - thử tải lại trang."; }
-      }, 4000);
+        } catch (e) { /* server đang restart - chờ tiếp */ }
+        if (tries > 60) { clearInterval(poll); st.innerHTML = "Server chưa lên lại sau ~3 phút - thử tải lại trang."; verUpd.disabled = false; }
+      }, 3000);
     };
     ovLoadVersion();
 
