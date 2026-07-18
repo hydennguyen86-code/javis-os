@@ -3719,18 +3719,56 @@ async def update_status():
     return {"state": st, "log_tail": tail}
 
 
+_UPDATE_ACTIVE = {"preparing", "pulling", "installing", "restarting", "health_check", "rolling_back"}
+
+
+def _git_head(root: str) -> str:
+    try:
+        import subprocess
+        r = subprocess.run(["git", "-C", root, "rev-parse", "HEAD"],
+                           capture_output=True, text=True, timeout=10)
+        return (r.stdout or "").strip() if r.returncode == 0 else ""
+    except Exception:
+        return ""
+
+
 @app.post("/update")
 async def do_update():
-    """Cập nhật lên bản mới nhất. Docker → nhờ Watchtower (chỉ nó có quyền Docker, app KHÔNG).
-    Native/Windows → git pull + restart ở tiến trình TÁCH RỜI (sống độc lập nếu process này bị kill)."""
+    """Cập nhật lên bản mới nhất. Git checkout (windows/native) → spawn updater.py TÁCH RỜI
+    (stop/pull/pip/start/health/rollback). Docker → Watchtower nếu có, không thì hướng dẫn Redeploy."""
     import sys as _sys
+    import subprocess
+    import datetime as _dt
+    now = lambda: _dt.datetime.now().isoformat(timespec="seconds")
+
+    st = _read_update_state()
+    if st.get("phase") in _UPDATE_ACTIVE:
+        return JSONResponse({"ok": False, "error": "Đang cập nhật rồi, chờ chút.",
+                             "phase": st.get("phase")}, status_code=409)
+
     mode = _deploy_mode()
+    cur = _read_version()
+    latest = None
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=8) as client:
+            r = await client.get(f"https://raw.githubusercontent.com/{GITHUB_REPO}/main/VERSION")
+            if r.status_code == 200:
+                latest = (r.text or "").strip() or None
+    except Exception:
+        latest = None
+
     if mode == "docker":
         if not await _watchtower_reachable():
             return JSONResponse({"ok": False,
-                "error": "Bản Docker cập nhật bằng cách REDEPLOY để kéo image mới nhất: trên Hostinger bấm nút Redeploy trong Docker Manager; trên VPS chạy lại lệnh dưới.",
-                "manual": "docker compose up -d --pull always"}, status_code=400)
+                "error": "Bản Docker cập nhật bằng REDEPLOY để kéo image mới: trên Hostinger bấm Redeploy trong Docker Manager; trên VPS chạy lệnh dưới. Nếu bản mới lỗi, pin tag phiên bản cũ rồi Redeploy để lùi.",
+                "manual": "docker compose up -d --pull always",
+                "current": cur, "latest": latest,
+                "previous_version": st.get("previous_version")}, status_code=400)
         token = os.getenv("WATCHTOWER_TOKEN", "")
+        _write_update_state({"phase": "restarting", "old_version": cur, "target_version": latest,
+                             "old_sha": None, "result": None, "error": None, "stashed": False,
+                             "started_at": now(), "finished_at": None})
         import asyncio
         import httpx
 
@@ -3741,36 +3779,35 @@ async def do_update():
                                       headers={"Authorization": f"Bearer {token}"})
             except Exception as e:
                 print(f"[update] watchtower trigger: {e}", file=_sys.stderr)
-        t = asyncio.create_task(_trigger())      # giữ ref → không bị GC
+        t = asyncio.create_task(_trigger())
         _UPDATE_TASKS.add(t)
         t.add_done_callback(_UPDATE_TASKS.discard)
         return {"ok": True, "mode": "docker", "message": "Đang kéo image mới + khởi động lại (~20-40s)."}
 
-    # native / windows - chỉ tự cập nhật được nếu là git checkout
+    # git checkout (windows / native)
     root = str(PROJECT_ROOT)
     if not _is_git_checkout(root):
         return JSONResponse({"ok": False,
             "error": "Thư mục cài đặt không phải git checkout → không tự cập nhật được. Cài lại bằng 'git clone' hoặc cập nhật thủ công.",
             "manual": "./update.sh"}, status_code=400)
+    old_sha = _git_head(root)
+    _write_update_state({"phase": "preparing", "old_version": cur, "old_sha": old_sha,
+                         "target_version": latest, "result": None, "error": None, "stashed": False,
+                         "started_at": now(), "finished_at": None})
     try:
-        import subprocess
-        logf = str(cfgmod.STATE_DIR / "update.log")
+        py = _sys.executable
+        updater = str(PROJECT_ROOT / "server" / "updater.py")
+        port = os.getenv("JAVIS_PORT", "7777")
+        args = [py, updater, "--old-sha", old_sha, "--old-version", cur,
+                "--target", latest or "", "--port", str(port)]
         if mode == "windows":
-            # Updater TÁCH RỜI (DETACHED): git pull ghi log rồi relaunch - không chết theo process này.
-            bat = str(cfgmod.STATE_DIR / "_selfupdate.bat")
-            with open(bat, "w", encoding="utf-8") as f:
-                f.write("@echo off\r\n")
-                f.write(f'cd /d "{root}"\r\n')
-                f.write(f'git pull --ff-only > "{logf}" 2>&1\r\n')
-                f.write('wscript.exe "start-javis.vbs"\r\n')
-            subprocess.Popen(["cmd", "/c", bat], cwd=root,
-                             creationflags=0x00000008 | 0x00000200)  # DETACHED_PROCESS|NEW_PROCESS_GROUP
+            subprocess.Popen(args, cwd=root, creationflags=0x00000008 | 0x00000200)  # DETACHED|NEW_GROUP
         else:
-            with open(logf, "w", encoding="utf-8") as lf:
-                subprocess.Popen(["bash", "update.sh", "native"], cwd=root,
-                                 stdout=lf, stderr=lf, start_new_session=True)
-        return {"ok": True, "mode": mode, "message": "Đang cập nhật + khởi động lại (log: update.log)."}
+            subprocess.Popen(args, cwd=root, start_new_session=True)
+        return {"ok": True, "mode": mode,
+                "message": "Đang cập nhật + khởi động lại (theo dõi ở thanh tiến trình)."}
     except Exception as e:
+        _write_update_state({"phase": "error", "result": "error", "error": str(e), "finished_at": now()})
         return JSONResponse({"ok": False, "error": str(e), "manual": "./update.sh"}, status_code=500)
 
 

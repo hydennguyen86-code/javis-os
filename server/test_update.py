@@ -79,6 +79,14 @@ _s = asyncio.run(main.update_status())
 check("/update/status trả state.phase", _s["state"].get("phase") == "health_check")
 check("/update/status trả log_tail", "dong 3" in _s["log_tail"])
 
+# --- POST /update chống chạy trùng ---
+from fastapi.responses import JSONResponse  # noqa: E402
+us.write_state({"phase": "pulling", "started_at": "2026-07-18T10:00:00"})
+_r = asyncio.run(main.do_update())
+check("update đang chạy → trả 409", isinstance(_r, JSONResponse) and _r.status_code == 409)
+us.write_state({"phase": "idle"})  # dọn để không kẹt
+check("có hàm _git_head", callable(getattr(main, "_git_head", None)))
+
 print()
 if _fails:
     print(f"{len(_fails)} FAIL: {_fails}"); sys.exit(1)
