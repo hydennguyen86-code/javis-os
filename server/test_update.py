@@ -120,6 +120,14 @@ check("early-return nhả claim → phase idle (không kẹt preparing)", us.rea
 main._deploy_mode = _orig_mode
 main._watchtower_reachable = _orig_wt
 
+# --- updater.py --dry-run (không thực thi git/pip) ---
+import subprocess as _sp  # noqa: E402
+_upd = os.path.join(os.path.dirname(os.path.abspath(__file__)), "updater.py")
+_p = _sp.run([sys.executable, _upd, "--dry-run", "--port", "7777"],
+             capture_output=True, text=True, env={**os.environ})
+check("updater --dry-run thoát 0", _p.returncode == 0)
+check("updater --dry-run in PLAN", "PLAN:" in (_p.stdout or ""))
+
 print()
 if _fails:
     print(f"{len(_fails)} FAIL: {_fails}"); sys.exit(1)
