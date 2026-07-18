@@ -1,0 +1,72 @@
+"""Test usage_parsers (parse thuan, khong I/O ngoai path duoc truyen). Chay tay:
+
+    cd server && ../.venv/Scripts/python.exe test_usage_parsers.py
+
+Khong pytest, khong cham mang. Exit code != 0 neu fail. Tu co lap temp dir cho phan
+co doc file (Codex).
+"""
+import json
+import os
+import sys
+import tempfile
+from pathlib import Path
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import usage_parsers as up  # noqa: E402
+
+_fails = []
+
+
+def check(name, cond):
+    print(("OK   " if cond else "FAIL ") + name)
+    if not cond:
+        _fails.append(name)
+
+
+# ============================================================
+# Task 1: parse_claude_line
+# ============================================================
+# Dong that dang assistant, entrypoint sdk-cli, co cache. Timestamp 18:30 UTC =
+# 01:30 (+7) NGAY HOM SAU (30) - de bat loi doi mui gio.
+line_bg = {
+    "type": "assistant", "entrypoint": "sdk-cli", "isSidechain": False,
+    "sessionId": "sess-bg", "cwd": "D:\\Project\\Javis-OS",
+    "timestamp": "2026-06-29T18:30:00.000Z",
+    "message": {"model": "claude-opus-4-8", "usage": {
+        "input_tokens": 10, "output_tokens": 300,
+        "cache_read_input_tokens": 14447, "cache_creation_input_tokens": 18184}},
+}
+ev = up.parse_claude_line(line_bg, set())
+check("claude: provider=claude", bool(ev) and ev["provider"] == "claude")
+check("claude: source=javis (sdk)", ev["source"] == "javis")
+check("claude: activity=background (session ngoai chat set)", ev["activity"] == "background")
+check("claude: giu du input+cache", ev["input"] == 10 and ev["cache_read"] == 14447 and ev["cache_create"] == 18184)
+check("claude: output", ev["output"] == 300)
+check("claude: day doi sang UTC+7 (hom sau)", ev["day"] == "2026-06-30")
+check("claude: project = basename cwd", ev["project"] == "Javis-OS")
+check("claude: model giu nguyen", ev["model"] == "claude-opus-4-8")
+
+ev_chat = up.parse_claude_line(line_bg, {"sess-bg"})
+check("claude: activity=chat khi session thuoc chat set", ev_chat["activity"] == "chat")
+
+ev_sc = up.parse_claude_line({**line_bg, "isSidechain": True}, {"sess-bg"})
+check("claude: activity=subagent khi isSidechain (uu tien)", ev_sc["activity"] == "subagent")
+
+ev_man = up.parse_claude_line({**line_bg, "entrypoint": "claude-desktop"}, set())
+check("claude: entrypoint desktop -> source=manual", ev_man["source"] == "manual")
+check("claude: manual -> activity=manual", ev_man["activity"] == "manual")
+
+check("claude: synthetic -> None",
+      up.parse_claude_line({**line_bg, "message": {"model": "<synthetic>", "usage": {"input_tokens": 5}}}, set()) is None)
+check("claude: non-assistant -> None", up.parse_claude_line({"type": "user"}, set()) is None)
+check("claude: khong co usage -> None",
+      up.parse_claude_line({"type": "assistant", "message": {"model": "claude-opus-4-8"}}, set()) is None)
+check("claude: 0 token -> None",
+      up.parse_claude_line({"type": "assistant", "entrypoint": "sdk-cli", "timestamp": "2026-06-29T18:30:00.000Z",
+                            "message": {"model": "claude-opus-4-8", "usage": {"input_tokens": 0, "output_tokens": 0}}}, set()) is None)
+
+
+if _fails:
+    print("\n%d FAIL" % len(_fails))
+    sys.exit(1)
+print("\nALL PASS")
