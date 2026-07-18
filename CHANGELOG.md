@@ -4,6 +4,10 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.82] - 2026-07-18
+### Sửa lỗi
+- **Nhãn nút trong khung sửa file thiếu dấu tiếng Việt**: các nút của `file-editor.js` viết không dấu ("Sua / Nguon / Luu / Da luu / Loi / Tai ve / Dong / Mo tab moi"), lệch với phần còn lại của app. Nay sửa thành "Sửa / Nguồn / Lưu / Đã lưu / Lỗi / Tải về / Đóng / Mở tab mới". Nội dung tiếng Việt gõ vào vẫn hiển thị đúng như trước, chỉ nhãn nút thiếu dấu. Bump `file-editor.js?v=3`, chỉ cần tải lại trang.
+
 ## [0.9.81] - 2026-07-18
 Nâng khung sửa file .md trong chat lên WYSIWYG (soạn như Word), dùng lại đúng bộ máy của editor cây. Thuần giao diện, KHÔNG cần khởi động lại server (chỉ tải lại trang, đã bump `?v`).
 ### Cải thiện

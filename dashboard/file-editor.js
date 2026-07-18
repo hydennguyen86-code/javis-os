@@ -125,7 +125,7 @@
   }
   function closeBtn() {
     var b = document.createElement("button");
-    b.className = "jvfe-btn icon"; b.textContent = "✕"; b.title = "Dong (Esc)";
+    b.className = "jvfe-btn icon"; b.textContent = "✕"; b.title = "Đóng (Esc)";
     b.onclick = close; return b;
   }
 
@@ -135,7 +135,7 @@
     build();
     var b = brain();
     elTitle.innerHTML = esc(baseOf(brainRel));
-    elActions.innerHTML = ""; elBody.innerHTML = '<div class="jvfe-note">Dang mo…</div>';
+    elActions.innerHTML = ""; elBody.innerHTML = '<div class="jvfe-note">Đang mở…</div>';
     curSave = null;
     modal.classList.add("open");
     document.body.classList.add("jvfe-open");
@@ -173,13 +173,13 @@
   }
   function renderError(b, ceil, brainRel, msg) {
     elActions.innerHTML = ""; elActions.appendChild(closeBtn());
-    elBody.innerHTML = '<div class="jvfe-note">' + esc(msg || "Khong doc duoc file.") +
-      ' - <a href="' + esc(rawUrl(b, ceil)) + '" target="_blank" rel="noopener">Mo tab moi</a>' +
-      ' · <a href="' + esc(rawUrl(b, ceil, 1)) + '">Tai ve</a></div>';
+    elBody.innerHTML = '<div class="jvfe-note">' + esc(msg || "Không đọc được file.") +
+      ' - <a href="' + esc(rawUrl(b, ceil)) + '" target="_blank" rel="noopener">Mở tab mới</a>' +
+      ' · <a href="' + esc(rawUrl(b, ceil, 1)) + '">Tải về</a></div>';
   }
   function dlLink(b, ceil) {
     var a = document.createElement("a");
-    a.href = rawUrl(b, ceil, 1); a.title = "Tai ve";
+    a.href = rawUrl(b, ceil, 1); a.title = "Tải về";
     a.innerHTML = '<button class="jvfe-btn icon" type="button">⇩</button>';
     return a;
   }
@@ -187,7 +187,7 @@
   // Nut Luu (dung getContent de lay noi dung THAT theo che do dang mo) + Tai + Dong.
   function appendSaveAndClose(b, ceil, getContent) {
     var save = document.createElement("button");
-    save.className = "jvfe-btn"; save.textContent = "💾 Luu"; save.title = "Luu (Ctrl+S)";
+    save.className = "jvfe-btn"; save.textContent = "💾 Lưu"; save.title = "Lưu (Ctrl+S)";
     curSave = function () {
       var fd = new FormData();
       fd.append("brain", b); fd.append("path", ceil); fd.append("content", getContent());
@@ -197,11 +197,11 @@
         .then(function (r) {
           save.disabled = false;
           if (r && r.ok) {
-            save.textContent = "✓ Da luu"; save.classList.add("saved");
-            setTimeout(function () { save.textContent = "💾 Luu"; save.classList.remove("saved"); }, 1400);
-          } else { save.textContent = "⚠ Loi"; setTimeout(function () { save.textContent = "💾 Luu"; }, 1600); }
+            save.textContent = "✓ Đã lưu"; save.classList.add("saved");
+            setTimeout(function () { save.textContent = "💾 Lưu"; save.classList.remove("saved"); }, 1400);
+          } else { save.textContent = "⚠ Lỗi"; setTimeout(function () { save.textContent = "💾 Lưu"; }, 1600); }
         })
-        .catch(function () { save.disabled = false; save.textContent = "⚠ Loi"; setTimeout(function () { save.textContent = "💾 Luu"; }, 1600); });
+        .catch(function () { save.disabled = false; save.textContent = "⚠ Lỗi"; setTimeout(function () { save.textContent = "💾 Lưu"; }, 1600); });
     };
     save.onclick = curSave;
     elActions.appendChild(save);
@@ -253,8 +253,8 @@
     }
 
     var seg = document.createElement("span"); seg.className = "ne-seg";
-    var bWys = document.createElement("button"); bWys.className = "jvfe-btn"; bWys.textContent = "Sua";
-    var bSrc = document.createElement("button"); bSrc.className = "jvfe-btn active"; bSrc.textContent = "Nguon";
+    var bWys = document.createElement("button"); bWys.className = "jvfe-btn"; bWys.textContent = "Sửa";
+    var bSrc = document.createElement("button"); bSrc.className = "jvfe-btn active"; bSrc.textContent = "Nguồn";
     function setMode(m) {
       if (m === curMode) return;
       if (m === "source") wysToSrc(); else srcToWys();
