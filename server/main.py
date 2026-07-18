@@ -51,6 +51,7 @@ import skill_router   # nguồn chân lý khám phá skill (canonical <brain>/sk
 import skill_usage     # telemetry: đếm skill nào THẬT SỰ được dùng qua javis_use_skill (tín hiệu DƯƠNG một chiều)
 import share_bundle   # xuất/nhập gói agent/skill/workflow (.zip) để chia sẻ giữa brain/người dùng
 import usage_store   # đếm token/chi phí Javis tự đo (đa nhà cung cấp)
+import usage_index   # dashboard token: index log thô Claude+Codex + query summary/insights
 from telegram_bot import TelegramBot, parse_chat_ids as tg_parse_ids
 import channel_context   # metadata kênh + gom file trả về kênh chat (port gateway hermes-agent)
 from sessions import get_store   # kho phiên hội thoại (sqlite + fts5): list/resume/search
@@ -2774,6 +2775,46 @@ async def usage_stats():
         orb = None
     out["openrouter"] = orb
     return out
+
+
+# ---- Dashboard Token (index log thô Claude + Codex + nhánh API) -----------------------
+@app.get("/usage/summary")
+async def usage_summary(period: str = "this_month", provider: str = "", project: str = "", refresh: int = 1):
+    """Báo cáo token theo kỳ: KPI + breakdown + timeseries, kèm so kỳ trước. refresh=1 (mặc
+    định) quét tăng dần trước khi trả (rẻ khi index đã ấm)."""
+    if refresh:
+        try:
+            await asyncio.to_thread(usage_index.refresh)
+        except Exception:
+            pass
+    try:
+        return usage_index.summary(period=period, provider=provider or None, project=project or None)
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+
+@app.get("/usage/insights")
+async def usage_insights(period: str = "this_month", refresh: int = 0):
+    """Danh sách đề xuất hành động cho kỳ. Mặc định KHÔNG refresh (UI đã refresh ở /usage/summary)."""
+    if refresh:
+        try:
+            await asyncio.to_thread(usage_index.refresh)
+        except Exception:
+            pass
+    try:
+        return {"items": usage_index.insights(period=period)}
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+
+@app.post("/usage/refresh")
+async def usage_refresh():
+    """Quét tăng dần 3 nguồn, trả số file/event xử lý lần này."""
+    try:
+        return await asyncio.to_thread(usage_index.refresh)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
 
 async def execute_workflow(brain, slug, input="", tools=None):
     """Chạy workflow nhiều agent tuần tự, YIELD event dict (KHÔNG bọc SSE). Dùng CHUNG cho:
