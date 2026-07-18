@@ -74,7 +74,7 @@ import update_state as us  # noqa: E402
 check("ver_newer 0.9.79 > 0.9.78", us.ver_newer("0.9.79", "0.9.78") is True)
 check("ver_newer bằng nhau → False", us.ver_newer("1.0.0", "1.0.0") is False)
 check("ver_newer local ahead → False", us.ver_newer("0.9.78", "0.9.79") is False)
-check("ver_tuple hỏng → None", us.ver_tuple("abc") is None)
+check("ver_tuple rác → coi như (0,0,0), không crash", us.ver_tuple("abc") == (0, 0, 0))
 
 # --- state round-trip ---
 us.write_state({"phase": "installing", "old_version": "0.9.78"})
