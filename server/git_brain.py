@@ -763,6 +763,67 @@ def gc_tombstones(brains_dir: str, ttl: int = _TOMBSTONE_TTL) -> int:
 
 
 # ============================================================
+# THÙNG RÁC CỤC BỘ - giữ bản sao não đã xóa (30 ngày) để cứu hộ. NGOÀI vùng đồng bộ (không lên git).
+# ============================================================
+def move_to_trash(brain_dir: str, trash_dir: str, name: str) -> Optional[str]:
+    """Chuyển thư mục não vào thùng rác <trash_dir>/<name>__<ts>/. Trả path đích hoặc None nếu
+    nguồn không phải thư mục. shutil.move xử lý cả khác ổ đĩa. Retry 3 lần: Windows có thể kẹt
+    handle (engine đang mở file trong não) - chờ ngắn rồi thử lại."""
+    src = Path(brain_dir)
+    if not src.is_dir():
+        return None
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    dst = Path(trash_dir) / f"{name}__{stamp}"
+    i = 1
+    while dst.exists():
+        dst = Path(trash_dir) / f"{name}__{stamp}-{i}"
+        i += 1
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    last = None
+    for _ in range(3):
+        try:
+            shutil.move(str(src), str(dst))
+            return str(dst)
+        except Exception as e:
+            last = e
+            time.sleep(0.3)
+    raise last
+
+
+def gc_trash(trash_dir: str, days: int = 30) -> int:
+    """Xóa các mục trong thùng rác cũ hơn <days> ngày (theo mtime thư mục). Trả số mục đã xóa."""
+    d = Path(trash_dir)
+    if not d.is_dir():
+        return 0
+    cutoff = time.time() - days * 86400
+    n = 0
+    for sub in d.iterdir():
+        try:
+            if sub.is_dir() and sub.stat().st_mtime < cutoff:
+                shutil.rmtree(str(sub))
+                n += 1
+        except Exception:
+            pass
+    return n
+
+
+def _dir_newer_than(root: str, ts: int) -> bool:
+    """Có file nào trong root có mtime > ts (dung sai +1s) không? Bỏ .git nested. Dùng cho chốt
+    thời gian: não dựng/sửa lại SAU khi có tombstone thì không bị xóa oan."""
+    if ts <= 0:
+        return False
+    for dp, dn, fns in os.walk(root):
+        dn[:] = [x for x in dn if x not in _BACKUP_SKIP_DIRS]
+        for fn in fns:
+            try:
+                if os.path.getmtime(os.path.join(dp, fn)) > ts + 1:
+                    return True
+            except Exception:
+                continue
+    return False
+
+
+# ============================================================
 # BrainLock - khoá cấp file cross-platform (serialize ghi giữa CÁC tiến trình)
 # ============================================================
 class BrainLock:
