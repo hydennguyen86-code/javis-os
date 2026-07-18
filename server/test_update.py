@@ -100,11 +100,32 @@ check("/update/status trả log_tail", "dong 3" in _s["log_tail"])
 
 # --- POST /update chống chạy trùng ---
 from fastapi.responses import JSONResponse  # noqa: E402
-us.write_state({"phase": "pulling", "started_at": "2026-07-18T10:00:00"})
+import datetime as _dtmod  # noqa: E402
+_recent_iso = _dtmod.datetime.now().isoformat(timespec="seconds")
+us.write_state({"phase": "pulling", "started_at": _recent_iso})
 _r = asyncio.run(main.do_update())
-check("update đang chạy → trả 409", isinstance(_r, JSONResponse) and _r.status_code == 409)
+check("update đang chạy (started_at gần đây) → 409", isinstance(_r, JSONResponse) and _r.status_code == 409)
 us.write_state({"phase": "idle"})  # dọn để không kẹt
 check("có hàm _git_head", callable(getattr(main, "_git_head", None)))
+check("có hàm _update_recent", callable(getattr(main, "_update_recent", None)))
+check("_update_recent: started_at rất cũ → False", main._update_recent("2000-01-01T00:00:00") is False)
+check("_update_recent: started_at bây giờ → True", main._update_recent(_dtmod.datetime.now().isoformat(timespec="seconds")) is True)
+check("_update_recent: rỗng → False", main._update_recent("") is False)
+# phase 'đang dở' NHƯNG started_at rất cũ (docker để restarting mãi / updater chết) -> KHÔNG được kẹt 409:
+# dùng mock docker+no-watchtower để chứng minh nó ĐI QUA guard và trả 400 (không 409), không spawn updater.
+_om = main._deploy_mode
+_ow = main._watchtower_reachable
+async def _wt_no():
+    return False
+main._deploy_mode = lambda: "docker"
+main._watchtower_reachable = _wt_no
+us.write_state({"phase": "restarting", "started_at": "2000-01-01T00:00:00"})
+_rs = asyncio.run(main.do_update())
+check("phase cũ kẹt (started_at rất cũ) → KHÔNG 409, cho chạy lại (docker→400)",
+      isinstance(_rs, JSONResponse) and _rs.status_code == 400)
+main._deploy_mode = _om
+main._watchtower_reachable = _ow
+us.write_state({"phase": "idle"})
 
 # --- claim rồi nhả: docker không watchtower → 400 + phase reset idle (chống kẹt "preparing") ---
 _orig_mode = main._deploy_mode

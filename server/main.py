@@ -3722,6 +3722,20 @@ async def update_status():
 _UPDATE_ACTIVE = {"preparing", "pulling", "installing", "restarting", "health_check", "rolling_back"}
 
 
+def _update_recent(started_at, window_s=900) -> bool:
+    """True nếu lần cập nhật đang dở BẮT ĐẦU gần đây (trong window ~15 phút). Guard chỉ chặn khi
+    THỰC SỰ đang chạy; phase 'đang dở' còn sót từ lần cũ (docker để 'restarting' vĩnh viễn, updater
+    chết giữa chừng, máy reboot) thì coi là cũ và CHO chạy lại. Khớp spec: 'phase đang dở VÀ started_at gần đây'.
+    started_at thiếu/hỏng -> coi là cũ (fail-open, tránh brick nút update)."""
+    if not started_at:
+        return False
+    try:
+        import datetime as _dt
+        return (_dt.datetime.now() - _dt.datetime.fromisoformat(started_at)).total_seconds() < window_s
+    except Exception:
+        return False
+
+
 def _git_head(root: str) -> str:
     try:
         import subprocess
@@ -3742,7 +3756,7 @@ async def do_update():
     now = lambda: _dt.datetime.now().isoformat(timespec="seconds")
 
     st = _read_update_state()
-    if st.get("phase") in _UPDATE_ACTIVE:
+    if st.get("phase") in _UPDATE_ACTIVE and _update_recent(st.get("started_at")):
         return JSONResponse({"ok": False, "error": "Đang cập nhật rồi, chờ chút.",
                              "phase": st.get("phase")}, status_code=409)
 
