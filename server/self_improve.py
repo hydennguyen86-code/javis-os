@@ -61,6 +61,7 @@ import yaml
 from fastapi import APIRouter, Form, Query
 
 from claude_cli import claude_engine, cancel_all, _empty_mcp_file
+import channel_context   # bóc khối JAVIS_* trước khi báo Telegram - kênh chữ, không phải web
 
 LEGACY_SLUG = "vong-lap-goc"
 GOALS = ("business", "brain", "product", "custom")
@@ -264,6 +265,10 @@ class LoopFeature:
         # notify: mặc định BẬT (báo Telegram mỗi vòng cho chủ loop). Chỉ tắt khi ghi rõ false/0/no.
         notify_raw = fm.get("notify", True)
         notify = str(notify_raw).strip().lower() not in ("false", "0", "no", "off", "")
+        # ambient_mcp: OPT-IN cho loop THẤY LẠI connector của máy (claude.ai: Gmail/Drive/lịch...)
+        # như thời engine Popen cũ. MẶC ĐỊNH TẮT - bản fork sạch, không lộ kết nối của ai. Chỉ bật
+        # khi ghi rõ true. Bật = loop chạy nhánh không-gated (nạp cấu hình máy), vẫn chặn Bash/Web/Task.
+        ambient_mcp = str(fm.get("ambient_mcp", False)).strip().lower() in ("true", "1", "yes", "on")
         return {
             # identity = TÊN FILE (stem) - frontmatter slug chỉ để hiển thị, tránh lệch nhau
             "slug": stem,
@@ -277,6 +282,7 @@ class LoopFeature:
             # owner_chat = chat_id người YÊU CẦU loop (để báo về đúng người). Rỗng = web → ID đầu.
             "owner_chat": str(fm.get("owner_chat", "") or "").strip(),
             "notify": notify,
+            "ambient_mcp": ambient_mcp,
             "updated": str(fm.get("updated", "") or ""),
             "body": (body or "").strip(),
         }
@@ -329,6 +335,9 @@ class LoopFeature:
             "owner_chat": loop.get("owner_chat", ""), "notify": bool(loop.get("notify", True)),
             "updated": _today(),
         }
+        # Chỉ ghi ambient_mcp khi BẬT - giữ file loop mặc định sạch (fork không thấy cờ lạ).
+        if loop.get("ambient_mcp"):
+            fm["ambient_mcp"] = True
         y = yaml.safe_dump(fm, allow_unicode=True, sort_keys=False, default_flow_style=False, width=1000).strip()
         d = self._loops_dir(brain)
         d.mkdir(parents=True, exist_ok=True)
@@ -599,7 +608,8 @@ class LoopFeature:
             "Mỗi việc 1 dòng '- [loại] mô tả → hành động'. Không có gì → 'Không có việc mới'."
         ), ""
 
-    def _make_cli(self, loop: dict, cwd: str, sysprompt: Optional[str], for_verify: bool = False):
+    def _make_cli(self, loop: dict, cwd: str, sysprompt: Optional[str], for_verify: bool = False,
+                  brain: str = ""):
         """Dựng CLI cho 1 vòng loop.
         - profile 'code' (nâng cao, chỉ đặt qua .md): Bash/Web + file, cwd=workspace, VẪN 0 MCP
           (fail-closed nếu không tạo được file MCP rỗng) - cho loop sửa mã repo.
@@ -629,11 +639,34 @@ class LoopFeature:
             # deny_tools per-server (apply_mcp đặt --disallowedTools) - chặn user đã chủ ý.
             cli = claude_engine(system_prompt=sysprompt, cwd=cwd, tag="loop", allowed_tools=None)
             if self.deps.apply_mcp:
+                # allowed_tools=None ở NHÁNH NÀY = ungated = plugin in-process CÓ nạp
+                # (claude_sdk_engine._mcp_servers: allowed_tools rỗng mới gọi _plugins_server()).
+                # PHẢI truyền brain để cli.javis_vault đúng brain đang chạy - thiếu brain thì
+                # plugin (vd javis_generate_image) không suy được vault, rơi về Brain Default.
                 try:
-                    self.deps.apply_mcp(cli, mode="full")   # hub nhận mode qua header X-Javis-Mode
+                    self.deps.apply_mcp(cli, mode="full", brain=brain)   # hub nhận mode qua header X-Javis-Mode
                 except TypeError:
                     self.deps.apply_mcp(cli)
             # KHÔNG _isolate: full mode chủ đích mở MCP + Bash. Không có apply_mcp (test) → vẫn None allowlist.
+        elif loop.get("ambient_mcp") and not for_verify:
+            # OPT-IN (frontmatter ambient_mcp: true, mode suggest/auto): loop THẤY LẠI connector
+            # của máy (claude.ai: Gmail/Drive/lịch) như bản Popen cũ. Dùng nhánh KHÔNG gated
+            # (allowed_tools=None) → engine SDK nạp setting_sources → connector ambient xuất hiện.
+            # An toàn giữ nguyên: chặn CỨNG Bash/Web/Task; tool tiền/đơn đi qua hub vẫn khoá theo
+            # mode (suggest = chỉ đọc). Connector gọi TRỰC TIẾP (ngoài hub) dựa vào kỷ luật prompt
+            # như bản cũ - đây là đánh đổi user CHỦ ĐỘNG bật, không phải mặc định.
+            cli = claude_engine(system_prompt=sysprompt, cwd=cwd, tag="loop", allowed_tools=None)
+            if self.deps.apply_mcp:
+                # Cũng ungated (allowed_tools=None) như nhánh full ở trên - PHẢI truyền brain
+                # cùng lý do (plugin in-process cần javis_vault đúng).
+                hub_mode = "auto" if mode == "auto" else "suggest"
+                try:
+                    self.deps.apply_mcp(cli, mode=hub_mode, brain=brain)
+                except TypeError:
+                    self.deps.apply_mcp(cli)
+            base_deny = ["Bash", "WebFetch", "WebSearch", "Task"]
+            cur = list(cli.disallowed_tools or [])
+            cli.disallowed_tools = base_deny + [d for d in cur if d not in base_deny]
         else:
             base = self.deps.readonly_tools if for_verify else (
                 self.deps.safe_tools if mode in ("auto", "full") else self.deps.readonly_tools)
@@ -648,9 +681,12 @@ class LoopFeature:
             if self.deps.apply_mcp:
                 # Hub ENFORCE quyền theo mode: suggest → chỉ đọc, auto → chặn danger (lớp cứng,
                 # cộng thêm allowlist + prompt sẵn có). for_verify luôn coi như suggest.
+                # Nhánh này GATED (allowed_tools=tools) nên plugin in-process KHÔNG nạp (_mcp_servers
+                # trả sớm khi allowed_tools có giá trị) - truyền brain vẫn AN TOÀN + nhất quán,
+                # phòng trường hợp allowlist sau này mở thêm pattern plugin.
                 hub_mode = "suggest" if (for_verify or mode not in ("auto",)) else "auto"
                 try:
-                    self.deps.apply_mcp(cli, mode=hub_mode)
+                    self.deps.apply_mcp(cli, mode=hub_mode, brain=brain)
                 except TypeError:
                     self.deps.apply_mcp(cli)   # deps cũ (test) không nhận mode
             else:
@@ -719,7 +755,12 @@ class LoopFeature:
                 if paused_now:
                     parts.append("⚠ " + patch["auto_paused_reason"] + " - bật lại hoặc bấm Chạy ngay để tiếp tục.")
                 try:
-                    asyncio.create_task(self.deps.report(loop.get("owner_chat", ""), "\n\n".join(parts)))
+                    # Telegram là kênh chữ thuần: lọc khối JAVIS_METRICS/JAVIS_ASK trước khi báo,
+                    # kẻo lộ nguyên cụm "<!-- JAVIS_...: ... -->" (system prompt loop dùng chung
+                    # CLAUDE.md nên có thể sinh các khối này).
+                    asyncio.create_task(self.deps.report(
+                        loop.get("owner_chat", ""),
+                        channel_context.strip_control_blocks("\n\n".join(parts))))
                     report_sent = True
                 except Exception:
                     pass
@@ -754,7 +795,7 @@ class LoopFeature:
             return {"ok": True, "summary": skip}
 
         sysprompt = self.deps.build_system_prompt(brain)
-        gcli = self._make_cli(loop, cwd, sysprompt)
+        gcli = self._make_cli(loop, cwd, sysprompt, brain=brain)
         if gcli is None:
             return _finish("Lỗi: không tạo được file MCP rỗng để cô lập (profile code từ chối chạy)", "", True)
         if not gcli.is_available():
@@ -771,7 +812,7 @@ class LoopFeature:
                 and "không có việc mới" not in summary.lower():
             # Kiểm chứng độc lập: giả định kết quả SAI, kiểm tra thực tế
             vcli = self._make_cli(loop, cwd, "Bạn là người KIỂM CHỨNG độc lập, giả định kết quả vừa rồi SAI.",
-                                  for_verify=True)
+                                  for_verify=True, brain=brain)
             if vcli is not None:
                 if loop["tools_profile"] == "code":
                     criteria = ("thay đổi có đúng mục tiêu không, diff có NHỎ không (dưới ~80 dòng), có phá API hiện có "

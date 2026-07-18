@@ -41,6 +41,7 @@ from typing import Any, Callable, List, Optional
 from fastapi import APIRouter, Body, Form, Query
 
 import cron_util
+import channel_context   # bóc khối JAVIS_* trước khi gửi Telegram - kênh chữ, không phải web
 from claude_cli import claude_engine, _empty_mcp_file
 
 VN_TZ = timezone(timedelta(hours=7))
@@ -267,36 +268,8 @@ class RemindersFeature:
                 "cron": r.get("cron", ""), "script": r.get("script", ""),
                 "result": (r.get("result") or "")[:500], "error": r.get("error", "")}
 
-    def _sched_text(self, r: dict) -> str:
-        due = _fmt_vn(r.get("due_at", 0))
-        if r.get("cron"):
-            return f"cron {r['cron']} · kế tiếp {due}"
-        rep = int(r.get("repeat_min") or 0)
-        return f"lặp mỗi {rep} phút · kế tiếp {due}" if rep else f"lúc {due}"
-
-    def pending_as_automations(self, brain: str) -> List[dict]:
-        """Nhắc hẹn/job đang chờ → hiện trong tab Lịch (read-only, id '__reminder__:<id>').
-        Toggle/xoá từ Lịch = huỷ."""
-        out = []
-        try:
-            for r in self._load(brain).get("reminders", []):
-                if r.get("status") != "pending":
-                    continue
-                mode = r.get("mode")
-                kind = {"task": "tự làm+báo", "script": f"script {r.get('script', '')}"}.get(mode, "nhắc")
-                out.append({
-                    "id": "__reminder__:" + str(r.get("id", "")), "builtin": True,
-                    "name": (r.get("label") or r.get("text") or "Nhắc hẹn")[:80],
-                    "type": "script" if mode == "script" else "reminder",
-                    "schedule": self._sched_text(r), "status": "active",
-                    "note": f"{kind} · {(r.get('text') or '')[:120]}",
-                })
-        except Exception as e:
-            print(f"[reminders automations] {type(e).__name__}: {e}", file=sys.stderr)
-        return out
-
     def cancel(self, brain: str, rid: str) -> bool:
-        """Huỷ 1 nhắc (đồng bộ - dùng cho route Lịch). Trả True nếu có đổi."""
+        """Huỷ 1 nhắc (đồng bộ). Trả True nếu có đổi."""
         data = self._load(brain)
         hit = False
         for r in data.get("reminders", []):
@@ -371,7 +344,11 @@ class RemindersFeature:
         ok, send_err = True, ""
         if deliver:
             try:
-                ok, send_err = await self.deps.send_telegram(rem.get("chat_id", ""), msg)
+                # Telegram là kênh chữ thuần: mode "task" chạy chung system prompt/CLAUDE.md với
+                # chat nên body có thể mang khối JAVIS_METRICS/JAVIS_ASK - lọc trước khi gửi, kẻo
+                # lộ nguyên cụm "<!-- JAVIS_...: ... -->".
+                ok, send_err = await self.deps.send_telegram(
+                    rem.get("chat_id", ""), channel_context.strip_control_blocks(msg))
             except Exception as e:
                 ok, send_err = False, f"{type(e).__name__}: {e}"
 

@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import shutil
 import sys
@@ -233,33 +234,109 @@ def migrate_brain(root) -> None:
 
 
 def mirror_skills(root) -> None:
-    """Mirror MỘT CHIỀU <root>/skills → <root>/.claude/skills (CHỈ skill đang BẬT).
+    """Mirror MỘT CHIỀU <root>/skills → <root>/.claude/skills (CHỈ skill đang BẬT), ĐỆ QUY
+    cả references/ scripts/ templates/ - skill là PACKAGE, không phải một file.
     Mục đích: các ngữ cảnh Claude Code chạy cwd=brain (workflow/loop/learn/lint) vẫn nạp skill
-    NATIVE như bonus. Add/update-only (so hash, trùng thì bỏ qua = rẻ), BỎ QUA .disabled (mirror
-    skill đã tắt = vô tình bật lại native). KHÔNG xoá entry lạ ở .claude (việc gỡ mirror khi
-    tắt/xoá skill do endpoint xử lý). Đây là bản phái sinh - hỏng cũng không phá router chính."""
+    NATIVE như bonus. Add/update-only, BỎ QUA .disabled (mirror skill đã tắt = vô tình bật lại
+    native). KHÔNG xoá entry lạ ở .claude (việc gỡ mirror khi tắt/xoá skill do endpoint xử lý).
+    Đây là bản phái sinh - hỏng cũng không phá router chính.
+
+    ĐƯỜNG NÓNG: gọi mỗi lượt chat qua build_system_prompt. Tầng 1 là cổng chữ ký stat-only
+    (đo thật nguyên hàm trên 3 brain đang chạy: còn khoảng 2-8ms tuỳ brain, không phải một
+    con số cố định - xem CHANGELOG 0.9.64) - 99% lượt thoát ở đây. Tầng 2 (copy thật) chỉ
+    chạy khi cây nguồn ĐỔI, hoặc khi còn nợ skill copy lỗi lượt trước - lúc đó CHỈ chép lại
+    đúng mấy skill nợ đó (_MIRROR_RETRY), nên một skill hỏng vĩnh viễn chỉ tốn rglob của
+    RIÊNG nó chứ không phạt cả brain mỗi lượt.
+
+    BIẾT TRƯỚC: chữ ký tính trên NGUỒN và cache nằm trong bộ nhớ, nên bản mirror bị phá từ
+    BÊN NGOÀI mà nguồn không đổi sẽ không tự lành cho tới khi khởi động lại tiến trình. Đánh
+    đổi có chủ đích (xem spec 2026-07-17-mirror-skills-tree-design.md). Tắt/bật skill THÌ TỰ
+    LÀNH: nhánh tắt trong /skills/toggle (main.py) vừa dời nguồn sang .disabled vừa GỌI LẠI
+    hàm này ngay tại đó, nên cache ghi nhận đúng chữ ký-đã-tắt NGAY LẬP TỨC - bật lại sau đó
+    chắc chắn tính ra chữ ký khác cache và copy lại toàn bộ. (Bản đầu của B4 chỉ dời nguồn mà
+    KHÔNG gọi lại hàm này ở nhánh tắt: do `rename` giữ nguyên st_mtime_ns/st_size, bật lại sẽ
+    quay về ĐÚNG chữ ký cache còn nhớ từ trước khi tắt, và mirror vừa rmtree không bao giờ
+    được tạo lại cho tới khi restart - CRITICAL đã vá, xem test_system_sync.py.)"""
     root = Path(root)
     canonical = root / "skills"
     mirror = root / ".claude" / "skills"
     if not canonical.is_dir():
         return
     try:
-        for d in sorted(p for p in canonical.iterdir()
-                        if p.is_dir() and p.name != ".disabled" and (p / "SKILL.md").is_file()):
-            try:
-                dst_dir = mirror / d.name
-                dst = dst_dir / "SKILL.md"
-                src_text = (d / "SKILL.md").read_text(encoding="utf-8", errors="replace")
-                if dst.is_file():
-                    cur = dst.read_text(encoding="utf-8", errors="replace")
-                    if skill_hash(cur) == skill_hash(src_text):
-                        continue   # đã trùng nội dung → khỏi ghi lại
-                dst_dir.mkdir(parents=True, exist_ok=True)
-                for f in d.iterdir():   # SKILL.md + file phụ (asset) cùng thư mục skill
-                    if f.is_file():
-                        shutil.copy2(str(f), str(dst_dir / f.name))
-            except Exception as e:
-                print(f"[skill mirror] {d.name}: {type(e).__name__}: {e}", file=sys.stderr)
+        key = str(root.resolve())
+    except OSError:
+        key = str(root)
+    try:
+        sig = _mirror_signature(canonical)
+        if sig and _MIRROR_SIG.get(key) == sig and not _MIRROR_RETRY.get(key):
+            return   # TẦNG 1: cây nguồn không đổi + không nợ skill nào -> khỏi làm gì (99% lượt)
+        lk = _mirror_lock(key)
+        if not lk.acquire(blocking=False):
+            return   # luồng khác đang mirror đúng root này -> nó làm rồi, khỏi xếp hàng
+        try:
+            # Kiểm lại LẦN NỮA sau khi đã cầm khoá (double-checked locking - lần kiểm THỨ HAI
+            # này là LINH HỒN của mẫu đó, thiếu nó thì khoá gần như vô dụng): xin-được-khoá
+            # không đồng nghĩa "không ai vừa làm xong việc của mình". Luồng khác có thể đã copy
+            # xong + ghi cache SIG rồi mới nhả khoá, đúng lúc ta xin được chính khoá đó (khoá
+            # lúc ấy đang RẢNH nên acquire THÀNH CÔNG). Thiếu bước này, 2 luồng cùng thấy "cây
+            # đã đổi" ở tầng 1 sẽ CÙNG copy: một luồng copy thật, luồng kia copy LẶP vô ích.
+            # DÙNG LẠI ĐÚNG `sig` chụp ở tầng 1, KHÔNG tính lại: `sig` là ẢNH CHỤP mà lượt copy
+            # này dựa vào, và chính việc so đúng ảnh chụp đó với cache mới làm re-check ĐÚNG.
+            # (Đừng "sửa" thành _mirror_signature(canonical) - nguồn CÓ THỂ đổi giữa chừng do
+            # POST /skills ghi xen, tính lại sẽ so nhầm ảnh chụp khác với việc mình sắp làm.)
+            pending = _MIRROR_RETRY.get(key)
+            if sig and _MIRROR_SIG.get(key) == sig and not pending:
+                return
+            # Cây KHÔNG đổi mà vẫn vào tới đây => chỉ còn nợ mấy skill lỗi lượt trước: chép ĐÚNG
+            # mấy slug đó thôi. Cây ĐỔI thì `only = None` = chép tất (nợ cũ nằm trong đó rồi).
+            # Đây là thứ giữ đường nóng khoảng 2-8ms (tuỳ brain) khi có 1 skill hỏng VĨNH VIỄN:
+            # nếu cứ "có lỗi thì không cache" thì mọi lượt chat lại full rglob + copy2 CẢ BRAIN -
+            # đo thật trên brain GIẢ LẬP dựng riêng để đo (27 skill/135 file, không phải hình
+            # dạng của brain thật nào) là 161ms/lượt so với 18ms khi tầng 1 ăn, tức còn TỆ HƠN cả
+            # bản ~52ms mà task này sinh ra để giết. Lỗi vĩnh viễn (MAX_PATH trên cây references/
+            # sâu dưới đường brain dài, file bị process khác giữ, file vướng ACL) là có thật và
+            # không tự khỏi, nên không được phép biến thành thuế mỗi lượt.
+            only = pending if (sig and _MIRROR_SIG.get(key) == sig) else None
+            failed = set()
+            for d in sorted(p for p in canonical.iterdir()
+                            if p.is_dir() and p.name != ".disabled"
+                            and (only is None or p.name in only)
+                            and (p / "SKILL.md").is_file()):
+                try:
+                    dst_dir = mirror / d.name
+                    rels = sorted(p.relative_to(d).as_posix()
+                                  for p in d.rglob("*") if p.is_file())
+                    for rel in rels:
+                        dst_f = dst_dir / rel
+                        dst_f.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(str(d / rel), str(dst_f))
+                except Exception as e:
+                    # 1 skill hỏng KHÔNG chặn các skill còn lại; nhớ TÊN nó để lượt sau thử lại
+                    # RIÊNG nó (rglob của đúng 1 skill), thay vì phạt cả brain mỗi lượt.
+                    failed.add(d.name)
+                    print(f"[skill mirror] {d.name}: {type(e).__name__}: {e}", file=sys.stderr)
+            # Ghi cache chữ ký của ẢNH CHỤP mà lượt copy này THỰC SỰ dựa vào (`sig` đọc ở tầng
+            # 1), KHÔNG phải chữ ký tính lại lúc này. Nguồn KHÔNG đứng yên suốt lượt copy: POST
+            # /skills ghi skill giữa phiên là kịch bản chính mà đường nóng này phục vụ. Nếu
+            # nguồn nhảy từ S_cũ sang S_mới giữa chừng, ta vừa chép nội dung của S_cũ; tính lại
+            # sẽ cache S_mới -> cache NÓI DỐI rằng mirror đang là S_mới -> tầng 1 thoát vĩnh
+            # viễn -> MẤT CẬP NHẬT. Cache đúng ảnh chụp thì xấu nhất chỉ là thừa một lượt copy
+            # ở lần gọi sau (an toàn). Đây CŨNG là thứ làm acquire(blocking=False) ở trên hợp
+            # lệ: luồng trượt khoá bỏ về vì tin "luồng kia đang làm việc của mình" - niềm tin
+            # đó chỉ đúng khi cache ghi lại đúng ảnh chụp mà lượt đó dựa vào.
+            # Skill lỗi KHÔNG chặn việc cache nữa (xem trên) - nó được nhớ RIÊNG trong
+            # _MIRROR_RETRY nên vẫn được thử lại đều, không cần hy sinh cache của skill lành.
+            # GHI _MIRROR_RETRY TRƯỚC _MIRROR_SIG: tầng 1 đọc 2 dict này bằng 2 lệnh riêng
+            # (không nguyên tử với nhau). Ghi theo thứ tự này thì luồng nào đã thấy `sig` MỚI
+            # chắc chắn cũng thấy danh sách nợ MỚI -> không bỏ sót lượt thử lại.
+            if failed:
+                _MIRROR_RETRY[key] = failed
+            else:
+                _MIRROR_RETRY.pop(key, None)
+            if sig:
+                _MIRROR_SIG[key] = sig
+        finally:
+            lk.release()
     except Exception as e:
         print(f"[skill mirror] {root}: {type(e).__name__}: {e}", file=sys.stderr)
 
@@ -275,6 +352,77 @@ def _merge_loop_update(new_content: str, cur_text: str) -> str:
     fm = yaml.safe_dump(new_meta, allow_unicode=True, sort_keys=False,
                         default_flow_style=False, width=1000).strip()
     return f"---\n{fm}\n---\n{new_body.lstrip()}" if new_body.strip() else f"---\n{fm}\n---\n"
+
+
+# ── Cổng chữ ký cho mirror_skills ──────────────────────────────────────────────
+# mirror_skills bị gọi ở ĐƯỜNG NÓNG: build_system_prompt (main.py:184) chạy mỗi lượt chat
+# dashboard, mỗi tin Telegram, mỗi task Kanban, mỗi vòng loop, mỗi nhắc hẹn, mỗi lần spawn
+# learn. Bản cũ đọc + băm SKILL.md hai lần cho MỖI skill mỗi lần gọi: đo thật trên brain
+# 27 skill là ~52ms MỖI LƯỢT, chặn thẳng event loop. Chữ ký chỉ dùng stat (không đọc byte
+# nào) nên còn khoảng 2-8ms tuỳ brain (đo thật nguyên hàm, không phải suy luận - xem
+# CHANGELOG 0.9.64), rẻ hơn khoảng 5 đến 7 lần tuỳ brain chứ không phải một con số cố định,
+# và tiện thể phủ luôn thư mục con.
+_MIRROR_SIG: dict = {}                    # root đã resolve -> chữ ký lần mirror gần nhất
+_MIRROR_RETRY: dict = {}                  # root đã resolve -> set slug copy LỖI, cần thử lại
+_MIRROR_LOCKS: dict = {}                  # root đã resolve -> Lock riêng cho mirror
+_MIRROR_LOCKS_GUARD = threading.Lock()    # chỉ bảo vệ việc TẠO lock trong _MIRROR_LOCKS
+# _MIRROR_SIG và _MIRROR_RETRY KHÔNG cần guard riêng (khác _MIRROR_LOCKS - cái đó phải guard vì
+# get-rồi-tạo phải nguyên tử, nếu không 2 luồng đẻ ra 2 Lock khác nhau cho cùng root là hỏng
+# hẳn tác dụng khoá). Ở đây mỗi thao tác chỉ là MỘT lệnh dict (get/set/pop) - nguyên tử dưới
+# GIL - và mọi lệnh GHI đều nằm trong khoá riêng của root nên không có 2 luồng cùng ghi 1 key.
+
+
+def _mirror_lock(key: str) -> threading.Lock:
+    """Lock riêng theo root cho mirror. TUYỆT ĐỐI không phải _LOCK: mirror_skills bị gọi từ
+    sync_brain KHI ĐANG giữ _LOCK, mà threading.Lock không reentrant nên lấy _LOCK ở đây là
+    deadlock ngay lượt chat đầu. Lock này chỉ được lấy BÊN TRONG mirror_skills và không có
+    lock nào khác bị lấy khi đang giữ nó -> không có chu trình -> không deadlock."""
+    with _MIRROR_LOCKS_GUARD:
+        lk = _MIRROR_LOCKS.get(key)
+        if lk is None:
+            lk = threading.Lock()
+            _MIRROR_LOCKS[key] = lk
+        return lk
+
+
+def _mirror_signature(canonical: Path) -> str:
+    """Chữ ký cây skill, cộng CHỈ bằng stat - KHÔNG đọc nội dung file nào.
+
+    Gộp (đường dẫn tương đối dạng posix, st_mtime_ns, st_size) của MỌI file thành 1 sha256.
+    Bỏ qua .disabled (skill đã tắt không được mirror). follow_symlinks=False ở cả is_dir lẫn
+    stat: đĩa hiện không có symlink nào, nhưng rglob trên cây có symlink có thể lặp vô hạn.
+    Trả chuỗi rỗng nếu thư mục không tồn tại. OSError trên 1 entry -> bỏ qua entry đó, không ném.
+    """
+    if not canonical.is_dir():
+        return ""
+    h = hashlib.sha256()
+    stack = [canonical]
+    rows = []
+    while stack:
+        d = stack.pop()
+        try:
+            # context manager BẮT BUỘC: os.scandir giữ file handle của thư mục cho tới khi
+            # đóng. Trên Windows, handle hở làm thư mục không xoá/đổi tên được cho tới khi
+            # GC dọn - đủ để phá test dùng tempfile và phá cả toggle skill (rmtree mirror).
+            with os.scandir(d) as it:
+                entries = list(it)
+        except OSError:
+            continue
+        for e in entries:
+            try:
+                if e.is_dir(follow_symlinks=False):
+                    if e.name != ".disabled":
+                        stack.append(Path(e.path))
+                    continue
+                st = e.stat(follow_symlinks=False)
+                rel = Path(e.path).relative_to(canonical).as_posix()
+                rows.append(f"{rel}\x00{st.st_mtime_ns}\x00{st.st_size}")
+            except OSError:
+                continue
+    for row in sorted(rows):   # sort để chữ ký không phụ thuộc thứ tự duyệt của OS
+        h.update(row.encode("utf-8", "replace"))
+        h.update(b"\x01")
+    return h.hexdigest()
 
 
 _LOCK = threading.Lock()
@@ -395,6 +543,9 @@ LEGACY_HASHES.update({
         "24081f68ed0152b09fc482dc79680e68e249e8153bc1c442f4a01af15b7f012f",
         # bản v0.9.32 (trước khi thêm khung metaprompt v0.9.33)
         "6f040dde409adf27ee69fed22c2c0490a5717c53a640d02d02fd670ee1bbfd76",
+        # bản v0.9.70 (trước khi vá I1 final-fix-gd2: mục Loop dạy gõ YAML tay, không gọi
+        # javis_schedule; thiếu owner_chat/goal trong template)
+        "b399b173c59b4a6c61fdf294944aec06e9cd6cdcd28d02cabaf1cbb424dc844b",
     },
     # ingest-source bản trước contextual-retrieval (v0.9.33) = 313675bc... đã có ở trên
     "skills/lint-wiki": {

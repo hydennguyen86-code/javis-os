@@ -136,6 +136,7 @@ class ClaudeSDK:
         self.disallowed_tools = None
         self.max_wall_s = None
         self.javis_mode = None    # _apply_mcp đặt (suggest|auto|full) - enforce min_mode plugin in-process
+        self.javis_vault = None   # _apply_mcp đặt - brain đang làm việc, cho ctx của plugin
         self._tmp_files = []      # file tạm (system prompt) dọn sau mỗi query
 
     def is_available(self) -> bool:
@@ -166,9 +167,17 @@ class ClaudeSDK:
         import plugins_host
         from claude_agent_sdk import tool as sdk_tool, create_sdk_mcp_server
         mode = (self.javis_mode or "full").strip().lower()
-        p_tools, p_route = plugins_host.plugin_tools(mode, None)   # None = plugin toàn cục, như hub phục vụ CLI
+        # vault_root: CHỈ để ctx của plugin biết đang làm việc ở brain nào (vd image-chatgpt lưu
+        # ảnh vào đúng attachments/). self.javis_vault do _apply_mcp đặt TƯỜNG MINH (main.py) -
+        # KHÔNG suy từ cwd: chat chạy với cwd = gốc project (CLAUDE_CWD), không phải thư mục
+        # brain, nên suy từ cwd luôn trượt đúng ở đường chat - nơi bug thật sự xảy ra.
+        # Vẫn KHÔNG nạp plugin riêng-của-vault (giữ nguyên hành vi cũ): scope_vault=False.
+        p_tools, p_route = plugins_host.plugin_tools(mode, self.javis_vault, scope_vault=False)
         if not p_tools:
             return None
+        # has_tool_hooks/wrap_with_hooks chưa biết scope_vault (ngoài phạm vi task này) - giữ
+        # nguyên vault_root=None ở đây để KHÔNG vô tình nạp plugin riêng-của-vault qua nhánh
+        # _load_all(vault_root) mặc định scope_vault=True của chúng.
         use_hooks = plugins_host.has_tool_hooks(None)
         sdk_tools = []
         for t in p_tools:

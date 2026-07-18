@@ -15,6 +15,10 @@ KHÔNG phụ thuộc cơ chế native của Claude. `.claude/skills` chỉ là b
 
 Mọi hàm ở đây CHỈ ĐỌC, an toàn OSError. Việc GHI/DI CHUYỂN (migration legacy → canonical, mirror
 canonical → .claude) nằm ở system_sync.py.
+
+Module này cũng sở hữu TRẦN HIỂN THỊ (SKILL_DESC_MAX / SKILL_LIST_MAX) - trước đây mỗi nơi
+tự cắt một kiểu (60 ở hub, 100 ở system prompt, 140 ở fallback) nên người viết skill không
+biết mình bị chấm theo thước nào.
 """
 from __future__ import annotations
 
@@ -29,6 +33,44 @@ _SLUG_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 
 # Thứ tự ưu tiên đọc: canonical trước, rồi các fallback (canonical "thắng" khi trùng slug).
 _READ_BASES = ("skills", ".claude/skills", ".agents")
+
+# Trần độ dài description khi bơm vào router (system prompt + mô tả tool javis_use_skill).
+# Dài hơn là BỊ CẮT IM LẶNG → phần đuôi không tới engine, skill không route được. Vì vậy
+# trần này được ÉP ở mọi chỗ GHI (POST /skills, learn.py), không chỉ cắt lúc hiển thị.
+# Ví dụ trigger đầy đủ thuộc về mục '## Khi nào dùng' trong thân file, nơi không bị cắt.
+SKILL_DESC_MAX = 150
+
+# Số skill tối đa liệt kê trong router. Nhiều hơn → trỏ sang Javis/index.md.
+SKILL_LIST_MAX = 20
+
+# Cụm mở đầu sáo rỗng: mọi skill đều mở y hệt nhau nên nó đốt ngân sách ký tự mà không
+# phân biệt được skill nào với skill nào. Cấm ở chỗ ghi.
+_DESC_BOILERPLATE_RE = re.compile(
+    r"^\s*(kích\s+hoạt\s+khi"
+    r"|sử\s+dụng\s+skill\s+này\s+khi"
+    r"|dùng\s+skill\s+này\s+khi"
+    r"|skill\s+này\s+(dùng|được\s+dùng)"
+    r"|use\s+this\s+skill\s+when"
+    r"|activate\s+when)",
+    re.I,
+)
+
+
+def validate_description(desc) -> Optional[str]:
+    """None = hợp lệ. Chuỗi = lý do từ chối (tiếng Việt, hiện thẳng cho user).
+    Hàm THUẦN (không I/O) nên vẫn đúng hợp đồng read-only của module."""
+    d = (desc or "").strip()
+    if not d:
+        return None    # rỗng là hợp lệ: POST /skills có body-fallback lo
+    if len(d) > SKILL_DESC_MAX:
+        return (f"description dài {len(d)} ký tự, vượt trần {SKILL_DESC_MAX}. Router cắt "
+                f"đúng ở {SKILL_DESC_MAX} nên phần dư MẤT IM LẶNG và skill không route "
+                "được. Đưa ví dụ trigger xuống mục '## Khi nào dùng' trong thân file.")
+    if _DESC_BOILERPLATE_RE.match(d):
+        return ("description mở đầu bằng cụm sáo rỗng (vd 'Kích hoạt khi ...'). Mọi skill "
+                "đều mở như vậy nên nó đốt ngân sách mà không phân biệt gì. Nêu thẳng "
+                "năng lực, vd 'Chuyển HTML sang file Webcake .pke.'")
+    return None
 
 
 def skills_base(root, canonical: bool = True) -> Path:
@@ -87,7 +129,7 @@ def _meta_of(smd: Path) -> dict:
         return {"name": smd.parent.name, "description": "", "group": "Chung"}
     meta, body = split_frontmatter(text)
     body = (body or "").strip()
-    desc = meta.get("description", "") or (body.split("\n")[0][:140] if body else "")
+    desc = meta.get("description", "") or (body.split("\n")[0][:SKILL_DESC_MAX] if body else "")
     return {"name": meta.get("name") or smd.parent.name,
             "description": desc,
             "group": meta.get("group") or "Chung"}

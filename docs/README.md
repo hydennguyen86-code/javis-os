@@ -24,7 +24,6 @@ Hướng dẫn sử dụng chi tiết từng chức năng của Javis OS. Mỗi 
 
 ### Kênh & lịch
 - [11 - Kênh Telegram](11-telegram.md) - hỏi Javis qua điện thoại.
-- [12 - Lịch & tự động hoá](12-lich-tu-dong-hoa.md) - cron/trigger/routine.
 
 ### Bộ não & dữ liệu
 - [13 - Second Brain: bộ nhớ, Wiki, INGEST](13-second-brain-bo-nho-wiki.md) - đa-brain, bộ nhớ sống, tiêu hoá tri thức.

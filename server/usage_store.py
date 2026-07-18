@@ -82,6 +82,27 @@ def _rollup(bucket: dict) -> dict:
     return {"items": items, "total": tot}
 
 
+def daily(n: int = 14) -> list:
+    """Chuỗi n ngày gần nhất (cũ -> mới) để vẽ đồ thị, lấp cả ngày trống cho trục liền mạch:
+    [{day, in, out, cost, turns}]."""
+    d = _load()
+    days = d.get("days", {})
+    tz = timezone(timedelta(hours=7))
+    today = datetime.now(tz).date()
+    out = []
+    for i in range(n - 1, -1, -1):
+        day = (today - timedelta(days=i)).strftime("%Y-%m-%d")
+        bucket = days.get(day, {})
+        tot = {"in": 0, "out": 0, "cost": 0.0, "turns": 0}
+        for e in bucket.values():
+            tot["in"] += e.get("in", 0)
+            tot["out"] += e.get("out", 0)
+            tot["cost"] += e.get("cost", 0.0)
+            tot["turns"] += e.get("turns", 0)
+        out.append({"day": day, **tot})
+    return out
+
+
 def summary() -> dict:
     d = _load()
     day = _today()

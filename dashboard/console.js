@@ -20,7 +20,6 @@
     workflows:   _svg('<path d="M13 2L4.5 13.5H11l-1 8.5L19.5 10H13l0-8z"/>'),
     agents:      _svg('<rect x="5" y="7" width="14" height="13" rx="2"/><path d="M12 7V3M8 3h8"/><circle cx="9.2" cy="13" r="1.1"/><circle cx="14.8" cy="13" r="1.1"/>'),
     skills:      _svg('<path d="M12 3l2.4 5.6L20 11l-5.6 2.4L12 19l-2.4-5.6L4 11l5.6-2.4L12 3z"/>'),
-    automations: _svg('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
     models:      _svg('<path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/>'),
     channels:    _svg('<path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/>'),
     mcp:         _svg('<path d="M9 2v6M15 2v6"/><path d="M7 8h10v3a5 5 0 0 1-10 0V8z"/><path d="M12 16v6"/>'),
@@ -31,8 +30,21 @@
     plugins:     _svg('<path d="M14 4a2 2 0 1 0-4 0v2H6a1 1 0 0 0-1 1v3H4a2 2 0 1 0 0 4h1v3a1 1 0 0 0 1 1h3v-1a2 2 0 1 1 4 0v1h3a1 1 0 0 0 1-1v-4h1a2 2 0 1 0 0-4h-1V7a1 1 0 0 0-1-1h-3V4z"/>'),
     learn:       _svg('<path d="M12 3v18"/><path d="M5 7h14"/><path d="M4 12h16"/><circle cx="12" cy="12" r="9"/>'),
     kanban:      _svg('<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="10" rx="1"/><rect x="17" y="4" width="4" height="13" rx="1"/>'),
+    usage:       _svg('<path d="M3 3v18h18"/><rect x="7" y="11" width="3" height="6" rx="0.5"/><rect x="12" y="7" width="3" height="10" rx="0.5"/><rect x="17" y="13" width="3" height="4" rx="0.5"/>'),
     settings:    _svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>'),
   };
+
+  // Icon cho TẦNG 1 (nhãn nhóm) - cùng phong cách line-style; chỉ dùng ở header nhóm rail.
+  const GICON = {
+    "Trợ lý":   _svg('<path d="M12 3l1.8 4.7L18.5 9.5 13.8 11.3 12 16l-1.8-4.7L5.5 9.5l4.7-1.8L12 3z"/><path d="M19 15l.7 1.8 1.8.7-1.8.7L19 20l-.7-1.8L16.5 17.5l1.8-.7L19 15z"/>'),
+    "Bộ não":   _svg('<path d="M8.5 4A3.5 3.5 0 0 0 5 7.5 3 3 0 0 0 4 13a3 3 0 0 0 2 4.5A3 3 0 0 0 12 19V5.5A2.5 2.5 0 0 0 8.5 4z"/><path d="M15.5 4A3.5 3.5 0 0 1 19 7.5 3 3 0 0 1 20 13a3 3 0 0 1-2 4.5A3 3 0 0 1 12 19"/>'),
+    "Năng lực": _svg('<path d="M12 2c3 1.2 5 4.2 5 8 0 2.2-1 4-2 5l-3 2-3-2c-1-1-2-2.8-2-5 0-3.8 2-6.8 5-8z"/><circle cx="12" cy="9" r="1.6"/><path d="M9 16l-2 4M15 16l2 4"/>'),
+    "Việc":     _svg('<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M8.5 11l2 2 4-4"/>'),
+    "Kết nối":  _svg('<path d="M9 15l6-6"/><path d="M10.5 7.5l1-1a3.5 3.5 0 0 1 5 5l-1 1M13.5 16.5l-1 1a3.5 3.5 0 0 1-5-5l1-1"/>'),
+    "Hệ thống": _svg('<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/><circle cx="4" cy="12" r="1.8"/><circle cx="12" cy="6" r="1.8"/><circle cx="20" cy="14" r="1.8"/>'),
+  };
+  // Icon nút thu/mở sidebar: kiểu "panel sidebar" (khung chia 2, cột trái có dòng nội dung). Tĩnh, không xoay.
+  const COLLAPSE_ICON = _svg('<rect x="3" y="3" width="18" height="18" rx="2.5"/><path d="M10 3v18"/><path d="M5.6 8h2.6M5.6 11.2h2.6M5.6 14.4h2.6"/>');
 
   const RAIL_ITEMS = [
     { id: "home",        icon: ICON.home,        label: "Javis" },
@@ -43,17 +55,49 @@
     { id: "agents",      icon: ICON.agents,      label: "Agents" },
     { id: "skills",      icon: ICON.skills,      label: "Skills" },
     { id: "files",       icon: ICON.files,       label: "Tệp tin" },
-    { id: "selfimprove", icon: ICON.selfimprove, label: "Loop" },
+    { id: "selfimprove", icon: ICON.selfimprove, label: "Việc định kỳ" },
     { id: "learn",       icon: ICON.learn,       label: "Tự học" },
     { id: "kanban",      icon: ICON.kanban,      label: "Việc" },
-    { id: "automations", icon: ICON.automations, label: "Lịch" },
     { id: "models",      icon: ICON.models,      label: "Models" },
     { id: "channels",    icon: ICON.channels,    label: "Kênh" },
     { id: "mcp",         icon: ICON.mcp,         label: "Kết nối" },
     { id: "plugins",     icon: ICON.plugins,     label: "Plugins" },
     { id: "logs",        icon: ICON.logs,        label: "Cập nhật" },
     { id: "account",     icon: ICON.account,     label: "Tài khoản" },
+    { id: "usage",       icon: ICON.usage,       label: "Mức dùng" },
   ];
+
+  // ---- Gom rail thành nhóm theo chức năng (dễ tìm hơn danh sách phẳng 18 mục) ----
+  // Nhóm cuối (foot:true) được ghim xuống ĐÁY rail; các nhóm còn lại cuộn ở giữa.
+  // Thứ tự & thành viên đổi ở đây; RAIL_ITEMS vẫn là nguồn icon/label + tra cứu cho go().
+  const RAIL_GROUPS = [
+    { label: "Trợ lý",      icon: GICON["Trợ lý"],   ids: ["home", "chat", "overview"] },
+    { label: "Bộ não",      icon: GICON["Bộ não"],   ids: ["files", "learn"] },
+    { label: "Năng lực",    icon: GICON["Năng lực"], ids: ["agents", "skills", "workflows", "plugins"] },
+    { label: "Việc",        icon: GICON["Việc"],     ids: ["kanban", "selfimprove"] },
+    { label: "Kết nối",     icon: GICON["Kết nối"],  ids: ["mcp", "channels", "models"] },
+    { label: "Hệ thống",    icon: GICON["Hệ thống"], ids: ["usage", "settings", "logs", "account"], foot: true },
+  ];
+  const RAIL_BY_ID = Object.fromEntries(RAIL_ITEMS.map(i => [i.id, i]));
+  // Trả về [{label, foot, items:[...]}], bỏ id không tồn tại. Mục nào chưa xếp nhóm → dồn vào "Khác".
+  function railGroups() {
+    const seen = new Set();
+    const groups = RAIL_GROUPS.map(g => {
+      const items = (g.ids || []).map(id => { seen.add(id); return RAIL_BY_ID[id]; }).filter(Boolean);
+      return { label: g.label, icon: g.icon || "", foot: !!g.foot, items };
+    }).filter(g => g.items.length);
+    const rest = RAIL_ITEMS.filter(i => !seen.has(i.id));
+    if (rest.length) {
+      const foot = groups.find(g => g.foot);
+      if (foot) foot.items.push(...rest); else groups.push({ label: "Khác", foot: false, items: rest });
+    }
+    return groups;
+  }
+  // Nhãn nhóm chứa một mục id (cho accordion: mở đúng nhóm của trang đang xem).
+  function groupLabelOf(id) {
+    const g = RAIL_GROUPS.find(gr => (gr.ids || []).includes(id));
+    return g ? g.label : (RAIL_GROUPS[0] && RAIL_GROUPS[0].label) || "";
+  }
 
   const VIEW_META = {
     home:        { icon: "⬡", label: "Javis OS", sub: "" },
@@ -64,20 +108,20 @@
     agents:      { icon: "🤖", label: "Agents", sub: "Trợ lý chuyên biệt" },
     skills:      { icon: "🧩", label: "Skills", sub: "Kỹ năng khả dụng" },
     files:       { icon: "🗂", label: "Tệp tin", sub: "Duyệt · sửa · tải file trong brain" },
-    selfimprove: { icon: "♻", label: "Loop", sub: "Nhiệm vụ lặp tự động chạy nền" },
+    selfimprove: { icon: "♻", label: "Việc định kỳ", sub: "Việc định kỳ + nhắc hẹn đang chờ" },
     learn:       { icon: "🧠", label: "Tự học", sub: "Rewire Memory · Wiki · Skill (an toàn, undo được)" },
     kanban:      { icon: "🗂", label: "Việc (Kanban)", sub: "Backlog + dispatcher tự làm task nền" },
-    automations: { icon: "⏰", label: "Lịch tự động", sub: "Cron · trigger · routine" },
     models:      { icon: "◈", label: "Models", sub: "Main model & providers" },
     channels:    { icon: "✉", label: "Kênh kết nối", sub: "Telegram & hơn nữa" },
     mcp:         { icon: "🔌", label: "Kết nối", sub: "Nguồn dữ liệu & công cụ" },
     plugins:     { icon: "🧰", label: "Plugins", sub: "Tool/hook native cho mọi engine" },
     logs:        { icon: "🗒", label: "Nhật ký cập nhật", sub: "Phiên bản & tính năng mới" },
     account:     { icon: "⚙", label: "Tài khoản", sub: "Đăng nhập & workspace" },
+    usage:       { icon: "📊", label: "Mức dùng", sub: "Token & chi phí theo ngày, theo nhà cung cấp" },
   };
 
   // 4 trang tách từ Studio cũ - render container rồi gọi loader trong studio.js (window.JavisStudio).
-  const STUDIO_PAGES = ["workflows", "agents", "skills", "automations"];
+  const STUDIO_PAGES = ["workflows", "agents", "skills"];
 
   let _settings = null;
   let _renderGen = 0;         // token chống race: mỗi lần đổi trang tăng 1; render async cũ tự bỏ
@@ -187,6 +231,7 @@
     if (id === "learn")    return renderLearn(el);
     if (id === "kanban")   return renderKanban(el);
     if (id === "logs")     return renderLogs(el);
+    if (id === "usage")    return renderUsage(el);
     el.innerHTML = placeholder(id);
   }
 
@@ -204,6 +249,86 @@
       <div class="ph-ico">${m.icon || "✦"}</div>
       <div><b>${esc(m.label || id)}</b> - đang phát triển</div>
       <div style="max-width:380px;font-size:14px;opacity:.7">${esc(note || "Trang này là chỗ cắm chức năng mở rộng sau. Khung điều hướng đã sẵn sàng.")}</div>
+    </div>`;
+  }
+
+  // ============================================
+  // Trang Mức dùng (token & chi phí Javis tự đo, có đồ thị 14 ngày)
+  // ============================================
+  let _uzCss = false;
+  function _injectUsageCss() {
+    if (_uzCss) return; _uzCss = true;
+    const css = `
+    .uz-wrap{max-width:840px}
+    .uz-cards{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:24px}
+    .uz-card{flex:1 1 150px;background:var(--glass);border:1px solid var(--glass-brd);border-radius:12px;padding:14px 16px}
+    .uz-card .uz-k{font-size:12px;color:var(--text3);letter-spacing:.3px}
+    .uz-card .uz-v{font-size:23px;font-weight:700;color:var(--text);margin-top:4px;font-variant-numeric:tabular-nums}
+    .uz-card .uz-sub{font-size:12px;color:var(--text2);margin-top:4px}
+    .uz-card.accent .uz-v{color:var(--accent)}
+    .uz-sec-h{font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin:0 0 12px;font-weight:600}
+    .uz-chart{display:flex;align-items:flex-end;gap:5px;height:150px;padding:6px 2px 0}
+    .uz-bar-col{flex:1 1 0;display:flex;align-items:flex-end;justify-content:center;height:100%;min-width:0;cursor:default}
+    .uz-bar{width:64%;max-width:24px;background:linear-gradient(180deg,var(--accent),#a2360f);border-radius:4px 4px 0 0;transition:opacity .15s;min-height:3px}
+    .uz-bar.empty{background:rgba(255,255,255,.07)}
+    .uz-bar-col:hover .uz-bar{opacity:.75}
+    .uz-xlabels{display:flex;gap:5px;border-top:1px solid var(--glass-brd);padding-top:5px;margin-bottom:26px}
+    .uz-xl{flex:1 1 0;text-align:center;font-size:9.5px;color:var(--text3);white-space:nowrap;overflow:hidden}
+    .uz-tbl{width:100%;border-collapse:collapse;font-size:13.5px}
+    .uz-tbl th{text-align:left;color:var(--text3);font-weight:600;font-size:12px;padding:6px 10px;border-bottom:1px solid var(--glass-brd)}
+    .uz-tbl td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.05);font-variant-numeric:tabular-nums}
+    .uz-tbl td.num{text-align:right;color:#8fb4ff}
+    .uz-tbl .uz-prov{color:var(--text)}
+    .uz-tbl .uz-mdl{color:var(--text3);font-size:12px}
+    .uz-note{margin-top:20px;font-size:12px;color:var(--text3);line-height:1.55;max-width:640px}`;
+    const s = document.createElement("style"); s.textContent = css; document.head.appendChild(s);
+  }
+  const _uzTok = (n) => { n = +n || 0; if (n >= 1e6) return (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + "M"; if (n >= 1e3) return (n / 1e3).toFixed(n >= 1e4 ? 0 : 1) + "k"; return "" + n; };
+  const _uzCost = (c) => (+c > 0 ? "$" + (+c).toFixed(+c < 0.01 ? 4 : 2) : "-");
+  const _UZ_PROV = { cli: "Claude Code", codex: "ChatGPT", openrouter: "OpenRouter", openai: "OpenAI", "anthropic-api": "Anthropic" };
+  const _uzModel = (m) => (m || "").split("/").pop().replace(/^(claude-|gpt-)/, "").slice(0, 26);
+
+  async function renderUsage(el) {
+    _injectUsageCss();
+    el.innerHTML = `<div class="uz-wrap"><div class="cview-placeholder" style="min-height:200px"><div class="ph-ico">📊</div><div class="dim">Đang tải mức dùng...</div></div></div>`;
+    let d;
+    try { d = await (await fetch("/usage")).json(); }
+    catch (e) { el.innerHTML = `<div class="uz-wrap"><div class="cview-placeholder"><div class="ph-ico">📊</div><div>Không tải được dữ liệu mức dùng.</div></div></div>`; return; }
+    const daily = d.daily || [];
+    const today = d.today || { items: [], total: { in: 0, out: 0, cost: 0, turns: 0 } };
+    const all = d.all_time || { items: [], total: { in: 0, out: 0, cost: 0, turns: 0 } };
+    const tt = today.total, at = all.total;
+
+    const orCard = (d.openrouter && d.openrouter.remaining != null)
+      ? `<div class="uz-card"><div class="uz-k">OpenRouter còn</div><div class="uz-v" style="color:#8fd0a0">$${(+d.openrouter.remaining).toFixed(2)}</div><div class="uz-sub">đã dùng $${(+(d.openrouter.used || 0)).toFixed(2)}</div></div>` : "";
+    const cards = `<div class="uz-cards">
+      <div class="uz-card accent"><div class="uz-k">Hôm nay</div><div class="uz-v">${_uzTok(tt.in + tt.out)}</div><div class="uz-sub">${_uzTok(tt.in)}↑ ${_uzTok(tt.out)}↓ · ${tt.turns || 0} lượt${tt.cost > 0 ? " · $" + tt.cost.toFixed(2) : ""}</div></div>
+      <div class="uz-card"><div class="uz-k">Tổng tích luỹ</div><div class="uz-v">${_uzTok(at.in + at.out)}</div><div class="uz-sub">${_uzTok(at.in)}↑ ${_uzTok(at.out)}↓${at.cost > 0 ? " · $" + at.cost.toFixed(2) : ""}</div></div>
+      ${orCard}
+    </div>`;
+
+    const maxv = Math.max(1, ...daily.map(x => x.in + x.out));
+    const bars = daily.map(x => {
+      const v = x.in + x.out, h = v > 0 ? Math.max(3, Math.round(v / maxv * 100)) : 0;
+      const tip = `${x.day}: ${_uzTok(v)} token${x.cost > 0 ? " · $" + x.cost.toFixed(2) : ""} · ${x.turns || 0} lượt`;
+      return `<div class="uz-bar-col" title="${esc(tip)}"><div class="uz-bar ${v > 0 ? "" : "empty"}" style="height:${h}%"></div></div>`;
+    }).join("");
+    const xlabels = daily.map(x => `<div class="uz-xl">${esc(x.day.slice(8))}</div>`).join("");
+    const chart = daily.length ? `<div class="uz-sec-h">${daily.length} ngày gần nhất · token/ngày</div>
+      <div class="uz-chart">${bars}</div><div class="uz-xlabels">${xlabels}</div>` : "";
+
+    const scope = today.items.length ? "hôm nay" : "tổng tích luỹ";
+    const items = today.items.length ? today.items : all.items;
+    const rows = items.length ? items.map(i => `<tr>
+        <td><span class="uz-prov">${esc(_UZ_PROV[i.provider] || i.provider)}</span> <span class="uz-mdl">${esc(_uzModel(i.model))}</span></td>
+        <td class="num">${_uzTok(i.in)}</td><td class="num">${_uzTok(i.out)}</td>
+        <td class="num">${i.turns || 0}</td><td class="num">${_uzCost(i.cost)}</td></tr>`).join("")
+      : `<tr><td colspan="5" style="padding:16px;color:var(--text3)">Chưa có lượt nào.</td></tr>`;
+    const table = `<div class="uz-sec-h">Theo nhà cung cấp · ${scope}</div>
+      <table class="uz-tbl"><thead><tr><th>Nhà cung cấp / model</th><th style="text-align:right">Token vào</th><th style="text-align:right">Token ra</th><th style="text-align:right">Lượt</th><th style="text-align:right">Chi phí</th></tr></thead><tbody>${rows}</tbody></table>`;
+
+    el.innerHTML = `<div class="uz-wrap">${cards}${chart}${table}
+      <div class="uz-note">Số liệu do Javis tự đo từ token vào/ra của mọi engine (Claude Code, ChatGPT/Codex, OpenRouter...), không phụ thuộc nhà cung cấp có lộ hạn mức hay không. Chi phí chỉ hiện khi nhà cung cấp trả về giá thật (vd Claude Code CLI); còn lại chỉ đếm token. Lưu 30 ngày gần nhất.</div>
     </div>`;
   }
 
@@ -241,7 +366,12 @@
     .cl-sec.feat li:before{content:"✨"} .cl-sec.fix li:before{content:"🔧"}
     .cl-sec.imp li:before{content:"⚡"} .cl-sec.sec li:before{content:"🔒"}
     .cl-sec.doc li:before{content:"📖"} .cl-sec.other li:before{content:"•"}
-    .cl-empty{color:#8a97b4;font-size:15px}`;
+    .cl-empty{color:#8a97b4;font-size:15px}
+    .cl-pager{display:flex;align-items:center;justify-content:center;gap:14px;margin:24px 0 6px;padding-top:16px;border-top:1px solid rgba(255,255,255,.07)}
+    .cl-pg{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:#cdd8ee;font-size:13.5px;font-weight:600;padding:7px 15px;border-radius:9px;cursor:pointer;transition:background .15s,border-color .15s,color .15s}
+    .cl-pg:hover:not(:disabled){background:rgba(120,180,255,.14);border-color:rgba(120,180,255,.45);color:#dce8ff}
+    .cl-pg:disabled{opacity:.32;cursor:default}
+    .cl-pg-info{font-size:13px;color:#8a97b4;min-width:130px;text-align:center}`;
     const s = document.createElement("style"); s.textContent = css; document.head.appendChild(s);
   }
   function _clSecClass(title) {
@@ -253,6 +383,63 @@
     if (t.includes("tài liệu") || t.includes("doc")) return "doc";
     return "other";
   }
+  // Phân trang nhật ký: giữ dữ liệu đã fetch, render 20 bản/trang - đỡ dài, đỡ nặng DOM.
+  let _clData = null;              // cache /changelog để đổi trang không phải gọi lại mạng
+  const CL_PAGE_SIZE = 20;         // số phiên bản hiển thị mỗi trang
+
+  function _clRelHtml(rel) {
+    const cls = rel.is_current ? "cur" : (rel.installed ? "" : "new");
+    const tag = rel.is_current ? `<span class="cl-tag cur">đang dùng</span>`
+      : (!rel.installed ? `<span class="cl-tag new">bản mới</span>` : "");
+    const secs = (rel.sections || []).map(s => {
+      const items = (s.items || []).map(it => `<li>${esc(it)}</li>`).join("");
+      return `<div class="cl-sec ${_clSecClass(s.title)}"><h4>${esc(s.title)}</h4><ul>${items}</ul></div>`;
+    }).join("");
+    return `<div class="cl-rel ${cls}">
+      <div class="cl-rtop"><span class="cl-ver">v${esc(rel.version)}</span>${rel.date ? `<span class="cl-date">${esc(rel.date)}</span>` : ""}${tag}</div>
+      ${secs || '<div class="cl-empty">(không có chi tiết)</div>'}
+    </div>`;
+  }
+
+  function _clRenderPage(el, page) {
+    const d = _clData; if (!d) return;
+    const cur = d.current || "?";
+    const upBadge = d.update_available
+      ? `<span class="cl-badge up">Có bản mới: v${esc(d.latest)}</span>`
+      : `<span class="cl-badge ok">Đang ở bản mới nhất</span>`;
+    const upNote = d.update_available
+      ? `<div class="cl-note">Cập nhật ở mục <b>Tổng quan</b>: bản có Watchtower bấm "Cập nhật ngay"; bản Docker khác thì <b>Redeploy</b> (Hostinger) hoặc <code>docker compose up -d --pull always</code>; bản VPS chạy <code>./update.sh</code>.</div>`
+      : "";
+    const rels = d.releases || [];
+    const total = rels.length;
+    const pages = Math.max(1, Math.ceil(total / CL_PAGE_SIZE));
+    page = Math.min(Math.max(0, page | 0), pages - 1);
+    const start = page * CL_PAGE_SIZE;
+    const slice = rels.slice(start, start + CL_PAGE_SIZE);
+    const timeline = slice.length
+      ? slice.map(_clRelHtml).join("")
+      : `<div class="cl-empty">Chưa có nhật ký. Thêm file <code>CHANGELOG.md</code> ở gốc dự án.</div>`;
+    const pager = pages > 1 ? `<div class="cl-pager">
+      <button class="cl-pg" data-clpage="${page - 1}"${page === 0 ? " disabled" : ""}>‹ Mới hơn</button>
+      <span class="cl-pg-info">Trang ${page + 1}/${pages} · ${total} bản</span>
+      <button class="cl-pg" data-clpage="${page + 1}"${page >= pages - 1 ? " disabled" : ""}>Cũ hơn ›</button>
+    </div>` : "";
+    el.innerHTML = `<div class="cl-wrap">
+      <div class="cl-head"><span class="cl-cur">Đang cài: <b>v${esc(cur)}</b></span>${upBadge}</div>
+      ${upNote}
+      ${timeline}
+      ${pager}
+    </div>`;
+    el.querySelectorAll(".cl-pg[data-clpage]").forEach(b => {
+      if (b.disabled) return;
+      b.onclick = () => {
+        _clRenderPage(el, parseInt(b.dataset.clpage, 10) || 0);
+        let n = el; while (n && n.scrollHeight <= n.clientHeight + 1) n = n.parentElement;
+        if (n) n.scrollTop = 0;   // đổi trang → cuộn lên đầu cho dễ đọc
+      };
+    });
+  }
+
   async function renderLogs(el) {
     _injectChangelogCss();
     const myGen = _renderGen;
@@ -267,32 +454,8 @@
       return;
     }
     if (myGen !== _renderGen) return;   // đã đổi trang trong lúc chờ
-    const cur = d.current || "?";
-    const upBadge = d.update_available
-      ? `<span class="cl-badge up">Có bản mới: v${esc(d.latest)}</span>`
-      : `<span class="cl-badge ok">Đang ở bản mới nhất</span>`;
-    const upNote = d.update_available
-      ? `<div class="cl-note">Cập nhật ở mục <b>Tổng quan</b>: bản có Watchtower bấm "Cập nhật ngay"; bản Docker khác thì <b>Redeploy</b> (Hostinger) hoặc <code>docker compose up -d --pull always</code>; bản VPS chạy <code>./update.sh</code>.</div>`
-      : "";
-    const rels = d.releases || [];
-    const timeline = rels.length ? rels.map(rel => {
-      const cls = rel.is_current ? "cur" : (rel.installed ? "" : "new");
-      const tag = rel.is_current ? `<span class="cl-tag cur">đang dùng</span>`
-        : (!rel.installed ? `<span class="cl-tag new">bản mới</span>` : "");
-      const secs = (rel.sections || []).map(s => {
-        const items = (s.items || []).map(it => `<li>${esc(it)}</li>`).join("");
-        return `<div class="cl-sec ${_clSecClass(s.title)}"><h4>${esc(s.title)}</h4><ul>${items}</ul></div>`;
-      }).join("");
-      return `<div class="cl-rel ${cls}">
-        <div class="cl-rtop"><span class="cl-ver">v${esc(rel.version)}</span>${rel.date ? `<span class="cl-date">${esc(rel.date)}</span>` : ""}${tag}</div>
-        ${secs || '<div class="cl-empty">(không có chi tiết)</div>'}
-      </div>`;
-    }).join("") : `<div class="cl-empty">Chưa có nhật ký. Thêm file <code>CHANGELOG.md</code> ở gốc dự án.</div>`;
-    el.innerHTML = `<div class="cl-wrap">
-      <div class="cl-head"><span class="cl-cur">Đang cài: <b>v${esc(cur)}</b></span>${upBadge}</div>
-      ${upNote}
-      ${timeline}
-    </div>`;
+    _clData = d;
+    _clRenderPage(el, 0);
   }
 
   const fbrain = () => (window.currentBrainPath ? currentBrainPath() : "brain");
@@ -615,7 +778,7 @@
     const fmtT = ts => ts ? new Date(ts * 1000).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : "-";
 
     el.innerHTML = `<div class="cview-section">
-      <p style="color:#9fb0cf;font-size:15px;max-width:680px;margin:0 0 14px">Nhiều <b>loop</b> chạy ngầm: mỗi loop tự thức theo chu kỳ, làm <b>một việc</b> anh mô tả, tự kiểm chứng rồi ghi log. Thực thi <b>tuần tự</b> (1 vòng/lúc). Loop <b>đọc được dữ liệu thật qua MCP</b> (POS, quảng cáo, lịch...) để làm việc, nhưng KHÔNG tự tạo đơn/tiêu tiền/đăng bài - chỉ ghi nháp để anh duyệt. Loop bật sẽ hiện ở tab <b>Lịch</b>.</p>
+      <p style="color:#9fb0cf;font-size:15px;max-width:680px;margin:0 0 14px">Nhiều <b>loop</b> chạy ngầm: mỗi loop tự thức theo chu kỳ, làm <b>một việc</b> anh mô tả, tự kiểm chứng rồi ghi log. Thực thi <b>tuần tự</b> (1 vòng/lúc). Loop <b>đọc được dữ liệu thật qua MCP</b> (POS, quảng cáo, lịch...) để làm việc, nhưng KHÔNG tự tạo đơn/tiêu tiền/đăng bài - chỉ ghi nháp để anh duyệt.</p>
       <div class="si-actions" style="margin-bottom:14px">
         <button class="s-btn" id="lpNew">+ Loop mới</button>
         <button class="s-btn-ghost" id="lpStop">■ Dừng vòng đang chạy</button>
@@ -641,6 +804,7 @@
         </div>
       </div>
       <div id="lpCards">Đang tải...</div>
+      <div id="lpReminders"></div>
       <div class="si-log"><h3 style="font-size:15px;color:#cdd8ee">Nhật ký gần đây · <select id="lpLogFilter" class="loop-sel" style="font-size:13px"><option value="">Tất cả loop</option></select></h3><div id="lpLog">Đang tải...</div></div>
     </div>`;
 
@@ -741,6 +905,42 @@
       return div;
     }
 
+    // Nhắc hẹn đang chờ: trước đây CHỈ hiện ở tab Lịch (đã xoá). Không gộp vào đây thì user
+    // mất chỗ nhìn chúng. Loop = việc bền (.md, sửa trong Obsidian); nhắc = việc phù du.
+    // Đọc thẳng /reminders (nguồn thật), KHÔNG qua lớp chiếu: lớp đó chỉ tồn tại vì tab Lịch.
+    async function loadReminders() {
+      if (myGen !== _renderGen) return;
+      const box = el.querySelector("#lpReminders");
+      if (!box) return;
+      let d = { pending: [] };
+      try { d = await (await fetch(`/reminders?brain=${encodeURIComponent(fbrain())}`)).json(); } catch (e) {}
+      if (myGen !== _renderGen) return;
+      const rem = d.pending || [];
+      if (!rem.length) { box.innerHTML = ""; return; }
+      const MODE_LBL = { notify: "nhắc", task: "tự làm + báo", script: "script" };
+      box.innerHTML = `<h3 style="font-size:15px;color:#cdd8ee;margin:18px 0 8px">Nhắc hẹn đang chờ</h3>`;
+      rem.forEach(r => {
+        const title = r.label || r.text || "Nhắc hẹn";
+        const when = r.cron ? `cron ${r.cron}`
+          : (r.repeat_min ? `lặp mỗi ${r.repeat_min} phút · kế tiếp ${r.due_human || ""}` : (r.due_human || ""));
+        const kind = MODE_LBL[r.mode] || "nhắc";
+        const div = document.createElement("div");
+        div.className = "wf-card";
+        div.innerHTML = `<b>${esc(title)}</b>
+          <div class="dim" style="font-size:12px;color:#6b7894">${esc(when)} · ${esc(kind)}</div>
+          <button class="s-btn-ghost rmCancel" style="margin-top:8px">Huỷ</button>`;
+        div.querySelector(".rmCancel").onclick = async () => {
+          if (!confirm(`Huỷ "${title}"?`)) return;
+          const f = new FormData();
+          f.append("id", r.id);        // id THÔ, /reminders/cancel nhận đúng dạng này
+          f.append("brain", fbrain());
+          await fetch("/reminders/cancel", { method: "POST", body: f });
+          loadReminders();
+        };
+        box.appendChild(div);
+      });
+    }
+
     async function loadLoops() {
       if (myGen !== _renderGen) return;   // đã rời trang
       let d = { loops: [] };
@@ -758,6 +958,7 @@
       const cur = sel.value;
       sel.innerHTML = `<option value="">Tất cả loop</option>` +
         (d.loops || []).map(lp => `<option value="${esc(lp.slug)}" ${lp.slug === cur ? "selected" : ""}>${esc(lp.name)}</option>`).join("");
+      loadReminders();
       clearTimeout(pollTimer);
       if (d.running) pollTimer = setTimeout(loadLoops, 5000);   // đang có vòng chạy → tự refresh (1 chuỗi)
     }
@@ -1118,14 +1319,17 @@
     el.innerHTML = `
       <div class="cview-section">
         <h3>Phiên bản</h3>
-        <div class="gcard" style="max-width:560px">
+        <div class="gcard" style="max-width:640px">
           <div class="gcard-top"><span class="gcard-name">Javis OS</span><span class="gcard-tag" id="ovVerTag">…</span></div>
           <div class="gcard-meta" id="ovVerMeta">Đang kiểm tra bản mới…</div>
+          <div id="ovVerChangelog" style="display:none;margin:8px 0;padding:8px 10px;border-left:3px solid var(--accent,#6aa);background:rgba(120,140,160,.08);border-radius:6px;font-size:13px;line-height:1.6"></div>
           <div class="js-actions">
             <button class="gcard-btn ghost" id="ovVerCheck">Kiểm tra lại</button>
             <button class="gcard-btn" id="ovVerUpdate" style="display:none">⬆ Cập nhật ngay</button>
           </div>
+          <div id="ovVerProgress" style="display:none;margin-top:10px"></div>
           <div class="gcard-meta" id="ovVerStatus"></div>
+          <div id="ovVerRollback" style="display:none;margin-top:10px;padding:10px;border:1px solid #c55;border-radius:8px;background:rgba(200,80,80,.08);font-size:13px;line-height:1.6"></div>
         </div>
       </div>
       <div class="cview-section">
@@ -1175,26 +1379,59 @@
       </div>`;
     // ---- Phiên bản + cập nhật trong UI ----
     const MODE_LBL = { docker: "Docker / VPS", native: "Linux (systemd)", windows: "Windows" };
+    const UPD_STEPS = [
+      { key: "preparing", label: "Chuẩn bị" },
+      { key: "pulling", label: "Tải code" },
+      { key: "installing", label: "Cài thư viện" },
+      { key: "restarting", label: "Khởi động lại" },
+      { key: "health_check", label: "Kiểm tra sức khoẻ" },
+      { key: "done", label: "Xong" },
+    ];
+    function updStepIndex(phase) {
+      if (phase === "rolling_back") return 4;        // vẫn ở giai đoạn kiểm tra/khôi phục
+      const i = UPD_STEPS.findIndex(s => s.key === phase);
+      return i < 0 ? 0 : i;
+    }
+    function renderProgress(phase, extra) {
+      const box = document.getElementById("ovVerProgress");
+      if (!box) return;
+      box.style.display = "";
+      const at = updStepIndex(phase);
+      const dots = UPD_STEPS.map((s, i) => {
+        const mark = i < at ? "✅" : (i === at ? "⏳" : "○");
+        const w = i === at ? "font-weight:600" : "opacity:.7";
+        return `<span style="${w}">${mark} ${esc(s.label)}</span>`;
+      }).join('<span style="opacity:.4"> → </span>');
+      box.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px">${dots}</div>`
+        + (phase === "rolling_back" ? `<div style="margin-top:6px;color:#c55">↩ Bản mới lỗi, đang tự quay về bản cũ…</div>` : "")
+        + (extra ? `<div style="margin-top:6px;opacity:.85">${esc(extra)}</div>` : "");
+    }
     async function ovLoadVersion() {
       const tag = document.getElementById("ovVerTag");
       const meta = document.getElementById("ovVerMeta");
       const upd = document.getElementById("ovVerUpdate");
+      const cl = document.getElementById("ovVerChangelog");
       if (!tag) return;
       meta.textContent = "Đang kiểm tra bản mới…";
       let j = {};
       try { j = await (await fetch("/version", { cache: "no-store" })).json(); }
       catch (e) { meta.textContent = "⚠ Không kiểm tra được (mạng)."; return; }
       tag.textContent = "v" + (j.current || "?");
+      window._ovVerCur = j.current || "";
+      window._ovVerPrev = j.previous_version || "";
+      window._ovVerMode = j.mode || "";
       const ml = MODE_LBL[j.mode] || j.mode || "";
+      if (cl) { cl.style.display = "none"; cl.innerHTML = ""; }
       if (j.update_available) {
         const base = "🆕 Có bản mới <b>v" + esc(j.latest) + "</b> (đang chạy v" + esc(j.current) + ") · " + esc(ml);
         if (j.can_self_update) {
           meta.innerHTML = base;
           upd.style.display = "";
+          ovLoadChangelogSnippet(j.current);
         } else {
-          // Docker không có Watchtower: cập nhật bằng REDEPLOY (kéo lại image mới nhất).
-          meta.innerHTML = base + '<div style="margin-top:8px;line-height:1.55">↻ Cập nhật bằng cách <b>Redeploy</b>: trên Hostinger bấm nút <b>Redeploy</b> trong Docker Manager; trên VPS chạy <code>docker compose up -d --pull always</code>.</div>';
+          meta.innerHTML = base + '<div style="margin-top:8px;line-height:1.55">↻ Cập nhật bằng cách <b>Redeploy</b>: trên Hostinger bấm nút <b>Redeploy</b> trong Docker Manager; trên VPS chạy <code>docker compose up -d --pull always</code>. Bản mới lỗi thì pin tag <code>:' + esc(j.previous_version || "bản-cũ") + '</code> rồi Redeploy để lùi.</div>';
           upd.style.display = "none";
+          ovLoadChangelogSnippet(j.current);
         }
       } else if (j.latest) {
         meta.innerHTML = "✅ Đang dùng bản mới nhất (v" + esc(j.current) + ") · " + esc(ml);
@@ -1204,42 +1441,86 @@
         upd.style.display = "none";
       }
     }
+    async function ovLoadChangelogSnippet(current) {
+      const cl = document.getElementById("ovVerChangelog");
+      if (!cl) return;
+      let d = {};
+      try { d = await (await fetch("/changelog", { cache: "no-store" })).json(); }
+      catch (e) { return; }
+      const fresh = (d.releases || []).filter(r => !r.installed).slice(0, 3);
+      if (!fresh.length) return;
+      cl.style.display = "";
+      cl.innerHTML = "<b>Bản mới có gì:</b><br>" + fresh.map(r => {
+        const items = (r.sections || []).flatMap(s => s.items || []).slice(0, 4);
+        return "<div style='margin-top:4px'>v" + esc(r.version) + (r.date ? " · " + esc(r.date) : "") + "</div>"
+          + "<ul style='margin:2px 0 0 16px;padding:0'>" + items.map(it => "<li>" + esc(it) + "</li>").join("") + "</ul>";
+      }).join("");
+    }
     const verCheck = document.getElementById("ovVerCheck");
     if (verCheck) verCheck.onclick = ovLoadVersion;
     const verUpd = document.getElementById("ovVerUpdate");
     if (verUpd) verUpd.onclick = async () => {
-      if (!confirm("Cập nhật Javis lên bản mới nhất?\nApp sẽ tự khởi động lại (~20-40 giây), trang sẽ tự tải lại.")) return;
+      if (!confirm("Cập nhật Javis lên bản mới nhất?\nApp sẽ tự khởi động lại. Nếu bản mới lỗi, hệ thống sẽ tự quay về bản cũ (bản git) hoặc hiện cách lùi (Docker).")) return;
       const st = document.getElementById("ovVerStatus");
+      const rb = document.getElementById("ovVerRollback");
+      const oldCur = window._ovVerCur || "";
       verUpd.disabled = true;
-      st.textContent = "⏳ Đang chuẩn bị cập nhật…";
+      if (rb) { rb.style.display = "none"; rb.innerHTML = ""; }
+      renderProgress("preparing", "Đang chuẩn bị cập nhật…");
+      st.textContent = "";
       let resp;
       try { resp = await (await fetch("/update", { method: "POST" })).json(); }
-      catch (e) { resp = { ok: true, _dropped: true }; }   // kết nối đứt = server đang restart, bình thường
+      catch (e) { resp = { ok: true, _dropped: true }; }   // đứt kết nối = server đang restart
       if (resp && resp.ok === false) {
         verUpd.disabled = false;
+        renderProgress("preparing", "");
+        document.getElementById("ovVerProgress").style.display = "none";
         st.innerHTML = "⚠ " + esc(resp.error || "Không cập nhật được.") + (resp.manual ? " Chạy: <code>" + esc(resp.manual) + "</code>" : "");
         return;
       }
-      st.textContent = "⏳ Đang tải bản mới + khởi động lại… (đừng tắt trang)";
-      let tries = 0, backButOld = 0;
+      st.textContent = "⏳ Đang cập nhật… đừng tắt trang.";
+      let tries = 0;
       const poll = setInterval(async () => {
         tries++;
+        // 1) ưu tiên trạng thái chi tiết từ updater (bản git)
+        let s = null;
+        try { s = await (await fetch("/update/status", { cache: "no-store" })).json(); } catch (e) { s = null; }
+        if (s && s.state && s.state.phase) {
+          const ph = s.state.phase, res = s.state.result;
+          const stashNote = s.state.stashed ? "📦 Sửa đổi cục bộ đã được cất vào git stash (dùng 'git stash list' để xem lại)." : "";
+          renderProgress(ph, stashNote);
+          if (res === "success") { clearInterval(poll); st.textContent = "✅ Đã cập nhật xong. Đang tải lại trang…"; setTimeout(() => location.reload(), 1500); return; }
+          if (res === "rolled_back") { clearInterval(poll); renderProgress("done", stashNote); st.innerHTML = "↩ Bản mới lỗi, đã <b>tự quay về bản cũ</b>. Xem <code>update.log</code>."; verUpd.disabled = false; return; }
+          if (res === "pull_failed" || res === "rollback_failed" || res === "error") {
+            clearInterval(poll);
+            const pb = document.getElementById("ovVerProgress"); if (pb) pb.style.display = "none";
+            st.innerHTML = "⚠ " + esc(s.state.error || "Cập nhật lỗi.") + " Xem <code>update.log</code>.";
+            verUpd.disabled = false; return;
+          }
+        }
+        // 2) fallback: dò /version (docker qua Watchtower - updater.py không chạy)
         try {
-          const j = await (await fetch("/version", { cache: "no-store" })).json();
-          if (j && j.update_available === false) {          // đã lên bản mới → xong
-            clearInterval(poll);
-            st.textContent = "✅ Đã cập nhật xong. Đang tải lại trang…";
-            setTimeout(() => location.reload(), 1500);
-            return;
+          const v = await (await fetch("/version", { cache: "no-store" })).json();
+          const flipOk = (window._ovVerMode === "docker") || !(s && s.state && s.state.phase);
+          if (flipOk && v && v.update_available === false && v.current && v.current !== oldCur) {
+            clearInterval(poll); st.textContent = "✅ Đã cập nhật xong. Đang tải lại trang…"; setTimeout(() => location.reload(), 1500); return;
           }
-          backButOld++;                                     // server sống lại nhưng vẫn bản cũ
-          if (backButOld >= 3) {
+          // docker bản mới có thể lỗi: server vẫn còn bản cũ sau khá lâu → hiện cách lùi
+          if ((window._ovVerMode === "docker") && tries >= 12 && v && v.current === oldCur) {
             clearInterval(poll);
-            st.innerHTML = "⚠ Server đã lên lại nhưng phiên bản chưa đổi - cập nhật có thể thất bại. Xem <code>update.log</code> / <code>docker compose logs</code>.";
+            const prev = window._ovVerPrev || (v.previous_version || "");
+            st.innerHTML = "⚠ Bản mới chưa lên sau một lúc - có thể lỗi.";
+            if (rb) {
+              rb.style.display = "";
+              rb.innerHTML = "<b>Cách lùi về bản cũ (Docker):</b><br>Pin tag phiên bản cũ rồi kéo lại:"
+                + "<br><code>docker compose pull && docker compose up -d</code>"
+                + (prev ? "<br>Hoặc sửa image thành <code>ghcr.io/blogminhquy/javis-os:" + esc(prev) + "</code> rồi Redeploy." : "");
+            }
+            verUpd.disabled = false; return;
           }
-        } catch (e) { backButOld = 0; /* server đang restart - tiếp tục chờ */ }
-        if (tries > 45) { clearInterval(poll); st.innerHTML = "Server chưa lên lại sau ~3 phút - thử tải lại trang."; }
-      }, 4000);
+        } catch (e) { /* server đang restart - chờ tiếp */ }
+        if (tries > 60) { clearInterval(poll); st.innerHTML = "Server chưa lên lại sau ~3 phút - thử tải lại trang."; verUpd.disabled = false; }
+      }, 3000);
     };
     ovLoadVersion();
 
@@ -2364,10 +2645,21 @@
     Alpine.store("nav", {
       active: "home",
       items: RAIL_ITEMS,
+      openGroup: groupLabelOf("home"),   // accordion 2 tầng: nhóm đang mở (mặc định nhóm chứa trang đầu)
+      collapsed: (() => { try { return localStorage.getItem("javis_rail_collapsed") === "1"; } catch (e) { return false; } })(),
+      collapseIcon: COLLAPSE_ICON,
+      get groups() { return railGroups(); },
       get meta() { return VIEW_META[this.active] || VIEW_META.home; },
+      isOpen(label) { return this.openGroup === label; },
+      toggleGroup(label) { this.openGroup = (this.openGroup === label) ? null : label; },   // 1 nhóm mở 1 lúc; bấm lại để đóng
+      toggleCollapsed() {   // thu/mở sidebar: thu → chỉ còn icon; mở → đầy chữ. Nhớ lựa chọn qua localStorage.
+        this.collapsed = !this.collapsed;
+        try { localStorage.setItem("javis_rail_collapsed", this.collapsed ? "1" : "0"); } catch (e) {}
+      },
       go(id) {
         const item = RAIL_ITEMS.find(i => i.id === id);
         if (item && item.launch) { item.launch(); recomputeGraph(); return; }  // launcher: không đổi view
+        const gl = groupLabelOf(id); if (gl) this.openGroup = gl;   // giữ nhóm chứa mục vừa mở luôn bung ra
         navigateTo(id);
       },
     });
@@ -2762,6 +3054,16 @@
     });
   }
 
+  // Cho khung sua file trong chat (file-editor.js) dung LAI dung bo may WYSIWYG cua editor cay:
+  // nap Turndown, doi HTML<->markdown (giu [[wikilink]]/![[anh]]), va thanh cong cu markdown.
+  if (typeof window !== "undefined") {
+    window.JavisNoteEditor = {
+      ensureTurndown: _ensureTurndown,
+      mdFromHtml: _mdFromHtml,
+      buildToolbar: _neBuildToolbar,
+    };
+  }
+
   async function openNote(rel, it) {
     const ed = document.getElementById("noteEditor"); if (!ed) return;
     it = it || {}; const ext = (it.ext || "").toLowerCase();
@@ -2835,6 +3137,36 @@
     _neRenderDownload(body, actions, rel, it); _vtMarkActive(null);
   }
 
+  // Tooltip NHANH cho rail khi thu gọn (native title trễ ~500ms). 1 node body-level, thoát mọi overflow clip.
+  function initRailTooltip() {
+    const nav = document.querySelector(".rail-nav"); if (!nav) return;
+    let tip = document.getElementById("railTip");
+    if (!tip) { tip = document.createElement("div"); tip.id = "railTip"; tip.className = "rail-tip"; document.body.appendChild(tip); }
+    let timer = null, cur = null;
+    const collapsed = () => document.body.classList.contains("rail-collapsed");
+    nav.addEventListener("mouseover", (e) => {
+      const btn = e.target.closest(".rail-item"); if (!btn || !collapsed() || btn === cur) return;
+      cur = btn;
+      if (btn.hasAttribute("title")) { btn.dataset.tip = btn.getAttribute("title"); btn.removeAttribute("title"); }  // chặn tooltip native chậm
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const label = btn.dataset.tip || ""; if (!label) return;
+        const r = btn.getBoundingClientRect();
+        tip.textContent = label;
+        tip.style.top = (r.top + r.height / 2) + "px";
+        tip.style.left = (r.right + 8) + "px";
+        tip.classList.add("show");
+      }, 90);
+    });
+    nav.addEventListener("mouseout", (e) => {
+      const btn = e.target.closest(".rail-item"); if (!btn) return;
+      if (e.relatedTarget && btn.contains(e.relatedTarget)) return;
+      clearTimeout(timer); tip.classList.remove("show");
+      if (btn.dataset.tip && !btn.hasAttribute("title")) btn.setAttribute("title", btn.dataset.tip);   // trả title cho accessibility
+      if (btn === cur) cur = null;
+    });
+  }
+
   function boot() {
     document.body.classList.add("has-rail");
     const ver = document.getElementById("railVersion");
@@ -2861,6 +3193,7 @@
 
     // Cột trái = Vault explorer (luôn có trong DOM ở màn home) → nạp cây ngay khi khởi động
     renderVaultTree();
+    initRailTooltip();   // tooltip nhanh cho rail thu gọn
 
     freshSettings().then(s => {
       graphEnabled = !(s.dashboard && s.dashboard.graph_enabled === false);
