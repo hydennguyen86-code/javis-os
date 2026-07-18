@@ -1185,3 +1185,29 @@ body.chat-zoomed #jv-sess-btn { display: none; }
   opacity: 1; border-color: var(--accent); color: var(--accent); background: rgba(255,122,60,.12);
 }
 .jv-ask-done .jv-ask-chip.jv-ask-picked::before { content: "✓ "; }
+
+/* Menu lệnh / (chat-slash.js) */
+.slash-menu {
+  position: fixed;
+  z-index: 999;
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0,0,0,.35);
+  padding: 4px;
+}
+.slash-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas: "cmd name" "cmd desc";
+  gap: 0 10px;
+  padding: 6px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+.slash-item.active, .slash-item:hover { background: var(--bg3); }
+.slash-cmd { grid-area: cmd; align-self: center; font-weight: 600; color: var(--accent); }
+.slash-name { grid-area: name; font-size: 13px; color: var(--text); }
+.slash-desc { grid-area: desc; font-size: 11px; color: var(--text3); }

@@ -74,8 +74,114 @@
   if (typeof window !== "undefined") window.JavisSlash = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 
-  // ===== Phan MENU DOM (chi trinh duyet) - dien o Task 3 =====
+  // ===== Phan MENU DOM (chi trinh duyet) =====
   if (typeof window !== "undefined" && typeof document !== "undefined") {
-    if (window.JavisSlash) window.JavisSlash._initMenu = function () { /* Task 3 */ };
+    var box = null, items = [], active = 0, skillsCache = null, cacheBrain = null;
+
+    function ensureBox() {
+      if (box) return box;
+      box = document.createElement("div");
+      box.id = "slashMenu";
+      box.className = "slash-menu";
+      box.style.display = "none";
+      document.body.appendChild(box);
+      return box;
+    }
+
+    async function loadSkills() {
+      var brain = (typeof window.currentBrainPath === "function") ? window.currentBrainPath() : "brain";
+      if (skillsCache && cacheBrain === brain) return skillsCache;
+      try {
+        var r = await fetch("/skills?brain=" + encodeURIComponent(brain));
+        var d = await r.json();
+        skillsCache = (d && d.skills) || [];
+      } catch (e) { skillsCache = []; }
+      cacheBrain = brain;
+      return skillsCache;
+    }
+
+    function hide() { if (box) box.style.display = "none"; items = []; active = 0; }
+
+    function positionBox(input) {
+      var rect = input.getBoundingClientRect();
+      box.style.left = rect.left + "px";
+      box.style.width = rect.width + "px";
+      box.style.bottom = (window.innerHeight - rect.top + 6) + "px";
+    }
+
+    function esc(s) {
+      return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
+        return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+      });
+    }
+
+    function renderList() {
+      box.innerHTML = "";
+      items.forEach(function (it, i) {
+        var row = document.createElement("div");
+        row.className = "slash-item" + (i === active ? " active" : "");
+        row.innerHTML = '<span class="slash-cmd">/' + esc(it.cmd) + '</span>' +
+          '<span class="slash-name">' + esc(it.name) + '</span>' +
+          '<span class="slash-desc">' + esc(it.desc) + '</span>';
+        row.addEventListener("mousedown", function (e) { e.preventDefault(); choose(i); });
+        box.appendChild(row);
+      });
+    }
+
+    function choose(i) {
+      var it = items[i];
+      if (!it) return;
+      var input = document.getElementById("chatInput");
+      hide();
+      if (it.kind === "skill") {
+        // Dien '/slug ' de nguoi dung go tiep noi dung roi Enter gui.
+        input.value = "/" + it.cmd + " ";
+        input.focus();
+        input.dispatchEvent(new Event("input"));
+      } else {
+        // Lenh phien: chay ngay.
+        input.value = "";
+        if (typeof window.JavisSend === "function") window.JavisSend("/" + it.cmd);
+      }
+    }
+
+    async function onInput() {
+      var input = document.getElementById("chatInput");
+      var val = input.value;
+      // Chi mo menu khi dang go token lenh dau (chua co khoang trang sau lenh) hoac vua go '/'.
+      var typingCmd = /^\/[a-zA-Z0-9_-]*$/.test(val);
+      if (!typingCmd) { hide(); return; }
+      ensureBox();
+      var skills = await loadSkills();
+      var all = buildMenu(skills);
+      var query = val.slice(1);   // bo dau '/'
+      items = filterItems(all, query);
+      active = 0;
+      if (!items.length) { hide(); return; }
+      positionBox(input);
+      renderList();
+      box.style.display = "block";
+    }
+
+    function onKeydown(e) {
+      if (!box || box.style.display === "none") return;
+      if (e.key === "ArrowDown") { e.preventDefault(); active = (active + 1) % items.length; renderList(); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); active = (active - 1 + items.length) % items.length; renderList(); }
+      else if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); e.stopImmediatePropagation(); choose(active); }
+      else if (e.key === "Escape") { e.preventDefault(); hide(); }
+    }
+
+    api._initMenu = function () {
+      var input = document.getElementById("chatInput");
+      if (!input) return;
+      input.addEventListener("input", onInput);
+      input.addEventListener("keydown", onKeydown);   // dang ky TRUOC app.js (script nap truoc)
+      input.addEventListener("blur", function () { setTimeout(hide, 120); });
+    };
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", api._initMenu);
+    } else {
+      api._initMenu();
+    }
   }
 })();

@@ -196,6 +196,14 @@ function handleMessage(data) {
 function sendMessage(text) {
   const msg = (text || chatInput.value).trim();
   const atts = pendingAttachments.filter(a => a.path);  // chỉ file đã upload xong
+  // Lệnh / : session-command chạy tại chỗ; skill-command bung thành lời gọi skill.
+  const _slash = (window.JavisSlash && msg) ? window.JavisSlash.route(msg) : { type: "passthrough" };
+  if (_slash.type === "session") {
+    chatInput.value = ""; chatInput.style.height = "auto";
+    if (_slash.cmd === "stop") { try { stopCurrent(); } catch (e) {} }
+    else { try { newChat(); } catch (e) {} }   // new | reset -> hội thoại mới trên web
+    return;
+  }
   if ((!msg && atts.length === 0) || !ws || ws.readyState !== WebSocket.OPEN) return;
   if (!savedSessionId) savedSessionId = newSid();        // hội thoại mới → mint id để định tuyến
   const sid = savedSessionId;
@@ -206,18 +214,24 @@ function sendMessage(text) {
   recordTurn("user", msg, atts.map(a => ({ name: a.name, kind: a.kind })));
 
   // Soạn message gửi Javis (kèm đường dẫn file trong Sources)
-  let outMsg = msg;
+  const _isSkill = _slash.type === "skill";
+  let outMsg = _isSkill ? _slash.message : msg;
   if (atts.length) {
     const lines = atts.map(a => `- ${a.path}`).join("\n");
     const src = atts[0].sources || "", attDir = atts[0].attachments || "";
-    const ctx =
-      `[File đính kèm để ĐỌC (đường dẫn):\n${lines}\n` +
-      `Mặc định: chỉ đọc file rồi trả lời, KHÔNG tự lưu đi đâu.\n` +
-      `CHỈ khi user yêu cầu rõ (vd "lưu vào source", "ingest", "ghi vào second brain") thì mới: ` +
-      `chuyển thành .md (ảnh thì đọc hiểu + mô tả) lưu vào Sources="${src}" (ảnh gốc chuyển vào Attachments="${attDir}"), kèm frontmatter source.]`;
-    outMsg = msg
-      ? `${ctx}\n\n${msg}`
-      : `${ctx}\n\nHãy đọc (các) file trên và phản hồi / tóm tắt nội dung chính.`;
+    if (_isSkill) {
+      // Với lệnh skill (vd /notes): đưa path như dữ liệu, để chính skill quyết định lưu.
+      outMsg = `[File đính kèm (đường dẫn), Sources="${src}", Attachments="${attDir}":\n${lines}]\n\n${_slash.message}`;
+    } else {
+      const ctx =
+        `[File đính kèm để ĐỌC (đường dẫn):\n${lines}\n` +
+        `Mặc định: chỉ đọc file rồi trả lời, KHÔNG tự lưu đi đâu.\n` +
+        `CHỈ khi user yêu cầu rõ (vd "lưu vào source", "ingest", "ghi vào second brain") thì mới: ` +
+        `chuyển thành .md (ảnh thì đọc hiểu + mô tả) lưu vào Sources="${src}" (ảnh gốc chuyển vào Attachments="${attDir}"), kèm frontmatter source.]`;
+      outMsg = msg
+        ? `${ctx}\n\n${msg}`
+        : `${ctx}\n\nHãy đọc (các) file trên và phản hồi / tóm tắt nội dung chính.`;
+    }
   }
 
   chatInput.value = ""; chatInput.style.height = "auto";
