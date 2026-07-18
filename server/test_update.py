@@ -87,6 +87,20 @@ check("update đang chạy → trả 409", isinstance(_r, JSONResponse) and _r.s
 us.write_state({"phase": "idle"})  # dọn để không kẹt
 check("có hàm _git_head", callable(getattr(main, "_git_head", None)))
 
+# --- claim rồi nhả: docker không watchtower → 400 + phase reset idle (chống kẹt "preparing") ---
+_orig_mode = main._deploy_mode
+_orig_wt = main._watchtower_reachable
+async def _wt_false():
+    return False
+main._deploy_mode = lambda: "docker"
+main._watchtower_reachable = _wt_false
+us.write_state({"phase": "idle"})
+_rd = asyncio.run(main.do_update())
+check("docker no-watchtower → 400", isinstance(_rd, JSONResponse) and _rd.status_code == 400)
+check("early-return nhả claim → phase idle (không kẹt preparing)", us.read_state().get("phase") == "idle")
+main._deploy_mode = _orig_mode
+main._watchtower_reachable = _orig_wt
+
 print()
 if _fails:
     print(f"{len(_fails)} FAIL: {_fails}"); sys.exit(1)

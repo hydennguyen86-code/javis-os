@@ -3746,6 +3746,11 @@ async def do_update():
         return JSONResponse({"ok": False, "error": "Đang cập nhật rồi, chờ chút.",
                              "phase": st.get("phase")}, status_code=409)
 
+    # Claim NGAY sau guard (KHÔNG có await ở giữa → nguyên tử với event loop) để chặn double-click:
+    # request thứ 2 đọc phase="preparing" (thuộc _UPDATE_ACTIVE) sẽ bị 409.
+    _write_update_state({"phase": "preparing", "result": None, "error": None,
+                         "started_at": now(), "finished_at": None})
+
     mode = _deploy_mode()
     cur = _read_version()
     latest = None
@@ -3760,6 +3765,7 @@ async def do_update():
 
     if mode == "docker":
         if not await _watchtower_reachable():
+            _write_update_state({"phase": "idle"})   # nhả claim, không kẹt "preparing"
             return JSONResponse({"ok": False,
                 "error": "Bản Docker cập nhật bằng REDEPLOY để kéo image mới: trên Hostinger bấm Redeploy trong Docker Manager; trên VPS chạy lệnh dưới. Nếu bản mới lỗi, pin tag phiên bản cũ rồi Redeploy để lùi.",
                 "manual": "docker compose up -d --pull always",
@@ -3787,6 +3793,7 @@ async def do_update():
     # git checkout (windows / native)
     root = str(PROJECT_ROOT)
     if not _is_git_checkout(root):
+        _write_update_state({"phase": "idle"})   # nhả claim, không kẹt "preparing"
         return JSONResponse({"ok": False,
             "error": "Thư mục cài đặt không phải git checkout → không tự cập nhật được. Cài lại bằng 'git clone' hoặc cập nhật thủ công.",
             "manual": "./update.sh"}, status_code=400)
