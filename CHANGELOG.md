@@ -4,6 +4,13 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.86] - 2026-07-18
+Khung lệnh `/` cho khung chat web (giống Telegram/Claude) và lệnh đầu tiên `/notes`: gõ `/notes` thì lưu tin nhắn hiện tại nguyên văn vào `sources/` (kèm ảnh), rồi tự chưng cất lên wiki nếu note đáng. Chỉ đổi frontend + thêm 1 skill hệ thống, không cần khởi động lại server; chỉ cần tải lại trang.
+### Thêm mới
+- **Menu lệnh `/` trên web**: gõ `/` ở ô chat hiện menu gợi ý các skill của brain + vài lệnh phiên (`/new`, `/reset`, `/stop`), lọc dần khi gõ, chọn bằng chuột hoặc phím mũi tên + Enter. Chọn skill thì điền `/slug ` để gõ tiếp nội dung; lệnh phiên chạy ngay. Nhất quán với Telegram (mọi `/<slug>` = gọi skill cùng tên).
+- **Skill hệ thống `notes`**: lưu nhanh một note vào Second Brain. Giữ nguyên văn phần chữ người dùng gõ (không biên tập), ảnh đính kèm chuyển vào `attachments/` và nhúng `![[...]]`. Sau khi lưu vào `sources/`, tự đánh giá đáng-wiki: đáng thì chưng cất lên `wiki/` đủ 3 kỷ luật của vault; không đáng thì vẫn giữ source, chỉ báo nhẹ. Chạy được cả trên web lẫn Telegram, mọi engine. Là skill hệ thống nên tự có ở mọi brain qua `system_sync`.
+- Frontend: thêm `dashboard/chat-slash.js` (logic parse/route/menu + menu DOM) và `dashboard/test_chat_slash.js` (test node headless); chặn `/` trong `sendMessage` của `app.js`. Bump `app.js?v=69`, thêm `chat-slash.js?v=1`.
+
 ## [0.9.85] - 2026-07-18
 Bản đánh dấu để kiểm tra luồng tự cập nhật 1-click (nút "Cập nhật ngay") chạy end-to-end trên bản Docker có Watchtower. Không đổi tính năng, không cần thao tác gì thêm.
 ### Cải thiện
