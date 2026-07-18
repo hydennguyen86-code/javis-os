@@ -599,7 +599,103 @@ def _brains_has_content(brains_dir: str) -> bool:
     return False
 
 
-def sync_brains(brains_dir: str, mirror_dir: str, repo_url: str, token: str, branch: str = "main") -> dict:
+def _restore_missing_brains(brains_dir: str, mirror_dir: str, protected_names) -> None:
+    """Bảo vệ mặc định 'xóa không thắng' (bổ sung cho _apply_tombstones ngay dưới đây): não là
+    con TRỰC TIẾP của mirror_dir (đã biết từ lần sync trước) mà giờ THIẾU khỏi brains_dir và
+    KHÔNG có tombstone hợp lệ trong brains_dir (xóa tay ngoài ý muốn, crash, volume lỗi...) thì
+    khôi phục NGAY từ mirror về brains_dir - PHẢI chạy TRƯỚC bước _sync_mirror() chụp snapshot ở
+    _sync_brains_locked, vì bước đó coi MỌI thứ thiếu trong brains là xóa có chủ đích rồi commit
+    + đẩy đi mất - lúc đó thông tin não từng tồn tại KHÔNG còn cách nào lấy lại. Chỉ tombstone
+    thật (đọc + xử lý ở _apply_tombstones, chạy SAU trong CÙNG lượt sync này) mới được làm não
+    biến mất vĩnh viễn; não mặc định (protected_names) luôn được khôi phục bất kể tombstone."""
+    if not is_git_checkout(mirror_dir):
+        return
+    protected = set(protected_names or ())
+    tomb_names = {t.get("name") for t in _read_tombstones(brains_dir)}
+    mp = Path(mirror_dir)
+    for child in mp.iterdir():
+        name = child.name
+        if not child.is_dir() or name in (".git", TOMBSTONE_DIR):
+            continue
+        if name in tomb_names and name not in protected:
+            continue   # có tombstone hợp lệ -> để _apply_tombstones xử lý xóa, không khôi phục oan
+        bp = Path(brains_dir) / name
+        if bp.exists():
+            continue
+        try:
+            shutil.copytree(str(child), str(bp))
+        except Exception as e:
+            print(f"[sync restore] {name}: {type(e).__name__}: {e}", file=__import__('sys').stderr)
+
+
+def _apply_tombstones(brains_dir: str, mirror_dir: str, trash_dir: str,
+                      protected_names) -> dict:
+    """Áp giấy báo tử: xóa DỨT KHOÁT các não có tombstone (ghi đè chính sách 'xóa không thắng'),
+    chỉ cho lần xóa cố ý. Đọc tombstone từ MIRROR sau hoà nhập (= union mọi máy).
+    - Chốt thời gian: não còn sống mà có file mtime > deleted_at -> dựng/sửa lại có chủ đích ->
+      BỎ QUA + gỡ tombstone (superseded, propagate việc gỡ).
+    - Xóa: brains_dir/<name> -> thùng rác; mirror/<name> -> git rm -r (stage) để đẩy đi.
+    - An toàn: bỏ qua não mặc định (protected_names) + tên phải là con TRỰC TIẾP của brains_dir.
+    Trả {deleted, superseded, failed}."""
+    rep = {"deleted": [], "superseded": [], "failed": []}
+    protected = set(protected_names or ())
+    tombs = _read_tombstones(mirror_dir)
+    if not tombs:
+        return rep
+    base = Path(brains_dir).resolve()
+    changed_mirror = False
+    for t in tombs:
+        name = t.get("name") or ""
+        deleted_at = int(t.get("deleted_at", 0))
+        if not name or name in protected:
+            continue
+        bp = Path(brains_dir) / name
+        mp = Path(mirror_dir) / name
+        try:
+            if bp.resolve().parent != base:   # chỉ con trực tiếp của brains_dir
+                continue
+        except Exception:
+            continue
+        # Chốt thời gian: dựng lại có chủ đích -> giữ + gỡ tombstone
+        if bp.is_dir() and _dir_newer_than(str(bp), deleted_at):
+            _git(mirror_dir, "rm", "-f", "--", f"{TOMBSTONE_DIR}/{t['_file']}")
+            try:
+                (Path(brains_dir) / TOMBSTONE_DIR / t["_file"]).unlink()
+            except Exception:
+                pass
+            changed_mirror = True
+            rep["superseded"].append(name)
+            continue
+        # Xóa dứt khoát
+        ok = True
+        if bp.is_dir():
+            try:
+                move_to_trash(str(bp), trash_dir, name)
+            except Exception as e:
+                ok = False
+                print(f"[tombstone] move trash {name}: {type(e).__name__}: {e}",
+                      file=__import__('sys').stderr)
+        if ok and mp.exists():
+            # --ignore-unmatch: máy CHỦ (vừa tự xóa não rồi mới sync) đã prune Foo khỏi git qua
+            # commit "backup:" đầu vòng sync (_sync_mirror), nên mirror/<name> có thể còn là thư
+            # mục RỖNG trên đĩa (mp.exists() = True) nhưng KHÔNG còn gì được git track bên dưới ->
+            # `git rm` không -ignore-unmatch sẽ báo "did not match any files" dù việc xóa đã xong.
+            r = _git(mirror_dir, "rm", "-r", "-f", "--ignore-unmatch", "--", name)
+            if r.returncode == 0:
+                changed_mirror = True
+            else:
+                ok = False
+        if ok:
+            rep["deleted"].append(name)
+        else:
+            rep["failed"].append(name)
+    if changed_mirror:
+        _git(mirror_dir, "commit", "-m", f"sync: áp giấy báo tử ({_host_tag()})")
+    return rep
+
+
+def sync_brains(brains_dir: str, mirror_dir: str, repo_url: str, token: str, branch: str = "main",
+                trash_dir: Optional[str] = None, protected_names=None) -> dict:
     """Đồng bộ 2 CHIỀU toàn bộ thư mục brains với repo GitHub. Trả
     {ok, pushed, committed, merged, restored, conflicts, applied, deleted, error?}."""
     if not has_git():
@@ -611,17 +707,23 @@ def sync_brains(brains_dir: str, mirror_dir: str, repo_url: str, token: str, bra
     if not _SYNC_LOCK.acquire(blocking=False):
         return {"ok": False, "error": "Đang có phiên đồng bộ khác chạy - thử lại sau"}
     try:
-        return _sync_brains_locked(str(brains_dir), str(mirror_dir), repo_url, token, branch)
+        return _sync_brains_locked(str(brains_dir), str(mirror_dir), repo_url, token, branch,
+                                   trash_dir, protected_names)
     except Exception as e:
         return {"ok": False, "error": _redact(f"{type(e).__name__}: {e}", token)}
     finally:
         _SYNC_LOCK.release()
 
 
-def _sync_brains_locked(brains_dir: str, mirror_dir: str, repo_url: str, token: str, branch: str) -> dict:
+def _sync_brains_locked(brains_dir: str, mirror_dir: str, repo_url: str, token: str, branch: str,
+                        trash_dir: Optional[str] = None, protected_names=None) -> dict:
     rep = {"ok": False, "pushed": False, "committed": False, "merged": False,
            "restored": False, "conflicts": [], "applied": 0, "deleted": 0,
-           "applied_sample": [], "deleted_sample": []}
+           "applied_sample": [], "deleted_sample": [], "brains_deleted": []}
+    if not trash_dir:
+        trash_dir = str(Path(mirror_dir).parent / "brain-trash")   # cạnh mirror (đều trong STATE_DIR)
+    gc_trash(trash_dir, 30)              # dọn thùng rác quá 30 ngày
+    gc_tombstones(brains_dir, _TOMBSTONE_TTL)   # dọn giấy báo tử quá 180 ngày
     Path(mirror_dir).mkdir(parents=True, exist_ok=True)
     if not is_git_checkout(mirror_dir):
         r = _git(mirror_dir, "init")
@@ -632,6 +734,10 @@ def _sync_brains_locked(brains_dir: str, mirror_dir: str, repo_url: str, token: 
     # Sync truyền BYTE NGUYÊN VĂN giữa các máy: tắt autocrlf để git Windows không tự đổi
     # LF↔CRLF lúc add/checkout (nếu không, cùng 1 file sẽ lệch byte giữa local và VPS mãi mãi).
     _git(mirror_dir, "config", "core.autocrlf", "false")
+
+    # Khôi phục não thiếu KHÔNG tombstone TRƯỚC khi chụp snapshot (xem docstring
+    # _restore_missing_brains) - phải chạy trước dòng _sync_mirror ngay dưới.
+    _restore_missing_brains(brains_dir, mirror_dir, protected_names)
 
     sync_start = time.time()
     if _brains_has_content(brains_dir):
@@ -661,6 +767,15 @@ def _sync_brains_locked(brains_dir: str, mirror_dir: str, repo_url: str, token: 
             rep["merged"] = rep["merged"] or bool(m.get("merged"))
             rep["conflicts"].extend(m.get("conflicts", []))
             changed = _changed_by_integration(mirror_dir, pre_head)
+        # Áp giấy báo tử: xóa dứt khoát não có tombstone (ghi đè 'xóa không thắng') TRƯỚC khi
+        # _apply_back kịp khôi phục chúng về brains. Đặt trước tự-vá + _apply_back là cố ý.
+        tomb = _apply_tombstones(brains_dir, mirror_dir, trash_dir, protected_names)
+        if tomb["failed"]:
+            _rollback_mirror(mirror_dir, pre_head)
+            return {**rep, "error": "Áp giấy báo tử lỗi (" + ", ".join(tomb["failed"][:2]) +
+                    ") - hoãn push, lần sau tự thử lại"}
+        if tomb["deleted"]:
+            rep["brains_deleted"] = (rep["brains_deleted"] + tomb["deleted"])[:50]
         # Tự vá: file có trong HEAD mirror nhưng THIẾU trong brains → luôn áp về. Bao trường hợp
         # khôi phục khi mirror đã up-to-date (diff rỗng) + brains bị wipe/volume mới. Chỉ THÊM
         # file thiếu, không bao giờ xoá (xoá chỉ đi qua diff của bước hoà nhập).

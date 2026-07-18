@@ -1206,7 +1206,9 @@ def _do_backup(brain: str = "") -> dict:
     if not (b.get("repo_url") and b.get("token")):
         return {"ok": False, "error": "Chưa cấu hình repo URL + token"}
     mirror = str(cfgmod.STATE_DIR / "brains-backup")   # repo mirror riêng (tránh nested git từng brain)
-    res = git_brain.sync_brains(BRAINS_DIR, mirror, b["repo_url"], b["token"], b.get("branch") or "main")
+    res = git_brain.sync_brains(BRAINS_DIR, mirror, b["repo_url"], b["token"], b.get("branch") or "main",
+                                trash_dir=str(cfgmod.STATE_DIR / "brain-trash"),
+                                protected_names={_default_brain_dir().name})
     # Ghi lại trạng thái (đọc lại cfg mới nhất để không đè thay đổi song song)
     cfg = cfgmod.read_settings()
     cfg.setdefault("backup", {})
