@@ -175,13 +175,18 @@
       var input = document.getElementById("chatInput");
       if (!input) return;
       input.addEventListener("input", onInput);
-      input.addEventListener("keydown", onKeydown);   // dang ky TRUOC app.js (script nap truoc)
+      // Keydown PHAI dang ky TRUOC app.js (cung element -> chay theo thu tu dang ky). Script
+      // nay nap truoc app.js va #chatInput da ton tai, nen init DONG BO ngay o duoi. Khi menu
+      // mo, onKeydown goi stopImmediatePropagation chan handler Enter cua app.js.
+      input.addEventListener("keydown", onKeydown);
       input.addEventListener("blur", function () { setTimeout(hide, 120); });
     };
-    if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", api._initMenu);
-    } else {
+    // #chatInput co san luc script chay -> init ngay de dang ky truoc app.js. Phong ho: neu
+    // chua co (load-order doi ve sau), doi DOMContentLoaded.
+    if (document.getElementById("chatInput")) {
       api._initMenu();
+    } else {
+      document.addEventListener("DOMContentLoaded", api._initMenu);
     }
   }
 })();
