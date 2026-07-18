@@ -4,6 +4,12 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.87] - 2026-07-18
+Chỉnh menu lệnh `/` sau lần chạy thật: mô tả skill dài giờ cắt gọn 1 dòng, tràn thì hiện "...". Chỉ đổi frontend, tải lại trang là thấy.
+### Sửa lỗi
+- **Mô tả trong menu `/` tràn nhiều dòng**: các skill mô tả dài (vd jay-abraham-sales) đẩy menu cao ngoằng, che cả các lệnh khác. Nay tên + mô tả mỗi cái cắt đúng 1 dòng, quá dài thì "..." (grid `minmax(0,1fr)` + `text-overflow: ellipsis`). Bump `style.css?v=46`.
+- **`/notes` chưa hiện trong menu ở brain đang mở**: skill hệ thống chỉ rải vào brain lần đầu truy cập trong đời process, mà server đã chạy từ trước khi thêm `notes` nên brain đang mở bị bỏ sót. Đã rải `notes` vào cả 3 brain trên đĩa (`system_sync.sync_brain`); endpoint `/skills` đọc đĩa nên menu thấy ngay, không cần khởi động lại. Brain mới hoặc sau khi restart thì tự có.
+
 ## [0.9.86] - 2026-07-18
 Khung lệnh `/` cho khung chat web (giống Telegram/Claude) và lệnh đầu tiên `/notes`: gõ `/notes` thì lưu tin nhắn hiện tại nguyên văn vào `sources/` (kèm ảnh), rồi tự chưng cất lên wiki nếu note đáng. Chỉ đổi frontend + thêm 1 skill hệ thống, không cần khởi động lại server; chỉ cần tải lại trang.
 ### Thêm mới

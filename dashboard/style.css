@@ -1200,7 +1200,7 @@ body.chat-zoomed #jv-sess-btn { display: none; }
 }
 .slash-item {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
   grid-template-areas: "cmd name" "cmd desc";
   gap: 0 10px;
   padding: 6px 10px;
@@ -1208,6 +1208,7 @@ body.chat-zoomed #jv-sess-btn { display: none; }
   cursor: pointer;
 }
 .slash-item.active, .slash-item:hover { background: var(--bg3); }
-.slash-cmd { grid-area: cmd; align-self: center; font-weight: 600; color: var(--accent); }
-.slash-name { grid-area: name; font-size: 13px; color: var(--text); }
-.slash-desc { grid-area: desc; font-size: 11px; color: var(--text3); }
+.slash-cmd { grid-area: cmd; align-self: center; font-weight: 600; color: var(--accent); white-space: nowrap; }
+/* name + desc: mỗi cái CẮT 1 DÒNG, tràn thì "..." (min-width:0 để ellipsis chạy trong grid) */
+.slash-name { grid-area: name; font-size: 13px; color: var(--text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.slash-desc { grid-area: desc; font-size: 11px; color: var(--text3); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
