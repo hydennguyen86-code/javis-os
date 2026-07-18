@@ -19,6 +19,37 @@ from datetime import datetime, timezone, timedelta
 _TZ = timezone(timedelta(hours=7))  # Asia/Ho_Chi_Minh
 
 
+_PRICING_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "usage_pricing.json")
+
+
+def load_prices(path: str = None) -> dict:
+    """Doc bang gia usage_pricing.json -> dict {tien_to_model: {in,out,cache_read,cache_write}}.
+    Loi/thieu file -> {} (chi phi se = 0, khong chan)."""
+    try:
+        with open(path or _PRICING_PATH, "r", encoding="utf-8") as fh:
+            return (json.load(fh) or {}).get("prices", {}) or {}
+    except Exception:
+        return {}
+
+
+def estimate_cost(ev: dict, prices: dict) -> float:
+    """Chi phi quy doi USD cho 1 UsageEvent theo bang gia (USD/1M token).
+    Khop model theo tien to DAI NHAT; khong khop -> 0."""
+    model = ev.get("model") or ""
+    best_key = ""
+    for key in prices:
+        if model.startswith(key) and len(key) > len(best_key):
+            best_key = key
+    if not best_key:
+        return 0.0
+    p = prices[best_key]
+    cost = (int(ev.get("input") or 0) * float(p.get("in") or 0)
+            + int(ev.get("output") or 0) * float(p.get("out") or 0)
+            + int(ev.get("cache_read") or 0) * float(p.get("cache_read") or 0)
+            + int(ev.get("cache_create") or 0) * float(p.get("cache_write") or 0))
+    return cost / 1_000_000.0
+
+
 def _parse_ts(s: str):
     """ISO (co the hau to Z) -> (epoch:int, day-local:str). None neu khong parse duoc."""
     if not s:

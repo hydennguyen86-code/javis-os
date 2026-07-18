@@ -1,0 +1,11 @@
+{
+  "_note": "Gia USD tren 1 TRIEU token. UOC TINH de quy doi 'neu tinh theo API thi ton bao nhieu' - voi goi subscription day KHONG phai tien that. Cap nhat TAY khi doi gia. Khop model theo tien to DAI NHAT (vd 'claude-opus-4-8' -> 'claude-opus'). Model khong khop -> chi phi 0.",
+  "prices": {
+    "claude-opus": {"in": 15.0, "out": 75.0, "cache_read": 1.5, "cache_write": 18.75},
+    "claude-sonnet": {"in": 3.0, "out": 15.0, "cache_read": 0.3, "cache_write": 3.75},
+    "claude-haiku": {"in": 0.8, "out": 4.0, "cache_read": 0.08, "cache_write": 1.0},
+    "claude-fable": {"in": 1.0, "out": 5.0, "cache_read": 0.1, "cache_write": 1.25},
+    "gpt-5": {"in": 1.25, "out": 10.0, "cache_read": 0.125, "cache_write": 0.0},
+    "gpt-4o": {"in": 2.5, "out": 10.0, "cache_read": 1.25, "cache_write": 0.0}
+  }
+}

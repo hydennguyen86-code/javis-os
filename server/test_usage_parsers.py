@@ -99,6 +99,25 @@ _no.write_text(json.dumps({"type": "session_meta", "payload": {"id": "x"}}), enc
 check("codex: khong co token_count -> None", up.parse_codex_file(str(_no)) is None)
 
 
+# ============================================================
+# Task 3: estimate_cost + load_prices
+# ============================================================
+_prices = {"claude-opus": {"in": 15.0, "out": 75.0, "cache_read": 1.5, "cache_write": 18.75}}
+_ev_1m = {"model": "claude-opus-4-8", "input": 1_000_000, "output": 1_000_000,
+          "cache_read": 1_000_000, "cache_create": 1_000_000}
+check("cost: 1M moi loai opus = 15+75+1.5+18.75", abs(up.estimate_cost(_ev_1m, _prices) - 110.25) < 1e-6)
+check("cost: model khong khop -> 0",
+      up.estimate_cost({"model": "weird-model", "input": 1000, "output": 1000, "cache_read": 0, "cache_create": 0}, _prices) == 0)
+
+_prices2 = {"gpt": {"in": 1.0, "out": 0, "cache_read": 0, "cache_write": 0},
+            "gpt-5": {"in": 2.0, "out": 0, "cache_read": 0, "cache_write": 0}}
+_ev_g = {"model": "gpt-5.5", "input": 1_000_000, "output": 0, "cache_read": 0, "cache_create": 0}
+check("cost: khop tien to DAI NHAT (gpt-5 chu khong gpt)", abs(up.estimate_cost(_ev_g, _prices2) - 2.0) < 1e-6)
+
+_loaded = up.load_prices()
+check("cost: load_prices doc duoc usage_pricing.json", isinstance(_loaded, dict) and "claude-opus" in _loaded)
+
+
 if _fails:
     print("\n%d FAIL" % len(_fails))
     sys.exit(1)
