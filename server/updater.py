@@ -36,7 +36,10 @@ def log(msg):
 
 def run(cmd):
     log("$ " + " ".join(cmd))
-    return subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True)
+    r = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True)
+    if r.returncode != 0:
+        log(f"  (rc={r.returncode}) " + (r.stderr or r.stdout or "").strip()[:500])
+    return r
 
 
 def venv_python():
@@ -112,9 +115,9 @@ def main():
         return 0
 
     target = a.target or None
-    us.write_state({"phase": "restarting", "started_at": _now(), "finished_at": None,
+    us.write_state({"phase": "preparing", "started_at": _now(), "finished_at": None,
                     "result": None, "error": None, "old_sha": a.old_sha,
-                    "old_version": a.old_version, "target_version": target})
+                    "old_version": a.old_version, "target_version": target, "stashed": False})
 
     if os.name != "nt" and not has_systemd():
         log("Không thấy systemd service 'javis' → không tự khởi động lại được. Hãy restart tay.")
