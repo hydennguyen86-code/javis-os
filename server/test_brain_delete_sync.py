@@ -74,5 +74,50 @@ seed(Eb, "Brain Default"); gb.write_tombstone(Eb, "Brain Default")
 sync(Eb, Em, Et)
 check("Não mặc định miễn nhiễm tombstone", (Path(Eb) / "Brain Default").exists())
 
+# --- Bảo vệ ĐA NÃO khi KHÔNG tombstone (case THẬT của _restore_missing_brains): máy có
+# NHIỀU não, xóa tay chỉ MỘT não -> não đó được khôi phục, não còn lại không đụng, remote
+# không mất não đã xóa tay. Khác case "Bảo vệ" phía trên (chỉ 1 não Bar -> sau khi rmtree
+# brains RỖNG hẳn -> _brains_has_content=False -> đi nhánh "restored", KHÔNG chạy nhánh
+# snapshot/prune nên KHÔNG thật sự gọi tới _restore_missing_brains; test đó sẽ PASS VÔ CỚ
+# dù có xóa hẳn hàm _restore_missing_brains đi). Ở đây "Keep" giữ brains không trống nên
+# _brains_has_content=True, nhánh snapshot/prune chạy thật, mới đi qua đúng hàm cần bảo vệ.
+Fb, Fm, Ft = machine("F"); Gb, Gm, Gt = machine("G")
+seed(Fb, "Keep"); seed(Fb, "Gone")
+sync(Fb, Fm, Ft)
+sync(Gb, Gm, Gt)
+check("Đa não: G nhận cả Keep lẫn Gone từ remote",
+      (Path(Gb) / "Keep" / "note.md").exists() and (Path(Gb) / "Gone" / "note.md").exists())
+_sh.rmtree(str(Path(Gb) / "Gone"))   # xóa TAY chỉ Gone, KHÔNG tombstone; Keep giữ nguyên
+sync(Gb, Gm, Gt)
+check("Đa não: Gone xóa tay được khôi phục trên G", (Path(Gb) / "Gone" / "note.md").exists())
+check("Đa não: Keep không bị đụng tới", (Path(Gb) / "Keep" / "note.md").exists())
+Hb, Hm, Ht = machine("H"); sync(Hb, Hm, Ht)   # máy thứ ba sync từ remote để soi remote còn Gone
+check("Đa não: remote không mất Gone", (Path(Hb) / "Gone").exists())
+
+# --- Rollback khi áp giấy báo tử LỖI: move_to_trash ném lỗi giữa chừng -> sync KHÔNG được
+# push nửa vời (bất biến "áp giấy báo tử lỗi -> rollback mirror -> hoãn push" ở
+# _apply_tombstones/_sync_brains_locked).
+Ib, Im, It = machine("I"); Jb, Jm, Jt = machine("J")
+seed(Ib, "Doomed"); sync(Ib, Im, It)
+sync(Jb, Jm, Jt)
+check("Rollback: J nhận Doomed từ remote", (Path(Jb) / "Doomed" / "note.md").exists())
+gb.move_to_trash(str(Path(Ib) / "Doomed"), It, "Doomed")
+gb.write_tombstone(Ib, "Doomed")
+sync(Ib, Im, It)   # I đẩy tombstone + việc xóa Doomed lên remote
+
+_orig_move_to_trash = gb.move_to_trash
+def _boom_move_to_trash(*a, **k):
+    raise RuntimeError("boom")
+gb.move_to_trash = _boom_move_to_trash
+try:
+    r_fail = sync(Jb, Jm, Jt)
+finally:
+    gb.move_to_trash = _orig_move_to_trash
+
+check("Rollback: sync báo KHÔNG ok khi áp giấy báo tử lỗi", r_fail.get("ok") is not True)
+check("Rollback: sync báo lỗi cụ thể", bool(r_fail.get("error")))
+check("Rollback: Doomed vẫn còn nguyên trên J (không nửa vời)",
+      (Path(Jb) / "Doomed" / "note.md").exists())
+
 print(); print("TẤT CẢ PASS" if not _fails else f"{len(_fails)} FAIL: {_fails}")
 sys.exit(1 if _fails else 0)
