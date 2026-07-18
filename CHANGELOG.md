@@ -4,6 +4,13 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.73] - 2026-07-18
+Tinh chỉnh nút thu/mở rail (bản 0.9.72) theo góp ý: đổi icon, dời vị trí, và sửa link tác giả.
+### Cải thiện
+- **Icon nút thu/mở đổi sang kiểu "panel sidebar"**: thay mũi tên kép `«` bằng khung vuông chia hai với cột trái có các dòng nội dung (giống icon toggle sidebar quen thuộc). Icon tĩnh, bỏ hiệu ứng xoay 180° khi thu (kiểu panel không cần chỉ hướng, trạng thái đã có tooltip).
+- **Dời nút thu/mở nằm CẠNH dòng version thay vì phía trên**: `.rail-foot` đổi từ xếp dọc sang hàng ngang, nút ở trái kề số phiên bản + "by Minh Quý". Khi thu gọn vẫn ẩn version/tác giả, chỉ còn mỗi nút căn giữa.
+- **Link "by Minh Quý" trỏ về javisos.com** thay cho minhquy.vn.
+
 ## [0.9.72] - 2026-07-18
 Làm gọn thanh điều hướng bên trái (rail) theo góp ý trực tiếp: chữ khó đọc vì dùng font monospace, header nhóm trơ không icon, và rail chiếm quá nhiều bề ngang màn hình.
 ### Thêm mới

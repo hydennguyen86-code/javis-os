@@ -196,9 +196,9 @@ body.in-console .hud-actions { display: none; }
 
 .rail-spacer { flex: 1; }
 .rail-foot {
-  font-family: var(--font); text-align: center; line-height: 1.5; padding-top: 8px;
+  font-family: var(--font); line-height: 1.35; padding-top: 8px;
   border-top: 1px solid var(--glass-brd);
-  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 10px;
 }
 .rail-collapse-btn {                                   /* nút thu/mở sidebar ở góc dưới */
   display: flex; align-items: center; justify-content: center;
@@ -209,7 +209,7 @@ body.in-console .hud-actions { display: none; }
 }
 .rail-collapse-btn:hover { color: var(--text); background: rgba(255, 255, 255, 0.06); }
 .rail-collapse-btn svg { width: 16px; height: 16px; }
-.rail-foot .rf-meta { text-align: center; }
+.rail-foot .rf-meta { text-align: left; }
 .rail-foot .rf-ver { font-size: 11px; color: var(--text2); }
 .rail-foot .rf-author { display: block; margin-top: 2px; font-size: 8.5px; color: var(--accent); text-decoration: none; }
 .rail-foot .rf-author:hover { text-decoration: underline; }
@@ -226,8 +226,7 @@ body.in-console .hud-actions { display: none; }
   }
   .rail.collapsed .rail-item { justify-content: center; padding: 9px 0; gap: 0; }
   .rail.collapsed .rail-item .rail-lbl { display: none; }       /* giấu chữ, chỉ còn icon */
-  .rail.collapsed .rf-meta { display: none; }                   /* giấu version/tác giả cho vừa bề ngang hẹp */
-  .rail.collapsed .rail-collapse-btn { transform: rotate(180deg); }   /* « thành » (xoay cả nút cho chắc, tránh quirk transform trên <svg>) */
+  .rail.collapsed .rf-meta { display: none; }                   /* giấu version/tác giả cho vừa bề ngang hẹp, chỉ còn nút */
 }
 
 /* ===== Đẩy cockpit sang phải để chừa rail ===== */

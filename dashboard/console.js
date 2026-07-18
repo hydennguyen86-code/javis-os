@@ -42,8 +42,8 @@
     "Kết nối":  _svg('<path d="M9 15l6-6"/><path d="M10.5 7.5l1-1a3.5 3.5 0 0 1 5 5l-1 1M13.5 16.5l-1 1a3.5 3.5 0 0 1-5-5l1-1"/>'),
     "Hệ thống": _svg('<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/><circle cx="4" cy="12" r="1.8"/><circle cx="12" cy="6" r="1.8"/><circle cx="20" cy="14" r="1.8"/>'),
   };
-  // Icon nút thu/mở sidebar (mũi tên kép «; body.rail-collapsed sẽ xoay 180° thành »).
-  const COLLAPSE_ICON = _svg('<path d="M15 6l-6 6 6 6"/><path d="M20 6l-6 6 6 6"/>');
+  // Icon nút thu/mở sidebar: kiểu "panel sidebar" (khung chia 2, cột trái có dòng nội dung). Tĩnh, không xoay.
+  const COLLAPSE_ICON = _svg('<rect x="3" y="3" width="18" height="18" rx="2.5"/><path d="M10 3v18"/><path d="M5.6 8h2.6M5.6 11.2h2.6M5.6 14.4h2.6"/>');
 
   const RAIL_ITEMS = [
     { id: "home",        icon: ICON.home,        label: "Javis" },
