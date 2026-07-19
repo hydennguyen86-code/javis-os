@@ -4,6 +4,12 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.94] - 2026-07-19
+Đổi font chữ toàn app sang **Montserrat** cho sạch, dễ đọc (thay font monospace cũ trông "lỗi lỗi" ở các nhãn). Code vẫn giữ font monospace. Và vá header màn cockpit trên điện thoại.
+### Cải thiện
+- **Font Montserrat**: nạp Montserrat (Google Fonts) và dùng làm font chính cho toàn giao diện (nhãn, tiêu đề, chữ thân, thanh bên). Khối mã và mã inline giữ font monospace riêng (`--mono`) cho dễ đọc code. Tải lại trang là thấy (đã bump ?v).
+- **Header cockpit điện thoại hết lệch**: ẩn nút "Lịch sử" trên điện thoại để header màn "Javis" (buồng lái) khỏi bị chồng dòng, gọn còn ☰ + chip model + nút hội thoại mới. (Lịch sử vẫn xem được ở khung chat phóng to trên máy tính.)
+
 ## [0.9.93] - 2026-07-19
 Chỉnh tiếp giao diện chat điện thoại theo phản hồi: header hết chồng lên nhau, bấm chip model là sổ ra danh sách được, và mục Hệ thống trong ngăn kéo gọn lại. Chỉ đổi bản điện thoại.
 ### Sửa lỗi
