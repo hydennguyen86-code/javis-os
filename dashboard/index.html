@@ -17,6 +17,12 @@
 
     <!-- ===== TOP BAR ===== -->
     <header class="hud-top">
+      <!-- Mobile-only: mở ngăn kéo điều hướng -->
+      <button class="hud-icon-btn nav-toggle-btn" id="navToggle" title="Menu" aria-label="Mở menu">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/>
+        </svg>
+      </button>
       <!-- NHÓM TRÁI: thương hiệu + chọn brain + số liệu (bám trái) -->
       <div class="hud-top-left">
         <div class="brand"><span class="brand-icon"><img src="/brand-logo" alt="" style="width:22px;height:22px;border-radius:5px;vertical-align:middle;object-fit:cover"></span> <span class="brand-text">JAVIS OS</span></div>
@@ -64,6 +70,12 @@
           <button class="hud-icon-btn" id="resetBtn" title="Reset hội thoại">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M3 12a9 9 0 1 0 9-9 9 9 0 0 0-6.7 3M3 4v5h5"/>
+            </svg>
+          </button>
+          <!-- Mobile-only: hội thoại mới -->
+          <button class="hud-icon-btn new-chat-btn" id="newChatBtn" title="Hội thoại mới" aria-label="Hội thoại mới">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
           </button>
         </div>
@@ -310,6 +322,9 @@
       </button>
     </div>
   </div>
+
+  <!-- Mobile-only: nền mờ khi mở ngăn kéo -->
+  <div class="nav-backdrop" id="navBackdrop" hidden></div>
 
   <!-- ===== Console layer: rail điều hướng + trang quản lý (Alpine-driven) ===== -->
   <nav class="rail" x-data x-cloak :class="{ collapsed: $store.nav.collapsed }"
@@ -592,6 +607,7 @@
   <script src="/static/usage.js?v=1"></script>
   <!-- Console layer: console.js đăng ký store TRƯỚC khi Alpine khởi động (defer) -->
   <script src="/static/console.js?v=71"></script>
+  <script src="/static/mobile-chat.js?v=1"></script>
   <!-- Nút đổi tông tối đậm / tối nhạt: lật data-theme trên <html>, nhớ qua localStorage -->
   <script>(function(){var b=document.getElementById('themeToggle');if(!b)return;b.addEventListener('click',function(){var dim=document.documentElement.getAttribute('data-theme')==='dim';if(dim)document.documentElement.removeAttribute('data-theme');else document.documentElement.setAttribute('data-theme','dim');try{localStorage.setItem('javis.theme',dim?'dark':'dim');}catch(e){}});})();</script>
   <script defer src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>
