@@ -55,7 +55,11 @@ check("B: Foo nằm trong thùng rác B", len(trashed) == 1 and (trashed[0] / "n
 
 # --- Chốt thời gian: tạo LẠI Foo mới ở A (mtime mới) rồi sync -> KHÔNG bị xóa, tombstone gỡ ---
 seed(Ab, "Foo", "moi")
-os.utime(Path(Ab) / "Foo" / "note.md", None)  # mtime = bây giờ > deleted_at
+# mtime phải RÕ RÀNG > deleted_at + 1 (dung sai chống lệch đồng hồ trong _dir_newer_than). Đặt
+# hẳn về tương lai, KHÔNG dùng "bây giờ": cả test chạy dưới 1 giây trên CI nhanh nên mtime=now
+# chỉ nhỉnh hơn deleted_at chút, không vượt +1s -> Foo bị coi là vẫn xóa (đua giây, fail CI).
+_future = time.time() + 10
+os.utime(Path(Ab) / "Foo" / "note.md", (_future, _future))
 r3 = sync(Ab, Am, At)
 check("A: Foo dựng lại KHÔNG bị xóa (chốt thời gian)", (Path(Ab) / "Foo" / "note.md").exists())
 check("A: tombstone Foo đã gỡ", not (Path(Ab) / gb.TOMBSTONE_DIR / "Foo.json").exists())
