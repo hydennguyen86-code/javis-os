@@ -383,6 +383,29 @@
       "risk": "Mức Toàn quyền cho phép Javis ĐĂNG BÀI và BÌNH LUẬN THẬT bằng tài khoản Facebook CÁ NHÂN của bạn. Đây là tự động hoá tài khoản cá nhân - vi phạm điều khoản Facebook, RỦI RO BỊ KHOÁ TÀI KHOẢN là có thật. Cookie phiên lưu trên server (đã mã hoá) là chìa khoá toàn quyền tài khoản. Giữ mức Chỉ đọc thì Javis chỉ lướt/đọc feed, không đăng hay bình luận gì. Chỉ bật Toàn quyền khi bạn hiểu và tự chịu rủi ro."
     },
     {
+      "id": "facebook-monitor",
+      "name": "Theo dõi Facebook (Apify)",
+      "icon": "/static/logos/meta-ads.webp",
+      "category": "Mạng xã hội",
+      "description": "Theo dõi Trang và Nhóm CÔNG KHAI trên Facebook để tìm bài viral (nhiều share), qua dịch vụ quét Apify. KHÔNG dùng tài khoản cá nhân của bạn nên không lo khoá; chạy tốt trên VPS 24/7. Trả về bài kèm số share/react/bình luận để lọc bài hot. Cần token Apify (đăng ký free, trả theo lượt quét ~2.6 USD/1000 bài). Nhóm KÍN là bước sau (cần thêm cookie).",
+      "status": "beta",
+      "transport": "http",
+      "url": "",
+      "auth": {
+        "type": "apikey",
+        "fields": [
+          { "key": "apify_token", "label": "Apify API token", "placeholder": "apify_api_xxxxxxxx", "env": "APIFY_TOKEN" }
+        ],
+        "guide": "Làm 1 lần: (1) Vào apify.com đăng ký tài khoản (có gói free + trả theo lượng dùng). (2) Vào Console > Settings > API & Integrations, copy 'Personal API token'. (3) Dán vào ô dưới rồi bấm Kết nối. Chi phí quét tính theo lượt (~2.6 USD cho 1000 bài với actor mặc định); Javis chỉ quét khi bạn hoặc loop yêu cầu. V1 hỗ trợ Trang và Nhóm CÔNG KHAI (không cần cookie); nhóm KÍN sẽ bổ sung sau (cần thêm cookie tài khoản là thành viên).",
+        "guide_url": "https://console.apify.com/settings/integrations"
+      },
+      "tool_meta": {
+        "read": ["fb_monitor"]
+      },
+      "default_perm": "readonly",
+      "risk": "Connector này CHỈ ĐỌC - quét dữ liệu CÔNG KHAI qua dịch vụ Apify, KHÔNG đụng tài khoản Facebook của bạn, không đăng hay bình luận gì nên không có rủi ro khoá tài khoản. Lưu ý mỗi lượt quét tốn một ít phí Apify tính theo số bài."
+    },
+    {
       "id": "google-ads",
       "name": "Google Ads",
       "icon": "/static/logos/google-ads.webp",

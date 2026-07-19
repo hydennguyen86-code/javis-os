@@ -4,7 +4,15 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
-## [0.9.108] - 2026-07-20
+## [0.9.109] - 2026-07-20
+Thêm connector **Theo dõi Facebook (Apify)** và plugin `fb-monitor-apify`: theo dõi Trang và Nhóm CÔNG KHAI để tìm bài viral (nhiều share) qua dịch vụ quét Apify, thay vì tự cào bằng cookie cá nhân. Không đụng tài khoản Facebook của user nên không lo khoá, chạy tốt trên VPS 24/7, trả về số share/react/bình luận để lọc bài hot. Đây là hướng đúng cho nhu cầu "theo dõi nhóm/trang tìm bài nhiều share" mà cookie cá nhân không kham nổi 24/7.
+### Thêm mới
+- **Connector `facebook-monitor`** (apikey, field `apify_token`): dán Personal API token của Apify (đăng ký free tại apify.com). Chỉ đọc, tốn phí Apify theo lượt (~2.6 USD/1000 bài). Khai trong `system/mcp-catalog.json`.
+- **Plugin `fb-monitor-apify`** (bundled) - tool `fb_monitor(urls, limit, min_shares)`: nhận danh sách link Trang/Nhóm công khai, tự chọn actor Apify theo URL (`/groups/` → `apify/facebook-groups-scraper`, còn lại → `apify/facebook-posts-scraper`), chạy đồng bộ qua `run-sync-get-dataset-items`, chuẩn hoá bài (share/react/bình luận/link/tác giả), lọc theo `min_shares` và sắp theo share giảm dần. readonly, không dùng tài khoản cá nhân.
+- Test `server/test_fb_monitor.py` (17 kiểm tra, không mạng): catalog hợp lệ, routing actor, bóc số share nhiều tên trường, lọc + sắp xếp, gộp lỗi.
+
+### Ghi chú
+- V1 chỉ Trang + Nhóm CÔNG KHAI (actor chính chủ Apify không vào nhóm kín). Nhóm KÍN là bước sau: cần actor nhận cookie + cookie tài khoản là thành viên, vẫn có chút rủi ro khoá.
 ### Cải thiện
 - **Đăng nhập ChatGPT qua trình duyệt báo lỗi rõ khi backend chưa sẵn**: nếu server đang chạy bản cũ (chưa có route browser OAuth), nút "Qua trình duyệt" trước đây mở một tab trắng (about:blank) không rõ vì sao. Giờ nó báo thẳng "Máy chủ chưa có chức năng này - khởi động lại Javis rồi tải lại trang" thay vì mở tab trắng.
 
