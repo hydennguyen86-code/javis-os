@@ -2027,6 +2027,7 @@
     try { d = await (await fetch("/oauth/openai/browser/start", { method: "POST" })).json(); }
     catch (e) { if (msg) msg.textContent = "Lỗi kết nối server."; return; }
     if (d.error) { if (msg) msg.textContent = "Lỗi: " + d.error; return; }
+    if (!d.authorize_url) { if (msg) msg.textContent = "Máy chủ chưa có chức năng này - khởi động lại Javis rồi tải lại trang (Ctrl+Shift+R)."; return; }
     try { window.open(d.authorize_url, "_blank"); } catch (e) {}
     if (msg) msg.innerHTML =
       `Đã mở trang <a href="${esc(safeHref(d.authorize_url))}" target="_blank">đăng nhập ChatGPT</a>. `

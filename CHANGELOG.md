@@ -4,6 +4,10 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.108] - 2026-07-20
+### Cải thiện
+- **Đăng nhập ChatGPT qua trình duyệt báo lỗi rõ khi backend chưa sẵn**: nếu server đang chạy bản cũ (chưa có route browser OAuth), nút "Qua trình duyệt" trước đây mở một tab trắng (about:blank) không rõ vì sao. Giờ nó báo thẳng "Máy chủ chưa có chức năng này - khởi động lại Javis rồi tải lại trang" thay vì mở tab trắng.
+
 ## [0.9.107] - 2026-07-19
 Thêm cách đăng nhập ChatGPT thứ hai qua trình duyệt (OAuth Authorization Code + PKCE), dành cho tài khoản Workspace bị chặn xác thực device-code. Trước đây Javis chỉ có một cách là device-code (nhập mã tại auth.openai.com/codex/device); Workspace nào tắt device-code thì không đăng nhập được. Cách mới dùng đúng luồng `codex login` mặc định.
 ### Thêm mới
