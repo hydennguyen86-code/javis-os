@@ -4,6 +4,11 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.89] - 2026-07-19
+Giao diện chat trên điện thoại gọn hẳn: ô nhập thành viên bo tròn lớn, header chỉ còn menu ☰ + chip model + nút hội thoại mới, dãy công cụ chuyển thành ngăn kéo trượt từ trái. Chỉ đổi bản điện thoại (màn hẹp dưới 860px), bản máy tính giữ nguyên. Có spec + plan ở `docs/superpowers/specs/2026-07-19-mobile-chat-declutter-design.md`.
+### Cải thiện
+- **Khung chat điện thoại gọn tối đa**: ô nhập nở to thành một viên (đính kèm bên trái, ô gõ chiếm gần hết bề ngang và tự cao lên, mic và nút gửi bên phải); bỏ hai hàng điều khiển chật (dải HỆ THỐNG/MCP và thanh công cụ ở đáy). Header rút còn ☰ (mở ngăn kéo công cụ) + chip model (bấm đổi model/engine như cũ) + nút hội thoại mới. Nút đọc tiếng dời khỏi thanh nhập. Bản máy tính không đổi.
+
 ## [0.9.88] - 2026-07-18
 Mỗi lần tải lại Javis giờ vào thẳng hội thoại mới thay vì mở lại phiên cũ. Chỉ đổi frontend, tải lại trang là có.
 ### Cải thiện
