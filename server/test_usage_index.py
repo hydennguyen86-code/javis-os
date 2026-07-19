@@ -107,10 +107,33 @@ check("api: chi cong phan moi (110/55)", _api2["input"] == 110 and _api2["output
 ui.refresh()
 check("api: idempotent (offset khong nap lai)", ui.totals_by("provider")["api"]["input"] == 110)
 
-# dong codex trong events KHONG duoc dem vao api (da co log tho codex -> tranh double count)
+# dong codex trong events KHONG lot vao nhom "api" (no la engine ChatGPT, gom rieng provider codex)
 usage_store.record("codex", "gpt-5.5", 999, 999, 0)
 ui.refresh()
-check("api: dong codex trong events bi bo qua", ui.totals_by("provider")["api"]["input"] == 110)
+check("api: dong codex trong events KHONG lan vao api", ui.totals_by("provider")["api"]["input"] == 110)
+
+
+# ============================================================
+# Task 5b: cli/codex events lam NGUON DU PHONG khi THIEU log tho (fix VPS bao cao 0 token)
+# ============================================================
+from datetime import datetime as _dt, timezone as _tz, timedelta as _td  # noqa: E402
+_today_vn = _dt.now(_tz(_td(hours=7))).strftime("%Y-%m-%d")
+# luot Claude qua SDK ghi provider "cli" vao usage-events; ngay HOM NAY khong co log tho claude
+_claude_before = ui.totals_by("provider")["claude"]["input"]        # 150 (log tho 2026-07-05)
+usage_store.record("cli", "sonnet", 700, 30, 0)
+ui.refresh()
+check("events: luot cli (Claude SDK) dem vao claude khi ngay do THIEU log tho",
+      ui.totals_by("provider")["claude"]["input"] == _claude_before + 700)
+
+# dedup: them log tho claude CUNG NGAY -> luot cli ngay do bi go, log tho thang, KHONG dem trung
+_c = ui._connect()
+_c.execute("INSERT INTO file_daily(path,day,provider,source,activity,model,project,input,output,cache_read,cache_create)"
+           " VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+           ("/raw/today.jsonl", _today_vn, "claude", "javis", "chat", "sonnet", "Demo", 1000, 40, 0, 0))
+_c.commit(); _c.close()
+ui.refresh()   # refresh chay _dedup_events_vs_raw
+check("events: dedup - log tho phu ngay nao thi go event ngay do (khong dem trung)",
+      ui.totals_by("provider")["claude"]["input"] == _claude_before + 1000)
 
 
 # ============================================================

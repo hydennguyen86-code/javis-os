@@ -170,10 +170,24 @@ def _scan_codex(conn) -> int:
     return n
 
 
-def _ingest_api_events(conn) -> int:
-    """Nap nhanh API tu usage-events.jsonl (append-only). Doc tu offset (so DONG da nap,
-    luu trong files_seen.offset). CHI lay provider API (openrouter/openai/anthropic) - dong
-    claude/codex bi bo qua vi da co log tho (tranh dem trung). Tra so event API moi nap."""
+# Map provider trong usage-events.jsonl -> provider chuan cua index. cli = engine Claude (SDK),
+# codex/openai-oauth = engine ChatGPT. Gom ve 'claude'/'codex' de tron dung cot voi log tho.
+_EVENT_CLAUDE = {"cli", "claude", "anthropic-cli"}
+_EVENT_CODEX = {"codex", "openai-oauth", "chatgpt", "oauth"}
+
+
+def _ingest_events(conn) -> int:
+    """Nap tu usage-events.jsonl (append-only, doc theo offset trong files_seen.offset).
+
+    - Provider API (openrouter/openai/anthropic...) -> provider='api': day la NGUON DUY NHAT
+      cho chung (khong co log tho).
+    - cli/codex CUNG nap vao day (provider 'claude'/'codex') lam NGUON DU PHONG: engine ghi so
+      token that vao usage-events moi luot, nen khi log tho KHONG co / khong doc duoc (ban Docker/
+      VPS, doi HOME, volume moi...) thi bao cao van co so thay vi 0. Chong dem trung: sau moi
+      refresh, _dedup_events_vs_raw() xoa dong-tu-event o NGAY da co log tho phu -> log tho luon
+      thang, event chi lap cho phan log tho thieu.
+
+    Tra so event moi nap lan nay."""
     path = str(_EVENTS_PATH)
     if not _EVENTS_PATH.exists():
         return 0
@@ -202,15 +216,23 @@ def _ingest_api_events(conn) -> int:
         except Exception:
             continue
         prov = (e.get("provider") or "").lower()
-        if prov not in _API_PROVIDERS:
-            continue
         tin = int(e.get("in") or 0)
         tout = int(e.get("out") or 0)
         if tin + tout <= 0:
             continue
-        events.append({"day": e.get("day") or "", "provider": "api", "source": "javis",
-                       "activity": "chat", "model": e.get("model") or "?", "project": "(api)",
-                       "input": tin, "output": tout, "cache_read": 0, "cache_create": 0})
+        day, model = e.get("day") or "", e.get("model") or "?"
+        if prov in _API_PROVIDERS:
+            events.append({"day": day, "provider": "api", "source": "javis", "activity": "chat",
+                           "model": model, "project": "(api)",
+                           "input": tin, "output": tout, "cache_read": 0, "cache_create": 0})
+        elif prov in _EVENT_CLAUDE:
+            events.append({"day": day, "provider": "claude", "source": "javis", "activity": "chat",
+                           "model": model, "project": "(events)",
+                           "input": tin, "output": tout, "cache_read": 0, "cache_create": 0})
+        elif prov in _EVENT_CODEX:
+            events.append({"day": day, "provider": "codex", "source": "javis", "activity": "chat",
+                           "model": model, "project": "(events)",
+                           "input": tin, "output": tout, "cache_read": 0, "cache_create": 0})
     if events:
         _insert_events(conn, path, events)
     conn.execute("INSERT INTO files_seen(path,size,mtime,offset) VALUES(?,?,?,?) "
@@ -219,15 +241,47 @@ def _ingest_api_events(conn) -> int:
     return len(events)
 
 
+def _dedup_events_vs_raw(conn) -> None:
+    """Log tho LUON thang: xoa cac dong nguon-event (path=usage-events.jsonl) cua claude/codex o
+    nhung NGAY da co log tho phu (dong provider do nhung path KHAC file event). Chay moi refresh
+    nen tu lanh du event den truoc hay log tho den truoc. Neu bao cao dang 0 vi log tho khong dong
+    gop dong nao -> khong co gi bi xoa -> event duoc giu, dung y do du phong."""
+    ev = str(_EVENTS_PATH)
+    for prov in ("claude", "codex"):
+        conn.execute(
+            "DELETE FROM file_daily WHERE path=? AND provider=? AND day IN "
+            "(SELECT DISTINCT day FROM file_daily WHERE provider=? AND path<>?)",
+            (ev, prov, prov, ev))
+
+
+# Marker migration: ban cu chi nap provider API tu usage-events.jsonl (bo cli/codex) va da day
+# offset qua het cac dong cli cu. Sau khi len ban moi, doc lai events tu DAU MOT LAN de backfill
+# lich su cli/codex; xoa row+offset cu cua events truoc nen API khong bi dem trung.
+_EVENTS_MIGRATE_MARK = "__events_migrate_v2__"
+
+
+def _migrate_events_once(conn) -> None:
+    row = conn.execute("SELECT offset FROM files_seen WHERE path=?", (_EVENTS_MIGRATE_MARK,)).fetchone()
+    if row:
+        return
+    ep = str(_EVENTS_PATH)
+    conn.execute("DELETE FROM file_daily WHERE path=?", (ep,))
+    conn.execute("DELETE FROM files_seen WHERE path=?", (ep,))
+    conn.execute("INSERT INTO files_seen(path,size,mtime,offset) VALUES(?,0,0,1) "
+                 "ON CONFLICT(path) DO NOTHING", (_EVENTS_MIGRATE_MARK,))
+
+
 def refresh() -> dict:
     """Quet tang dan ca 3 nguon. Tra so file/event thuc su xu ly lan nay."""
     res = {"claude_files": 0, "codex_files": 0, "api_events": 0}
     conn = _connect()
     try:
+        _migrate_events_once(conn)                  # 1 lan: backfill cli/codex tu events cu
         chat = _chat_sessions()
         res["claude_files"] = _scan_claude(conn, chat)
         res["codex_files"] = _scan_codex(conn)
-        res["api_events"] = _ingest_api_events(conn)
+        res["api_events"] = _ingest_events(conn)   # API + du phong cli/codex tu usage-events.jsonl
+        _dedup_events_vs_raw(conn)                  # log tho phu ngay nao thi xoa event ngay do
         conn.commit()
     finally:
         conn.close()

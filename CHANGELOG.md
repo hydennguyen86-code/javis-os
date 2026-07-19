@@ -4,6 +4,12 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.106] - 2026-07-19
+Sửa lỗi trang Mức dùng (token & chi phí) hiện toàn số 0 trên một số bản cài (điển hình VPS Docker). Nguyên nhân: chỉ số Claude/ChatGPT được dựng TỪ log thô (~/.claude/projects, ~/.codex/sessions); bản cài nào không có/không đọc được log thô đó thì mất trắng, dù mỗi lượt đã ghi số token thật vào usage-events.jsonl (nguồn này trước đây bị bỏ qua cho cli/codex).
+### Sửa lỗi
+- **Trang Mức dùng dùng usage-events làm nguồn dự phòng**: indexer giờ nạp cả lượt cli (Claude SDK) và codex/ChatGPT từ usage-events.jsonl khi log thô thiếu, nên báo cáo có số thay vì 0. Chống đếm trùng: ngày nào đã có log thô phủ thì bỏ dòng-từ-event ngày đó, log thô luôn thắng.
+- **Backfill lịch sử một lần**: sau khi lên bản này, indexer đọc lại usage-events.jsonl từ đầu đúng một lần để dựng lại lịch sử token cli/codex đã ghi trước đó (xoá dòng cũ trước nên nhánh API không bị đếm trùng).
+
 ## [0.9.105] - 2026-07-19
 Sửa lỗi trang Việc định kỳ báo "không tải được danh sách việc" trên VPS nặng. Nguyên nhân: /viec/all đếm số note của mọi brain (quét cả cây file) mỗi lần mở, vault lớn thì mất vài giây và reverse proxy cắt giữa chừng. VPS nhẹ thì kịp nên vẫn hiện, VPS nặng thì lỗi.
 ### Sửa lỗi
