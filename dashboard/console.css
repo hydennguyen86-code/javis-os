@@ -329,7 +329,10 @@ body.has-rail .hud { margin-left: var(--rail-w); width: calc(100% - var(--rail-w
 
   /* Header mobile: chỉ ☰ · chip model · ＋. Ẩn phần rườm rà. */
   .nav-toggle-btn, .new-chat-btn { display: inline-flex; }
-  .hud-top { position: relative; display: flex; align-items: center; gap: 6px; padding: 0 8px; }
+  /* Header CỐ ĐỊNH trên cùng: luôn thấy ☰/chip model/＋ ở mọi trang, không bị cuộn trôi mất. */
+  .hud-top { position: fixed; top: 0; left: 0; right: 0; height: 46px; z-index: 55;
+    background: var(--bg2); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 6px; padding: 0 8px; }
   .hud-top-left, .hud-top-right { display: none; }    /* rỗng ở mobile: ☰ · chip model · ＋ là con trực tiếp header */
   .hud-top .brand, .hud-top .navbar-brain,
   .hud-top #themeToggle, .hud-top #studioOpenBtn,
@@ -384,7 +387,8 @@ body.has-rail .hud { margin-left: var(--rail-w); width: calc(100% - var(--rail-w
   /* Trang quản lý (cview đè lên cockpit): KHOÁ cuộn body để header không trượt lộ quả cầu phía sau;
      nội dung trang tự cuộn trong .cview-body. */
   body.in-console { overflow: hidden; }
-  .hud { grid-template-rows: 46px 1fr auto; }         /* voice tự cao theo pill, bỏ 62px cứng */
+  body.in-console .hud-body { visibility: hidden; }   /* trang quản lý: giấu quả cầu cockpit phía sau (không lộ, không kéo được) */
+  .hud { grid-template-rows: 1fr auto; padding-top: 46px; }  /* header ra khỏi lưới (fixed) → chừa 46px + hàng body/voice */
   .hud-body { grid-template-columns: 1fr; overflow-y: auto; }
   .hud-left { display: none; }              /* số liệu KD ẩn trên mobile (xem ở Console) */
   .hud-center { min-height: 46vh; }
