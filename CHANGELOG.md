@@ -4,6 +4,11 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.97] - 2026-07-19
+Vá lỗi trên điện thoại: ở trang quản lý (Tổng quan, Kết nối...) quả cầu 2D phía sau bị lộ ra và trượt nhẹ ở mép trên header. Chỉ đổi bản điện thoại.
+### Sửa lỗi
+- **Quả cầu cockpit lộ sau lưng trang quản lý khi cuộn**: mobile bật cuộn body cho màn cockpit dài, nhưng trang quản lý (cview đè lên) khi cuộn nhẹ làm header trượt lên để lộ quả cầu 3D/2D phía sau. Nay khoá cuộn body khi đang ở trang quản lý (`body.in-console`), nội dung trang tự cuộn bên trong khung - header cố định, không còn lộ cockpit. Màn cockpit vẫn cuộn bình thường.
+
 ## [0.9.96] - 2026-07-19
 Vá nút + (hội thoại mới) trên header điện thoại: hết lệch khỏi header và bấm được. Chỉ đổi bản điện thoại.
 ### Sửa lỗi

@@ -381,6 +381,9 @@ body.has-rail .hud { margin-left: var(--rail-w); width: calc(100% - var(--rail-w
 
   /* Cockpit co lại 1 cột, cho cuộn dọc thay vì vỡ khung */
   body { overflow: auto; }
+  /* Trang quản lý (cview đè lên cockpit): KHOÁ cuộn body để header không trượt lộ quả cầu phía sau;
+     nội dung trang tự cuộn trong .cview-body. */
+  body.in-console { overflow: hidden; }
   .hud { grid-template-rows: 46px 1fr auto; }         /* voice tự cao theo pill, bỏ 62px cứng */
   .hud-body { grid-template-columns: 1fr; overflow-y: auto; }
   .hud-left { display: none; }              /* số liệu KD ẩn trên mobile (xem ở Console) */
