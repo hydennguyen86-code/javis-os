@@ -3219,10 +3219,8 @@ async def viec_all():
     để thấy cả việc nằm ở brain chưa từng mở trên dashboard - đây là gốc của cái rối 'tạo qua
     Telegram vào brain mặc định, tìm ở brain khác không thấy'."""
     loop_feature.ensure_migrated()
-    bd = await list_brains()
-    out = []
-    for b in (bd.get("brains") or []):
-        name, path = b.get("name") or "", b.get("path") or ""
+
+    def _brain_viec(name: str, path: str, is_default: bool) -> dict:
         try:
             st_all = loop_feature.read_state(path)
             loops = []
@@ -3241,8 +3239,40 @@ async def viec_all():
             rems = []
         if loops or rems:
             loop_feature.register_brain(path)   # brain có việc → scheduler nền quét
-        out.append({"name": name, "path": path, "is_default": b.get("is_default", False),
-                    "loops": loops, "reminders": rems})
+        return {"name": name, "path": path, "is_default": is_default,
+                "loops": loops, "reminders": rems}
+
+    bd = await list_brains()
+    out = []
+    seen = set()
+    for b in (bd.get("brains") or []):
+        name, path = b.get("name") or "", b.get("path") or ""
+        try:
+            seen.add(str(Path(path).resolve()))
+        except Exception:
+            pass
+        out.append(_brain_viec(name, path, b.get("is_default", False)))
+
+    # Gộp thêm brain đã ĐĂNG KÝ với scheduler nhưng KHÔNG nằm trong BRAINS_DIR (folder ngoài, hoặc
+    # brain legacy trong loop_config). Trước đây chỉ quét list_brains() nên loop tạo qua chat vào
+    # brain ngoài VẪN CHẠY (scheduler quét) mà KHÔNG hiện ở tab Việc → đúng triệu chứng khách báo.
+    try:
+        extra = loop_feature.scheduler_brains()
+    except Exception:
+        extra = []
+    for bident in extra:
+        try:
+            ep = _brain_root(bident)
+            rp = str(Path(ep).resolve())
+        except Exception:
+            continue
+        if rp in seen or not os.path.isdir(ep):
+            continue
+        seen.add(rp)
+        v = _brain_viec(Path(ep).name, ep, False)
+        if v["loops"] or v["reminders"]:   # brain ngoài chỉ hiện khi thực sự có việc (tránh rác)
+            out.append(v)
+
     return {"brains": out, "running": loop_feature.lock.locked(),
             "running_slug": loop_feature._running[1] if loop_feature._running else ""}
 

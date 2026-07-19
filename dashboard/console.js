@@ -783,28 +783,42 @@
     el.innerHTML = `<div class="cview-section">
       <p style="color:#9fb0cf;font-size:15px;max-width:680px;margin:0 0 14px">Nhiều <b>loop</b> chạy ngầm: mỗi loop tự thức theo chu kỳ, làm <b>một việc</b> anh mô tả, tự kiểm chứng rồi ghi log. Thực thi <b>tuần tự</b> (1 vòng/lúc). Loop <b>đọc được dữ liệu thật qua MCP</b> (POS, quảng cáo, lịch...) để làm việc, nhưng KHÔNG tự tạo đơn/tiêu tiền/đăng bài - chỉ ghi nháp để anh duyệt.</p>
       <div class="si-actions" style="margin-bottom:14px">
-        <button class="s-btn" id="lpNew">+ Loop mới</button>
+        <button class="s-btn" id="lpNew">+ Thêm việc</button>
         <button class="s-btn-ghost" id="lpStop">■ Dừng vòng đang chạy</button>
       </div>
       <div id="lpForm" style="display:none;margin-bottom:14px;padding:14px;border:1px solid rgba(255,255,255,.1);border-radius:10px;background:rgba(255,255,255,.03)">
         <input type="hidden" id="lpSlug">
         <div class="si-grid">
-          <div class="si-field"><label>Tên loop</label><input id="lpName" placeholder="VD: Đọc source mỗi 2 tiếng"></div>
-          <div class="si-field"><label>Mô tả nhiệm vụ (mỗi vòng Javis làm đúng việc này)</label>
+          <div class="si-field"><label>Loại việc</label><div class="si-row" id="lpKind">
+            <button class="si-chip sel" data-kind="loop">🔁 Việc lặp</button>
+            <button class="si-chip" data-kind="reminder">⏰ Nhắc hẹn</button></div></div>
+          <div class="si-field"><label>Tên</label><input id="lpName" placeholder="VD: Đọc email mỗi 2 tiếng"></div>
+          <div class="si-field"><label id="lpBodyLabel">Mô tả nhiệm vụ (mỗi vòng Javis làm đúng việc này)</label>
             <textarea id="lpBody" placeholder="VD: Mỗi vòng đọc 1 source chưa xử lý trong 06 - Sources rồi đề xuất Wiki page nên tạo. Hoặc: đọc số đơn hôm nay qua MCP POS, nếu thấp thì soạn nháp 1 caption đẩy hàng vào 05 - Projects."></textarea></div>
-          <div class="si-row" style="gap:14px;flex-wrap:wrap">
-            <div class="si-field"><label>Chế độ</label><div class="si-row" id="lpModes">
-              <button class="si-chip" data-mode="suggest">Đề xuất (chỉ đọc)</button>
-              <button class="si-chip" data-mode="auto">Tự làm (an toàn)</button>
-              <button class="si-chip" data-mode="full" style="border-color:rgba(224,102,74,.5)">⚠ Toàn quyền</button></div></div>
-            <div class="si-field"><label>Chu kỳ (phút, tối thiểu 5)</label><input type="number" id="lpInterval" min="5" value="120" style="max-width:120px"></div>
-            <div class="si-field"><label>Brain (nơi lưu việc)</label><select id="lpBrain" class="loop-sel" style="min-width:180px"></select></div>
+          <div id="lpLoopFields">
+            <div class="si-row" style="gap:14px;flex-wrap:wrap">
+              <div class="si-field"><label>Chế độ</label><div class="si-row" id="lpModes">
+                <button class="si-chip" data-mode="suggest">Đề xuất (chỉ đọc)</button>
+                <button class="si-chip" data-mode="auto">Tự làm (an toàn)</button>
+                <button class="si-chip" data-mode="full" style="border-color:rgba(224,102,74,.5)">⚠ Toàn quyền</button></div></div>
+              <div class="si-field"><label>Chu kỳ (phút, tối thiểu 5)</label><input type="number" id="lpInterval" min="5" value="120" style="max-width:120px"></div>
+            </div>
           </div>
+          <div id="lpRemFields" style="display:none">
+            <div class="si-row" style="gap:14px;flex-wrap:wrap">
+              <div class="si-field"><label>Khi nào</label><input id="lpRemWhen" placeholder="30 phút nữa · 8h30 · 0 7 * * * · 2026-07-20 09:00" style="min-width:260px"></div>
+              <div class="si-field"><label>Kiểu</label><div class="si-row" id="lpRemModes">
+                <button class="si-chip sel" data-rmode="notify">⏰ Chỉ nhắc</button>
+                <button class="si-chip" data-rmode="task">🤖 Tự làm rồi báo</button></div></div>
+            </div>
+            <div class="dim" style="font-size:12px;color:#6b7894;margin-top:4px">Nhắc một lần: "30 phút nữa", "8h30", "2026-07-20 09:00". Lặp theo giờ cố định: cron 5 trường (vd "0 7 * * *" = 7h sáng mỗi ngày). "Chỉ nhắc" = bắn tin nhắc anh; "Tự làm rồi báo" = Javis chạy việc (đọc MCP, ghi nháp) rồi báo kết quả.</div>
+          </div>
+          <div class="si-field"><label>Brain (nơi lưu việc)</label><select id="lpBrain" class="loop-sel" style="min-width:180px"></select></div>
           <div id="lpFullWarn" style="display:none;margin-top:4px;padding:10px 12px;border:1px solid rgba(224,102,74,.5);border-radius:8px;background:rgba(224,102,74,.08);color:#ffb59e;font-size:13px;line-height:1.5">
             <b>⚠ CHẾ ĐỘ TOÀN QUYỀN - rủi ro cao.</b> Loop sẽ tự thao tác THẬT qua MCP không cần hỏi: có thể <b>tạo/sửa đơn hàng, chạy quảng cáo (tiêu tiền thật), gửi tin nhắn/email, đăng bài</b>. Nó chạy nền theo lịch, KHÔNG có người duyệt từng bước, và <b>hành động thật không hoàn tác được</b>. Chỉ bật khi anh đã tin tưởng loop này và mô tả nhiệm vụ thật rõ ràng, giới hạn phạm vi. Nên chạy thử ở "Đề xuất" hoặc "Tự làm (an toàn)" trước.
           </div>
-          <div class="dim" style="font-size:12px;color:#6b7894;margin-top:2px">Đề xuất = chỉ đọc + gợi ý. Tự làm (an toàn) = ghi nháp file + đọc MCP, KHÔNG tiền/đơn/đăng bài. Toàn quyền = tự thao tác mọi thứ. · Tinh chỉnh nâng cao (giờ im lặng, trần vòng/ngày, thư mục code): sửa file <code>Javis/loops/&lt;tên&gt;.md</code>.</div>
-          <div class="si-actions"><button class="s-btn" id="lpSave">💾 Lưu loop</button><button class="s-btn-ghost" id="lpCancel">Huỷ</button><span class="dim" id="lpFormMsg" style="font-size:13px;color:#e0a04a"></span></div>
+          <div class="dim" id="lpLoopNote" style="font-size:12px;color:#6b7894;margin-top:2px">Đề xuất = chỉ đọc + gợi ý. Tự làm (an toàn) = ghi nháp file + đọc MCP, KHÔNG tiền/đơn/đăng bài. Toàn quyền = tự thao tác mọi thứ. · Tinh chỉnh nâng cao (giờ im lặng, trần vòng/ngày, thư mục code): sửa file <code>Javis/loops/&lt;tên&gt;.md</code>.</div>
+          <div class="si-actions"><button class="s-btn" id="lpSave">💾 Lưu</button><button class="s-btn-ghost" id="lpCancel">Huỷ</button><span class="dim" id="lpFormMsg" style="font-size:13px;color:#e0a04a"></span></div>
         </div>
       </div>
       <div id="lpGroups">Đang tải...</div>
@@ -812,14 +826,71 @@
     </div>`;
 
     let fcur = { mode: "suggest" };
+    let fkind = "loop";      // loại việc đang tạo: loop (việc lặp) | reminder (nhắc hẹn)
+    let frmode = "notify";   // kiểu nhắc hẹn: notify (chỉ nhắc) | task (tự làm rồi báo)
     function syncFormChips() {
       el.querySelectorAll("#lpModes .si-chip").forEach(x => x.classList.toggle("sel", x.dataset.mode === fcur.mode));
-      const w = el.querySelector("#lpFullWarn"); if (w) w.style.display = (fcur.mode === "full") ? "block" : "none";
+      const w = el.querySelector("#lpFullWarn"); if (w) w.style.display = (fcur.mode === "full" && fkind === "loop") ? "block" : "none";
     }
     el.querySelectorAll("#lpModes .si-chip").forEach(c => c.onclick = () => { fcur.mode = c.dataset.mode; syncFormChips(); });
 
+    // Chuyển giao diện form theo loại việc: loop hiện chế độ + chu kỳ; nhắc hẹn hiện thời điểm + kiểu.
+    function syncKindUI() {
+      el.querySelectorAll("#lpKind .si-chip").forEach(x => x.classList.toggle("sel", x.dataset.kind === fkind));
+      const isRem = fkind === "reminder";
+      const q = id => el.querySelector(id);
+      if (q("#lpLoopFields")) q("#lpLoopFields").style.display = isRem ? "none" : "";
+      if (q("#lpRemFields")) q("#lpRemFields").style.display = isRem ? "" : "none";
+      if (q("#lpLoopNote")) q("#lpLoopNote").style.display = isRem ? "none" : "";
+      if (isRem && q("#lpFullWarn")) q("#lpFullWarn").style.display = "none";
+      q("#lpBodyLabel").textContent = isRem
+        ? "Nội dung nhắc (Javis sẽ nhắc hoặc làm đúng việc này)"
+        : "Mô tả nhiệm vụ (mỗi vòng Javis làm đúng việc này)";
+    }
+    el.querySelectorAll("#lpKind .si-chip").forEach(c => c.onclick = () => {
+      if (el.querySelector("#lpSlug").value) return;   // đang SỬA loop → khoá loại, không đổi sang nhắc
+      fkind = c.dataset.kind; syncKindUI();
+    });
+    el.querySelectorAll("#lpRemModes .si-chip").forEach(c => c.onclick = () => {
+      frmode = c.dataset.rmode;
+      el.querySelectorAll("#lpRemModes .si-chip").forEach(x => x.classList.toggle("sel", x.dataset.rmode === frmode));
+    });
+
+    // "Khi nào" (nhắc hẹn) → payload cho POST /reminders. Cron 5 trường/@macro → {cron};
+    // "N phút/tiếng/giờ/ngày [nữa]" → {delay_min}; còn lại (8h30, 07:00, ngày giờ) → {at} để
+    // reminders.resolve_due tự hiểu. Chỉ nhận đơn-vị-chữ cho delay để "8h" vẫn là mốc giờ 8h.
+    function parseReminderWhen(s) {
+      s = (s || "").trim();
+      if (!s) return null;
+      if (s[0] === "@") return { cron: s };
+      const toks = s.split(/\s+/);
+      if (toks.length === 5 && toks.every(t => /^[\d*/,\-]+$/.test(t))) return { cron: s };
+      // KHÔNG dùng \b sau đơn vị: \b của JS là ranh giới ASCII, mà "giờ" kết thúc bằng ký tự có
+      // dấu ("ờ") nên "1.5 giờ" ở cuối chuỗi sẽ trượt. Alternation đã đủ đặc trưng để không khớp bừa.
+      const m = s.toLowerCase().match(/^(\d+(?:[.,]\d+)?)\s*(phút|phut|tiếng|tieng|giờ|gio|ngày|ngay)/);
+      if (m) {
+        const num = parseFloat(m[1].replace(",", "."));
+        const u = m[2];
+        const mins = (u === "ngày" || u === "ngay") ? num * 1440
+          : (u === "tiếng" || u === "tieng" || u === "giờ" || u === "gio") ? num * 60 : num;
+        return { delay_min: Math.max(1, Math.round(mins)) };
+      }
+      return { at: s };
+    }
+
     let allLoops = [];    // phẳng mọi brain - cho bộ lọc nhật ký (log per brain+slug)
     let allBrains = [];   // [{name, path, is_default}] - cho ô chọn brain (tạo mới + chuyển)
+
+    // Nạp danh sách brain cho ô chọn ĐỘC LẬP với /viec/all (vốn nặng: quét note mọi brain).
+    // /brains là nguồn chuẩn của sidebar - nhanh + luôn sẵn, nên form không bao giờ trống ô brain
+    // dù /viec/all còn đang tải hoặc lỗi. Đây là gốc bug "phần brain không thấy để chọn".
+    async function ensureBrains() {
+      if (allBrains.length) return;
+      try {
+        const d = await (await fetch("/brains")).json();
+        allBrains = (d.brains || []).map(b => ({ name: b.name, path: b.path, is_default: b.is_default }));
+      } catch (e) {}
+    }
 
     function isCurrentBrain(b) {
       const cur = fbrain();   // path brain đang chọn ở sidebar, hoặc "brain" (mặc định)
@@ -831,13 +902,20 @@
         .map(b => `<option value="${esc(b.path)}">${esc(b.name)}</option>`).join("");
     }
 
-    function openForm(lp) {
+    async function openForm(lp) {
+      await ensureBrains();   // đảm bảo ô brain luôn có lựa chọn dù /viec/all chưa tải xong
       fcur = { mode: lp ? lp.mode : "suggest" };
+      // Form này chỉ SỬA loop (nhắc hẹn không sửa ở đây, chỉ huỷ/chuyển trên thẻ). Tạo mới → về loop.
+      fkind = "loop"; frmode = "notify";
       el.querySelector("#lpSlug").value = lp ? lp.slug : "";
       el.querySelector("#lpName").value = lp ? lp.name : "";
       el.querySelector("#lpBody").value = lp ? (lp.body || "") : "";
       el.querySelector("#lpInterval").value = lp ? lp.interval_min : 120;
+      el.querySelector("#lpRemWhen").value = "";
+      el.querySelectorAll("#lpRemModes .si-chip").forEach(x => x.classList.toggle("sel", x.dataset.rmode === "notify"));
       el.querySelector("#lpFormMsg").textContent = "";
+      // Khoá bộ chọn loại khi SỬA (chỉ đổi được lúc tạo mới); mờ đi cho rõ.
+      el.querySelectorAll("#lpKind .si-chip").forEach(x => { x.disabled = !!lp; x.style.opacity = lp ? .45 : 1; });
       // Ô chọn brain: TẠO MỚI cho chọn (mặc định brain đang xem); SỬA thì khoá về brain của loop
       // (đổi brain lúc sửa sẽ đẻ file mới ở brain khác mà bản gốc vẫn còn - muốn dời thì dùng nút
       // "Chuyển sang brain" trên thẻ, có kiểm tra trùng + dời state đàng hoàng).
@@ -847,6 +925,7 @@
       bsel.innerHTML = allBrains.map(b =>
         `<option value="${esc(b.path)}" ${b.path === defPath ? "selected" : ""}>${esc(b.name)}</option>`).join("");
       bsel.disabled = !!lp;
+      syncKindUI();
       syncFormChips();
       el.querySelector("#lpForm").style.display = "block";
       el.querySelector("#lpName").focus();
@@ -857,8 +936,30 @@
     el.querySelector("#lpSave").onclick = async () => {
       const name = el.querySelector("#lpName").value.trim();
       const body = el.querySelector("#lpBody").value.trim();
-      if (!name) { el.querySelector("#lpFormMsg").textContent = "Nhập tên loop"; return; }
-      if (!body) { el.querySelector("#lpFormMsg").textContent = "Nhập mô tả nhiệm vụ (Javis cần biết mỗi vòng làm gì)"; return; }
+      const msg = el.querySelector("#lpFormMsg");
+      const brainVal = el.querySelector("#lpBrain").value || fbrain();   // brain đích do user chọn
+      const b = el.querySelector("#lpSave");
+      if (!name) { msg.textContent = "Nhập tên"; return; }
+      if (!body) { msg.textContent = fkind === "reminder" ? "Nhập nội dung nhắc" : "Nhập mô tả nhiệm vụ (Javis cần biết mỗi vòng làm gì)"; return; }
+
+      // NHẮC HẸN → POST /reminders (kho reminders, JSON). Một lần hoặc lặp cron.
+      if (fkind === "reminder") {
+        const timePayload = parseReminderWhen(el.querySelector("#lpRemWhen").value);
+        if (!timePayload) { msg.textContent = 'Nhập thời điểm (vd "30 phút nữa", "8h30", "0 7 * * *")'; return; }
+        b.textContent = "Đang lưu...";
+        const payload = Object.assign(
+          { text: body, label: name, mode: frmode, brain: brainVal, created_by: "dashboard" }, timePayload);
+        let r = {};
+        try { r = await (await fetch("/reminders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })).json(); }
+        catch (e) { r = { error: e.message }; }
+        b.textContent = "💾 Lưu";
+        if (!r.ok) { msg.textContent = "⚠ " + (r.error || "Lưu lỗi"); return; }
+        el.querySelector("#lpForm").style.display = "none";
+        loadAll();
+        return;
+      }
+
+      // LOOP → POST /loops (file Javis/loops/<slug>.md).
       if (fcur.mode === "full" && !confirm(`Bật CHẾ ĐỘ TOÀN QUYỀN cho loop "${name}"?\n\nLoop sẽ tự thao tác THẬT qua MCP không cần hỏi: tạo/sửa đơn, chạy quảng cáo (tiêu tiền thật), gửi tin, đăng bài. Chạy nền theo lịch, KHÔNG duyệt từng bước, hành động KHÔNG hoàn tác được.\n\nAnh chắc chắn chứ?`)) return;
       const fd = new FormData();
       fd.append("slug", el.querySelector("#lpSlug").value);
@@ -866,13 +967,13 @@
       fd.append("mode", fcur.mode);
       fd.append("interval_min", el.querySelector("#lpInterval").value || "120");
       fd.append("body", body);
-      fd.append("brain", el.querySelector("#lpBrain").value || fbrain());   // brain đích do user chọn
+      fd.append("brain", brainVal);
       // Không gửi goal/workspace/tools_profile/quiet/maxruns → server giữ giá trị cũ (khi sửa)
       // hoặc mặc định an toàn (tạo mới: goal=custom, vault + MCP đọc).
-      const b = el.querySelector("#lpSave"); b.textContent = "Đang lưu...";
+      b.textContent = "Đang lưu...";
       let r = {}; try { r = await (await fetch("/loops", { method: "POST", body: fd })).json(); } catch (e) { r = { error: e.message }; }
-      b.textContent = "💾 Lưu loop";
-      if (!r.ok) { el.querySelector("#lpFormMsg").textContent = "⚠ " + (r.error || "Lưu lỗi"); return; }
+      b.textContent = "💾 Lưu";
+      if (!r.ok) { msg.textContent = "⚠ " + (r.error || "Lưu lỗi"); return; }
       el.querySelector("#lpForm").style.display = "none";
       loadAll(); loadLog();
     };
@@ -984,11 +1085,20 @@
     // xem ở sidebar lên đầu; brain khác rỗng thì ẩn. Mỗi item mang brain_path riêng.
     async function loadAll() {
       if (myGen !== _renderGen) return;
-      let d = { brains: [] };
-      try { d = await (await fetch("/viec/all")).json(); } catch (e) {}
+      let d = null, loadErr = false;
+      try { d = await (await fetch("/viec/all")).json(); } catch (e) { loadErr = true; }
       if (myGen !== _renderGen) return;
       const box = el.querySelector("#lpGroups");
       if (!box) return;
+      // /viec/all lỗi/hết-giờ (VPS chậm) → BÁO RÕ + cho thử lại, KHÔNG im lặng hiện "chưa có việc"
+      // (dễ tưởng việc biến mất). Giữ danh sách brain cũ + ensureBrains cho ô chọn của form.
+      if (loadErr || !d || !d.brains) {
+        ensureBrains();
+        box.innerHTML = `<div class="empty">Không tải được danh sách việc (mạng chậm hoặc hết giờ). <a href="#" id="lpRetry" style="color:#6ea8fe">Thử lại</a></div>`;
+        const rt = el.querySelector("#lpRetry");
+        if (rt) rt.onclick = (ev) => { ev.preventDefault(); loadAll(); loadLog(); };
+        return;
+      }
       allBrains = (d.brains || []).map(b => ({ name: b.name, path: b.path, is_default: b.is_default }));
       allLoops = [];
       const groups = (d.brains || []).slice().sort((a, b) => {
@@ -1011,7 +1121,7 @@
         if (!loops.length && !rems.length) {
           const e2 = document.createElement("div");
           e2.className = "empty"; e2.style.margin = "0 0 10px";
-          e2.innerHTML = `Chưa có việc nào ở brain này. Bấm <b>+ Loop mới</b>, hoặc nói với Javis trong chat.`;
+          e2.innerHTML = `Chưa có việc nào ở brain này. Bấm <b>+ Thêm việc</b>, hoặc nói với Javis trong chat.`;
           box.appendChild(e2);
         }
         loops.forEach(lp => { allLoops.push(lp); box.appendChild(loopCard(lp)); });
@@ -1024,7 +1134,7 @@
         }
       });
       if (!anyItem) {
-        box.innerHTML = `<div class="empty">Chưa có việc định kỳ hay nhắc hẹn nào. Bấm <b>+ Loop mới</b>, hoặc nói với Javis trong chat (vd "tạo loop mỗi 2 tiếng đọc 1 source rồi đề xuất").</div>`;
+        box.innerHTML = `<div class="empty">Chưa có việc định kỳ hay nhắc hẹn nào. Bấm <b>+ Thêm việc</b>, hoặc nói với Javis trong chat (vd "tạo loop mỗi 2 tiếng đọc 1 source rồi đề xuất").</div>`;
       }
       // Bộ lọc nhật ký: mọi loop mọi brain (value = index vào allLoops → biết cả brain lẫn slug).
       const sel = el.querySelector("#lpLogFilter");
@@ -1047,6 +1157,7 @@
       box.innerHTML = (d.entries || []).length ? d.entries.map(e => `<div class="le">${esc(e)}</div>`).join("") : `<div class="dim" style="color:#6b7894">Chưa có nhật ký.</div>`;
     }
     el.querySelector("#lpLogFilter").onchange = loadLog;
+    ensureBrains();   // nạp sẵn danh sách brain cho ô chọn (không chờ /viec/all vốn nặng)
     loadAll(); loadLog();
   }
 

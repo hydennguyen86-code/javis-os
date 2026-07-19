@@ -4,6 +4,14 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.104] - 2026-07-19
+Trang Việc định kỳ hết cảnh tạo tay mà ô Brain trống, và giờ thêm được cả nhắc hẹn ngay trong form chứ không chỉ loop. Loop tạo qua chat rơi vào brain nào cũng hiện được.
+### Thêm mới
+- **Thêm nhắc hẹn ngay trong form Việc định kỳ**: nút "+ Thêm việc" cho chọn "Việc lặp" hay "Nhắc hẹn". Nhắc hẹn nhận thời điểm linh hoạt ("30 phút nữa", "8h30", cron "0 7 * * *", hoặc ngày giờ đầy đủ) và kiểu "Chỉ nhắc" hoặc "Tự làm rồi báo", lưu thẳng vào kho nhắc hẹn của brain đã chọn.
+### Sửa lỗi
+- **Ô chọn Brain trống khi tạo việc tay**: ô Brain trước đây chỉ đổ sau khi /viec/all (quét note mọi brain, chậm trên VPS) tải xong, bấm sớm là trống và không tự đổ lại. Giờ đổ độc lập từ /brains nên luôn có lựa chọn dù danh sách việc còn đang tải.
+- **Loop tạo qua chat chạy nhưng không hiện ở tab Việc**: /viec/all giờ gộp cả brain đã đăng ký với scheduler nằm ngoài thư mục brains, nên loop chạy nền ở brain ngoài cũng hiện. Khi /viec/all lỗi hoặc quá chậm thì báo rõ kèm nút Thử lại thay vì im lặng hiện "chưa có việc".
+
 ## [0.9.103] - 2026-07-19
 Phần Skills trong Studio trên điện thoại giờ dễ đọc, dễ bấm. Trước đây dưới 860px khung Skills vẫn giữ 2 cột như máy tính (cột nhóm 210px + cột skill), khiến cột skill chỉ còn khoảng 150px và mô tả bị xuống dòng mỗi chữ một dòng; các nút Sửa/Xuất/Xoá lại chỉ hiện khi rê chuột nên trên điện thoại không bao giờ bấm được. Chỉ đổi bản điện thoại.
 ### Cải thiện
