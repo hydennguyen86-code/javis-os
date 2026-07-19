@@ -2069,6 +2069,27 @@
     };
   }
 
+  // Wizard cài đặt cho connector tự-tạo-app (Facebook/Meta): nút mở thẳng trang Developer
+  // + ô Redirect URI kèm nút sao chép. Chỉ hiện khi connector khai auth.setup trong catalog.
+  function oauthWizard(con) {
+    const s = con.setup || {};
+    const hasLinks = Array.isArray(s.links) && s.links.length;
+    if (!hasLinks && !s.redirect) return "";
+    let h = '<div class="conn-wizard">';
+    if (hasLinks) {
+      h += '<div class="wiz-links">' + s.links.map(l =>
+        '<button type="button" class="mp-btn wiz-open" data-url="' + esc(l.url) + '">' + esc(l.label) + ' ↗</button>'
+      ).join("") + '</div>';
+    }
+    if (s.redirect) {
+      const uri = 'http://localhost:' + (location.port || '7777') + '/connect/oauth/callback';
+      h += '<label class="mcp-lb">Redirect URI - dán vào ô "Valid OAuth Redirect URIs" (Facebook Login &gt; Settings)'
+        + '<div class="wiz-copy"><input class="js-input" id="wizRedirect" readonly value="' + esc(uri) + '">'
+        + '<button type="button" class="mp-btn wiz-copy-btn" id="wizCopy">Sao chép</button></div></label>';
+    }
+    return h + '</div>';
+  }
+
   function openOauthFlow(el, con) {
     // Provider không tự đăng ký client (vd Google) khai sẵn fields client_id/secret user tự tạo.
     const fields = (con.fields || []).map(f =>
@@ -2077,9 +2098,19 @@
     const m = connModal(mHead("KẾT NỐI " + esc((con.name || "").toUpperCase()))
       + '<div class="conn-form"><div class="conn-guide">' + esc(con.guide || "Đăng nhập bằng tài khoản của nhà cung cấp.")
       + (con.guide_url ? ' <a href="' + esc(con.guide_url) + '" target="_blank">Hướng dẫn ↗</a>' : "") + '</div>'
+      + oauthWizard(con)
       + fields
       + '<button class="mp-btn primary" id="oGo">' + (fields ? "Lưu & mở trang đăng nhập" : "Mở trang đăng nhập") + '</button></div>'
       + '<div class="mp-foot"><span class="mp-note" id="oErr"></span><button class="mp-btn" data-act="close">Đóng</button></div>');
+    m.querySelectorAll(".wiz-open").forEach(b => { b.onclick = () => window.open(b.dataset.url, "_blank", "noopener"); });
+    const wizCopy = m.querySelector("#wizCopy");
+    if (wizCopy) wizCopy.onclick = async () => {
+      const inp = m.querySelector("#wizRedirect");
+      try { await navigator.clipboard.writeText(inp.value); }
+      catch (e) { inp.select(); try { document.execCommand("copy"); } catch (_) {} }
+      wizCopy.textContent = "Đã chép ✓";
+      setTimeout(() => { wizCopy.textContent = "Sao chép"; }, 1400);
+    };
     m.querySelector("#oGo").onclick = async () => {
       const err = m.querySelector("#oErr"), go = m.querySelector("#oGo");
       const fieldsVal = {};

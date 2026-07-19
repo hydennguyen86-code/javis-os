@@ -305,8 +305,15 @@
           { "key": "client_id", "label": "App ID (Facebook)", "placeholder": "vd 1122334455667788" },
           { "key": "client_secret", "label": "App Secret (Facebook)", "placeholder": "vd a1b2c3d4e5f6..." }
         ],
-        "guide": "Làm 1 lần (~10 phút): (1) Vào developers.facebook.com/apps > Create App > chọn loại 'Business' (hoặc 'Other'), đặt tên bất kỳ. (2) Trong app, thêm sản phẩm 'Facebook Login' THƯỜNG (không phải 'for Business'). (3) Facebook Login > Settings > 'Valid OAuth Redirect URIs' dán CHÍNH XÁC: http://localhost:7777/connect/oauth/callback (dùng 'localhost' KHÔNG phải 127.0.0.1; nếu bạn chạy Javis cổng khác thì đổi 7777). (4) GIỮ app ở chế độ Development (góc trên), và đảm bảo bạn là Admin của app + ad account - khi đó tự cấp được quyền ads_read mà KHÔNG cần App Review. (5) App Settings > Basic: copy App ID + App Secret, dán vào ô dưới rồi bấm Kết nối. Token sống ~60 ngày, Javis tự gia hạn khi còn dùng; hết hạn thì bấm Kết nối lại.",
-        "guide_url": "https://developers.facebook.com/docs/marketing-api/get-started/authorization"
+        "guide": "Làm 1 lần (~10 phút): (1) Bấm 'Bước 1: Tạo App mới' bên dưới > chọn loại 'Business' (hoặc 'Other'), đặt tên bất kỳ. (2) Trong app thêm sản phẩm 'Facebook Login' THƯỜNG (không phải 'for Business'). (3) Facebook Login > Settings > ô 'Valid OAuth Redirect URIs': dán đúng địa chỉ ở nút 'Sao chép' bên dưới (dùng 'localhost' KHÔNG phải 127.0.0.1). (4) GIỮ app ở chế độ Development (góc trên) và đảm bảo bạn là Admin của app + ad account - khi đó tự cấp được quyền ads_read mà KHÔNG cần App Review. (5) App Settings > Basic: copy App ID + App Secret dán vào ô dưới rồi bấm Kết nối. Token sống ~60 ngày, Javis tự gia hạn; hết hạn thì Kết nối lại.",
+        "guide_url": "https://developers.facebook.com/docs/marketing-api/get-started/authorization",
+        "setup": {
+          "redirect": true,
+          "links": [
+            { "label": "Bước 1: Tạo App mới", "url": "https://developers.facebook.com/apps/creation/" },
+            { "label": "App của tôi", "url": "https://developers.facebook.com/apps/" }
+          ]
+        }
       },
       "tool_meta": {
         "read": ["meta_ads_*"]
@@ -333,8 +340,15 @@
           { "key": "client_id", "label": "App ID (Facebook)", "placeholder": "vd 1122334455667788" },
           { "key": "client_secret", "label": "App Secret (Facebook)", "placeholder": "vd a1b2c3d4e5f6..." }
         ],
-        "guide": "Làm 1 lần (~5 phút), dùng lại được app bạn đã tạo cho Meta Ads: (1) Vào developers.facebook.com/apps > Create App > loại 'Business' (hoặc 'Other'), đặt tên bất kỳ. (2) Thêm sản phẩm 'Facebook Login' THƯỜNG (không phải 'for Business'). (3) Facebook Login > Settings > 'Valid OAuth Redirect URIs' dán CHÍNH XÁC: http://localhost:7777/connect/oauth/callback (dùng 'localhost' KHÔNG phải 127.0.0.1; nếu chạy Javis cổng khác thì đổi 7777). (4) GIỮ app ở chế độ Development (góc trên), và đảm bảo bạn là Admin của app + là Admin của các Trang muốn quản lý - khi đó tự cấp được quyền Trang mà KHÔNG cần App Review. (5) App Settings > Basic: copy App ID + App Secret, dán vào ô dưới rồi bấm Kết nối. Khi Facebook hỏi quyền, nhớ TICK chọn các Trang bạn muốn Javis quản lý. Token sống ~60 ngày, Javis tự gia hạn khi còn dùng; hết hạn thì bấm Kết nối lại.",
-        "guide_url": "https://developers.facebook.com/docs/pages-api/getting-started"
+        "guide": "Làm 1 lần (~5 phút), dùng lại được app bạn đã tạo cho Meta Ads: (1) Bấm 'Bước 1: Tạo App mới' bên dưới > chọn loại 'Business' (hoặc 'Other'), đặt tên bất kỳ. (2) Trong app thêm sản phẩm 'Facebook Login' THƯỜNG (không phải 'for Business'). (3) Facebook Login > Settings > ô 'Valid OAuth Redirect URIs': dán đúng địa chỉ ở nút 'Sao chép' bên dưới (dùng 'localhost' KHÔNG phải 127.0.0.1). (4) GIỮ app ở chế độ Development (góc trên) và đảm bảo bạn là Admin của app + Admin các Trang muốn quản lý - khi đó tự cấp được quyền Trang mà KHÔNG cần App Review. (5) App Settings > Basic: copy App ID + App Secret dán vào ô dưới rồi bấm Kết nối. Khi Facebook hỏi quyền, nhớ TICK chọn các Trang. Token sống ~60 ngày, Javis tự gia hạn; hết hạn thì Kết nối lại.",
+        "guide_url": "https://developers.facebook.com/docs/pages-api/getting-started",
+        "setup": {
+          "redirect": true,
+          "links": [
+            { "label": "Bước 1: Tạo App mới", "url": "https://developers.facebook.com/apps/creation/" },
+            { "label": "App của tôi", "url": "https://developers.facebook.com/apps/" }
+          ]
+        }
       },
       "tool_meta": {
         "read": ["fb_pages_list", "fb_page_posts", "fb_page_comments"],

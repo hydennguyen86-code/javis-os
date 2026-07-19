@@ -426,6 +426,12 @@ body.has-rail .hud { margin-left: var(--rail-w); width: calc(100% - var(--rail-w
   border: 1px solid rgba(77,163,255,.25); border-radius: 8px; padding: 9px 12px; line-height: 1.5; }
 .conn-risk { font-size: 13px; background: rgba(217,165,33,.10); border: 1px solid rgba(217,165,33,.45);
   border-radius: 8px; padding: 10px 12px; line-height: 1.55; }
+.conn-wizard { display: flex; flex-direction: column; gap: 10px; }
+.wiz-links { display: flex; flex-wrap: wrap; gap: 8px; }
+.wiz-links .wiz-open { margin-left: 0; font-size: 13px; padding: 7px 12px; }
+.wiz-copy { display: flex; gap: 8px; align-items: stretch; }
+.wiz-copy input { flex: 1 1 auto; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; }
+.wiz-copy .wiz-copy-btn { margin-left: 0; white-space: nowrap; }
 .conn-ok { font-size: 14.5px; padding: 8px 2px; color: #3fb96a; }
 .conn-hint { margin-top: 8px; font-size: 13px; color: #d9a521; }
 .qr-img { width: 240px; height: 240px; border-radius: 10px; background: #fff; padding: 8px;

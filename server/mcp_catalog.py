@@ -68,6 +68,7 @@ def public_catalog():
                         "multiline": bool(f.get("multiline") or f.get("file"))}
                        for f in (auth.get("fields") or [])],
             "guide": auth.get("guide", ""), "guide_url": auth.get("guide_url", ""),
+            "setup": auth.get("setup") or {},
             "risk": c.get("risk", ""), "default_perm": c.get("default_perm", "readonly"),
         })
     return out

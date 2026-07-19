@@ -4,7 +4,10 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
-## [0.9.91] - 2026-07-19
+## [0.9.92] - 2026-07-19
+Wizard cài đặt cho các connector tự-tạo-app (Facebook Trang, Meta Ads): thêm nút mở thẳng trang tạo Facebook App và ô Redirect URI kèm nút Sao chép, để bớt thao tác dán tay hay dán sai. Chỉ đổi trang Kết nối, tải lại trang là thấy.
+### Cải thiện
+- **Nút mở trang + copy Redirect URI khi kết nối**: modal đăng nhập OAuth giờ đọc thêm `auth.setup` từ catalog để vẽ dãy nút "Bước 1: Tạo App mới / App của tôi" (mở tab mới) và một ô Redirect URI chỉ-đọc kèm nút Sao chép (tự lấy đúng cổng đang chạy). Hướng dẫn bằng chữ được rút gọn theo, trỏ vào các nút này. Áp cho connector `facebook-pages` và `meta-ads-graph`; connector không khai `setup` thì không đổi. Thêm trường `setup` vào `public_catalog()`, hàm `oauthWizard()` trong `console.js`, style `.conn-wizard/.wiz-*` trong `console.css`. Bump `console.js?v=72`, `console.css?v=21`.
 Vá tiếp giao diện chat điện thoại (0.9.89): rút gọn dòng gợi ý trong ô nhập cho khỏi xuống dòng, và đưa "phần Hệ thống" trở lại. Chỉ đổi bản điện thoại.
 ### Sửa lỗi
 - **Dòng gợi ý ô nhập bị xuống dòng trên điện thoại**: đổi placeholder mobile thành câu ngắn "Nói hoặc gõ cho Javis…" cho vừa một dòng (bản máy tính giữ câu đầy đủ).
