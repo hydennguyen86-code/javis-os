@@ -333,10 +333,10 @@ body.has-rail .hud { margin-left: var(--rail-w); width: calc(100% - var(--rail-w
   .hud-top .brand, .hud-top .navbar-brain,
   .hud-top #themeToggle, .hud-top #studioOpenBtn,
   .hud-top #settingsBtn, .hud-top #ttsToggle, .hud-top #resetBtn { display: none; }
-  .hud-center-title { font-size: 13px; }
+  .hud-center-title { display: none; }                /* mobile: ẩn tên workspace + ngày; chip model làm giữa header */
   .hud-top #mbOpen { display: inline-flex; }
-  .hud-top #mbPop { bottom: auto; top: calc(100% + 6px); left: 50%; transform: translateX(-50%);
-    width: min(340px, 92vw); }
+  .hud-top #mbPop { position: fixed; top: 50px; bottom: auto; left: 50%; transform: translateX(-50%);
+    width: min(340px, 92vw); z-index: 200; max-height: 70vh; }
   .model-bar { display: none; }                       /* hàng model gốc ẩn; chip + sysBar bên trong dời đi (JS) */
 
   /* Rail: từ thanh đáy → ngăn kéo trượt từ trái */
@@ -359,7 +359,7 @@ body.has-rail .hud { margin-left: var(--rail-w); width: calc(100% - var(--rail-w
   .rail-sys { margin-top: 8px; padding: 10px 6px 4px; border-top: 1px solid var(--glass-brd);
     display: flex; flex-direction: column; gap: 10px; }
   .rail-sys-lbl { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--text3); }
-  .rail-sys .navbar-brain { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .rail-sys .navbar-brain { position: static; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
   .rail-sys .graph-select { flex: 1 1 auto; min-width: 0; max-width: 100%; }
   .rail-sys-btns { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
   .rail-sys-btns .hud-icon-btn { display: inline-flex; }

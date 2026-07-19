@@ -4,6 +4,14 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.93] - 2026-07-19
+Chỉnh tiếp giao diện chat điện thoại theo phản hồi: header hết chồng lên nhau, bấm chip model là sổ ra danh sách được, và mục Hệ thống trong ngăn kéo gọn lại. Chỉ đổi bản điện thoại.
+### Sửa lỗi
+- **Header điện thoại bị chồng lên nhau**: ẩn tên workspace + ngày trên mobile để chip model làm phần giữa header, không còn đè lên tiêu đề hội thoại.
+- **Bấm chip model không sổ ra danh sách**: popover chọn model giờ dùng vị trí cố định (không bị khung cha cắt), và sửa model-picker để bấm trong popover (chọn model, đổi effort) không tự đóng - trước đó do popover đã dời khỏi khung model-bar nên bị hiểu là bấm ra ngoài.
+- **Rò dòng comment ra màn hình** ("...parse vào đây nhưng không hiển thị"): comment HTML lồng nhau ở stub số liệu làm rò chữ; đã gỡ dấu comment lồng.
+- **Mục Hệ thống trong ngăn kéo**: bỏ nút Studio (không dùng nữa) và vá lỗi cụm chọn brain bị định vị đè lên đầu ngăn kéo.
+
 ## [0.9.92] - 2026-07-19
 Wizard cài đặt cho các connector tự-tạo-app (Facebook Trang, Meta Ads): thêm nút mở thẳng trang tạo Facebook App và ô Redirect URI kèm nút Sao chép, để bớt thao tác dán tay hay dán sai. Chỉ đổi trang Kết nối, tải lại trang là thấy.
 ### Cải thiện

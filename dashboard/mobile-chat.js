@@ -59,7 +59,6 @@
       if (mq.matches) {
         if (!moved.length) {
           moveEl(document.querySelector(".navbar-brain"), false);
-          moveEl(document.getElementById("studioOpenBtn"), true);
           moveEl(document.getElementById("settingsBtn"), true);
           moveEl(document.getElementById("themeToggle"), true);
           moveEl(document.getElementById("ttsToggle"), true);
