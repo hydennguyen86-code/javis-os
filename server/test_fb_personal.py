@@ -174,6 +174,10 @@ UNSUPPORTED = ('<html><body><h2>Trình duyệt này không hỗ trợ Facebook, 
                '</body></html>')
 check("_unsupported: bắt trang 'không hỗ trợ / Facebook Lite'",
       plug._unsupported(UNSUPPORTED) and not plug._unsupported(HOME))
+LOGINPAGE = ('<html><body><form method="post" action="/login/device-based/regular/login/">'
+             '<input name="email" type="text"><input name="pass" type="password">'
+             '<input name="login" value="Đăng nhập"></form></body></html>')
+check("_is_login: bắt trang đăng nhập (email+pass)", plug._is_login(LOGINPAGE) and not plug._is_login(HOME))
 
 
 async def fetch_tests():
@@ -214,6 +218,16 @@ async def fetch_tests():
     page, _url, _ua2, err2 = await plug._fetch("c=1", "/")
     check("_fetch: UA đầu bị chê thì tự thử UA sau và qua được",
           err2 is None and "xc_message" in page and calls["n"] == 2)
+
+    # trang đăng nhập theo NỘI DUNG (url vẫn mbasic, không /login) → báo cookie bị từ chối, KHÔNG đổi UA vô ích
+    async def _get_login(client, url):
+        return LOGINPAGE, BASE_HOME
+    plug._get = _get_login
+    _p3, _u3, _ua3, err3 = await plug._fetch("c=1", "/")
+    check("_fetch: trang đăng nhập (nội dung) → ERROR cookie bị từ chối", bool(err3) and "từ chối" in err3)
+    r_feed_login = await plug._feed({}, None)
+    check("fb_feed_read: cookie bị từ chối → ERROR rõ (không đọc login thành feed)",
+          r_feed_login.startswith("ERROR") and "ĐĂNG NHẬP" in r_feed_login)
 
 asyncio.run(fetch_tests())
 

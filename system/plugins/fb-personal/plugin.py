@@ -114,6 +114,21 @@ def _unsupported(page):
                           page or "", re.I))
 
 
+def _is_login(page):
+    """mbasic trả trang ĐĂNG NHẬP (cookie bị từ chối) - có cả ô email lẫn ô mật khẩu."""
+    p = page or ""
+    return (bool(re.search(r'<input[^>]*name="email"', p, re.I))
+            and bool(re.search(r'<input[^>]*name="(pass|encpass)"', p, re.I)))
+
+
+_COOKIE_HELP = ("ERROR: Facebook trả trang ĐĂNG NHẬP - cookie đang bị từ chối, không đọc được feed. "
+                "Thường do: (1) cookie đã hết hạn / bạn đã đăng xuất trình duyệt gốc - đừng logout sau khi "
+                "copy, và lấy cookie MỚI ngay trước khi thử; (2) Javis đang chạy ở IP/máy KHÁC nơi bạn đăng "
+                "nhập (VPS, khác nước) nên Facebook chặn phiên vì 'đăng nhập lạ' - chạy Javis cùng máy/mạng "
+                "nơi đăng nhập, hoặc đăng nhập Facebook từ chính IP của VPS; (3) tài khoản đang bị checkpoint - "
+                "mở trình duyệt xác minh xong rồi lấy lại cookie. Kiểm tra cookie có đủ cả c_user và xs.")
+
+
 _UA_HELP = ("mbasic chê trình duyệt ('không hỗ trợ, tải Facebook Lite') với mọi User-Agent thử. "
             "Cách sửa: mở kết nối Facebook cá nhân, dán vào ô 'User-Agent' đúng UA của trình duyệt "
             "nơi bạn lấy cookie (tra 'my user agent' trên trình duyệt đó). Tốt nhất lấy cookie từ "
@@ -129,9 +144,8 @@ async def _fetch(cookie, url):
                 page, furl = await _get(c, url)
         except Exception as e:
             return None, "", ua, f"ERROR: không tải được ({type(e).__name__}: {e})."
-        if _blocked(furl):
-            return None, furl, ua, ("ERROR: Cookie không đăng nhập được (bị đẩy về login/checkpoint). "
-                                    "Cookie hết hạn hoặc tài khoản bị chặn - lấy lại cookie mới.")
+        if _blocked(furl) or _is_login(page):
+            return None, furl, ua, _COOKIE_HELP     # cookie bị từ chối - đổi UA không cứu được
         if _unsupported(page):
             last_url = furl
             continue                      # thử UA kế tiếp

@@ -4,7 +4,10 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
-## [0.9.100] - 2026-07-19
+## [0.9.101] - 2026-07-19
+Facebook cá nhân: nhận diện đúng trang ĐĂNG NHẬP mbasic trả về khi cookie bị từ chối, thay vì đọc nhầm trang login thành feed. Trước đó fix User-Agent (0.9.99) đã hết lỗi "không hỗ trợ", nhưng nếu cookie hết hạn/bị Facebook chặn thì mbasic trả trang đăng nhập (URL vẫn là mbasic, không redirect) nên không bị bắt.
+### Sửa lỗi
+- **fb-personal đọc nhầm trang đăng nhập thành feed**: thêm `_is_login()` (trang có cả ô email lẫn ô mật khẩu) vào lớp `_fetch`; gặp trang đăng nhập (theo NỘI DUNG, không chỉ theo URL redirect) thì trả lỗi rõ nêu 3 nguyên nhân thường gặp (cookie hết hạn/đã logout; Javis chạy ở IP/máy khác nơi đăng nhập nên Facebook chặn phiên lạ; tài khoản bị checkpoint) kèm cách sửa, thay vì trả nội dung trang login. Test lên 31 kiểm tra.
 Trang Việc định kỳ giờ gộp MỌI brain, mỗi việc gắn nhãn brain và chuyển được sang brain khác; tạo việc qua chat báo rõ brain; lựa chọn /brain trên Telegram được nhớ bền qua khởi động lại. Gỡ cái rối "tạo việc qua Telegram vào brain mặc định, tìm ở brain đang làm không thấy" - hai khái niệm brain (phiên Telegram vs brain đang xem trên dashboard) vốn tách rời, việc vẫn chạy nhưng người dùng không nhìn thấy.
 ### Thêm mới
 - **Trang Việc gộp mọi brain**: endpoint `GET /viec/all` trả loop + nhắc hẹn của TẤT CẢ brain, nhóm theo brain (brain đang xem lên đầu, gắn "đang xem"), mỗi thẻ có nhãn brain. Nút bật/tắt/xoá/chạy/huỷ nhắm ĐÚNG brain của chính việc đó thay vì brain ở sidebar.
