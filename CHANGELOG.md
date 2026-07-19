@@ -4,6 +4,12 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.91] - 2026-07-19
+Vá tiếp giao diện chat điện thoại (0.9.89): rút gọn dòng gợi ý trong ô nhập cho khỏi xuống dòng, và đưa "phần Hệ thống" trở lại. Chỉ đổi bản điện thoại.
+### Sửa lỗi
+- **Dòng gợi ý ô nhập bị xuống dòng trên điện thoại**: đổi placeholder mobile thành câu ngắn "Nói hoặc gõ cho Javis…" cho vừa một dòng (bản máy tính giữ câu đầy đủ).
+- **Mất phần Hệ thống trên điện thoại**: chọn brain, Cài đặt, Đổi tông, Studio, bật/tắt loa và dải trạng thái HỆ THỐNG/MCP nay gom vào mục "Hệ thống" ở đáy ngăn kéo ☰ (trước đó bị ẩn mất). Dùng lại đúng nút cũ nên bấm là chạy như thường.
+
 ## [0.9.90] - 2026-07-19
 Thêm connector **Facebook Trang (tự tạo app - Graph API)** và plugin `meta-pages-graph`: quản lý Fanpage của bạn qua Graph API chính chủ. Vẫn theo kiểu tự tạo app (BYO) nên KHÔNG cần Facebook duyệt app khi thao tác trên Trang bạn là admin, và mỗi bản fork tự đứng được một mình. Xem danh sách Trang, đọc bài và bình luận (chỉ đọc); đăng bài và trả lời bình luận (toàn quyền, không tự chạy lén). Dùng lại nguyên hạ tầng OAuth Meta sẵn có, không đụng `oauth_mcp`. Lưu ý: "lướt feed" trên trang cá nhân KHÔNG làm được qua Page API (Facebook đã đóng), để dành bài toán browser-automation đợt sau.
 ### Thêm mới
