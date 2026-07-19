@@ -356,6 +356,52 @@ class LoopFeature:
             self._write_state(brain, st)
         return True
 
+    def move_loop(self, from_brain: str, to_brain: str, slug: str) -> dict:
+        """Dời 1 loop (file .md) sang brain khác, giữ NGUYÊN tên file + nội dung + trạng thái.
+
+        Copy nguyên byte file (KHÔNG round-trip qua save_loop - nó chỉ render lại các field
+        chuẩn nên sẽ nuốt mọi frontmatter lạ user tự thêm trong Obsidian). Định danh loop = TÊN
+        FILE, nên đích đã có file cùng slug thì TỪ CHỐI, không ghi đè (builtin tu-cai-tien-javis
+        có ở MỌI brain -> đây là va chạm thật sẽ gặp). Trả {"ok":bool, "error":str}."""
+        src_fp = self._loop_path(from_brain, slug)
+        if src_fp is None or not src_fp.exists():
+            return {"ok": False, "error": "không thấy việc ở brain nguồn"}
+        dst_fp = self._loop_path(to_brain, slug)
+        if dst_fp is None:
+            return {"ok": False, "error": "tên việc không hợp lệ"}
+        try:
+            src_root = str(Path(self.deps.brain_root(from_brain)).resolve())
+            dst_root = str(Path(self.deps.brain_root(to_brain)).resolve())
+        except Exception:
+            return {"ok": False, "error": "brain không hợp lệ"}
+        if src_root == dst_root:
+            return {"ok": False, "error": "brain nguồn và đích trùng nhau"}
+        # Đang chạy đúng loop này -> để yên, tránh dời file dưới chân vòng đang thực thi.
+        if self._running and self._running[1] == slug and self._running[0] == src_root:
+            return {"ok": False, "error": "việc đang chạy, thử lại sau"}
+        if dst_fp.exists():
+            return {"ok": False,
+                    "error": f"brain đích đã có việc '{slug}' - đổi tên hoặc xoá bên đó trước"}
+        try:
+            content = src_fp.read_text(encoding="utf-8")
+            dst_fp.parent.mkdir(parents=True, exist_ok=True)
+            self.deps.atomic_write_text(dst_fp, content)   # ghi ĐÍCH trước (mất điện = còn nguồn)
+        except Exception as e:
+            return {"ok": False, "error": f"ghi file đích lỗi: {type(e).__name__}: {e}"}
+        # Dời entry state runtime (last_run/runs_today/fail_streak) để đích không nổ lại ngay.
+        try:
+            src_state = self.read_state(from_brain)
+            entry = src_state.get(slug)
+            if entry is not None:
+                dst_state = self.read_state(to_brain)
+                dst_state[slug] = entry
+                self._write_state(to_brain, dst_state)
+        except Exception:
+            pass   # state phù du: dời không được thì đích chạy như loop mới, không sao
+        self.delete_loop(from_brain, slug)   # xoá file + entry state nguồn (đích đã ghi xong)
+        self.register_brain(to_brain)
+        return {"ok": True}
+
     # ══════════════════════ state runtime: Javis/loop-state.json ══════════════════════
 
     def read_state(self, brain: str) -> dict:
@@ -972,6 +1018,12 @@ class LoopFeature:
             if not self.delete_loop(brain, slug):
                 return {"ok": False, "error": "not found"}
             return {"ok": True}
+
+        @router.post("/loops/move")
+        async def loops_move(slug: str = Form(...), from_brain: str = Form(...),
+                             to_brain: str = Form(...)):
+            self.ensure_migrated()
+            return self.move_loop(from_brain, to_brain, slug)
 
         @router.post("/loops/run-now")
         async def loops_run_now(slug: str = Form(...), brain: str = Form("brain")):

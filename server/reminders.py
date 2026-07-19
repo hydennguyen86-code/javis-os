@@ -280,6 +280,35 @@ class RemindersFeature:
             self._save(brain, data)
         return hit
 
+    def pending_views(self, brain: str) -> list:
+        """View các nhắc ĐANG CHỜ của 1 brain, sắp theo giờ tới. Dùng cho trang Việc gộp mọi
+        brain (/viec/all) - tránh main.py thò vào _load/_view riêng tư."""
+        rems = [r for r in self._load(brain).get("reminders", []) if r.get("status") == "pending"]
+        rems.sort(key=lambda r: float(r.get("due_at") or 0))
+        return [self._view(r) for r in rems]
+
+    def move(self, from_brain: str, to_brain: str, rid: str) -> dict:
+        """Dời 1 nhắc hẹn sang brain khác, giữ nguyên id + mọi field (cron/due_at/chat_id...).
+        Trả {"ok":bool, "error":str}. Ghi ĐÍCH trước rồi mới xoá nguồn: sự cố giữa chừng để lại
+        bản trùng (khôi phục được) chứ không mất record."""
+        try:
+            src_root = str(Path(self.deps.brain_root(from_brain)).resolve())
+            dst_root = str(Path(self.deps.brain_root(to_brain)).resolve())
+        except Exception:
+            return {"ok": False, "error": "brain không hợp lệ"}
+        if src_root == dst_root:
+            return {"ok": False, "error": "brain nguồn và đích trùng nhau"}
+        src = self._load(from_brain)
+        rec = next((r for r in src.get("reminders", []) if r.get("id") == rid), None)
+        if rec is None:
+            return {"ok": False, "error": "không thấy nhắc hẹn ở brain nguồn"}
+        dst = self._load(to_brain)
+        dst.setdefault("reminders", []).append(rec)
+        self._save(to_brain, dst)
+        src["reminders"] = [r for r in src.get("reminders", []) if r.get("id") != rid]
+        self._save(from_brain, src)
+        return {"ok": True}
+
     # ── scheduler gọi mỗi nhịp ──
     async def tick(self) -> None:
         try:
@@ -525,6 +554,12 @@ class RemindersFeature:
             async with self._io:
                 hit = self.cancel(brain, id)
             return {"ok": hit, "error": ("" if hit else "not found")}
+
+        @router.post("/reminders/move")
+        async def reminders_move(id: str = Form(...), from_brain: str = Form(...),
+                                 to_brain: str = Form(...)):
+            async with self._io:
+                return self.move(from_brain, to_brain, id)
 
         @router.post("/reminders/clear")
         async def reminders_clear(brain: str = Form("brain")):

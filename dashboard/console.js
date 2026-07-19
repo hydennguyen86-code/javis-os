@@ -798,6 +798,7 @@
               <button class="si-chip" data-mode="auto">Tự làm (an toàn)</button>
               <button class="si-chip" data-mode="full" style="border-color:rgba(224,102,74,.5)">⚠ Toàn quyền</button></div></div>
             <div class="si-field"><label>Chu kỳ (phút, tối thiểu 5)</label><input type="number" id="lpInterval" min="5" value="120" style="max-width:120px"></div>
+            <div class="si-field"><label>Brain (nơi lưu việc)</label><select id="lpBrain" class="loop-sel" style="min-width:180px"></select></div>
           </div>
           <div id="lpFullWarn" style="display:none;margin-top:4px;padding:10px 12px;border:1px solid rgba(224,102,74,.5);border-radius:8px;background:rgba(224,102,74,.08);color:#ffb59e;font-size:13px;line-height:1.5">
             <b>⚠ CHẾ ĐỘ TOÀN QUYỀN - rủi ro cao.</b> Loop sẽ tự thao tác THẬT qua MCP không cần hỏi: có thể <b>tạo/sửa đơn hàng, chạy quảng cáo (tiêu tiền thật), gửi tin nhắn/email, đăng bài</b>. Nó chạy nền theo lịch, KHÔNG có người duyệt từng bước, và <b>hành động thật không hoàn tác được</b>. Chỉ bật khi anh đã tin tưởng loop này và mô tả nhiệm vụ thật rõ ràng, giới hạn phạm vi. Nên chạy thử ở "Đề xuất" hoặc "Tự làm (an toàn)" trước.
@@ -806,8 +807,7 @@
           <div class="si-actions"><button class="s-btn" id="lpSave">💾 Lưu loop</button><button class="s-btn-ghost" id="lpCancel">Huỷ</button><span class="dim" id="lpFormMsg" style="font-size:13px;color:#e0a04a"></span></div>
         </div>
       </div>
-      <div id="lpCards">Đang tải...</div>
-      <div id="lpReminders"></div>
+      <div id="lpGroups">Đang tải...</div>
       <div class="si-log"><h3 style="font-size:15px;color:#cdd8ee">Nhật ký gần đây · <select id="lpLogFilter" class="loop-sel" style="font-size:13px"><option value="">Tất cả loop</option></select></h3><div id="lpLog">Đang tải...</div></div>
     </div>`;
 
@@ -818,6 +818,19 @@
     }
     el.querySelectorAll("#lpModes .si-chip").forEach(c => c.onclick = () => { fcur.mode = c.dataset.mode; syncFormChips(); });
 
+    let allLoops = [];    // phẳng mọi brain - cho bộ lọc nhật ký (log per brain+slug)
+    let allBrains = [];   // [{name, path, is_default}] - cho ô chọn brain (tạo mới + chuyển)
+
+    function isCurrentBrain(b) {
+      const cur = fbrain();   // path brain đang chọn ở sidebar, hoặc "brain" (mặc định)
+      return cur === "brain" ? !!b.is_default : b.path === cur;
+    }
+    // Options brain cho nút "Chuyển sang..." - bỏ chính brain của item (không chuyển sang chỗ cũ).
+    function moveOptions(exceptPath) {
+      return allBrains.filter(b => b.path !== exceptPath)
+        .map(b => `<option value="${esc(b.path)}">${esc(b.name)}</option>`).join("");
+    }
+
     function openForm(lp) {
       fcur = { mode: lp ? lp.mode : "suggest" };
       el.querySelector("#lpSlug").value = lp ? lp.slug : "";
@@ -825,6 +838,15 @@
       el.querySelector("#lpBody").value = lp ? (lp.body || "") : "";
       el.querySelector("#lpInterval").value = lp ? lp.interval_min : 120;
       el.querySelector("#lpFormMsg").textContent = "";
+      // Ô chọn brain: TẠO MỚI cho chọn (mặc định brain đang xem); SỬA thì khoá về brain của loop
+      // (đổi brain lúc sửa sẽ đẻ file mới ở brain khác mà bản gốc vẫn còn - muốn dời thì dùng nút
+      // "Chuyển sang brain" trên thẻ, có kiểm tra trùng + dời state đàng hoàng).
+      const bsel = el.querySelector("#lpBrain");
+      const defPath = lp ? (lp.brain_path || "")
+        : ((allBrains.find(isCurrentBrain) || allBrains[0] || {}).path || "");
+      bsel.innerHTML = allBrains.map(b =>
+        `<option value="${esc(b.path)}" ${b.path === defPath ? "selected" : ""}>${esc(b.name)}</option>`).join("");
+      bsel.disabled = !!lp;
       syncFormChips();
       el.querySelector("#lpForm").style.display = "block";
       el.querySelector("#lpName").focus();
@@ -844,7 +866,7 @@
       fd.append("mode", fcur.mode);
       fd.append("interval_min", el.querySelector("#lpInterval").value || "120");
       fd.append("body", body);
-      fd.append("brain", fbrain());
+      fd.append("brain", el.querySelector("#lpBrain").value || fbrain());   // brain đích do user chọn
       // Không gửi goal/workspace/tools_profile/quiet/maxruns → server giữ giá trị cũ (khi sửa)
       // hoặc mặc định an toàn (tạo mới: goal=custom, vault + MCP đọc).
       const b = el.querySelector("#lpSave"); b.textContent = "Đang lưu...";
@@ -852,10 +874,10 @@
       b.textContent = "💾 Lưu loop";
       if (!r.ok) { el.querySelector("#lpFormMsg").textContent = "⚠ " + (r.error || "Lưu lỗi"); return; }
       el.querySelector("#lpForm").style.display = "none";
-      loadLoops(); loadLog();
+      loadAll(); loadLog();
     };
 
-    el.querySelector("#lpStop").onclick = async () => { await fetch("/loops/stop", { method: "POST" }); loadLoops(); };
+    el.querySelector("#lpStop").onclick = async () => { await fetch("/loops/stop", { method: "POST" }); loadAll(); };
 
     function loopCard(lp) {
       const paused = !!lp.auto_paused_reason;
@@ -886,97 +908,146 @@
           <button class="s-btn-ghost run">▶ Chạy ngay</button>
           <button class="s-btn-ghost edit">Sửa</button>
           <button class="s-btn-ghost del" style="color:#e0664a">Xoá</button>
+          <select class="mv loop-sel" style="font-size:12px"><option value="">Chuyển brain…</option>${moveOptions(lp.brain_path)}</select>
         </div>`;
+      // MỌI thao tác gửi brain của CHÍNH item (lp.brain_path), KHÔNG phải fbrain() - trang này gộp
+      // nhiều brain nên bám sidebar sẽ nhắm nhầm brain.
       div.querySelector(".tgl").onclick = async () => {
         // Bật loop TOÀN QUYỀN = xác nhận rủi ro (tắt thì khỏi hỏi)
         if (!lp.enabled && lp.mode === "full" &&
             !confirm(`Bật loop TOÀN QUYỀN "${lp.name}"?\n\nNó sẽ tự thao tác THẬT qua MCP (tạo đơn, tiêu tiền quảng cáo, gửi tin, đăng bài) theo lịch, không duyệt từng bước. Chắc chứ?`)) return;
-        await fetch("/loops/toggle", { method: "POST", body: (() => { const f = new FormData(); f.append("slug", lp.slug); f.append("brain", fbrain()); return f; })() });
-        loadLoops();
+        await fetch("/loops/toggle", { method: "POST", body: (() => { const f = new FormData(); f.append("slug", lp.slug); f.append("brain", lp.brain_path); return f; })() });
+        loadAll();
       };
       div.querySelector(".run").onclick = async (e) => {
         e.target.disabled = true; e.target.textContent = "Đang chạy...";
-        await fetch("/loops/run-now", { method: "POST", body: (() => { const f = new FormData(); f.append("slug", lp.slug); f.append("brain", fbrain()); return f; })() });
-        setTimeout(() => { loadLoops(); loadLog(); }, 2500);
+        await fetch("/loops/run-now", { method: "POST", body: (() => { const f = new FormData(); f.append("slug", lp.slug); f.append("brain", lp.brain_path); return f; })() });
+        setTimeout(() => { loadAll(); loadLog(); }, 2500);
       };
       div.querySelector(".edit").onclick = () => openForm(lp);
       div.querySelector(".del").onclick = async () => {
         if (!confirm(`Xoá loop "${lp.name}"? File Javis/loops/${lp.slug}.md sẽ bị xoá.`)) return;
-        await fetch("/loops/delete", { method: "POST", body: (() => { const f = new FormData(); f.append("slug", lp.slug); f.append("brain", fbrain()); return f; })() });
-        loadLoops(); loadLog();
+        await fetch("/loops/delete", { method: "POST", body: (() => { const f = new FormData(); f.append("slug", lp.slug); f.append("brain", lp.brain_path); return f; })() });
+        loadAll(); loadLog();
+      };
+      div.querySelector(".mv").onchange = async (e) => {
+        const to = e.target.value; if (!to) return;
+        const toName = (allBrains.find(b => b.path === to) || {}).name || to;
+        if (!confirm(`Chuyển việc "${lp.name}" sang brain ${toName}?`)) { e.target.value = ""; return; }
+        const f = new FormData();
+        f.append("slug", lp.slug); f.append("from_brain", lp.brain_path); f.append("to_brain", to);
+        let r = {}; try { r = await (await fetch("/loops/move", { method: "POST", body: f })).json(); } catch (er) { r = { error: er.message }; }
+        if (!r.ok) alert("Không chuyển được: " + (r.error || "lỗi"));
+        loadAll(); loadLog();
       };
       return div;
     }
 
-    // Nhắc hẹn đang chờ: trước đây CHỈ hiện ở tab Lịch (đã xoá). Không gộp vào đây thì user
-    // mất chỗ nhìn chúng. Loop = việc bền (.md, sửa trong Obsidian); nhắc = việc phù du.
-    // Đọc thẳng /reminders (nguồn thật), KHÔNG qua lớp chiếu: lớp đó chỉ tồn tại vì tab Lịch.
-    async function loadReminders() {
-      if (myGen !== _renderGen) return;
-      const box = el.querySelector("#lpReminders");
-      if (!box) return;
-      let d = { pending: [] };
-      try { d = await (await fetch(`/reminders?brain=${encodeURIComponent(fbrain())}`)).json(); } catch (e) {}
-      if (myGen !== _renderGen) return;
-      const rem = d.pending || [];
-      if (!rem.length) { box.innerHTML = ""; return; }
-      const MODE_LBL = { notify: "nhắc", task: "tự làm + báo", script: "script" };
-      box.innerHTML = `<h3 style="font-size:15px;color:#cdd8ee;margin:18px 0 8px">Nhắc hẹn đang chờ</h3>`;
-      rem.forEach(r => {
-        const title = r.label || r.text || "Nhắc hẹn";
-        const when = r.cron ? `cron ${r.cron}`
-          : (r.repeat_min ? `lặp mỗi ${r.repeat_min} phút · kế tiếp ${r.due_human || ""}` : (r.due_human || ""));
-        const kind = MODE_LBL[r.mode] || "nhắc";
-        const div = document.createElement("div");
-        div.className = "wf-card";
-        div.innerHTML = `<b>${esc(title)}</b>
-          <div class="dim" style="font-size:12px;color:#6b7894">${esc(when)} · ${esc(kind)}</div>
-          <button class="s-btn-ghost rmCancel" style="margin-top:8px">Huỷ</button>`;
-        div.querySelector(".rmCancel").onclick = async () => {
-          if (!confirm(`Huỷ "${title}"?`)) return;
-          const f = new FormData();
-          f.append("id", r.id);        // id THÔ, /reminders/cancel nhận đúng dạng này
-          f.append("brain", fbrain());
-          await fetch("/reminders/cancel", { method: "POST", body: f });
-          loadReminders();
-        };
-        box.appendChild(div);
-      });
+    // Nhắc hẹn đang chờ: gộp cùng loop trong mỗi nhóm brain. Loop = việc bền (.md, sửa trong
+    // Obsidian); nhắc = việc phù du. Cả hai đều gắn brain_path để thao tác đúng brain.
+    const MODE_LBL = { notify: "nhắc", task: "tự làm + báo", script: "script" };
+    function reminderCard(r) {
+      const title = r.label || r.text || "Nhắc hẹn";
+      const when = r.cron ? `cron ${r.cron}`
+        : (r.repeat_min ? `lặp mỗi ${r.repeat_min} phút · kế tiếp ${r.due_human || ""}` : (r.due_human || ""));
+      const kind = MODE_LBL[r.mode] || "nhắc";
+      const div = document.createElement("div");
+      div.className = "wf-card";
+      div.innerHTML = `<b>${esc(title)}</b>
+        <div class="dim" style="font-size:12px;color:#6b7894">${esc(when)} · ${esc(kind)}</div>
+        <div class="wf-actions" style="margin-top:8px">
+          <button class="s-btn-ghost rmCancel">Huỷ</button>
+          <select class="mv loop-sel" style="font-size:12px"><option value="">Chuyển brain…</option>${moveOptions(r.brain_path)}</select>
+        </div>`;
+      div.querySelector(".rmCancel").onclick = async () => {
+        if (!confirm(`Huỷ "${title}"?`)) return;
+        const f = new FormData();
+        f.append("id", r.id);        // id THÔ, /reminders/cancel nhận đúng dạng này
+        f.append("brain", r.brain_path);
+        await fetch("/reminders/cancel", { method: "POST", body: f });
+        loadAll();
+      };
+      div.querySelector(".mv").onchange = async (e) => {
+        const to = e.target.value; if (!to) return;
+        const toName = (allBrains.find(b => b.path === to) || {}).name || to;
+        if (!confirm(`Chuyển nhắc "${title}" sang brain ${toName}?`)) { e.target.value = ""; return; }
+        const f = new FormData();
+        f.append("id", r.id); f.append("from_brain", r.brain_path); f.append("to_brain", to);
+        let rr = {}; try { rr = await (await fetch("/reminders/move", { method: "POST", body: f })).json(); } catch (er) { rr = { error: er.message }; }
+        if (!rr.ok) alert("Không chuyển được: " + (rr.error || "lỗi"));
+        loadAll();
+      };
+      return div;
     }
 
-    async function loadLoops() {
-      if (myGen !== _renderGen) return;   // đã rời trang
-      let d = { loops: [] };
-      try { d = await (await fetch(`/loops?brain=${encodeURIComponent(fbrain())}`)).json(); } catch (e) {}
-      if (myGen !== _renderGen) return;   // đổi trang trong lúc chờ fetch
-      const box = el.querySelector("#lpCards");
+    // Gộp MỌI brain: /viec/all trả từng brain kèm loop + nhắc hẹn. Nhóm theo brain, brain đang
+    // xem ở sidebar lên đầu; brain khác rỗng thì ẩn. Mỗi item mang brain_path riêng.
+    async function loadAll() {
+      if (myGen !== _renderGen) return;
+      let d = { brains: [] };
+      try { d = await (await fetch("/viec/all")).json(); } catch (e) {}
+      if (myGen !== _renderGen) return;
+      const box = el.querySelector("#lpGroups");
       if (!box) return;
+      allBrains = (d.brains || []).map(b => ({ name: b.name, path: b.path, is_default: b.is_default }));
+      allLoops = [];
+      const groups = (d.brains || []).slice().sort((a, b) => {
+        const ac = isCurrentBrain(a) ? 0 : 1, bc = isCurrentBrain(b) ? 0 : 1;
+        return ac - bc || String(a.name).localeCompare(String(b.name));
+      });
       box.innerHTML = "";
-      if (!(d.loops || []).length) {
-        box.innerHTML = `<div class="empty">Chưa có loop nào. Bấm <b>+ Loop mới</b>, hoặc nói với Javis trong chat (vd "tạo loop mỗi 2 tiếng đọc 1 source rồi đề xuất").</div>`;
-      } else {
-        d.loops.forEach(lp => box.appendChild(loopCard(lp)));
+      let anyItem = false;
+      groups.forEach(g => {
+        const loops = g.loops || [], rems = g.reminders || [];
+        const cur = isCurrentBrain(g);
+        if (!loops.length && !rems.length && !cur) return;   // brain rỗng không phải brain đang xem → ẩn
+        if (loops.length || rems.length) anyItem = true;
+        const head = document.createElement("div");
+        head.style.cssText = "display:flex;align-items:center;gap:8px;margin:18px 0 8px;font-size:15px;color:#cdd8ee;font-weight:600;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:6px";
+        head.innerHTML = `<span>🧠 ${esc(g.name)}</span>`
+          + (cur ? `<span style="font-size:11px;color:#3fdc86;font-weight:500">đang xem</span>` : "")
+          + (g.is_default ? `<span style="font-size:11px;color:#6b7894;font-weight:400">mặc định</span>` : "");
+        box.appendChild(head);
+        if (!loops.length && !rems.length) {
+          const e2 = document.createElement("div");
+          e2.className = "empty"; e2.style.margin = "0 0 10px";
+          e2.innerHTML = `Chưa có việc nào ở brain này. Bấm <b>+ Loop mới</b>, hoặc nói với Javis trong chat.`;
+          box.appendChild(e2);
+        }
+        loops.forEach(lp => { allLoops.push(lp); box.appendChild(loopCard(lp)); });
+        if (rems.length) {
+          const rh = document.createElement("div");
+          rh.style.cssText = "font-size:13px;color:#9fb0cf;margin:10px 0 6px";
+          rh.textContent = "Nhắc hẹn đang chờ";
+          box.appendChild(rh);
+          rems.forEach(r => box.appendChild(reminderCard(r)));
+        }
+      });
+      if (!anyItem) {
+        box.innerHTML = `<div class="empty">Chưa có việc định kỳ hay nhắc hẹn nào. Bấm <b>+ Loop mới</b>, hoặc nói với Javis trong chat (vd "tạo loop mỗi 2 tiếng đọc 1 source rồi đề xuất").</div>`;
       }
+      // Bộ lọc nhật ký: mọi loop mọi brain (value = index vào allLoops → biết cả brain lẫn slug).
       const sel = el.querySelector("#lpLogFilter");
       const cur = sel.value;
-      sel.innerHTML = `<option value="">Tất cả loop</option>` +
-        (d.loops || []).map(lp => `<option value="${esc(lp.slug)}" ${lp.slug === cur ? "selected" : ""}>${esc(lp.name)}</option>`).join("");
-      loadReminders();
+      sel.innerHTML = `<option value="">Nhật ký brain đang xem</option>` +
+        allLoops.map((lp, i) => `<option value="${i}" ${String(i) === cur ? "selected" : ""}>${esc(lp.name)} · ${esc(lp.brain_name)}</option>`).join("");
       clearTimeout(pollTimer);
-      if (d.running) pollTimer = setTimeout(loadLoops, 5000);   // đang có vòng chạy → tự refresh (1 chuỗi)
+      if (d.running) pollTimer = setTimeout(loadAll, 5000);   // đang có vòng chạy → tự refresh
     }
     async function loadLog() {
       if (myGen !== _renderGen) return;
-      const slug = el.querySelector("#lpLogFilter").value;
+      const v = el.querySelector("#lpLogFilter").value;
+      let brainQ = fbrain(), slugQ = "";
+      if (v !== "") { const lp = allLoops[+v]; if (lp) { brainQ = lp.brain_path; slugQ = lp.slug; } }
       let d = { entries: [] };
-      try { d = await (await fetch(`/loops/log?brain=${encodeURIComponent(fbrain())}&slug=${encodeURIComponent(slug)}&limit=10`)).json(); } catch (e) { }
+      try { d = await (await fetch(`/loops/log?brain=${encodeURIComponent(brainQ)}&slug=${encodeURIComponent(slugQ)}&limit=10`)).json(); } catch (e) { }
       if (myGen !== _renderGen) return;
       const box = el.querySelector("#lpLog");
       if (!box) return;
       box.innerHTML = (d.entries || []).length ? d.entries.map(e => `<div class="le">${esc(e)}</div>`).join("") : `<div class="dim" style="color:#6b7894">Chưa có nhật ký.</div>`;
     }
     el.querySelector("#lpLogFilter").onchange = loadLog;
-    loadLoops(); loadLog();
+    loadAll(); loadLog();
   }
 
   // ============================================

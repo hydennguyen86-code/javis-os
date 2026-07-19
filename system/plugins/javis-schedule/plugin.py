@@ -198,7 +198,7 @@ def _loops_dir(vault_root: str) -> Path:
 
 
 def _create_loop_file(vault_root: str, name: str, prompt: str, schedule: str,
-                      owner_chat: str = "") -> str:
+                      owner_chat: str = "", brain_name: str = "") -> str:
     """Ghi 1 loop mới vào <vault_root>/Javis/loops/<slug>.md. AN TOÀN CỨNG (không nhận tham số
     để đổi): enabled luôn false, mode luôn suggest. Trùng slug (việc đã có) -> báo lỗi rõ, KHÔNG
     ghi đè - self_improve.py lấy định danh loop theo TÊN FILE nên đẻ bản ascii song song sẽ để
@@ -246,7 +246,8 @@ def _create_loop_file(vault_root: str, name: str, prompt: str, schedule: str,
         tmp.replace(fp)
     except Exception as e:
         return f"ERROR: ghi file loop lỗi: {type(e).__name__}: {e}"
-    return (f"Đã tạo việc lặp '{name}' tại Javis/loops/{slug}.md, chạy mỗi {interval} phút. "
+    where = f" trong brain {brain_name}" if brain_name else ""
+    return (f"Đã tạo việc lặp '{name}'{where} (Javis/loops/{slug}.md), chạy mỗi {interval} phút. "
              f"Đang TẮT (enabled: false) và chỉ-gợi-ý (mode: suggest) theo luật an toàn - "
              f"vào tab Việc trong dashboard để bật thật.")
 
@@ -334,7 +335,7 @@ def _reminder_time_payload(schedule: str) -> dict:
 # cho tới khi hết timeout. Xem mẫu async đúng: system/plugins/meta-ads-graph/plugin.py `_get()`,
 # system/plugins/image-chatgpt/plugin.py `_gen()`. test_javis_schedule.py có lưới hồi quy
 # (inspect.iscoroutinefunction) chặn ai đó quay lại lối sync.
-async def _post_reminder(payload: dict) -> str:
+async def _post_reminder(payload: dict, brain_name: str = "") -> str:
     """Tạo 1 nhắc hẹn/job qua HTTP POST /reminders trên localhost (miễn đăng nhập -
     main.py:70 _AUTH_LOCAL_EXACT, đúng đường agent vốn gọi bằng curl - reminders.py:17)."""
     try:
@@ -345,9 +346,10 @@ async def _post_reminder(payload: dict) -> str:
         return f"ERROR: gọi kho nhắc hẹn lỗi: {type(e).__name__}: {e}"
     if not data.get("ok"):
         return f"ERROR: {data.get('error') or 'tạo nhắc hẹn thất bại'}"
+    where = f" (brain {brain_name})" if brain_name else ""
     if data.get("cron"):
-        return f"Đã đặt lịch lặp cron '{data['cron']}' (id {data.get('id')})."
-    return f"Đã đặt nhắc hẹn lúc {data.get('due_human') or '?'} (id {data.get('id')})."
+        return f"Đã đặt lịch lặp cron '{data['cron']}'{where} (id {data.get('id')})."
+    return f"Đã đặt nhắc hẹn lúc {data.get('due_human') or '?'}{where} (id {data.get('id')})."
 
 
 async def _get_reminders(vault_root: str) -> dict:
@@ -381,10 +383,11 @@ async def _do_create(vault_root: str, args: dict) -> str:
         return "ERROR: cần đủ 'name', 'prompt' và 'schedule' để tạo việc."
     notify_only = bool(args.get("notify_only") or False)
     chat_id = str(args.get("chat_id") or args.get("owner_chat") or "").strip()
+    brain_name = Path(vault_root).name   # tên brain phiên → nói cho user biết việc rơi vào đâu
     kind = _route_kind(schedule, notify_only)
     if kind == "loop":
         return _create_loop_file(vault_root, name=name, prompt=prompt, schedule=schedule,
-                                 owner_chat=chat_id)
+                                 owner_chat=chat_id, brain_name=brain_name)
     # I2: notify_only=True nghĩa là CHỈ nhắc bằng lời (mode "notify" - reminders.py:342 "⏰ Nhắc
     # anh: ..."), KHÔNG dựng nguyên engine Claude + MCP để "làm hộ" (mode "task" - reminders.py:
     # 418 _run_task, tốn tới max_wall_s=300). Trước đây hard-code "task" nên notify_only vô nghĩa -
@@ -392,7 +395,7 @@ async def _do_create(vault_root: str, args: dict) -> str:
     payload = {"text": prompt, "label": name, "mode": ("notify" if notify_only else "task"),
                "brain": vault_root, "chat_id": chat_id, "created_by": "javis_schedule"}
     payload.update(_reminder_time_payload(schedule))
-    return await _post_reminder(payload)
+    return await _post_reminder(payload, brain_name=brain_name)
 
 
 async def _do_list(vault_root: str) -> str:

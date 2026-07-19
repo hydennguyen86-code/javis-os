@@ -3211,6 +3211,42 @@ reminders_feature = reminders_mod.register(app, reminders_mod.RemindersDeps(
 ))
 
 
+@app.get("/viec/all")
+async def viec_all():
+    """Gộp MỌI brain cho trang Việc: mỗi brain kèm loop + nhắc hẹn đang chờ, mỗi item gắn
+    brain_name/brain_path để nút thao tác (bật/tắt/xoá/chuyển/huỷ) nhắm ĐÚNG brain của chính
+    item, không phải brain đang chọn ở sidebar. Quét list_brains() (KHÔNG chỉ brain đã đăng ký)
+    để thấy cả việc nằm ở brain chưa từng mở trên dashboard - đây là gốc của cái rối 'tạo qua
+    Telegram vào brain mặc định, tìm ở brain khác không thấy'."""
+    loop_feature.ensure_migrated()
+    bd = await list_brains()
+    out = []
+    for b in (bd.get("brains") or []):
+        name, path = b.get("name") or "", b.get("path") or ""
+        try:
+            st_all = loop_feature.read_state(path)
+            loops = []
+            for lp in loop_feature.list_loops(path):
+                v = loop_feature.loop_view(path, lp, st_all)
+                v["brain_name"], v["brain_path"] = name, path
+                loops.append(v)
+        except Exception:
+            loops = []
+        try:
+            rems = []
+            for v in reminders_feature.pending_views(path):
+                v["brain_name"], v["brain_path"] = name, path
+                rems.append(v)
+        except Exception:
+            rems = []
+        if loops or rems:
+            loop_feature.register_brain(path)   # brain có việc → scheduler nền quét
+        out.append({"name": name, "path": path, "is_default": b.get("is_default", False),
+                    "loops": loops, "reminders": rems})
+    return {"brains": out, "running": loop_feature.lock.locked(),
+            "running_slug": loop_feature._running[1] if loop_feature._running else ""}
+
+
 @app.get("/lint")
 async def lint(brain: str = Query("brain")):
     """LINT - health-check Wiki (chỉ đọc, không sửa). Trả danh sách 8 loại vấn đề."""
@@ -4613,6 +4649,33 @@ _TG_BOT = None
 #    "brain": str|None}       # brain RIÊNG của phiên (path); None = brain mặc định (theo Settings)
 _TG_SESS = {}
 
+# Map BỀN chat_id -> TÊN brain, sống sót qua restart (khác _TG_SESS bị .clear() mỗi lần bot bật
+# lại). Lưu theo TÊN (không phải path tuyệt đối) để bền qua Docker/local + brain đổi chỗ; đọc mới
+# resolve tên -> path. Ghi STATE_DIR/tg_brain.json (server state, gitignored, xuyên brain).
+_TG_BRAIN_PATH = cfgmod.STATE_DIR / "tg_brain.json"
+
+
+def _tg_load_brain_map() -> dict:
+    try:
+        if _TG_BRAIN_PATH.exists():
+            d = json.loads(_TG_BRAIN_PATH.read_text(encoding="utf-8"))
+            if isinstance(d, dict):
+                return {str(k): str(v) for k, v in d.items()}
+    except Exception:
+        pass
+    return {}
+
+
+_TG_BRAIN_MAP = _tg_load_brain_map()
+
+
+def _tg_save_brain_map() -> None:
+    try:
+        _atomic_write_text(_TG_BRAIN_PATH, json.dumps(_TG_BRAIN_MAP, ensure_ascii=False, indent=2))
+    except Exception as e:
+        import sys
+        print(f"[tg brain map write] {type(e).__name__}: {e}", file=sys.stderr)
+
 
 def _tg_session(chat_id):
     """Lấy (tạo nếu chưa có) phiên riêng của 1 chat_id. chat_id rỗng → gộp vào 'default'."""
@@ -4625,20 +4688,34 @@ def _tg_session(chat_id):
 
 
 def _tg_brain(chat_id):
-    """Brain của phiên Telegram này: phiên đã /brain thì dùng brain đó (nếu folder còn),
-    chưa chọn thì rơi về brain mặc định (cấu hình loop/Settings) - hành vi cũ."""
-    sess = _TG_SESS.get(str(chat_id or "default")) or {}
+    """Brain của phiên Telegram này. Ưu tiên: phiên sống (RAM) -> map BỀN (chat đã /brain, kể cả
+    trước restart) -> brain mặc định (Settings/loop). Map bền lưu TÊN brain nên brain đã xoá/đổi
+    tên thì tự dọn entry cũ và rơi về mặc định, không kẹt vào brain không còn."""
+    key = str(chat_id or "default")
+    sess = _TG_SESS.get(key) or {}
     b = sess.get("brain")
     if b and os.path.isdir(b):
         return b
+    name = _TG_BRAIN_MAP.get(key)
+    if name:
+        p = str(Path(BRAINS_DIR) / name)
+        if os.path.isdir(p):
+            return p
+        _TG_BRAIN_MAP.pop(key, None)   # brain đã biến mất → dọn, khỏi kẹt
+        _tg_save_brain_map()
     return _read_loop_config().get("brain", "brain")
 
 
 def _tg_set_brain(chat_id, brain_path):
     """Đổi brain cho 1 phiên Telegram + reset ngữ cảnh (brain khác = bộ nhớ/skill khác,
-    giữ mạch cũ sẽ trộn tri thức 2 vault)."""
+    giữ mạch cũ sẽ trộn tri thức 2 vault). Ghi cả phiên sống lẫn map BỀN để sống qua restart."""
     sess = _tg_session(chat_id)
     sess["brain"] = str(brain_path)
+    try:
+        _TG_BRAIN_MAP[str(chat_id or "default")] = Path(str(brain_path)).name
+        _tg_save_brain_map()
+    except Exception:
+        pass
     if sess.get("cli"):
         sess["cli"].reset_session()
     sess["or"] = None

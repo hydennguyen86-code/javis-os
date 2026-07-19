@@ -210,7 +210,7 @@ check("C2 LƯỚI THẬT: thân file (prompt) TỚI ĐƯỢC self_improve - đú
 _captured_payload = {}
 
 
-async def _fake_post_reminder(payload):
+async def _fake_post_reminder(payload, brain_name=""):
     _captured_payload.clear()
     _captured_payload.update(payload)
     return "Đã đặt nhắc hẹn lúc ? (id fake)."

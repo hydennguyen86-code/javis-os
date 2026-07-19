@@ -4,6 +4,16 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.100] - 2026-07-19
+Trang Việc định kỳ giờ gộp MỌI brain, mỗi việc gắn nhãn brain và chuyển được sang brain khác; tạo việc qua chat báo rõ brain; lựa chọn /brain trên Telegram được nhớ bền qua khởi động lại. Gỡ cái rối "tạo việc qua Telegram vào brain mặc định, tìm ở brain đang làm không thấy" - hai khái niệm brain (phiên Telegram vs brain đang xem trên dashboard) vốn tách rời, việc vẫn chạy nhưng người dùng không nhìn thấy.
+### Thêm mới
+- **Trang Việc gộp mọi brain**: endpoint `GET /viec/all` trả loop + nhắc hẹn của TẤT CẢ brain, nhóm theo brain (brain đang xem lên đầu, gắn "đang xem"), mỗi thẻ có nhãn brain. Nút bật/tắt/xoá/chạy/huỷ nhắm ĐÚNG brain của chính việc đó thay vì brain ở sidebar.
+- **Chuyển việc sang brain khác**: nút "Chuyển brain" trên mỗi loop/nhắc (`POST /loops/move`, `POST /reminders/move`). Loop dời nguyên file .md + trạng thái chạy; trùng tên ở brain đích thì từ chối, KHÔNG ghi đè (định danh loop theo tên file). Form tạo loop mới có ô chọn brain đích.
+- **Nhớ bền /brain Telegram**: lựa chọn brain của mỗi cuộc chat lưu bền ở `tg_brain.json` (theo tên brain), sống sót qua khởi động lại bot thay vì mất về mặc định như trước; brain bị xoá thì tự về mặc định + dọn mục cũ.
+### Cải thiện
+- **javis_schedule báo rõ brain**: câu xác nhận khi tạo việc/nhắc qua chat nêu tên brain ("Đã tạo việc ... trong brain Kim Khí Hà Lộc") để biết ngay việc rơi vào brain nào, không phải đi tìm mới ngã ngửa.
+- Test mới `test_viec_xuyen_brain.py` (30 kiểm tra): di chuyển loop/nhắc hẹn (thành công, va chạm slug, brain trùng, không tồn tại), nhớ bền tg brain qua restart + brain xoá, `/viec/all` gắn đúng brain cho từng item.
+
 ## [0.9.99] - 2026-07-19
 Vá lỗi Facebook cá nhân (0.9.95) trả trang "Trình duyệt không hỗ trợ, hãy tải Facebook Lite" thay vì feed. Nguyên nhân: mbasic.facebook.com chê User-Agent - đã dò thật, mbasic chỉ nhả HTML cho trình duyệt DI ĐỘNG (UA iPhone Safari nhận được trang thật, UA desktop/Firefox mobile bị đẩy sang trang Lite).
 ### Sửa lỗi
