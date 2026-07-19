@@ -524,6 +524,24 @@ body {
 .send-btn:hover { opacity: 0.85; }
 .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+/* ===== Mobile: ô nhập thành viên pill lớn (chat là chính) ===== */
+@media (max-width: 860px) {
+  .hud-voice {
+    margin: 6px 10px 8px; padding: 5px 6px 5px 8px; gap: 4px;
+    border: 1px solid var(--border); border-radius: 24px; background: var(--bg2);
+    align-items: flex-end;
+  }
+  #ttsToggleBar { display: none; }                 /* loa dời vào ngăn kéo */
+  .hud-voice .attach-btn { order: 1; width: 34px; height: 34px; border: none; background: transparent; }
+  .hud-voice .voice-input {
+    order: 2; border: none; background: transparent; border-radius: 0;
+    min-height: 36px; max-height: 40vh; padding: 8px 4px; font-size: 16px;
+  }
+  .hud-voice .voice-input:focus { border: none; }
+  .hud-voice .mic-big { order: 3; width: 34px; height: 34px; border: none; background: transparent; }
+  .hud-voice .stop-btn, .hud-voice .send-btn { order: 4; width: 36px; height: 36px; border-radius: 50%; }
+}
+
 .stop-btn {
   background: var(--red); border: none; color: white; width: 44px; height: 44px;
   border-radius: 12px; cursor: pointer; flex-shrink: 0;
