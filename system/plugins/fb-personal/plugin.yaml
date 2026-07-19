@@ -1,0 +1,12 @@
+name: Facebook cá nhân (cookie)
+slug: fb-personal
+version: 1.0.0
+description: Tự động hoá tài khoản Facebook CÁ NHÂN qua cookie (mbasic) - đọc feed (readonly), đăng bài + bình luận (full). THỬ NGHIỆM, rủi ro khoá tài khoản. Dùng cookie của kết nối "facebook-personal".
+author: Javis (bundled)
+enabled: true
+min_mode: full
+tools:
+  - fb_feed_read
+  - fb_personal_post
+  - fb_personal_comment
+hooks: []

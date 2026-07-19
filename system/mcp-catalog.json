@@ -358,6 +358,30 @@
       "risk": "Mức Toàn quyền cho phép Javis ĐĂNG BÀI và TRẢ LỜI BÌNH LUẬN công khai trên Trang của bạn - hành động thật, khó rút lại. Giữ mức Chỉ đọc thì Javis chỉ xem Trang, bài và bình luận, không đăng hay trả lời gì. Token chỉ thao tác được trên Trang mà chính bạn là admin."
     },
     {
+      "id": "facebook-personal",
+      "name": "Facebook cá nhân (cookie - thử nghiệm)",
+      "icon": "/static/logos/meta-ads.webp",
+      "category": "Mạng xã hội",
+      "description": "Tự động hoá TÀI KHOẢN Facebook CÁ NHÂN bằng cookie phiên (Facebook đã đóng API cá nhân nên đi đường cookie): lướt/đọc feed, đăng bài lên tường, bình luận. Chạy được trên VPS headless vì chỉ cần cookie, không cần mở trình duyệt. CẢNH BÁO: vi phạm điều khoản Facebook, có thể bị KHOÁ TÀI KHOẢN; cookie là chìa khoá toàn quyền tài khoản. Mặc định TẮT, chỉ bật khi bạn chấp nhận rủi ro.",
+      "status": "beta",
+      "transport": "http",
+      "url": "",
+      "auth": {
+        "type": "apikey",
+        "fields": [
+          { "key": "cookie", "label": "Cookie phiên Facebook (dán cả dòng Cookie)", "placeholder": "c_user=...; xs=...; datr=...; fr=...", "multiline": true }
+        ],
+        "guide": "Lấy cookie 1 lần, làm trên MÁY CÓ MÀN HÌNH: (1) Mở trình duyệt, đăng nhập facebook.com bằng chính tài khoản muốn Javis dùng. (2) Bấm F12 mở DevTools > tab Network > tải lại trang (F5) > bấm request đầu tiên tới facebook.com > kéo tới mục 'Request Headers' > tìm dòng 'Cookie:' > copy TOÀN BỘ giá trị sau chữ 'Cookie:'. (Hoặc dùng tiện ích trình duyệt kiểu 'Get cookies.txt' rồi ghép thành chuỗi 'c_user=...; xs=...; datr=...'.) (3) Dán vào ô dưới rồi bấm Kết nối. Cookie sống tới khi bạn đăng xuất hoặc Facebook thu hồi; hết hạn thì lấy lại. TUYỆT ĐỐI không đưa cookie này cho ai - nó vào thẳng tài khoản của bạn.",
+        "guide_url": ""
+      },
+      "tool_meta": {
+        "read": ["fb_feed_read"],
+        "danger": ["fb_personal_post", "fb_personal_comment"]
+      },
+      "default_perm": "readonly",
+      "risk": "Mức Toàn quyền cho phép Javis ĐĂNG BÀI và BÌNH LUẬN THẬT bằng tài khoản Facebook CÁ NHÂN của bạn. Đây là tự động hoá tài khoản cá nhân - vi phạm điều khoản Facebook, RỦI RO BỊ KHOÁ TÀI KHOẢN là có thật. Cookie phiên lưu trên server (đã mã hoá) là chìa khoá toàn quyền tài khoản. Giữ mức Chỉ đọc thì Javis chỉ lướt/đọc feed, không đăng hay bình luận gì. Chỉ bật Toàn quyền khi bạn hiểu và tự chịu rủi ro."
+    },
+    {
       "id": "google-ads",
       "name": "Google Ads",
       "icon": "/static/logos/google-ads.webp",

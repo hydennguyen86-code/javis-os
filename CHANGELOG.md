@@ -4,7 +4,16 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
-## [0.9.94] - 2026-07-19
+## [0.9.95] - 2026-07-19
+Thêm connector **Facebook cá nhân (cookie - thử nghiệm)** và plugin `fb-personal`: tự động hoá tài khoản Facebook CÁ NHÂN bằng cookie phiên (Facebook đã đóng API cá nhân) - lướt/đọc feed, đăng bài lên tường, bình luận. Đi đường cookie + mbasic bằng httpx nên chạy được trên VPS headless, không cần Chromium. CẢNH BÁO: vi phạm điều khoản Facebook, rủi ro khoá tài khoản; mặc định TẮT, cookie mã hoá at rest. Đây là bước 2 nối tiếp connector Trang (0.9.90) cho nhu cầu lướt feed cá nhân.
+### Thêm mới
+- **Connector `facebook-personal`** (apikey, field `cookie` mã hoá): dán cookie phiên Facebook (kèm hướng dẫn lấy an toàn từ DevTools). Mặc định Chỉ đọc; đăng/bình luận chỉ chạy khi nâng Toàn quyền. Khai trong `system/mcp-catalog.json`.
+- **Plugin `fb-personal`** (bundled) - 3 tool: `fb_feed_read` (readonly, trả văn bản feed đã làm sạch + link bài để Javis tóm tắt) và `fb_personal_post`, `fb_personal_comment` (min_mode full). Engine gọi `mbasic.facebook.com` bằng httpx + cookie, tự bóc `fb_dtsg` và tìm form soạn bài/bình luận (best-effort, chỉnh selector khi Facebook đổi). Chặn rõ khi cookie bị đẩy về login/checkpoint.
+- **`validate_connection` nhận connector ẢO**: connector plugin-backed không có URL/command (Meta/Facebook gọi qua plugin) nay qua cửa thêm-kết-nối mà không dial MCP (đếm tool theo `tool_meta`). Trước đây connector apikey không URL sẽ bị xoá khi thêm. Sửa trong `mcp_hub.py` + bơm không đổi.
+- Test `server/test_fb_personal.py` (24 kiểm tra, không mạng): catalog hợp lệ, min_mode đúng, gate chưa-có-cookie, bóc fb_dtsg/tìm form, đọc feed + chặn login, đăng/bình luận build đúng POST, và nhánh validate connector ẢO.
+
+### Ghi chú
+- Phần tự động hoá Facebook cá nhân là THỬ NGHIỆM và chỉ kiểm chứng được khi chạy thật với cookie thật trên máy đích; mbasic có thể bị Facebook đổi/đóng nên bộ tìm form là best-effort, cần tinh chỉnh khi kết nối thực tế.
 Đổi font chữ toàn app sang **Montserrat** cho sạch, dễ đọc (thay font monospace cũ trông "lỗi lỗi" ở các nhãn). Code vẫn giữ font monospace. Và vá header màn cockpit trên điện thoại.
 ### Cải thiện
 - **Font Montserrat**: nạp Montserrat (Google Fonts) và dùng làm font chính cho toàn giao diện (nhãn, tiêu đề, chữ thân, thanh bên). Khối mã và mã inline giữ font monospace riêng (`--mono`) cho dễ đọc code. Tải lại trang là thấy (đã bump ?v).

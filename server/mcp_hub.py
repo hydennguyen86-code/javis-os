@@ -541,6 +541,12 @@ async def validate_connection(conn_id):
     conn = next((c for c in mcp_store.resolved(enabled_only=False) if c["id"] == conn_id), None)
     if not conn:
         return {"ok": False, "label": "", "tools": 0, "error": "Không tìm thấy kết nối"}
+    # Connector ẢO (không URL, không command): tool do PLUGIN phục vụ (vd Meta/Facebook gọi
+    # Graph API/cookie), không có MCP server để dial. Coi là hợp lệ; đếm tool theo tool_meta để hiển thị.
+    if not (conn.get("url") or "").strip() and not (conn.get("command") or "").strip():
+        tm = (conn.get("connector") or {}).get("tool_meta") or {}
+        n = len((tm.get("read") or []) + (tm.get("write") or []) + (tm.get("danger") or []))
+        return {"ok": True, "label": "", "tools": n, "error": ""}
     spec = mcp_client._conn_spec(conn)
     try:
         spec["headers"].update(await mcp_client._oauth_headers(conn))
