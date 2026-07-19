@@ -4,6 +4,11 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.99] - 2026-07-19
+Vá lỗi Facebook cá nhân (0.9.95) trả trang "Trình duyệt không hỗ trợ, hãy tải Facebook Lite" thay vì feed. Nguyên nhân: mbasic.facebook.com chê User-Agent - đã dò thật, mbasic chỉ nhả HTML cho trình duyệt DI ĐỘNG (UA iPhone Safari nhận được trang thật, UA desktop/Firefox mobile bị đẩy sang trang Lite).
+### Sửa lỗi
+- **fb-personal đọc feed ra trang "không hỗ trợ / Facebook Lite"**: đổi User-Agent mặc định sang iPhone Safari + danh sách UA dự phòng. Thêm lớp `_fetch` tự đổi UA khi gặp trang bị chê; nếu MỌI UA đều bị chê thì trả lỗi kèm cách sửa (dán UA riêng, lấy cookie từ trình duyệt di động) thay vì trả rác. Phát hiện đúng trang "không hỗ trợ" và trang login/checkpoint để báo lỗi rõ. Thêm field tuỳ chọn `user_agent` vào connector `facebook-personal` (khớp UA với trình duyệt nơi lấy cookie là chắc nhất) + cập nhật hướng dẫn. Test `test_fb_personal.py` lên 28 kiểm tra (thêm phát hiện UA + tự đổi UA + override).
+
 ## [0.9.98] - 2026-07-19
 Vá triệt để lỗi header điện thoại ở trang quản lý (0.9.97 chưa dứt): header giờ CỐ ĐỊNH trên cùng nên luôn thấy nút ☰ để vào menu, và quả cầu cockpit ẩn hẳn sau trang quản lý. Chỉ đổi bản điện thoại.
 ### Sửa lỗi

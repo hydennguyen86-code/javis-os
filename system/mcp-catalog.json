@@ -369,9 +369,10 @@
       "auth": {
         "type": "apikey",
         "fields": [
-          { "key": "cookie", "label": "Cookie phiên Facebook (dán cả dòng Cookie)", "placeholder": "c_user=...; xs=...; datr=...; fr=...", "multiline": true }
+          { "key": "cookie", "label": "Cookie phiên Facebook (dán cả dòng Cookie)", "placeholder": "c_user=...; xs=...; datr=...; fr=...", "multiline": true },
+          { "key": "user_agent", "label": "User-Agent trình duyệt (tuỳ chọn - dán khi bị chê 'không hỗ trợ, tải Facebook Lite')", "placeholder": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) ... Safari/604.1", "optional": true }
         ],
-        "guide": "Lấy cookie 1 lần, làm trên MÁY CÓ MÀN HÌNH: (1) Mở trình duyệt, đăng nhập facebook.com bằng chính tài khoản muốn Javis dùng. (2) Bấm F12 mở DevTools > tab Network > tải lại trang (F5) > bấm request đầu tiên tới facebook.com > kéo tới mục 'Request Headers' > tìm dòng 'Cookie:' > copy TOÀN BỘ giá trị sau chữ 'Cookie:'. (Hoặc dùng tiện ích trình duyệt kiểu 'Get cookies.txt' rồi ghép thành chuỗi 'c_user=...; xs=...; datr=...'.) (3) Dán vào ô dưới rồi bấm Kết nối. Cookie sống tới khi bạn đăng xuất hoặc Facebook thu hồi; hết hạn thì lấy lại. TUYỆT ĐỐI không đưa cookie này cho ai - nó vào thẳng tài khoản của bạn.",
+        "guide": "Lấy cookie 1 lần, làm trên MÁY CÓ MÀN HÌNH: (1) Mở trình duyệt, đăng nhập facebook.com bằng chính tài khoản muốn Javis dùng. (2) Bấm F12 mở DevTools > tab Network > tải lại trang (F5) > bấm request đầu tiên tới facebook.com > kéo tới mục 'Request Headers' > tìm dòng 'Cookie:' > copy TOÀN BỘ giá trị sau chữ 'Cookie:'. (Hoặc dùng tiện ích trình duyệt kiểu 'Get cookies.txt' rồi ghép thành chuỗi 'c_user=...; xs=...; datr=...'.) (3) Dán vào ô dưới rồi bấm Kết nối. Cookie sống tới khi bạn đăng xuất hoặc Facebook thu hồi; hết hạn thì lấy lại. TUYỆT ĐỐI không đưa cookie này cho ai - nó vào thẳng tài khoản của bạn. LƯU Ý: mbasic chỉ chạy với trình duyệt DI ĐỘNG - nếu Javis báo 'không hỗ trợ / tải Facebook Lite', hãy lấy cookie từ trình duyệt trên ĐIỆN THOẠI (hoặc chế độ mobile) rồi dán thêm User-Agent của trình duyệt đó vào ô User-Agent bên dưới.",
         "guide_url": ""
       },
       "tool_meta": {

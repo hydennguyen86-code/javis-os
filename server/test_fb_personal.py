@@ -119,7 +119,7 @@ async def handler_tests():
     class _FakeClient:
         async def __aenter__(self): return self
         async def __aexit__(self, *a): return False
-    plug._client = lambda ck: _FakeClient()
+    plug._client = lambda ck, ua=None: _FakeClient()
 
     state = {"page": HOME, "url": BASE_HOME, "posted": None}
     async def _fake_get(client, url):
@@ -167,6 +167,55 @@ async def handler_tests():
 
 BASE_HOME = "https://mbasic.facebook.com/"
 asyncio.run(handler_tests())
+
+
+# ---- 6. Lớp fetch: phát hiện trang 'không hỗ trợ' + tự đổi UA + ô UA override ----
+UNSUPPORTED = ('<html><body><h2>Trình duyệt này không hỗ trợ Facebook, hãy tải Facebook Lite</h2>'
+               '</body></html>')
+check("_unsupported: bắt trang 'không hỗ trợ / Facebook Lite'",
+      plug._unsupported(UNSUPPORTED) and not plug._unsupported(HOME))
+
+
+async def fetch_tests():
+    plug._connected_id = lambda: "cfp"
+    plug._cookie = lambda: "c_user=1; xs=abc"
+
+    class _FakeClient:
+        async def __aenter__(self): return self
+        async def __aexit__(self, *a): return False
+    plug._client = lambda ck, ua: _FakeClient()
+
+    # UA override: field user_agent → đứng đầu danh sách UA thử
+    import mcp_store
+    orig = mcp_store.connection_secrets
+    mcp_store.connection_secrets = lambda cid: {"cookie": "c=1", "user_agent": "MyUA/1.0"}
+    try:
+        check("_uas: UA user khai đứng đầu + còn UA mặc định",
+              plug._uas()[0] == "MyUA/1.0" and len(plug._uas()) >= 2)
+    finally:
+        mcp_store.connection_secrets = orig
+
+    # mọi UA bị chê → trả lỗi hướng dẫn đổi UA (KHÔNG trả rác)
+    async def _get_bad(client, url):
+        return UNSUPPORTED, BASE_HOME
+    plug._get = _get_bad
+    _p, _u, _ua, err = await plug._fetch("c=1", "/")
+    check("_fetch: mọi UA bị chê → ERROR hướng dẫn đổi UA", bool(err) and err.startswith("ERROR") and "User-Agent" in err)
+    r_feed_bad = await plug._feed({}, None)
+    check("fb_feed_read: trang 'không hỗ trợ' → ERROR rõ (không trả rác)",
+          r_feed_bad.startswith("ERROR") and "User-Agent" in r_feed_bad)
+
+    # UA đầu bị chê, UA sau OK → tự chuyển, trả trang tốt
+    calls = {"n": 0}
+    async def _get_flaky(client, url):
+        calls["n"] += 1
+        return (UNSUPPORTED, BASE_HOME) if calls["n"] == 1 else (HOME, BASE_HOME)
+    plug._get = _get_flaky
+    page, _url, _ua2, err2 = await plug._fetch("c=1", "/")
+    check("_fetch: UA đầu bị chê thì tự thử UA sau và qua được",
+          err2 is None and "xc_message" in page and calls["n"] == 2)
+
+asyncio.run(fetch_tests())
 
 if _fails:
     print(f"\nFAIL - {len(_fails)} test: {_fails}")
