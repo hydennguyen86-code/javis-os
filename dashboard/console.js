@@ -1083,17 +1083,23 @@
 
     // Gộp MỌI brain: /viec/all trả từng brain kèm loop + nhắc hẹn. Nhóm theo brain, brain đang
     // xem ở sidebar lên đầu; brain khác rỗng thì ẩn. Mỗi item mang brain_path riêng.
-    async function loadAll() {
+    async function loadAll(retried) {
       if (myGen !== _renderGen) return;
       let d = null, loadErr = false;
       try { d = await (await fetch("/viec/all")).json(); } catch (e) { loadErr = true; }
       if (myGen !== _renderGen) return;
       const box = el.querySelector("#lpGroups");
       if (!box) return;
-      // /viec/all lỗi/hết-giờ (VPS chậm) → BÁO RÕ + cho thử lại, KHÔNG im lặng hiện "chưa có việc"
-      // (dễ tưởng việc biến mất). Giữ danh sách brain cũ + ensureBrains cho ô chọn của form.
+      // /viec/all lỗi/hết-giờ (VPS chậm) → tự thử lại 1 lần sau 1.5s (vượt qua nhịp chậm/nghẽn
+      // thoáng qua), rồi mới BÁO RÕ + cho bấm thử lại. KHÔNG im lặng hiện "chưa có việc" (dễ tưởng
+      // việc biến mất). Giữ danh sách brain cũ + ensureBrains cho ô chọn của form.
       if (loadErr || !d || !d.brains) {
         ensureBrains();
+        if (!retried) {
+          box.innerHTML = `<div class="empty">Đang tải danh sách việc...</div>`;
+          setTimeout(() => { if (myGen === _renderGen) loadAll(true); }, 1500);
+          return;
+        }
         box.innerHTML = `<div class="empty">Không tải được danh sách việc (mạng chậm hoặc hết giờ). <a href="#" id="lpRetry" style="color:#6ea8fe">Thử lại</a></div>`;
         const rt = el.querySelector("#lpRetry");
         if (rt) rt.onclick = (ev) => { ev.preventDefault(); loadAll(); loadLog(); };

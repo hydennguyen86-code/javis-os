@@ -3242,16 +3242,35 @@ async def viec_all():
         return {"name": name, "path": path, "is_default": is_default,
                 "loops": loops, "reminders": rems}
 
-    bd = await list_brains()
+    # Liệt kê thư mục brain RẺ - KHÔNG dùng list_brains() vì nó đếm note bằng rglob("*.md") quét
+    # CẢ cây mỗi brain (vault lớn = vài giây). Trang Việc không cần số note; đếm làm /viec/all chậm
+    # tới mức reverse proxy trên VPS cắt giữa chừng (504) → dashboard báo "không tải được". Đây là
+    # gốc lỗi VPS khách không hiện mà VPS nhẹ hơn vẫn hiện.
+    base = Path(BRAINS_DIR)
+    try:
+        base.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
+    try:
+        default_resolved = _default_brain_dir().resolve()
+    except Exception:
+        default_resolved = None
     out = []
     seen = set()
-    for b in (bd.get("brains") or []):
-        name, path = b.get("name") or "", b.get("path") or ""
+    try:
+        brain_dirs = sorted((p for p in base.iterdir() if p.is_dir() and not p.name.startswith(".")),
+                            key=lambda x: x.name.lower())
+    except Exception:
+        brain_dirs = []
+    for p in brain_dirs:
+        path = str(p)
         try:
-            seen.add(str(Path(path).resolve()))
+            rp = p.resolve()
+            seen.add(str(rp))
+            is_def = default_resolved is not None and rp == default_resolved
         except Exception:
-            pass
-        out.append(_brain_viec(name, path, b.get("is_default", False)))
+            is_def = False
+        out.append(_brain_viec(p.name, path, is_def))
 
     # Gộp thêm brain đã ĐĂNG KÝ với scheduler nhưng KHÔNG nằm trong BRAINS_DIR (folder ngoài, hoặc
     # brain legacy trong loop_config). Trước đây chỉ quét list_brains() nên loop tạo qua chat vào

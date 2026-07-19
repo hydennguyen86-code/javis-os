@@ -4,6 +4,12 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.105] - 2026-07-19
+Sửa lỗi trang Việc định kỳ báo "không tải được danh sách việc" trên VPS nặng. Nguyên nhân: /viec/all đếm số note của mọi brain (quét cả cây file) mỗi lần mở, vault lớn thì mất vài giây và reverse proxy cắt giữa chừng. VPS nhẹ thì kịp nên vẫn hiện, VPS nặng thì lỗi.
+### Sửa lỗi
+- **/viec/all bỏ đếm note**: trang Việc không cần số note nên bỏ hẳn phần quét cả cây file (rglob) - nhanh hơn 4-6 lần (đo tại chỗ 2.06s xuống 0.3s). Đây là gốc lỗi VPS khách không tải được danh sách.
+- **Tự thử lại 1 lần**: /viec/all lỗi/nghẽn thoáng qua thì dashboard tự thử lại sau 1.5s trước khi báo lỗi + nút Thử lại, đỡ phải bấm tay khi mạng chậm chốc lát.
+
 ## [0.9.104] - 2026-07-19
 Trang Việc định kỳ hết cảnh tạo tay mà ô Brain trống, và giờ thêm được cả nhắc hẹn ngay trong form chứ không chỉ loop. Loop tạo qua chat rơi vào brain nào cũng hiện được.
 ### Thêm mới
