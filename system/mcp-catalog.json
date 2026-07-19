@@ -315,6 +315,35 @@
       "risk": "Connector này CHỈ ĐỌC số liệu quảng cáo - không tạo/sửa chiến dịch, không tiêu tiền. Token chỉ thao tác được trên tài khoản quảng cáo mà chính bạn là admin."
     },
     {
+      "id": "facebook-pages",
+      "name": "Facebook Trang (tự tạo app - Graph API)",
+      "icon": "/static/logos/meta-ads.webp",
+      "category": "Mạng xã hội",
+      "description": "Quản lý Trang/Fanpage Facebook của bạn qua Graph API chính chủ: xem danh sách Trang, đọc bài và bình luận (chỉ đọc), đăng bài và trả lời bình luận (toàn quyền). Bạn tạo 1 Facebook App (dùng lại app đang có cho Meta Ads cũng được), dán App ID + App Secret. Đăng bài và trả lời bình luận là hành động THẬT nên chỉ chạy ở mức Toàn quyền, không tự làm lén.",
+      "status": "beta",
+      "transport": "http",
+      "url": "",
+      "auth": {
+        "type": "oauth",
+        "provider": "meta",
+        "authorize_url": "https://www.facebook.com/v25.0/dialog/oauth",
+        "token_url": "https://graph.facebook.com/v25.0/oauth/access_token",
+        "scopes": ["pages_show_list", "pages_read_engagement", "pages_manage_posts", "pages_manage_engagement"],
+        "fields": [
+          { "key": "client_id", "label": "App ID (Facebook)", "placeholder": "vd 1122334455667788" },
+          { "key": "client_secret", "label": "App Secret (Facebook)", "placeholder": "vd a1b2c3d4e5f6..." }
+        ],
+        "guide": "Làm 1 lần (~5 phút), dùng lại được app bạn đã tạo cho Meta Ads: (1) Vào developers.facebook.com/apps > Create App > loại 'Business' (hoặc 'Other'), đặt tên bất kỳ. (2) Thêm sản phẩm 'Facebook Login' THƯỜNG (không phải 'for Business'). (3) Facebook Login > Settings > 'Valid OAuth Redirect URIs' dán CHÍNH XÁC: http://localhost:7777/connect/oauth/callback (dùng 'localhost' KHÔNG phải 127.0.0.1; nếu chạy Javis cổng khác thì đổi 7777). (4) GIỮ app ở chế độ Development (góc trên), và đảm bảo bạn là Admin của app + là Admin của các Trang muốn quản lý - khi đó tự cấp được quyền Trang mà KHÔNG cần App Review. (5) App Settings > Basic: copy App ID + App Secret, dán vào ô dưới rồi bấm Kết nối. Khi Facebook hỏi quyền, nhớ TICK chọn các Trang bạn muốn Javis quản lý. Token sống ~60 ngày, Javis tự gia hạn khi còn dùng; hết hạn thì bấm Kết nối lại.",
+        "guide_url": "https://developers.facebook.com/docs/pages-api/getting-started"
+      },
+      "tool_meta": {
+        "read": ["fb_pages_list", "fb_page_posts", "fb_page_comments"],
+        "danger": ["fb_page_post", "fb_page_reply"]
+      },
+      "default_perm": "readonly",
+      "risk": "Mức Toàn quyền cho phép Javis ĐĂNG BÀI và TRẢ LỜI BÌNH LUẬN công khai trên Trang của bạn - hành động thật, khó rút lại. Giữ mức Chỉ đọc thì Javis chỉ xem Trang, bài và bình luận, không đăng hay trả lời gì. Token chỉ thao tác được trên Trang mà chính bạn là admin."
+    },
+    {
       "id": "google-ads",
       "name": "Google Ads",
       "icon": "/static/logos/google-ads.webp",

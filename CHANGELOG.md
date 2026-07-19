@@ -4,6 +4,13 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.90] - 2026-07-19
+Thêm connector **Facebook Trang (tự tạo app - Graph API)** và plugin `meta-pages-graph`: quản lý Fanpage của bạn qua Graph API chính chủ. Vẫn theo kiểu tự tạo app (BYO) nên KHÔNG cần Facebook duyệt app khi thao tác trên Trang bạn là admin, và mỗi bản fork tự đứng được một mình. Xem danh sách Trang, đọc bài và bình luận (chỉ đọc); đăng bài và trả lời bình luận (toàn quyền, không tự chạy lén). Dùng lại nguyên hạ tầng OAuth Meta sẵn có, không đụng `oauth_mcp`. Lưu ý: "lướt feed" trên trang cá nhân KHÔNG làm được qua Page API (Facebook đã đóng), để dành bài toán browser-automation đợt sau.
+### Thêm mới
+- **Connector `facebook-pages`**: OAuth BYO app kiểu Meta (dùng chung app với Meta Ads được), scope `pages_show_list, pages_read_engagement, pages_manage_posts, pages_manage_engagement`. Mặc định thêm ở mức Chỉ đọc; đăng/trả lời chỉ chạy khi user nâng lên Toàn quyền. Khai trong `system/mcp-catalog.json`, kèm hướng dẫn tạo app (~5 phút, redirect localhost).
+- **Plugin `meta-pages-graph`** (bundled) - 5 tool cho mọi engine: `fb_pages_list`, `fb_page_posts`, `fb_page_comments` (readonly) và `fb_page_post`, `fb_page_reply` (min_mode full). Mỗi thao tác trên một Trang dùng Page Access Token RIÊNG lấy từ `/me/accounts`, không dùng token cá nhân; `fb_pages_list` không lộ token Trang ra output. Tự chọn Trang khi chỉ có 1, bắt chỉ rõ khi có nhiều.
+- Test `server/test_meta_pages.py` (27 kiểm tra, không mạng): catalog hợp lệ, min_mode đúng (đọc readonly / ghi full), gate chưa-kết-nối, chọn Trang, đăng/trả lời dùng đúng token Trang, không lộ token.
+
 ## [0.9.89] - 2026-07-19
 Giao diện chat trên điện thoại gọn hẳn: ô nhập thành viên bo tròn lớn, header chỉ còn menu ☰ + chip model + nút hội thoại mới, dãy công cụ chuyển thành ngăn kéo trượt từ trái. Chỉ đổi bản điện thoại (màn hẹp dưới 860px), bản máy tính giữ nguyên. Có spec + plan ở `docs/superpowers/specs/2026-07-19-mobile-chat-declutter-design.md`.
 ### Cải thiện
