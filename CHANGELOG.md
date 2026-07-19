@@ -4,6 +4,11 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.102] - 2026-07-19
+Màn Javis (cockpit) trên điện thoại giờ là một khung cố định không trôi: quả cầu thu nhỏ ở trên, khung chat cuộn được ngay dưới để đọc kết quả. Chỉ đổi bản điện thoại.
+### Cải thiện
+- **Cockpit điện thoại thành 1 khung cố định**: khoá cuộn cả trang trên điện thoại (không còn cảnh trôi lên trôi xuống lộ quả cầu), quả cầu não thu về khoảng 34% màn hình ở trên, phần chat chiếm khoảng còn lại và tự cuộn bên trong để đọc hội thoại. Header cố định + ô nhập bám đáy như cũ.
+
 ## [0.9.101] - 2026-07-19
 Facebook cá nhân: nhận diện đúng trang ĐĂNG NHẬP mbasic trả về khi cookie bị từ chối, thay vì đọc nhầm trang login thành feed. Trước đó fix User-Agent (0.9.99) đã hết lỗi "không hỗ trợ", nhưng nếu cookie hết hạn/bị Facebook chặn thì mbasic trả trang đăng nhập (URL vẫn là mbasic, không redirect) nên không bị bắt.
 ### Sửa lỗi

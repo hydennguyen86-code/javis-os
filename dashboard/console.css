@@ -382,17 +382,14 @@ body.has-rail .hud { margin-left: var(--rail-w); width: calc(100% - var(--rail-w
   .cview-body { padding: 16px 14px; }
   .cgrid { grid-template-columns: 1fr; }
 
-  /* Cockpit co lại 1 cột, cho cuộn dọc thay vì vỡ khung */
-  body { overflow: auto; }
-  /* Trang quản lý (cview đè lên cockpit): KHOÁ cuộn body để header không trượt lộ quả cầu phía sau;
-     nội dung trang tự cuộn trong .cview-body. */
-  body.in-console { overflow: hidden; }
-  body.in-console .hud-body { visibility: hidden; }   /* trang quản lý: giấu quả cầu cockpit phía sau (không lộ, không kéo được) */
+  /* Mobile: KHÔNG cho cả trang trôi lên xuống - cả màn là 1 khung cố định; mỗi khung tự cuộn bên trong. */
+  body { overflow: hidden; }
+  body.in-console .hud-body { visibility: hidden; }   /* trang quản lý: giấu quả cầu cockpit phía sau */
   .hud { grid-template-rows: 1fr auto; padding-top: 46px; }  /* header ra khỏi lưới (fixed) → chừa 46px + hàng body/voice */
-  .hud-body { grid-template-columns: 1fr; overflow-y: auto; }
+  .hud-body { display: flex; flex-direction: column; overflow: hidden; min-height: 0; }  /* cockpit: quả cầu trên, chat dưới, không trôi */
   .hud-left { display: none; }              /* số liệu KD ẩn trên mobile (xem ở Console) */
-  .hud-center { min-height: 46vh; }
-  .hud-right { border-top: 1px solid var(--border); }
+  .hud-center { flex: 0 0 auto; height: 34vh; min-height: 0; }   /* quả cầu nhỏ gọn ở trên, cố định */
+  .hud-right { flex: 1 1 auto; min-height: 0; overflow-y: auto; border-top: 1px solid var(--border); }  /* chat cuộn được để đọc kết quả */
   .cview-head { padding: 14px 16px; }
   .cview-title { font-size: 16px; }
 }
