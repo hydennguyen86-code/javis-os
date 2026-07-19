@@ -1,7 +1,7 @@
 // Wiring giao diện chat trên điện thoại (mobile-only, <=860px):
-//  - dời chip model (#mbOpen + #mbPop) lên header khi mobile, trả về model-bar khi desktop
-//  - dời nhóm Hệ thống (chọn brain, cài đặt, đổi tông, Studio, loa, dải HỆ THỐNG) vào đáy ngăn kéo
-//  - nút + = hội thoại mới (dùng lại #resetBtn)
+//  - dời chip model (#mbOpen + #mbPop) và nút + (#newChatBtn) lên header khi mobile, trả về khi desktop
+//  - dời nhóm Hệ thống (chọn brain, cài đặt, đổi tông, loa, dải HỆ THỐNG) vào đáy ngăn kéo
+//  - nút + = hội thoại mới (reset) + focus ô nhập
 //  - ngăn kéo điều hướng: ☰ mở/đóng, backdrop / Esc / chọn mục thì đóng
 //  - rút gọn placeholder ô nhập cho vừa bề ngang điện thoại
 (function () {
@@ -9,26 +9,29 @@
     var mq = window.matchMedia("(max-width: 860px)");
     var railEl = document.querySelector(".rail");
 
-    // ---- 1) Chip model: mobile đưa lên giữa header, desktop trả về .model-bar ----
+    // ---- 1) Header mobile: dời chip model + nút + lên header; desktop trả về chỗ cũ ----
     var mbOpen = document.getElementById("mbOpen");
     var mbPop = document.getElementById("mbPop");
     var modelBar = document.getElementById("modelBar");
     var headerRoot = document.querySelector(".hud-top");
     var headerCenter = document.querySelector(".hud-center-title");
-    function placeModelChip() {
-      if (!mbOpen || !modelBar || !headerRoot) return;
+    var newChatBtn = document.getElementById("newChatBtn");
+    var origNewChatParent = newChatBtn ? newChatBtn.parentElement : null;
+    function placeHeader() {
+      if (!headerRoot) return;
       if (mq.matches) {
-        if (mbOpen.parentElement !== headerRoot) {
-          if (headerCenter && headerCenter.parentElement === headerRoot) {
-            headerRoot.insertBefore(mbOpen, headerCenter.nextSibling);
-          } else {
-            headerRoot.appendChild(mbOpen);
-          }
+        if (mbOpen && mbOpen.parentElement !== headerRoot) {
+          if (headerCenter && headerCenter.parentElement === headerRoot) headerRoot.insertBefore(mbOpen, headerCenter.nextSibling);
+          else headerRoot.appendChild(mbOpen);
           if (mbPop) headerRoot.insertBefore(mbPop, mbOpen.nextSibling);
         }
-      } else if (mbOpen.parentElement !== modelBar) {
-        modelBar.insertBefore(mbOpen, modelBar.firstChild);
-        if (mbPop) modelBar.insertBefore(mbPop, mbOpen.nextSibling);
+        if (newChatBtn && newChatBtn.parentElement !== headerRoot) headerRoot.appendChild(newChatBtn);  // + về cuối header
+      } else {
+        if (mbOpen && modelBar && mbOpen.parentElement !== modelBar) {
+          modelBar.insertBefore(mbOpen, modelBar.firstChild);
+          if (mbPop) modelBar.insertBefore(mbPop, mbOpen.nextSibling);
+        }
+        if (newChatBtn && origNewChatParent && newChatBtn.parentElement !== origNewChatParent) origNewChatParent.appendChild(newChatBtn);
       }
     }
 
@@ -80,10 +83,12 @@
       if (chatInput) chatInput.setAttribute("placeholder", mq.matches ? "Nói hoặc gõ cho Javis…" : longPh);
     }
 
-    // ---- 4) Nút + = hội thoại mới ----
-    var newChat = document.getElementById("newChatBtn");
+    // ---- 4) Nút + = hội thoại mới (reset) + focus ô nhập cho phản hồi tức thì ----
     var reset = document.getElementById("resetBtn");
-    if (newChat && reset) newChat.addEventListener("click", function () { reset.click(); });
+    if (newChatBtn && reset) newChatBtn.addEventListener("click", function () {
+      reset.click();
+      if (chatInput) { try { chatInput.focus(); } catch (e) {} }
+    });
 
     // ---- 5) Ngăn kéo điều hướng ----
     var toggle = document.getElementById("navToggle");
@@ -99,7 +104,7 @@
       if (e.target.closest(".rail-item") && mq.matches) closeNav();  // chọn mục điều hướng -> đóng
     });
 
-    function applyAll() { placeModelChip(); placeSystem(); setPlaceholder(); }
+    function applyAll() { placeHeader(); placeSystem(); setPlaceholder(); }
     applyAll();
 
     var onChange = function () { applyAll(); closeNav(); };

@@ -329,12 +329,13 @@ body.has-rail .hud { margin-left: var(--rail-w); width: calc(100% - var(--rail-w
 
   /* Header mobile: chỉ ☰ · chip model · ＋. Ẩn phần rườm rà. */
   .nav-toggle-btn, .new-chat-btn { display: inline-flex; }
-  .hud-top { position: relative; }
+  .hud-top { position: relative; display: flex; align-items: center; gap: 6px; padding: 0 8px; }
+  .hud-top-left, .hud-top-right { display: none; }    /* rỗng ở mobile: ☰ · chip model · ＋ là con trực tiếp header */
   .hud-top .brand, .hud-top .navbar-brain,
   .hud-top #themeToggle, .hud-top #studioOpenBtn,
   .hud-top #settingsBtn, .hud-top #ttsToggle, .hud-top #resetBtn { display: none; }
   .hud-center-title { display: none; }                /* mobile: ẩn tên workspace + ngày; chip model làm giữa header */
-  .hud-top #mbOpen { display: inline-flex; }
+  .hud-top #mbOpen { display: inline-flex; margin-left: auto; margin-right: auto; }  /* chip model căn giữa, đẩy ＋ sang phải */
   .hud-top #mbPop { position: fixed; top: 50px; bottom: auto; left: 50%; transform: translateX(-50%);
     width: min(340px, 92vw); z-index: 200; max-height: 70vh; }
   .model-bar { display: none; }                       /* hàng model gốc ẩn; chip + sysBar bên trong dời đi (JS) */

@@ -4,6 +4,11 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.96] - 2026-07-19
+Vá nút + (hội thoại mới) trên header điện thoại: hết lệch khỏi header và bấm được. Chỉ đổi bản điện thoại.
+### Sửa lỗi
+- **Nút + bị rớt khỏi header, bấm không ăn**: header mobile trước là lưới 3 cột, thêm ☰ và chip model làm dư ô nên nút + rớt xuống dòng, đè lên quả cầu 3D và bị canvas chặn tap. Nay header thành một hàng flex (☰ · chip model căn giữa · +), nút + là con trực tiếp header (không còn nằm trong cụm bị ẩn ở trang quản lý). Bấm + giờ mở hội thoại mới và focus ô nhập luôn.
+
 ## [0.9.95] - 2026-07-19
 Thêm connector **Facebook cá nhân (cookie - thử nghiệm)** và plugin `fb-personal`: tự động hoá tài khoản Facebook CÁ NHÂN bằng cookie phiên (Facebook đã đóng API cá nhân) - lướt/đọc feed, đăng bài lên tường, bình luận. Đi đường cookie + mbasic bằng httpx nên chạy được trên VPS headless, không cần Chromium. CẢNH BÁO: vi phạm điều khoản Facebook, rủi ro khoá tài khoản; mặc định TẮT, cookie mã hoá at rest. Đây là bước 2 nối tiếp connector Trang (0.9.90) cho nhu cầu lướt feed cá nhân.
 ### Thêm mới
