@@ -1,15 +1,22 @@
 """
-Đăng nhập ChatGPT (OpenAI) bằng OAuth **device-code** - dùng gói ChatGPT Plus/Pro
-thay cho API key. Spec pin từ source chính thức openai/codex (device_code_auth.rs,
-token_data.rs, server.rs) + plugin tumf/opencode-openai-device-auth.
+Đăng nhập ChatGPT (OpenAI) bằng OAuth - dùng gói ChatGPT Plus/Pro thay cho API key.
+Hỗ trợ HAI cách, cùng client_id + cùng endpoint đổi token của openai/codex:
 
-Luồng:
-  1. POST /api/accounts/deviceauth/usercode {client_id} -> {device_auth_id, user_code, interval}
-     User mở https://auth.openai.com/codex/device, nhập user_code.
-  2. Poll POST /api/accounts/deviceauth/token {device_auth_id, user_code}
-       403/404 = đang chờ; 200 -> {authorization_code, code_verifier}
-  3. Đổi: POST /oauth/token (form) grant_type=authorization_code + code + code_verifier
-       + redirect_uri=https://auth.openai.com/deviceauth/callback -> access/refresh/id_token
+A) Device-code (mặc định, hợp VPS headless): spec pin từ source chính thức openai/codex
+   (device_code_auth.rs, token_data.rs, server.rs) + plugin tumf/opencode-openai-device-auth.
+   1. POST /api/accounts/deviceauth/usercode {client_id} -> {device_auth_id, user_code, interval}
+      User mở https://auth.openai.com/codex/device, nhập user_code.
+   2. Poll POST /api/accounts/deviceauth/token {device_auth_id, user_code}
+        403/404 = đang chờ; 200 -> {authorization_code, code_verifier}
+   3. Đổi: POST /oauth/token grant_type=authorization_code + redirect_uri deviceauth/callback.
+
+B) Browser OAuth (Authorization Code + PKCE) - CHO WORKSPACE CHẶN device-code. Đúng luồng
+   `codex login` mặc định: mở /oauth/authorize trên trình duyệt, đăng nhập, OpenAI redirect
+   kèm ?code=...&state=... về http://localhost:1455/auth/callback. Vì Javis có thể chạy trên
+   VPS (trình duyệt ở máy user, không tới được server), ta dùng kiểu "dán lại URL callback":
+   user copy URL redirect (dù trang localhost không tải được) rồi dán vào, server tách code +
+   đổi token. Không cần server tự bind cổng localhost nên chạy được cả local lẫn headless.
+
   account_id = claim id_token["https://api.openai.com/auth"]["chatgpt_account_id"]
 
 ⚠️ Không chính thức cho app ngoài Codex - token chạy backend Codex (model gpt-5-codex),
@@ -18,7 +25,10 @@ có thể vỡ khi OpenAI đổi. Token lưu trong settings.json (gitignored).
 import time
 import json
 import base64
+import hashlib
+import secrets
 import httpx
+from urllib.parse import urlencode, urlparse, parse_qs
 
 import config as cfgmod
 
@@ -27,12 +37,19 @@ AUTH_BASE = "https://auth.openai.com"
 DEVICE_USERCODE_URL = AUTH_BASE + "/api/accounts/deviceauth/usercode"
 DEVICE_TOKEN_URL = AUTH_BASE + "/api/accounts/deviceauth/token"
 OAUTH_TOKEN_URL = AUTH_BASE + "/oauth/token"
+OAUTH_AUTHORIZE_URL = AUTH_BASE + "/oauth/authorize"
 REDIRECT_URI = AUTH_BASE + "/deviceauth/callback"
+# Redirect của luồng browser: PHẢI khớp đúng cái codex CLI đăng ký (loopback cổng 1455) thì
+# OpenAI mới chấp nhận. Ta không thật sự bind cổng này - chỉ để user dán lại URL redirect.
+BROWSER_REDIRECT_URI = "http://localhost:1455/auth/callback"
+BROWSER_SCOPE = "openid profile email offline_access"
 VERIFY_URL = AUTH_BASE + "/codex/device"
 UA = "javis-os/0.3 (+device-auth)"
 
 # Phiên device đang chờ (1 admin nên giữ in-memory là đủ).
 _pending = {}
+# Phiên browser-OAuth đang chờ (giữ code_verifier + state giữa lúc start và lúc dán URL về).
+_browser_pending = {}
 
 
 def _empty():
@@ -67,11 +84,11 @@ def _save_tokens(tok):
     cfgmod.write_settings(cfg)
 
 
-def _exchange(code, code_verifier):
+def _exchange(code, code_verifier, redirect_uri=REDIRECT_URI):
     r = httpx.post(OAUTH_TOKEN_URL, data={
         "grant_type": "authorization_code",
         "code": code,
-        "redirect_uri": REDIRECT_URI,
+        "redirect_uri": redirect_uri,
         "client_id": CLIENT_ID,
         "code_verifier": code_verifier,
     }, headers={"Content-Type": "application/x-www-form-urlencoded", "User-Agent": UA}, timeout=30)
@@ -119,6 +136,72 @@ def poll():
     except Exception as e:
         return {"status": "error", "error": f"Đổi token lỗi: {type(e).__name__}: {e}"}
     _pending.clear()
+    o = cfgmod.read_settings()["model"].get("openai_oauth") or {}
+    return {"status": "connected", "account_id": o.get("account_id", ""), "plan": o.get("plan", "")}
+
+
+# ---- Luồng B: Browser OAuth (Authorization Code + PKCE) ----
+
+def _gen_pkce():
+    """(code_verifier, code_challenge) theo RFC 7636 - challenge = base64url(sha256(verifier))."""
+    verifier = base64.urlsafe_b64encode(secrets.token_bytes(64)).rstrip(b"=").decode("ascii")
+    challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode("ascii")).digest()).rstrip(b"=").decode("ascii")
+    return verifier, challenge
+
+
+def start_browser():
+    """Bước 1 luồng browser: dựng URL /oauth/authorize (khớp đúng codex CLI) + giữ verifier/state.
+    Trả {authorize_url, redirect_uri} cho frontend mở trình duyệt."""
+    verifier, challenge = _gen_pkce()
+    state = secrets.token_urlsafe(24)
+    params = {
+        "response_type": "code",
+        "client_id": CLIENT_ID,
+        "redirect_uri": BROWSER_REDIRECT_URI,
+        "scope": BROWSER_SCOPE,
+        "code_challenge": challenge,
+        "code_challenge_method": "S256",
+        "id_token_add_organizations": "true",
+        "codex_cli_simplified_flow": "true",
+        "state": state,
+        "originator": "codex_cli_rs",
+    }
+    _browser_pending.clear()
+    _browser_pending.update({"verifier": verifier, "state": state, "ts": time.time()})
+    return {"authorize_url": OAUTH_AUTHORIZE_URL + "?" + urlencode(params), "redirect_uri": BROWSER_REDIRECT_URI}
+
+
+def finish_browser(callback):
+    """Bước 2-3 luồng browser: nhận URL callback user dán về (hoặc chính chuỗi code), tách code,
+    kiểm state, đổi lấy token. Trả pending-free: connected | error."""
+    if not _browser_pending:
+        return {"status": "error", "error": "Chưa bắt đầu đăng nhập bằng trình duyệt."}
+    if time.time() - _browser_pending["ts"] > 15 * 60:
+        _browser_pending.clear()
+        return {"status": "error", "error": "Phiên hết hạn (15 phút), thử lại."}
+    raw = (callback or "").strip()
+    if not raw:
+        return {"status": "error", "error": "Chưa dán đường dẫn callback."}
+    code = None
+    state = None
+    if raw.startswith("http://") or raw.startswith("https://"):
+        q = parse_qs(urlparse(raw).query)
+        code = (q.get("code") or [None])[0]
+        state = (q.get("state") or [None])[0]
+        err = (q.get("error") or [None])[0]
+        if err:
+            return {"status": "error", "error": f"OpenAI trả lỗi: {err}"}
+    else:
+        code = raw   # user dán thẳng mã code
+    if not code:
+        return {"status": "error", "error": "Không tìm thấy 'code' trong đường dẫn dán vào."}
+    if state and state != _browser_pending.get("state"):
+        return {"status": "error", "error": "State không khớp - đăng nhập lại cho chắc."}
+    try:
+        _save_tokens(_exchange(code, _browser_pending["verifier"], redirect_uri=BROWSER_REDIRECT_URI))
+    except Exception as e:
+        return {"status": "error", "error": f"Đổi token lỗi: {type(e).__name__}: {e}"}
+    _browser_pending.clear()
     o = cfgmod.read_settings()["model"].get("openai_oauth") or {}
     return {"status": "connected", "account_id": o.get("account_id", ""), "plan": o.get("plan", "")}
 
@@ -227,6 +310,7 @@ def disconnect():
     cfg["model"]["openai_oauth"] = _empty()
     cfgmod.write_settings(cfg)
     _pending.clear()
+    _browser_pending.clear()
 
 
 def status():

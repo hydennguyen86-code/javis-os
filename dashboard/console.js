@@ -1820,11 +1820,12 @@
           : "○ Chưa kết nối · " + p.models.length + " model";
         return `<div class="prov-card ${p.is_main ? "main" : ""}">
           ${provHead(p, on, "Device code", st)}
-          <div class="prov-action">
+          <div class="prov-action" style="flex-wrap:wrap">
             ${on
               ? `<button class="gcard-btn" data-oauth-disc="1" style="background:transparent;opacity:.75">Ngắt</button>`
-              : `<button class="gcard-btn" data-oauth-login="1">Đăng nhập ChatGPT</button>`}
-            <span id="oauthMsg" class="gcard-meta" style="margin-left:10px;flex:1"></span>
+              : `<button class="gcard-btn" data-oauth-login="1">Đăng nhập ChatGPT</button>
+                 <button class="gcard-btn" data-oauth-browser="1" style="background:transparent;opacity:.85">Qua trình duyệt</button>`}
+            <span id="oauthMsg" class="gcard-meta" style="margin-left:10px;flex:1;min-width:220px"></span>
           </div>
         </div>`;
       }
@@ -1908,6 +1909,8 @@
     });
     const ol = el.querySelector("[data-oauth-login]");
     if (ol) ol.onclick = () => startOauthLogin(el);
+    const ob = el.querySelector("[data-oauth-browser]");
+    if (ob) ob.onclick = () => startOauthBrowser(el);
     const od = el.querySelector("[data-oauth-disc]");
     if (od) od.onclick = async () => {
       od.disabled = true; od.textContent = "Đang ngắt...";
@@ -2014,6 +2017,42 @@
       setTimeout(poll, iv);
     };
     setTimeout(poll, iv);
+  }
+
+  // ---- ChatGPT OAuth qua trình duyệt: mở link → user dán lại URL callback → đổi token ----
+  async function startOauthBrowser(el) {
+    const msg = el.querySelector("#oauthMsg");
+    if (msg) msg.textContent = "Đang khởi tạo…";
+    let d;
+    try { d = await (await fetch("/oauth/openai/browser/start", { method: "POST" })).json(); }
+    catch (e) { if (msg) msg.textContent = "Lỗi kết nối server."; return; }
+    if (d.error) { if (msg) msg.textContent = "Lỗi: " + d.error; return; }
+    try { window.open(d.authorize_url, "_blank"); } catch (e) {}
+    if (msg) msg.innerHTML =
+      `Đã mở trang <a href="${esc(safeHref(d.authorize_url))}" target="_blank">đăng nhập ChatGPT</a>. `
+      + `Đăng nhập xong, trình duyệt sẽ nhảy sang <b>localhost</b> (có thể báo không tải được trang - không sao). `
+      + `Copy toàn bộ đường dẫn trên thanh địa chỉ rồi dán vào đây:`
+      + `<div style="display:flex;gap:6px;margin-top:6px">`
+      + `<input id="oauthCb" class="js-input" placeholder="http://localhost:1455/auth/callback?code=…" style="flex:1;min-width:180px">`
+      + `<button class="gcard-btn" id="oauthCbBtn">Xác nhận</button></div>`
+      + `<div id="oauthCbMsg" class="gcard-meta" style="margin-top:4px;opacity:.75"></div>`;
+    const btn = el.querySelector("#oauthCbBtn");
+    if (btn) btn.onclick = async () => {
+      const cb = (el.querySelector("#oauthCb").value || "").trim();
+      const m2 = el.querySelector("#oauthCbMsg");
+      if (!cb) { if (m2) m2.textContent = "Dán đường dẫn callback vào đã."; return; }
+      btn.disabled = true; if (m2) m2.textContent = "Đang xác nhận…";
+      let p;
+      try {
+        p = await (await fetch("/oauth/openai/browser/finish", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ callback: cb }),
+        })).json();
+      } catch (e) { if (m2) m2.textContent = "Lỗi mạng."; btn.disabled = false; return; }
+      if (p.status === "connected") { if (msg) msg.textContent = "✓ Đã kết nối!"; renderModels(el); return; }
+      if (m2) m2.textContent = "⚠ " + (p.error || "Chưa được, thử lại.");
+      btn.disabled = false;
+    };
   }
 
   // ---- Picker model (kiểu Hermes SET MAIN MODEL) ----

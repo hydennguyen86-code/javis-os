@@ -4,6 +4,12 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.107] - 2026-07-19
+Thêm cách đăng nhập ChatGPT thứ hai qua trình duyệt (OAuth Authorization Code + PKCE), dành cho tài khoản Workspace bị chặn xác thực device-code. Trước đây Javis chỉ có một cách là device-code (nhập mã tại auth.openai.com/codex/device); Workspace nào tắt device-code thì không đăng nhập được. Cách mới dùng đúng luồng `codex login` mặc định.
+### Thêm mới
+- **Đăng nhập ChatGPT qua trình duyệt**: nút "Qua trình duyệt" ở card ChatGPT (trang Model) mở trang đăng nhập OpenAI; đăng nhập xong dán lại đường dẫn callback trên thanh địa chỉ để Javis tách mã và đổi lấy token. Chạy được cả bản trên máy cá nhân lẫn VPS headless vì không cần server tự bắt cổng localhost. Dùng chung client_id và endpoint đổi token với device-code nên token tương thích, vẫn bắc cầu sang ~/.codex/auth.json như cũ.
+- Kèm test offline `server/test_openai_oauth.py` phủ PKCE, dựng URL /oauth/authorize, tách mã từ URL callback dán lại, kiểm state, và redirect_uri đúng cho từng luồng. (Bước bấm nút đăng nhập thật với OpenAI cần kiểm tại chỗ vì đụng mạng.)
+
 ## [0.9.106] - 2026-07-19
 Sửa lỗi trang Mức dùng (token & chi phí) hiện toàn số 0 trên một số bản cài (điển hình VPS Docker). Nguyên nhân: chỉ số Claude/ChatGPT được dựng TỪ log thô (~/.claude/projects, ~/.codex/sessions); bản cài nào không có/không đọc được log thô đó thì mất trắng, dù mỗi lượt đã ghi số token thật vào usage-events.jsonl (nguồn này trước đây bị bỏ qua cho cli/codex).
 ### Sửa lỗi

@@ -746,6 +746,25 @@ def oauth_openai_poll():
     return openai_oauth.poll()
 
 
+# Browser OAuth (Authorization Code + PKCE) - cho Workspace chặn device-code.
+@app.post("/oauth/openai/browser/start")
+def oauth_openai_browser_start():
+    try:
+        return openai_oauth.start_browser()
+    except Exception as e:
+        return JSONResponse({"error": f"{type(e).__name__}: {e}"}, status_code=400)
+
+
+@app.post("/oauth/openai/browser/finish")
+async def oauth_openai_browser_finish(request: Request):
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    callback = (body or {}).get("callback") or (body or {}).get("url") or ""
+    return openai_oauth.finish_browser(callback)
+
+
 @app.post("/oauth/openai/disconnect")
 def oauth_openai_disconnect():
     cfg = cfgmod.read_settings()
