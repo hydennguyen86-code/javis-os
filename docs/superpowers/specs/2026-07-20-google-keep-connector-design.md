@@ -1,0 +1,193 @@
+# Thiết kế: Connector Google Keep
+
+Ngày: 2026-07-20
+Trạng thái: chờ duyệt
+
+## Mục tiêu
+
+Cho Javis đọc và thao tác note trong Google Keep, đấu qua MCP server cộng đồng
+[feuerdev/keep-mcp](https://github.com/feuerdev/keep-mcp) (PyPI `keep-mcp` 0.3.1, Python >=3.10).
+
+## Bối cảnh: vì sao phải dùng master token
+
+Google Keep KHÔNG có API công khai cho tài khoản gmail cá nhân. API chính chủ (Keep API) chỉ mở
+cho Google Workspace Enterprise kèm service account + domain-wide delegation. Tài khoản dùng ở đây
+là gmail thường, nên đường duy nhất là thư viện không chính thức `gkeepapi`, vốn đòi
+**Google Master Token**.
+
+Master token KHÔNG phải OAuth token giới hạn phạm vi. Nó là token cấp thiết bị Android, dạng
+`aas_et/...`, [có toàn quyền trên tài khoản và tương đương mật khẩu](https://gkeepapi.readthedocs.io/en/latest/):
+nắm nó là mint được token cho gần như mọi dịch vụ Google khác (Gmail, Drive, Photos, Contacts).
+
+Javis mã hoá secret at rest bằng Fernet qua `secrets_store.encrypt_map` (xem `mcp_store.save`),
+nên token không nằm plaintext trên đĩa. Nhưng mã hoá at rest không đổi được bản chất
+"token = toàn quyền tài khoản", và token sẽ nằm cả trên VPS Hostinger.
+
+Rủi ro này đã được nêu rõ với người dùng và người dùng chấp nhận, chọn dùng tài khoản chính.
+
+## Quyết định đã chốt
+
+1. **Phạm vi thao tác**: bật `UNSAFE_MODE` để Javis sửa được MỌI note, kể cả note viết tay
+   trong app Keep (mặc định của server chỉ cho sửa note nó tự tạo, gắn nhãn `keep-mcp`).
+2. **Tài khoản**: dùng tài khoản chính, không lập tài khoản phụ.
+3. **Runner**: `uvx` chứ không `pipx` như README gợi ý, cho khớp các connector stdio sẵn có
+   (`google-sheets`, `tiktok-ads`). Kèm theo phải thêm `uv` vào Docker image (xem dưới).
+4. **`UNSAFE_MODE` là ô nhập tuỳ chọn**, KHÔNG hardcode trong catalog.
+
+Về quyết định 4, lý do: hardcode `UNSAFE_MODE=true` sẽ bật sẵn chế độ sửa-mọi-note cho mọi người
+fork Javis về, trái nguyên tắc đã chốt là năng lực chạm dữ liệu cá nhân phải opt-in mặc định TẮT.
+Để thành ô nhập thì người dùng này vẫn được đúng cái họ chọn (gõ `true`), bản fork vẫn sạch, và
+công tắc nguy hiểm hiện rõ trên trang Kết nối nên sau này gỡ được. Cách này cũng KHÔNG cần sửa lõi,
+vì `mcp_catalog.build_env` hiện chỉ dựng env từ `auth.fields` có khai `env`, chưa hỗ trợ env tĩnh
+ở cấp connector.
+
+## Thay đổi 1: entry catalog
+
+Thêm vào `system/mcp-catalog.json`, mảng `connectors`. Không sửa `mcp_hub`, `mcp_store`,
+`mcp_catalog`, hay dashboard: toàn bộ hạ tầng đã sẵn (form đăng nhập tự sinh từ `auth.fields`,
+secret tự mã hoá, ba mức quyền tự áp qua `tool_meta`).
+
+Icon dùng emoji thay vì file logo, theo tiền lệ `google-search-console` (`🔍`) và
+`google-workspace` (`📧`). Tránh phải tải asset có nhãn hiệu vào repo.
+
+Lưu ý: `requires` là metadata THUẦN TÀI LIỆU, không có chỗ nào trong code đọc nó (đã grep
+`server/*.py` và `dashboard/console.js`). `lark` khai `requires: {node: ">=18"}` cũng chỉ để đọc.
+Giữ lại cho khớp tiền lệ và để người sau biết connector cần gì, nhưng ĐỪNG trông đợi nó chặn
+được việc thiếu `uv`. Cái thật sự bảo đảm `uv` có mặt là thay đổi Dockerfile ở dưới.
+
+```json
+{
+  "id": "google-keep",
+  "name": "Google Keep",
+  "icon": "📒",
+  "category": "Văn phòng",
+  "description": "Đọc và sửa ghi chú Google Keep: tìm note, tạo note/danh sách việc, gắn nhãn, ghim, lưu trữ. Chạy local qua thư viện không chính thức - cần Google master token.",
+  "status": "beta",
+  "transport": "stdio",
+  "command": "uvx",
+  "args": ["keep-mcp"],
+  "requires": { "uv": true },
+  "auth": {
+    "type": "apikey",
+    "fields": [
+      {
+        "key": "google_email",
+        "label": "Email Google",
+        "placeholder": "ten@gmail.com",
+        "env": "GOOGLE_EMAIL"
+      },
+      {
+        "key": "master_token",
+        "label": "Google master token (aas_et/...)",
+        "placeholder": "aas_et/...",
+        "env": "GOOGLE_MASTER_TOKEN"
+      },
+      {
+        "key": "unsafe_mode",
+        "label": "Cho sửa MỌI note - gõ true nếu muốn (để trống = chỉ sửa note do Javis tạo)",
+        "placeholder": "để trống cho an toàn",
+        "optional": true,
+        "env": "UNSAFE_MODE"
+      }
+    ],
+    "guide": "Google Keep KHÔNG có API chính chủ cho gmail thường nên phải dùng master token. CẢNH BÁO: token này có TOÀN QUYỀN tài khoản Google của bạn (Gmail, Drive, Photos...), tương đương mật khẩu - đừng chia sẻ cho ai. Lấy 1 lần: (1) Bật xác minh 2 bước cho tài khoản. (2) Vào myaccount.google.com/apppasswords tạo App Password 16 ký tự. (3) Chạy lệnh này trong terminal (cần cài uv: winget install astral-sh.uv): uv run --no-project --with gpsoauth python -c \"import gpsoauth; print(gpsoauth.perform_master_login('EMAIL_CUA_BAN','APP_PASSWORD_16_KY_TU','0123456789abcdef')['Token'])\" (4) Dán chuỗi bắt đầu bằng aas_et/ vào ô Master token. Ô cuối để trống thì Javis chỉ sửa được note do chính nó tạo; gõ true thì Javis sửa được mọi note kể cả note bạn viết tay.",
+    "guide_url": "https://github.com/feuerdev/keep-mcp"
+  },
+  "validate": { "tool": "list_labels", "args": {} },
+  "tool_meta": {
+    "read": ["find", "get_note", "list_labels", "list_note_collaborators", "list_note_media"],
+    "write": [
+      "create_note", "create_list", "update_note",
+      "add_list_item", "update_list_item", "delete_list_item",
+      "set_note_color", "pin_note", "archive_note", "restore_note",
+      "create_label", "add_label_to_note", "remove_label_from_note"
+    ],
+    "danger": [
+      "trash_note", "delete_note", "delete_label",
+      "add_note_collaborator", "remove_note_collaborator"
+    ]
+  },
+  "default_perm": "readonly",
+  "risk": "Kết nối này dùng Google MASTER TOKEN - token có TOÀN QUYỀN tài khoản Google (Gmail, Drive, Photos), không phải OAuth giới hạn phạm vi. Mức Ghi nháp cho Javis tạo/sửa note, ghim, lưu trữ, gắn nhãn thật trong Keep. Mức Toàn quyền thêm quyền VỨT/XOÁ note và CHIA SẺ note cho người khác. Nếu đã gõ true vào ô UNSAFE_MODE thì Javis đụng được cả note bạn viết tay, không chỉ note nó tạo."
+}
+```
+
+### Phân loại tool và lý do
+
+`mcp_catalog.allowed()` chặn dựa vào `tool_meta`, đây là lớp cứng không phụ thuộc prompt, nên
+phân loại phải khai tường minh chứ không dựa heuristic `WRITE_HINTS`.
+
+Hai chủ ý đáng chú ý:
+
+- `restore_note` xếp **write** còn `trash_note` xếp **danger**. Nghĩa là ở mức Ghi nháp, Javis
+  luôn gỡ lại được note bị vứt nhầm nhưng không tự vứt được. Bất đối xứng này là cố ý.
+- `add_note_collaborator` và `remove_note_collaborator` xếp **danger** vì chúng chia sẻ note ra
+  người khác, tức là rò dữ liệu ra ngoài, khác về chất với sửa nội dung trong nhà.
+
+`archive_note` xếp write vì không phá huỷ (note vẫn còn, chỉ ẩn khỏi danh sách chính).
+`delete_list_item` xếp write vì xoá một dòng trong checklist là thao tác soạn thảo bình thường.
+
+### Về khối `validate`
+
+Dùng `list_labels` (không tham số, thuần đọc) để nút Test thực sự chạm tới Keep API, chứng minh
+master token còn sống chứ không chỉ chứng minh server khởi động được.
+
+KHÔNG khai `label_paths` vì chưa biết chắc hình dạng response của `list_labels`. Theo
+`mcp_hub.validate_connection`, thiếu `label_paths` chỉ làm nhãn hiển thị rỗng, không làm hỏng
+kết nối. Đoán sai `label_paths` cũng không làm Test fail, nhưng khai bừa thì vô nghĩa.
+
+Cần lưu ý: khối `validate` này CHƯA được kiểm chứng thực tế vì cần master token thật để chạy.
+Nếu `list_labels` trả lỗi khi tài khoản chưa có nhãn nào, nút Test sẽ báo fail oan và phải bỏ
+khối `validate` đi. Đây là điểm phải xác nhận khi nghiệm thu.
+
+## Thay đổi 2: thêm uv vào Docker image
+
+`Dockerfile` hiện chỉ có `node`, `npx`, `pip`; không có `uv` lẫn `pipx`. Nên `uvx keep-mcp` chạy
+được trên máy Windows (uv 0.11.26 đã cài) nhưng sẽ chết trên VPS Hostinger.
+
+Phát hiện kèm theo: 4 connector beta sẵn có (`google-sheets`, `google-search-console`,
+`google-ads`, `tiktok-ads`) đều khai `command: uvx`, nên nhiều khả năng cũng đang hỏng trên VPS.
+Một dòng sửa thông cả 5.
+
+Thêm vào `Dockerfile`, sau bước `pip install -r requirements.txt`:
+
+```dockerfile
+# uv: runner cho các connector MCP dạng `uvx <package>` trong system/mcp-catalog.json
+# (google-keep, google-sheets, google-search-console, google-ads, tiktok-ads).
+RUN pip install --no-cache-dir uv && uv --version
+```
+
+Đặt `uv` thành dòng RUN riêng thay vì nhét vào `requirements.txt` vì nó là công cụ runtime của
+tiến trình con, không phải thư viện app import.
+
+## Kiểm thử nghiệm thu
+
+1. `python -c "import json; json.load(open('system/mcp-catalog.json', encoding='utf-8'))"` phải sạch.
+2. `mcp_catalog.load()` nhận được `google-keep`; `public_catalog()` trả đủ 3 field.
+3. Kiểm phân loại quyền bằng `mcp_catalog.allowed()`:
+   - `readonly` + `find` cho qua; `readonly` + `create_note` bị chặn.
+   - `safe` + `create_note` cho qua; `safe` + `delete_note` bị chặn.
+   - `safe` + `restore_note` cho qua nhưng `safe` + `trash_note` bị chặn (kiểm bất đối xứng có chủ ý).
+   - `full` + `add_note_collaborator` cho qua.
+   - `mode: suggest` ép mọi thứ về readonly kể cả khi perm là full.
+4. Docker: `docker build` xong `docker run --rm <image> uvx --help` phải chạy.
+5. Thủ công: đấu kết nối thật trên trang Kết nối, bấm Test, xác nhận `validate` không báo fail oan.
+   Rồi thử `find` qua chat.
+
+Điểm 1 tới 3 viết được thành test tự động trong `server/test_*.py` theo lối sẵn có. Điểm 4 và 5
+phải làm tay.
+
+## Ngoài phạm vi
+
+- Không viết skill hay agent riêng cho Keep. Tool MCP đủ để Javis dùng qua chat; có nhu cầu lặp
+  lại thật thì mới cân nhắc sau.
+- Không đồng bộ hai chiều Keep với Second Brain. Đây là việc lớn và riêng.
+- Không tự động hoá bước lấy master token. Bước đó buộc phải người dùng tự làm vì dính App Password.
+- Không đụng 4 connector `uvx` đang hỏng ngoài việc thêm `uv` vào image. Kiểm chứng lại chúng là
+  việc riêng.
+
+## Nguồn
+
+- [feuerdev/keep-mcp](https://github.com/feuerdev/keep-mcp)
+- [gkeepapi: obtaining a master token](https://gkeepapi.readthedocs.io/en/latest/)
+- [simon-weber/gpsoauth](https://github.com/simon-weber/gpsoauth)
