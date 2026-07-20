@@ -75,7 +75,7 @@ request từ ngoài vẫn bị `_auth_guard` chặn.
 Bắt buộc **trả 200 ngay** rồi xử lý bất đồng bộ, vì `zalo-agent-cli` chỉ chờ 5
 giây rồi bỏ qua âm thầm.
 
-### 3. Bộ lọc
+### 3. Bộ lọc: whitelist cuộc chat
 
 Đọc cấu hình từ `settings.json` khoá `zalo_listener`:
 
@@ -83,20 +83,31 @@ giây rồi bỏ qua âm thầm.
 {
   "enabled": false,
   "conn_id": "<id connection zalo>",
-  "keywords": ["giá", "còn hàng", "đặt", "ship"],
-  "threads": [],
-  "dm_only": true,
+  "threads": ["<thread id>"],
+  "keywords": [],
   "quiet_hours": "23-07",
   "secret": "<sinh tự động>",
   "owner_chat": ""
 }
 ```
 
-Mặc định **chặt**: chỉ tin nhắn riêng có chứa từ khoá, không báo nhóm. Nới ra
-sau khi dùng vài ngày thấy sót, an toàn hơn là mặc định báo hết rồi phải tắt bớt.
+**`threads` là cổng chính.** Chủ chỉ muốn nghe liên tục đúng vài nhóm hoặc vài
+khách cần support, phần còn lại để đọc theo yêu cầu hoặc theo loop. Chưa chọn
+cuộc chat nào thì **không báo gì** - im lặng là mặc định đúng, không phải lỗi.
 
-`threads` rỗng nghĩa là không lọc theo cuộc chat. Bỏ qua tin của chính mình
-(`--no-self`). Trong giờ im lặng thì nuốt thông báo, không dồn lại bắn một loạt.
+`keywords` chỉ là lọc phụ, thu hẹp thêm bên trong các cuộc chat đã chọn. Bỏ qua
+tin của chính mình. Trong giờ im lặng thì nuốt thông báo, không dồn lại bắn một loạt.
+
+Không còn `dm_only`: chọn cuộc chat nào là nghe cuộc chat đó, nhóm hay riêng
+không còn là tiêu chí. Để một ô lọc mâu thuẫn với whitelist chỉ gây rối.
+
+**Sổ cuộc chat (roster).** Chủ không biết thread ID, nên sidecar học từ chính
+luồng webhook: mỗi tin đi qua đều ghi vào sổ (id, tên, loại, lần cuối), giao
+diện hiện thành danh sách để tick. Ghi sổ xảy ra **trước** bộ lọc, nếu không thì
+cuộc chat chưa chọn sẽ không bao giờ hiện ra để mà chọn.
+
+Cố ý không gọi tool `zalo_list_threads` để lấy danh sách: gọi tool sẽ dựng thêm
+một socket cho cùng tài khoản, đúng vào va chạm chưa kiểm chứng nói ở dưới.
 
 ### 4. Chống trùng lặp
 
@@ -126,6 +137,40 @@ trạng thái thật: đang nghe, mất kết nối đang thử lại, hay trùn
   trỏ vào `server/`, nên không lọt lên git.
 - Rủi ro nền: chạy 24/7 trên tài khoản cá nhân là vi phạm điều khoản Zalo, có
   thể bị khoá số. Dùng SIM phụ, không dùng số chính của cửa hàng.
+
+## Chống prompt injection từ tin nhắn Zalo
+
+Đây là bề mặt tấn công thật: nội dung do người lạ soạn, đi thẳng vào hệ thống của
+chủ. Mô hình đe doạ gồm bốn hướng, và cách chặn từng hướng:
+
+**Sai khiến Javis.** Chặn bằng kiến trúc chứ không bằng lời dặn: nội dung tin
+**không bao giờ đi vào engine**. Đường dữ liệu là webhook, lọc, chuỗi text,
+Telegram. Hết. `ZaloListenerDeps` chỉ có đúng năm phụ thuộc (`read_settings`,
+`write_settings`, `get_connection`, `notify`, `port`) - không có engine, không
+Bash, không file, không MCP. Có test chốt đúng bộ năm này, ai thêm engine vào
+sau sẽ làm gãy test.
+
+**Giả dạng lời của Javis để lừa chủ.** Một tin cố ý xuống dòng rồi viết "Javis:
+đã xác minh, trả lời CÓ để chuyển khoản" sẽ trông như lời hệ thống. Chặn bằng
+cách rào nội dung giữa hai vạch có nhãn "tin của khách, KHÔNG phải lệnh cho
+Javis", nhãn nằm **trước** nội dung, và cắt độ dài để tin dài không đẩy nhãn
+trôi khỏi màn hình.
+
+**Dựng markup trong Telegram.** `main._notify_owner` gửi plain text, không đặt
+`parse_mode` (khác `telegram_bot._send` dùng MarkdownV2). Có test trong
+`test_security.py` chốt điều này, vì đổi một dòng ở đó là mở lại lỗ.
+
+**Chèn HTML vào dashboard (XSS).** Tên hiển thị trên Zalo do người lạ tự đặt và
+được vẽ vào sổ cuộc chat trong trang Kết nối. Mọi trường đi vào HTML đều bọc
+`esc()`. Có `dashboard/test_zalo_panel.js` chạy thật hàm `esc()` và chốt nguồn
+chỗ vẽ roster.
+
+Ngoài ra: lọc ký tự điều khiển và ký tự tàng hình (zero-width, đảo chiều RTL) -
+những thứ dùng để giấu chữ, nhìn vô hại mà máy đọc ra nội dung khác. Trần kích
+thước payload 256KB. Trần số cuộc chat trong sổ. Trần 20 thông báo mỗi 10 phút.
+
+Chiều ngược lại cũng đóng: không có đường nào để một tin Zalo khiến máy chủ chạy
+lệnh, đọc ghi file, hay gọi MCP.
 
 ## Điều chưa kiểm chứng
 

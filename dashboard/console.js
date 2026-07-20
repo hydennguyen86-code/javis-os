@@ -2222,20 +2222,64 @@
       + '<b style="font-size:13px">Nghe tin liên tục</b>'
       + '<span id="zlState" class="mp-note">đang tải…</span>'
       + '<button class="mp-btn" id="zlToggle" style="margin-left:auto">…</button></div>'
-      + '<div class="gcard-meta" style="margin-top:6px">Chạy nền một tiến trình riêng để nhận tin ngay khi khách nhắn, rồi báo về Telegram. Javis không tự trả lời khách.</div>'
+      + '<div class="gcard-meta" style="margin-top:6px">Chỉ theo dõi đúng những cuộc chat anh chọn bên dưới. Có tin là báo về Telegram ngay. Javis không tự trả lời khách.</div>'
+      + '<div class="mp-note" id="zlSignal" style="margin-top:6px">đang tải…</div>'
       + '<div id="zlForm" style="margin-top:10px;display:flex;flex-direction:column;gap:8px">'
       + '<label class="mcp-lb">Tài khoản Zalo dùng để nghe<select class="js-input" id="zlConn">' + opts + '</select></label>'
-      + '<label class="mcp-lb">Chỉ báo khi tin có chứa (cách nhau bằng dấu phẩy - để trống là báo mọi tin)'
+      + '<div class="mcp-lb">Cuộc chat theo dõi <span style="opacity:.6">(chưa chọn cái nào thì không báo gì)</span>'
+      + '<div id="zlThreads" style="max-height:170px;overflow:auto;border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:6px;margin-top:4px"></div></div>'
+      + '<label class="mcp-lb">Chỉ báo khi tin có chứa <span style="opacity:.6">(tuỳ chọn, cách nhau bằng dấu phẩy)</span>'
       + '<input class="js-input" id="zlKw" placeholder="giá, còn hàng, đặt, ship"></label>'
       + '<label class="mcp-lb">Giờ im lặng (tuỳ chọn, vd 23-07)<input class="js-input" id="zlQuiet" placeholder="23-07" style="max-width:140px"></label>'
-      + '<label style="font-size:13px;cursor:pointer"><input type="checkbox" id="zlDm"> Bỏ qua tin nhóm, chỉ báo tin nhắn riêng</label>'
       + '<div class="mp-note" id="zlErr" style="color:#c0392b"></div></div></div>';
+  }
+  function zlAgo(ts) {
+    if (!ts) return "";
+    const d = new Date(ts * 1000), s = (Date.now() / 1000) - ts;
+    if (s < 60) return "vừa xong";
+    if (s < 3600) return Math.floor(s / 60) + " phút trước";
+    const p = n => String(n).padStart(2, "0");
+    return p(d.getHours()) + ":" + p(d.getMinutes()) + " " + p(d.getDate()) + "/" + p(d.getMonth() + 1);
   }
   async function wireZaloListener(el) {
     const panel = el.querySelector(".zl-panel");
     if (!panel) return;
     const $ = id => panel.querySelector("#" + id);
-    let on = false;
+    let on = false, selected = new Set(), rosterKey = "";
+    const cfgBody = () => ({
+      conn_id: $("zlConn").value,
+      threads: Array.from(selected),
+      keywords: $("zlKw").value.split(",").map(s => s.trim()).filter(Boolean),
+      quiet_hours: $("zlQuiet").value.trim(),
+    });
+    // Dấu hiệu MỘT DÒNG: đủ để phân biệt "không ai nhắn" với "đang hỏng mà vẫn báo đang nghe".
+    const signal = (st) => {
+      if (!st.enabled) return "Đang tắt.";
+      if (st.last_event) return "Tin gần nhất nhận lúc " + zlAgo(st.last_event) + ".";
+      if (st.state === "listening") return "Đã nối, chưa nhận tin nào. Nhắn thử một tin để kiểm tra.";
+      return "Chưa nhận tin nào.";
+    };
+    const paintRoster = (st) => {
+      const list = st.roster || [];
+      const key = list.map(x => x.id).join("|");
+      if (key === rosterKey) return;         // không vẽ lại khi chưa đổi, tránh nhảy ô đang tick
+      rosterKey = key;
+      const box = $("zlThreads");
+      if (!list.length) {
+        box.innerHTML = '<div class="mp-note">Chưa thấy cuộc chat nào. Bật nghe rồi đợi có người nhắn, các cuộc chat sẽ tự hiện ra đây để anh tick chọn.</div>';
+        return;
+      }
+      // esc() BẮT BUỘC: tên hiển thị do người lạ trên Zalo tự đặt, chèn thẳng vào HTML là hở XSS.
+      box.innerHTML = list.map(t =>
+        '<label style="display:block;font-size:13px;padding:3px 0;cursor:pointer">'
+        + '<input type="checkbox" class="zl-th" value="' + esc(t.id) + '"' + (selected.has(t.id) ? " checked" : "") + '> '
+        + esc(t.name || t.id) + (t.type === "group" ? ' <span style="opacity:.55">(nhóm)</span>' : "")
+        + ' <span style="opacity:.45">' + zlAgo(t.last) + '</span></label>').join("");
+      box.querySelectorAll(".zl-th").forEach(cb => cb.onchange = async () => {
+        cb.checked ? selected.add(cb.value) : selected.delete(cb.value);
+        await postJson("/zalo-listener/config", cfgBody());   // ăn ngay, không cần tắt bật lại
+      });
+    };
     const paint = (st) => {
       const [txt, color] = ZL_STATE[st.state] || ZL_STATE.off;
       on = !!st.enabled;
@@ -2244,25 +2288,21 @@
       $("zlToggle").textContent = on ? "Tắt" : "Bật nghe";
       $("zlToggle").classList.toggle("primary", !on);
       $("zlErr").textContent = (st.enabled && st.error) ? st.error : "";
+      $("zlSignal").textContent = signal(st);
+      paintRoster(st);
     };
     let st;
     try { st = await (await fetch("/zalo-listener/status")).json(); } catch (e) { return; }
     const c = st.cfg || {};
     if (c.conn_id) $("zlConn").value = c.conn_id;
+    selected = new Set(c.threads || []);
     $("zlKw").value = (c.keywords || []).join(", ");
     $("zlQuiet").value = c.quiet_hours || "";
-    $("zlDm").checked = c.dm_only !== false;
     paint(st);
     $("zlToggle").onclick = async () => {
       $("zlErr").textContent = "";
       $("zlToggle").disabled = true;
-      const body = {
-        conn_id: $("zlConn").value,
-        keywords: $("zlKw").value.split(",").map(s => s.trim()).filter(Boolean),
-        quiet_hours: $("zlQuiet").value.trim(),
-        dm_only: $("zlDm").checked,
-      };
-      const r = await postJson(on ? "/zalo-listener/stop" : "/zalo-listener/start", on ? {} : body);
+      const r = await postJson(on ? "/zalo-listener/stop" : "/zalo-listener/start", on ? {} : cfgBody());
       $("zlToggle").disabled = false;
       if (r.ok === false) { $("zlErr").textContent = r.error || "Lỗi"; return; }
       try { paint(await (await fetch("/zalo-listener/status")).json()); } catch (e) {}

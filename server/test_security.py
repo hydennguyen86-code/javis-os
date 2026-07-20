@@ -164,6 +164,12 @@ check("rào: /hook/zalo được miễn đăng nhập localhost (sidecar không 
 import zalo_listener as _zl  # noqa: E402
 check("rào: /hook/zalo còn tầng hai là secret header (loopback một mình không đủ)",
       bool(_zl.SECRET_HEADER) and "secret" in _zl.DEFAULT_CFG)
+# Tin Zalo do NGƯỜI LẠ soạn và được chuyển thẳng vào Telegram của chủ. _notify_owner phải
+# gửi PLAIN TEXT: nếu ai đó thêm parse_mode như telegram_bot._send (MarkdownV2) thì chữ
+# trong tin khách sẽ dựng được markup, mở đường giả dạng lời của Javis.
+import inspect  # noqa: E402
+check("rào: _notify_owner gửi plain text, KHÔNG parse_mode (tin người lạ không dựng được markup)",
+      "parse_mode" not in inspect.getsource(main._notify_owner))
 
 print()
 if _fails:
