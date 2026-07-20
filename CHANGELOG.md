@@ -4,6 +4,16 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.130] - 2026-07-20
+Sửa lỗi tick chọn cuộc chat theo dõi nhưng không lưu được gì, và thêm nút lưu có xác nhận nhìn thấy được.
+### Sửa lỗi
+- **Tick vào không lưu gì cả**: từ khi chuyển sang luật riêng cho từng cuộc chat, giao diện vẫn gửi danh sách theo khuôn cấu hình cũ, mà phần ghi cấu hình chỉ nhận những trường còn trong khuôn mặc định nên danh sách bị vứt âm thầm. Đây là lỗi dời kiến trúc mà quên nối lại giao diện. Nay tick chọn sẽ ghi thành file luật thật trong brain.
+- **Ô tick hiện sai trạng thái**: nó đọc từ trường cấu hình đã bị bỏ, nên luật đặt qua chat không hiện lên và ngược lại. Nay lấy thẳng từ luật đang bật, và tự vẽ lại khi luật đổi.
+### Thêm mới
+- **Nút Lưu theo dõi kèm dòng xác nhận**: bấm là thấy ngay đã lưu bao nhiêu cuộc chat và theo kiểu gì. Trước đây lưu ngầm nên không có cách nào biết là đã ăn hay chưa. Ô từ khoá và giờ im lặng cũng được lưu cùng, trước đây hai ô đó chỉ ghi khi bật tắt nên sửa xong mà không bật tắt là mất.
+### Bảo mật
+- **Không để một cái tick xoá mất công sức**: luật chế độ chatbot hoặc nhắc khi quên trả lời do chủ đặt kỹ qua chat thì tick chỉ bật hoặc tắt, tuyệt đối không ghi đè chế độ và kịch bản. Bỏ tick cũng chỉ tắt luật chứ không xoá file, nên kịch bản đã viết vẫn còn nguyên.
+
 ## [0.9.129] - 2026-07-20
 Phân biệt được các nhóm Zalo trong danh sách cuộc chat, thay vì tất cả cùng hiện tên người nhắn.
 ### Sửa lỗi

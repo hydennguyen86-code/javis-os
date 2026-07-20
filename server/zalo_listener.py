@@ -1130,6 +1130,48 @@ def register(app, deps: ZaloListenerDeps):
                 pass
         return res
 
+    @router.post("/zalo-listener/watch")
+    async def watch(payload: dict = Body(...)):
+        """Lưu các cuộc chat đang theo dõi từ giao diện, thành FILE LUẬT.
+
+        Trước đây giao diện gửi threads/keywords vào settings, nhưng từ khi chuyển sang
+        luật-theo-từng-cuộc-chat thì write_cfg chỉ nhận khoá có trong DEFAULT_CFG nên hai
+        trường đó bị vứt âm thầm: chủ tick xong tưởng đã lưu mà thực ra không lưu gì.
+        """
+        brain = deps.brain_root()
+        threads = [str(t) for t in (payload.get("threads") or [])]
+        kws = [str(k).strip() for k in (payload.get("keywords") or []) if str(k).strip()]
+        write_cfg(deps, {"quiet_hours": payload.get("quiet_hours") or ""})
+        names = {x["id"]: x.get("name") for x in roster.list()}
+        rules = zalo_rules.list_rules(brain)
+        mode = "tu-khoa" if kws else "bao-het"
+        on = off = 0
+        for tid in threads:
+            r = zalo_rules.rule_for(rules, tid)
+            if r and r.get("mode") in ("chatbot", "nhac-quen"):
+                # Luật chủ đã đặt kỹ qua chat: chỉ bật, TUYỆT ĐỐI không ghi đè chế độ và
+                # kịch bản bằng một cái tick trên giao diện.
+                r["enabled"] = True
+            else:
+                r = r or {"thread_id": tid, "thread_name": names.get(tid) or tid,
+                          "escalate_after_min": 30, "owner_uid": "",
+                          "max_reply_per_hour": 20, "script": ""}
+                r.update(mode=mode, keywords=kws, enabled=True)
+                if not r.get("thread_name"):
+                    r["thread_name"] = names.get(tid) or tid
+            r["updated"] = time.strftime("%Y-%m-%d")
+            zalo_rules.save_rule(brain, r)
+            on += 1
+        for r in rules:
+            if r.get("thread_id") not in threads and r.get("enabled"):
+                r["enabled"] = False
+                zalo_rules.save_rule(brain, r)
+                off += 1
+        return {"ok": True, "on": on, "off": off,
+                "msg": (f"Đã lưu: theo dõi {on} cuộc chat"
+                        + (f" khi tin có chứa {', '.join(kws)}" if kws else " (báo mọi tin)")
+                        + (f", ngừng theo dõi {off} cuộc chat." if off else "."))}
+
     @router.post("/zalo-listener/group-names")
     async def group_names():
         """Lấy tên thật của các nhóm. Là thao tác TAY vì nó mở một kết nối ngắn, khiến

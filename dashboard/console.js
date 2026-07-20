@@ -2234,6 +2234,9 @@
       + '<label class="mcp-lb">Chỉ báo khi tin có chứa <span style="opacity:.6">(tuỳ chọn, cách nhau bằng dấu phẩy)</span>'
       + '<input class="js-input" id="zlKw" placeholder="giá, còn hàng, đặt, ship"></label>'
       + '<label class="mcp-lb">Giờ im lặng (tuỳ chọn, vd 23-07)<input class="js-input" id="zlQuiet" placeholder="23-07" style="max-width:140px"></label>'
+      + '<div style="display:flex;align-items:center;gap:8px">'
+      + '<button class="mp-btn primary" id="zlSave" style="font-size:12px">Lưu theo dõi</button>'
+      + '<span class="mp-note" id="zlSaved"></span></div>'
       + '<div class="mp-note" id="zlErr" style="color:#c0392b"></div>'
       // Chỉ hiện khi đang trùng phiên: `zalo-agent logout` cố ý giữ lại thông tin đăng
       // nhập nên đăng xuất KHÔNG gỡ được phiên đang kẹt, phải xoá thẳng rồi quét QR lại.
@@ -2280,13 +2283,36 @@
           ? ' <span style="opacity:.55">' + (t.named ? "(nhóm)" : "(nhóm #" + esc(String(t.id).slice(-4)) + ")") + '</span>'
           : "")
       + ' <span style="opacity:.45">' + zlAgo(t.last) + '</span></label>';
+    // Lưu thành FILE LUẬT qua /watch. Gửi vào settings như trước là mất trắng: write_cfg
+    // chỉ nhận khoá có trong DEFAULT_CFG, mà threads/keywords đã bị bỏ khỏi đó.
+    const saveWatch = async () => {
+      $("zlSaved").textContent = "đang lưu…";
+      $("zlSaved").style.color = "";
+      const r = await postJson("/zalo-listener/watch", {
+        threads: Array.from(selected),
+        keywords: $("zlKw").value.split(",").map(s => s.trim()).filter(Boolean),
+        quiet_hours: $("zlQuiet").value.trim(),
+      });
+      if (r.ok === false) {
+        $("zlSaved").textContent = "";
+        $("zlErr").textContent = r.error || "Lưu không được";
+        return false;
+      }
+      $("zlErr").textContent = "";
+      $("zlSaved").textContent = "✓ " + (r.msg || "Đã lưu.");
+      $("zlSaved").style.color = "#2c7a4b";
+      setTimeout(() => { if ($("zlSaved")) $("zlSaved").textContent = ""; }, 6000);
+      return true;
+    };
     const paintRoster = (st) => {
       const list = st.roster || [];
       const q = ($("zlSearch").value || "").trim().toLowerCase();
       // Khoá vẽ lại gồm cả trạng thái bật/tắt, từ khoá tìm và cờ xem-thêm: thiếu cái nào
       // thì thao tác đó không có tác dụng vì bị guard chặn.
       const key = (st.enabled ? "on" : "off") + "|" + (showAll ? "all" : "top") + "|" + q
-        + "|" + list.map(x => x.id).join("|");
+        + "|" + list.map(x => x.id).join("|")
+        // Luật đổi (vd chủ đặt qua chat) thì ô tick phải vẽ lại theo, không thì hiện sai.
+        + "|" + (st.rules || []).filter(x => x.enabled).map(x => x.thread_id).sort().join(",");
       if (key === rosterKey) return;         // không vẽ lại khi chưa đổi, tránh nhảy ô đang tick
       rosterKey = key;
       const box = $("zlThreads");
@@ -2311,8 +2337,8 @@
         + (hidden ? '<button class="mp-btn" id="zlMore" style="margin-top:6px;font-size:12px">Xem thêm ' + hidden + ' cuộc chat</button>' : "");
       box.querySelectorAll(".zl-th").forEach(cb => cb.onchange = async () => {
         cb.checked ? selected.add(cb.value) : selected.delete(cb.value);
-        rosterKey = null;                                     // ghim lại lên đầu ngay
-        await postJson("/zalo-listener/config", cfgBody());   // ăn ngay, không cần tắt bật lại
+        rosterKey = null;                       // ghim lại lên đầu ngay
+        await saveWatch();                      // tick là lưu luôn, và PHẢI báo cho thấy
       });
       const more = box.querySelector("#zlMore");
       if (more) more.onclick = () => { showAll = true; rosterKey = null; paintRoster(st); };
@@ -2351,12 +2377,20 @@
     try { st = await (await fetch("/zalo-listener/status")).json(); } catch (e) { return; }
     const c = st.cfg || {};
     if (c.conn_id) $("zlConn").value = c.conn_id;
-    selected = new Set(c.threads || []);
+    // Lấy từ LUẬT đang bật, không lấy từ cfg.threads (trường đó đã bỏ, đọc vào là sai).
+    selected = new Set((st.rules || []).filter(x => x.enabled).map(x => x.thread_id));
     $("zlKw").value = (c.keywords || []).join(", ");
     $("zlQuiet").value = c.quiet_hours || "";
     $("zlSearch").oninput = () => { rosterKey = null; if (lastSt) paintRoster(lastSt); };
     // Tên nhóm KHÔNG có trong dữ liệu tin nhắn nên phải hỏi Zalo riêng. Là nút bấm tay vì
     // nó mở một kết nối ngắn, làm listener phải nối lại một nhịp.
+    $("zlSave").onclick = async () => {
+      $("zlSave").disabled = true;
+      await saveWatch();
+      $("zlSave").disabled = false;
+      rosterKey = null;
+      try { paint(await (await fetch("/zalo-listener/status")).json()); } catch (e) {}
+    };
     $("zlNames").onclick = async () => {
       $("zlNames").disabled = true;
       $("zlNames").textContent = "Đang lấy…";
