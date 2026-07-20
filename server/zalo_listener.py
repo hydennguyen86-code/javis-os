@@ -215,6 +215,10 @@ class Roster:
         nm = sanitize_text(nm or "", cap=40)
         if nm or not it.get("name"):
             it["name"] = nm or sanitize_text(ev.get("sender") or "", cap=40) or tid
+        # Đánh dấu tên này chỉ là TẠM (lấy từ người gửi) hay là tên nhóm THẬT. Payload
+        # webhook thực tế KHÔNG kèm tên nhóm, nên hai nhóm khác nhau mà cùng một người
+        # nhắn sẽ hiện y hệt nhau. Tên thật phải lấy riêng bằng `group list`.
+        it["named"] = bool(nm) if ev.get("thread_type") == "group" else True
         it["type"] = ev.get("thread_type") or "user"
         it["count"] = it["count"] + 1
         it["last"] = time.time()
@@ -225,6 +229,21 @@ class Roster:
 
     def list(self) -> list:
         return sorted(self._items.values(), key=lambda x: x.get("last", 0), reverse=True)
+
+    def apply_names(self, names: dict) -> int:
+        """Gắn tên nhóm THẬT lấy từ `zalo-agent group list`. Trả số nhóm được đặt tên."""
+        n = 0
+        for tid, nm in (names or {}).items():
+            it = self._items.get(str(tid))
+            nm = sanitize_text(nm, cap=40)
+            if it and nm:
+                it["name"], it["named"] = nm, True
+                n += 1
+        return n
+
+    def unnamed_groups(self) -> list:
+        return [x["id"] for x in self._items.values()
+                if x.get("type") == "group" and not x.get("named")]
 
 
 class SeenSet:
@@ -399,6 +418,84 @@ async def send_zalo(deps, conn_id: str, thread_id: str, thread_type: str, text: 
         tail = _strip_ansi((out or b"").decode("utf-8", "replace")).strip()[-200:]
         return False, tail or f"mã thoát {proc.returncode}"
     return True, ""
+
+
+async def fetch_group_names(deps, conn_id: str) -> tuple:
+    """Lấy tên TẤT CẢ nhóm bằng `zalo-agent group list`. Trả ({id: tên}, error).
+
+    Cần vì payload webhook KHÔNG kèm tên nhóm - sổ cuộc chat đành lấy tên người gửi, nên
+    hai nhóm khác nhau mà cùng một người nhắn thì hiện y hệt, không phân biệt nổi.
+
+    Lấy MỘT LẦN cho mọi nhóm chứ không tra từng nhóm: mỗi lần gọi là một kết nối ngắn,
+    mà Zalo chỉ cho một kết nối mỗi tài khoản nên listener sẽ phải nối lại. Gọi một lần
+    thì chỉ gián đoạn một nhịp.
+    """
+    home, err = _home_of(deps, conn_id)
+    if err:
+        return {}, err
+    npx = shutil.which("npx")
+    if not npx:
+        return {}, "thiếu npx"
+    argv = [npx, "-y", "zalo-agent-cli", "--json", "group", "list"]
+    if str(npx).lower().endswith((".cmd", ".bat")):
+        argv = ["cmd.exe", "/c"] + argv
+    env = dict(os.environ)
+    env["HOME"] = home
+    env["USERPROFILE"] = home
+    kwargs = {"start_new_session": True} if os.name != "nt" else {
+        "creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0)}
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *argv, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
+            stdin=asyncio.subprocess.DEVNULL, env=env, **kwargs)
+        out, _ = await asyncio.wait_for(proc.communicate(), timeout=90)
+    except asyncio.TimeoutError:
+        return {}, "quá 90s không xong"
+    except Exception as e:
+        return {}, f"{type(e).__name__}: {e}"
+    text = _strip_ansi((out or b"").decode("utf-8", "replace"))
+    if proc.returncode != 0:
+        return {}, text.strip()[-200:] or f"mã thoát {proc.returncode}"
+    return _parse_group_list(text), ""
+
+
+def _parse_group_list(text: str) -> dict:
+    """Bóc {id: tên} từ đầu ra `group list`. Định dạng CHƯA kiểm chứng được (cần tài
+    khoản đăng nhập thật) nên nhận cả JSON lẫn văn bản, và không bao giờ nổ."""
+    out = {}
+    # Thử JSON trước: có thể là mảng, hoặc object bọc ở {data|groups|items}.
+    for chunk in (text, text[text.find("["):] if "[" in text else "",
+                  text[text.find("{"):] if "{" in text else ""):
+        if not chunk.strip():
+            continue
+        try:
+            obj = json.loads(chunk)
+        except Exception:
+            continue
+        rows = obj if isinstance(obj, list) else next(
+            (obj[k] for k in ("data", "groups", "items", "result")
+             if isinstance(obj.get(k), list)), None)
+        if isinstance(rows, dict):
+            rows = [{"id": k, "name": v} for k, v in rows.items()]
+        for r in (rows or []):
+            if not isinstance(r, dict):
+                continue
+            gid = r.get("groupId") or r.get("id") or r.get("threadId")
+            nm = r.get("name") or r.get("groupName") or r.get("title")
+            if gid and nm:
+                out[str(gid)] = str(nm)
+        if out:
+            return out
+    # Không phải JSON: bắt các dòng dạng "<id> ... <tên>" hoặc "<tên> (<id>)".
+    for line in text.splitlines():
+        m = re.match(r"^\s*(\d{6,})\s*[-:|\t]\s*(.+?)\s*$", line)
+        if m:
+            out[m.group(1)] = m.group(2)[:40]
+            continue
+        m = re.match(r"^\s*(.+?)\s*\((\d{6,})\)\s*$", line)
+        if m:
+            out[m.group(2)] = m.group(1)[:40]
+    return out
 
 
 def format_message(ev: dict, thread_name=None) -> str:
@@ -1032,6 +1129,20 @@ def register(app, deps: ZaloListenerDeps):
             except Exception:
                 pass
         return res
+
+    @router.post("/zalo-listener/group-names")
+    async def group_names():
+        """Lấy tên thật của các nhóm. Là thao tác TAY vì nó mở một kết nối ngắn, khiến
+        listener phải nối lại một nhịp - không tự chạy ngầm để khỏi làm phiền."""
+        cfg = read_cfg(deps)
+        names, err = await fetch_group_names(deps, cfg.get("conn_id", ""))
+        if err:
+            return {"ok": False, "error": err}
+        n = roster.apply_names(names)
+        con = len(roster.unnamed_groups())
+        return {"ok": True, "named": n,
+                "msg": (f"Đã lấy tên cho {n} nhóm."
+                        + (f" Còn {con} nhóm chưa có tên." if con else ""))}
 
     @router.post("/zalo-listener/clear-session")
     async def clear_session():

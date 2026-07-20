@@ -4,6 +4,15 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.129] - 2026-07-20
+Phân biệt được các nhóm Zalo trong danh sách cuộc chat, thay vì tất cả cùng hiện tên người nhắn.
+### Sửa lỗi
+- **Nhóm hiện tên người nhắn chứ không phải tên nhóm**: dữ liệu tin nhắn gửi về không hề kèm tên nhóm. Bản trước đoán tên trường mà không kiểm chứng được, nên thực tế vẫn rơi về tên người gửi, và hai nhóm khác nhau mà cùng một người nhắn thì hiện y hệt nhau.
+### Thêm mới
+- **Phân biệt được ngay**: nhóm chưa có tên thật sẽ hiện kèm bốn số cuối của mã nhóm, nên không còn hai dòng trùng nhau.
+- **Nút lấy tên nhóm**: hỏi Zalo tên thật của tất cả nhóm trong một lần gọi rồi gắn vào danh sách. Để là nút bấm tay chứ không tự chạy ngầm, vì mỗi lần gọi mở một kết nối ngắn khiến listener phải nối lại một nhịp.
+- Bộ đọc kết quả nhận được nhiều định dạng khác nhau và không bao giờ lỗi với dữ liệu lạ, vì định dạng đầu ra của công cụ chưa kiểm chứng được nếu không có tài khoản đăng nhập thật.
+
 ## [0.9.128] - 2026-07-20
 Sửa lỗi báo mất kết nối trong khi thực tế vẫn đang nghe bình thường và tin vẫn về đều.
 ### Sửa lỗi

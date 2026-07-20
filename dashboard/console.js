@@ -2227,7 +2227,9 @@
       + '<div id="zlForm" style="margin-top:10px;display:flex;flex-direction:column;gap:8px">'
       + '<label class="mcp-lb">Tài khoản Zalo dùng để nghe<select class="js-input" id="zlConn">' + opts + '</select></label>'
       + '<div class="mcp-lb">Cuộc chat theo dõi <span style="opacity:.6">(chưa chọn cái nào thì không báo gì)</span>'
-      + '<input class="js-input" id="zlSearch" placeholder="Tìm tên nhóm hoặc người…" style="margin-top:4px">'
+      + '<div style="display:flex;gap:6px;margin-top:4px">'
+      + '<input class="js-input" id="zlSearch" placeholder="Tìm tên nhóm hoặc người…" style="flex:1">'
+      + '<button class="mp-btn" id="zlNames" style="font-size:12px;white-space:nowrap">Lấy tên nhóm</button></div>'
       + '<div id="zlThreads" style="max-height:200px;overflow:auto;border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:6px;margin-top:4px"></div></div>'
       + '<label class="mcp-lb">Chỉ báo khi tin có chứa <span style="opacity:.6">(tuỳ chọn, cách nhau bằng dấu phẩy)</span>'
       + '<input class="js-input" id="zlKw" placeholder="giá, còn hàng, đặt, ship"></label>'
@@ -2271,7 +2273,12 @@
     const row = (t) => '<label style="display:block;font-size:13px;padding:3px 0;cursor:pointer">'
       // esc() BẮT BUỘC: tên hiển thị do người lạ trên Zalo tự đặt, chèn thẳng vào HTML là hở XSS.
       + '<input type="checkbox" class="zl-th" value="' + esc(t.id) + '"' + (selected.has(t.id) ? " checked" : "") + '> '
-      + esc(t.name || t.id) + (t.type === "group" ? ' <span style="opacity:.55">(nhóm)</span>' : "")
+      + esc(t.name || t.id)
+      // Payload webhook không kèm tên nhóm nên tên đang hiện là của NGƯỜI NHẮN. Hai nhóm
+      // khác nhau mà cùng một người nhắn sẽ trùng tên y hệt, phải kèm mã để phân biệt.
+      + (t.type === "group"
+          ? ' <span style="opacity:.55">' + (t.named ? "(nhóm)" : "(nhóm #" + esc(String(t.id).slice(-4)) + ")") + '</span>'
+          : "")
       + ' <span style="opacity:.45">' + zlAgo(t.last) + '</span></label>';
     const paintRoster = (st) => {
       const list = st.roster || [];
@@ -2348,6 +2355,18 @@
     $("zlKw").value = (c.keywords || []).join(", ");
     $("zlQuiet").value = c.quiet_hours || "";
     $("zlSearch").oninput = () => { rosterKey = null; if (lastSt) paintRoster(lastSt); };
+    // Tên nhóm KHÔNG có trong dữ liệu tin nhắn nên phải hỏi Zalo riêng. Là nút bấm tay vì
+    // nó mở một kết nối ngắn, làm listener phải nối lại một nhịp.
+    $("zlNames").onclick = async () => {
+      $("zlNames").disabled = true;
+      $("zlNames").textContent = "Đang lấy…";
+      const r = await postJson("/zalo-listener/group-names", {});
+      $("zlNames").disabled = false;
+      $("zlNames").textContent = "Lấy tên nhóm";
+      $("zlErr").textContent = r.ok ? (r.msg || "") : (r.error || "Lỗi");
+      rosterKey = null;
+      try { paint(await (await fetch("/zalo-listener/status")).json()); } catch (e) {}
+    };
     paint(st);
     $("zlToggle").onclick = async () => {
       $("zlErr").textContent = "";

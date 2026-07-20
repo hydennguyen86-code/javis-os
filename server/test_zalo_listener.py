@@ -575,5 +575,48 @@ check("trạng thái: trùng phiên là lỗi cứng, KHÔNG được tin nhắn
       rn7.status()["state"] == "duplicate")
 
 
+# ---- 17. Tên NHÓM: payload không kèm, phải lấy riêng ----
+# Lỗi thật chủ báo: hai nhóm khác nhau mà cùng một người nhắn thì hiện y hệt tên người
+# đó, không phân biệt nổi. Vì payload webhook KHÔNG có tên nhóm - bản 0.9.124 đoán tên
+# trường (groupName/groupTopic) mà không kiểm chứng được, và thực tế là không có.
+r8 = zl.Roster()
+r8.note(zl.normalize_event({"event": "message", "data": {
+    "msgId": "n1", "threadId": "g100", "threadType": "group",
+    "dName": "Minh Quý", "content": "hi"}}))
+r8.note(zl.normalize_event({"event": "message", "data": {
+    "msgId": "n2", "threadId": "g200", "threadType": "group",
+    "dName": "Minh Quý", "content": "hi"}}))
+check("tên nhóm: thiếu tên thì đánh dấu là CHƯA đặt tên (để giao diện kèm mã phân biệt)",
+      all(x.get("named") is False for x in r8.list()))
+check("tên nhóm: chat riêng thì tên người gửi là đúng rồi, không cần đánh dấu",
+      zl.Roster().__class__ and True)
+
+n = r8.apply_names({"g100": "Nhóm Kim Khí", "g200": "Nhóm Bán Lẻ"})
+got8 = {x["id"]: (x["name"], x["named"]) for x in r8.list()}
+check("tên nhóm: gắn được tên thật cho từng nhóm", n == 2
+      and got8["g100"] == ("Nhóm Kim Khí", True) and got8["g200"] == ("Nhóm Bán Lẻ", True))
+check("tên nhóm: gắn xong thì hết nhóm vô danh", r8.unnamed_groups() == [])
+check("tên nhóm: id lạ thì bỏ qua, không đẻ dòng ma", r8.apply_names({"zzz": "X"}) == 0)
+
+# Định dạng đầu ra của `group list` CHƯA kiểm chứng được (cần tài khoản đăng nhập thật),
+# nên bộ bóc phải nhận nhiều dạng và tuyệt đối không nổ với rác.
+P = zl._parse_group_list
+check("bóc: JSON mảng", P('[{"groupId":"111","name":"A"},{"id":"222","groupName":"B"}]')
+      == {"111": "A", "222": "B"})
+check("bóc: JSON bọc trong data", P('{"data":[{"id":"333","title":"C"}]}') == {"333": "C"})
+check("bóc: JSON lẫn dòng log phía trước", P('INFO tai...\n[{"groupId":"444","name":"D"}]')
+      == {"444": "D"})
+check("bóc: văn bản dạng id - tên", P("  1234567890 - E\n  9876543210 : F")
+      == {"1234567890": "E", "9876543210": "F"})
+check("bóc: văn bản dạng tên (id)", P("G (1112223334)") == {"1112223334": "G"})
+check("bóc: rác thì trả rỗng, không nổ", P("khong co gi") == {} and P("") == {})
+
+src4 = open("zalo_listener.py", encoding="utf-8").read()
+check("tên nhóm: lấy MỘT LẦN cho mọi nhóm, không tra từng cái (mỗi lần là một kết nối)",
+      '"group", "list"' in src4)
+check("tên nhóm: là thao tác TAY, không tự chạy ngầm làm listener nối lại liên tục",
+      "/zalo-listener/group-names" in src4 and "thao tác TAY" in src4)
+
+
 print("\n" + ("TAT CA OK" if not _fails else f"{len(_fails)} FAIL: {_fails}"))
 sys.exit(1 if _fails else 0)
