@@ -730,5 +730,42 @@ feat.shutdown()   # gọi thật, không được ném lỗi
 check("tắt app: gọi được mà không nổ", True)
 
 
+# ---- 21. Tự dọn đống luật ồn do MẶC ĐỊNH HỎNG của chính Javis ----
+# Chủ hỏi lần thứ ba: "sao e nói mặc định không gửi telegram nữa mà vẫn gửi". Vì đổi mặc
+# định ở 0.9.131 chỉ áp cho luật MỚI, còn file tạo hồi 0.9.130 vẫn là bao-het. Bắt chủ tự
+# đi bấm Lưu lại từng cái là đẩy việc dọn hậu quả sang cho người dùng.
+BR5 = _tf.mkdtemp(prefix="javis-migrate-")
+zr.save_rule(BR5, {"thread_id": "m1", "thread_name": "Minh Quý", "mode": "bao-het",
+                   "enabled": True, "script": ""})                       # do mặc định hỏng
+zr.save_rule(BR5, {"thread_id": "m2", "thread_name": "Nhóm giá", "mode": "bao-het",
+                   "enabled": True, "keywords": ["giá"], "script": ""})  # chủ CỐ Ý
+zr.save_rule(BR5, {"thread_id": "m3", "thread_name": "Nhóm bot", "mode": "chatbot",
+                   "enabled": True, "script": "kịch bản"})               # chủ CỐ Ý
+zr.save_rule(BR5, {"thread_id": "m4", "thread_name": "Nhóm nhắc", "mode": "nhac-quen",
+                   "enabled": True, "script": ""})                       # chủ CỐ Ý
+
+_st5 = {"zalo_listener": {**zl.DEFAULT_CFG, "conn_id": "c1"}}
+app5 = FastAPI()
+feat5 = zl.register(app5, mkdeps(read_settings=lambda: _st5,
+                                 write_settings=lambda s: _st5.update(s),
+                                 brain_root=lambda: BR5, brain_roots=lambda: [BR5]))
+asyncio.run(feat5.autostart())
+m5 = {x["thread_id"]: x["mode"] for x in zr.list_rules(BR5)}
+check("dọn: luật 'báo mọi tin' KHÔNG từ khoá (dấu vết mặc định hỏng) chuyển về im lặng",
+      m5["m1"] == "im-lang")
+check("dọn: luật CÓ từ khoá là chủ cố ý, KHÔNG được đụng", m5["m2"] == "bao-het")
+check("dọn: luật chatbot chủ đặt kỹ, KHÔNG được đụng", m5["m3"] == "chatbot")
+check("dọn: luật nhắc-khi-quên chủ đặt, KHÔNG được đụng", m5["m4"] == "nhac-quen")
+check("dọn: có báo cho chủ biết Javis vừa tự sửa cái gì, không lặng lẽ đổi hành vi",
+      any("IM LẶNG" in t for _, t in _sent))
+
+# Chạy đúng MỘT lần, không mỗi lần khởi động lại là đè luật chủ vừa sửa.
+zr.save_rule(BR5, {"thread_id": "m1", "thread_name": "Minh Quý", "mode": "bao-het",
+                   "enabled": True, "script": ""})
+asyncio.run(feat5.autostart())
+check("dọn: chỉ chạy MỘT lần, sau đó không đè luật chủ tự đặt lại nữa",
+      zr.rule_for(zr.list_rules(BR5), "m1")["mode"] == "bao-het")
+
+
 print("\n" + ("TAT CA OK" if not _fails else f"{len(_fails)} FAIL: {_fails}"))
 sys.exit(1 if _fails else 0)

@@ -100,6 +100,7 @@ DEFAULT_CFG = {
     "secret": "",
     "owner_chat": "",
     "conn_was_enabled": False,   # nhớ để dừng nghe thì trả connector Zalo về như cũ
+    "migrated_quiet": False,     # đã dọn xong đống luật ồn do mặc định hỏng trước 0.9.131
 }
 
 MAX_BODY = 256 * 1024      # trần kích thước 1 payload webhook (chống nhồi bộ nhớ)
@@ -1276,8 +1277,62 @@ def register(app, deps: ZaloListenerDeps):
 
     app.include_router(router)
 
+    def migrate_noisy_rules():
+        """MỘT LẦN: dọn các luật "báo mọi tin" do mặc định HỎNG của giao diện sinh ra.
+
+        Trước 0.9.131, tick một cuộc chat trong panel tạo luật mode=bao-het, nên chủ chỉ
+        định theo dõi mà lại bị dội mọi tin về Telegram. Đổi mặc định ở 0.9.131 chỉ áp cho
+        luật MỚI, file cũ vẫn ồn. Bắt chủ tự đi bấm Lưu lại từng cái là đẩy việc dọn hậu
+        quả sang cho người dùng - Javis phải tự sửa.
+
+        CHỈ đụng luật bao-het KHÔNG có từ khoá: đó đúng là dấu vết của mặc định cũ. Luật
+        có từ khoá, hoặc nhac-quen/chatbot, là chủ cố ý đặt - không được động vào.
+        """
+        cfg = read_cfg(deps)
+        if cfg.get("migrated_quiet"):
+            return 0
+        done = 0
+        try:
+            roots = list(deps.brain_roots() or [])
+        except Exception:
+            roots = []
+        try:
+            d = deps.brain_root()
+            if d and d not in roots:
+                roots.insert(0, d)
+        except Exception:
+            pass
+        for root in roots:
+            try:
+                for r in zalo_rules.list_rules(root):
+                    if r.get("mode") == "bao-het" and not r.get("keywords"):
+                        r["mode"] = "im-lang"
+                        zalo_rules.save_rule(root, r)
+                        done += 1
+            except Exception as e:
+                print(f"[zalo listener] dọn luật ồn ở {root} lỗi: {e}", file=sys.stderr)
+        write_cfg(deps, {"migrated_quiet": True})
+        if done:
+            print(f"[zalo listener] đã chuyển {done} luật 'báo mọi tin' về im lặng "
+                  f"(mặc định hỏng trước 0.9.131)", file=sys.stderr)
+        return done
+
     async def autostart():
-        """Bật lại listener sau khi Javis khởi động, nếu chủ đã bật trước đó."""
+        """Bật lại listener sau khi Javis khởi động, nếu chủ đã bật trước đó.
+
+        Dọn luật ồn TRƯỚC và làm bất kể listener có đang bật hay không - chủ có thể đang
+        tắt nghe, nhưng đống luật hỏng vẫn phải được sửa cho lần bật sau.
+        """
+        try:
+            n_quiet = migrate_noisy_rules()
+            if n_quiet:
+                await _notify(read_cfg(deps),
+                              f"Javis vừa chuyển {n_quiet} cuộc chat Zalo về chế độ IM LẶNG. "
+                              f"Trước đây tick theo dõi trong trang Kết nối bị mặc định thành "
+                              f"'báo mọi tin' - đó là lỗi của Javis, nay đã dọn xong. Muốn được "
+                              f"báo lại thì nhập từ khoá trong panel, hoặc dặn thẳng trong chat.")
+        except Exception as e:
+            print(f"[zalo listener] migrate lỗi: {e}", file=sys.stderr)
         cfg = read_cfg(deps)
         if not cfg.get("enabled"):
             return

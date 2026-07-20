@@ -4,6 +4,13 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.135] - 2026-07-20
+Javis tự dọn đống luật ồn do chính mặc định hỏng của nó sinh ra, thay vì bắt chủ đi sửa tay từng cái.
+### Sửa lỗi
+- **Đổi mặc định không cứu được luật đã tạo**: bản 0.9.131 chuyển mặc định sang im lặng nhưng chỉ áp cho luật mới, còn những cuộc chat đã tick từ bản 0.9.130 vẫn mang chế độ báo mọi tin nên vẫn dội về Telegram. Ba lần trước Javis chỉ bảo chủ bấm Lưu lại, tức là đẩy việc dọn hậu quả sang cho người dùng. Nay khi khởi động Javis tự chuyển chúng về im lặng đúng một lần, và nhắn cho chủ biết đã sửa cái gì.
+- Chỉ đụng vào luật báo mọi tin mà không có từ khoá, vì đó đúng là dấu vết của mặc định hỏng. Luật có từ khoá, luật nhắc khi quên trả lời, và luật để Javis tự trả lời đều là chủ cố ý đặt nên giữ nguyên.
+- Việc dọn chạy đúng một lần, những lần khởi động sau không đè lên luật chủ tự đặt lại.
+
 ## [0.9.134] - 2026-07-20
 Hết cảnh cập nhật xong là báo đỏ trùng phiên và phải xoá kết nối quét lại mã QR.
 ### Sửa lỗi
