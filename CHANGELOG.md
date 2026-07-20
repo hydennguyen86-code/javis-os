@@ -4,6 +4,14 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.124] - 2026-07-20
+Xử lý va chạm một kết nối mỗi tài khoản Zalo, thứ đã ghi là chưa kiểm chứng từ bản đầu và nay xảy ra thật trên máy chủ.
+### Sửa lỗi
+- **Listener bị đá ra liên tục**: log thật báo có kết nối khác được mở nên kết nối này bị đóng, cứ vài phút một lần. Nguyên nhân là đường gửi tin đi qua connector Zalo, mà connector giữ một kết nối lâu dài cho cùng tài khoản nên chính nó đá listener, rồi listener nối lại và đá ngược. Nay gửi tin bằng lệnh một lần, chỉ mở kết nối trong tích tắc rồi thoát.
+- **Không còn quay vòng vô ích**: chuỗi báo lỗi của thư viện Zalo trong trường hợp này không nằm trong bộ nhận diện lỗi cứng, nên listener tưởng là rớt mạng thường và cứ thử lại mãi. Nay nhận ra đúng, dừng lại và nói rõ phải kiểm tra những gì: connector Zalo đã tắt chưa, có đang mở Zalo Web không, có listener cũ nào còn chạy không.
+- **Log không còn rác ký tự**: bóc mã màu trước khi hiển thị, hết cảnh nhìn thấy những đoạn như ESC ngoặc 31m ERROR.
+- **Nhóm hiện đúng tên nhóm**: trước đây sổ cuộc chat lấy tên người gửi làm tên nhóm nên hai nhóm khác nhau cùng hiện một tên và không phân biệt được. Nay ưu tiên tên nhóm, và người nhắn sau không ghi đè mất tên đã biết.
+
 ## [0.9.123] - 2026-07-20
 Zalo chuyển từ một bộ lọc thông báo dùng chung sang chính sách riêng cho từng cuộc chat, đặt bằng lời qua chat. Thêm chế độ Javis tự trả lời khách như một chatbot, chạy trong hộp cát.
 ### Thêm mới

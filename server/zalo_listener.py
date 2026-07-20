@@ -66,8 +66,20 @@ _RATE_LIMIT = 20           # trần số thông báo ...
 _RATE_WINDOW_S = 600       # ... trong 10 phút (nhóm đông không làm nổ Telegram)
 
 # Chuỗi trong stdout/stderr của CLI báo hiệu ĐỪNG thử lại nữa.
-_FATAL_MARKS = ("duplicate", "trùng phiên", "another session", "already running",
-                "login required", "not logged in", "chưa đăng nhập", "unauthorized")
+# "another connection is opened" là câu THẬT của zca-js khi có thứ khác chiếm socket của
+# cùng tài khoản - gặp trên VPS. Thiếu chuỗi này thì listener coi là rớt mạng thường và
+# quay vòng đánh nhau với kết nối kia mãi không thôi.
+_FATAL_MARKS = ("duplicate", "trùng phiên", "another session", "another connection",
+                "already running", "login required", "not logged in",
+                "chưa đăng nhập", "unauthorized")
+
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+
+
+def _strip_ansi(s) -> str:
+    """Bỏ mã màu ANSI. CLI tô màu log nên nhét thẳng lên giao diện là ra một đống
+    ký tự rác kiểu '[31mERROR[0m'."""
+    return _ANSI_RE.sub("", str(s or ""))
 
 DEFAULT_CFG = {
     "enabled": False,
@@ -143,6 +155,9 @@ def normalize_event(raw) -> dict:
         "thread_type": thread_type,
         "text": text,
         "sender": str(pick("dName", "displayName", "senderName", "fromName", "name") or ""),
+        # Tên NHÓM (khác tên người gửi). Thiếu nó thì sổ cuộc chat lấy tên người gửi làm
+        # tên nhóm, ra hai dòng trùng tên nhau và chủ không biết đâu là nhóm nào.
+        "group_name": str(pick("groupName", "group_name", "groupTopic", "topic") or ""),
         # uid người gửi: chế độ nhac-quen cần nó để biết CHỦ đã trả lời hay chưa (chủ
         # dùng tài khoản Zalo khác nên trong nhóm là một thành viên bình thường).
         "sender_uid": str(pick("uidFrom", "senderId", "sender_id", "fromUid", "uid") or ""),
@@ -185,7 +200,12 @@ class Roster:
         it = self._items.get(tid) or {"id": tid, "count": 0}
         # Tên người gửi là dữ liệu KHÔNG tin được (khách tự đặt) - cắt ngắn ở đây,
         # và phía giao diện phải esc() trước khi chèn vào HTML.
-        it["name"] = sanitize_text(ev.get("sender") or "", cap=40) or tid
+        # Nhóm thì ưu tiên TÊN NHÓM; chỉ khi payload không có mới đành lấy tên người gửi
+        # (và giữ tên cũ nếu đã từng biết, đừng để tên nhóm bị người nhắn sau ghi đè).
+        nm = ev.get("group_name") if ev.get("thread_type") == "group" else ev.get("sender")
+        nm = sanitize_text(nm or "", cap=40)
+        if nm or not it.get("name"):
+            it["name"] = nm or sanitize_text(ev.get("sender") or "", cap=40) or tid
         it["type"] = ev.get("thread_type") or "user"
         it["count"] = it["count"] + 1
         it["last"] = time.time()
@@ -330,29 +350,45 @@ async def bot_reply(rule: dict, ev: dict, deps) -> tuple:
 
 
 async def send_zalo(deps, conn_id: str, thread_id: str, thread_type: str, text: str) -> tuple:
-    """Gửi tin qua connector MCP `zalo`. Trả (ok, error).
+    """Gửi tin bằng lệnh CLI MỘT LẦN (`zalo-agent msg send`). Trả (ok, error).
 
-    Sidecar `listen` không gửi được tin nên phải đi đường MCP. Đây CHÍNH là chỗ chạm vào
-    va chạm một-socket-mỗi-tài-khoản đã ghi trong spec trước - chưa kiểm chứng được, nên
-    lỗi ở đây phải báo nguyên văn cho chủ thay vì nuốt.
+    CỐ Ý không đi qua connector MCP `zalo`. Đường MCP giữ một websocket LÂU DÀI cho cùng
+    tài khoản, mà Zalo chỉ cho MỘT kết nối mỗi tài khoản, nên nó đá listener ra rồi
+    listener đá lại, quay vòng mãi. Triệu chứng đã gặp THẬT trên VPS:
+        "Another connection is opened, closing this one" ... "Re-login in 5s"
+    Lệnh một lần chỉ mở kết nối trong tích tắc rồi thoát, listener cùng lắm nối lại một
+    nhịp thay vì đánh nhau liên miên.
     """
+    home, err = _home_of(deps, conn_id)
+    if err:
+        return False, err
+    npx = shutil.which("npx")
+    if not npx:
+        return False, "thiếu npx"
+    argv = [npx, "-y", "zalo-agent-cli", "msg", "send", str(thread_id), text,
+            "-t", "1" if thread_type == "group" else "0"]
+    if str(npx).lower().endswith((".cmd", ".bat")):
+        argv = ["cmd.exe", "/c"] + argv
+    env = dict(os.environ)
+    env["HOME"] = home
+    env["USERPROFILE"] = home
+    kwargs = {}
+    if os.name == "nt":
+        kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    else:
+        kwargs["start_new_session"] = True
     try:
-        import mcp_client
-        rows = deps.resolved_conns() or []
+        proc = await asyncio.create_subprocess_exec(
+            *argv, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
+            stdin=asyncio.subprocess.DEVNULL, env=env, **kwargs)
+        out, _ = await asyncio.wait_for(proc.communicate(), timeout=60)
+    except asyncio.TimeoutError:
+        return False, "gửi quá 60s không xong"
     except Exception as e:
         return False, f"{type(e).__name__}: {e}"
-    spec = next((r for r in rows if r.get("id") == conn_id), None)
-    if not spec:
-        return False, "không tìm thấy kết nối Zalo để gửi"
-    args = {"threadId": str(thread_id), "text": text,
-            "threadType": "group" if thread_type == "group" else "user"}
-    try:
-        res = await mcp_client.pool.call_tool(spec, "zalo_send_message", args)
-    except Exception as e:
-        return False, f"{type(e).__name__}: {e}"
-    s = str(res or "")
-    if s.startswith("ERROR"):
-        return False, s[:200]
+    if proc.returncode != 0:
+        tail = _strip_ansi((out or b"").decode("utf-8", "replace")).strip()[-200:]
+        return False, tail or f"mã thoát {proc.returncode}"
     return True, ""
 
 
@@ -458,9 +494,9 @@ class _Runner:
 
     def _scan_line(self, line: str) -> Optional[str]:
         """Đọc 1 dòng log CLI → trạng thái mới (nếu có). Trả 'fatal' nếu đừng thử lại."""
-        low = line.lower()
+        low = _strip_ansi(line).lower()
         if any(m in low for m in _FATAL_MARKS):
-            self.error = line.strip()[:200]
+            self.error = _strip_ansi(line).strip()[:200]
             return "fatal"
         if "connected" in low or "listening" in low or "đang nghe" in low:
             return "listening"
@@ -498,7 +534,7 @@ class _Runner:
                     line = (raw or "").rstrip()
                     if not line:
                         continue
-                    self._tail.append(line[:200])
+                    self._tail.append(_strip_ansi(line)[:200])
                     st = self._scan_line(line)
                     if st == "fatal":
                         fatal = True
@@ -521,7 +557,17 @@ class _Runner:
             if fatal:
                 # Trùng phiên: connector `zalo` (mcp start) nhiều khả năng đang giữ socket
                 # của CÙNG tài khoản. Dừng hẳn + báo rõ để chủ thấy va chạm, đừng quay vòng.
-                self.state = "duplicate" if "duplicate" in self.error.lower() else "error"
+                low = self.error.lower()
+                if "duplicate" in low or "another connection" in low or "another session" in low:
+                    # Thứ khác đang giữ socket của CÙNG tài khoản Zalo. Nói thẳng phải làm
+                    # gì, vì nhìn log thô "Another connection is opened" chủ không đoán ra.
+                    self.state = "duplicate"
+                    self.error = ("Tài khoản Zalo này đang bị một kết nối khác chiếm. "
+                                  "Kiểm tra: đã tắt connector Zalo trong kho Kết nối chưa, "
+                                  "có đang mở Zalo Web trên trình duyệt không, và có listener "
+                                  "cũ nào còn chạy không. Sửa xong bấm Bật nghe lại.")
+                else:
+                    self.state = "error"
                 return
             # Chết NGAY mà chưa kịp nghe được gì = lệnh sai / CLI không chạy được, KHÁC hẳn
             # với "đang nghe rồi mới rớt mạng". Thử lại mãi chỉ làm giao diện báo 'đang thử

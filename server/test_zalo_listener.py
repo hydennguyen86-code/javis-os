@@ -404,5 +404,38 @@ check("nhac-quen: khách nhắn thì có mốc chờ", had)
 check("nhac-quen: CHỦ trả lời thì xoá mốc, không nhắc nữa", cleared)
 
 
+# ---- 12. Va chạm một-socket-mỗi-tài-khoản (đã gặp THẬT trên VPS) ----
+# Log thật: "ERROR Another connection is opened, closing this one" rồi "Re-login in 5s".
+# Thiếu chuỗi này trong _FATAL_MARKS thì listener coi là rớt mạng thường và quay vòng
+# đánh nhau với kết nối kia mãi, cứ 2-3 phút một lần.
+rn3 = zl._Runner(mkdeps())
+st3 = rn3._scan_line("\x1b[31mERROR\x1b[0m Another connection is opened, closing this one")
+check("va chạm: nhận ra 'another connection' là lỗi cứng, không thử lại mù",
+      st3 == "fatal")
+check("va chạm: lời lỗi đã bỏ mã màu ANSI (không còn rác '[31mERROR[0m')",
+      "\x1b" not in rn3.error and "[31m" not in rn3.error)
+check("ANSI: hàm bóc mã màu chạy đúng",
+      zl._strip_ansi("\x1b[31mERROR\x1b[0m loi") == "ERROR loi")
+
+# Gửi tin KHÔNG được đi qua MCP: connector MCP giữ socket lâu dài cho cùng tài khoản nên
+# chính nó là thứ đá listener. Lệnh một lần chỉ mở kết nối trong tích tắc.
+src2 = open("zalo_listener.py", encoding="utf-8").read()
+check("gửi tin: dùng lệnh CLI một lần, KHÔNG qua connector MCP (chính nó gây va chạm)",
+      '"msg", "send"' in src2 and "zalo_send_message" not in src2)
+
+# Sổ cuộc chat: nhóm phải mang TÊN NHÓM. Trước đây lấy tên người gửi nên hai nhóm khác
+# nhau cùng hiện là "Minh Quý" và chủ không biết đâu là đâu.
+r4 = zl.Roster()
+r4.note(zl.normalize_event({"event": "message", "data": {
+    "msgId": "a", "threadId": "g9", "threadType": "group",
+    "groupName": "Nhóm Kim Khí", "dName": "Minh Quý", "content": "hi"}}))
+r4.note(zl.normalize_event({"event": "message", "data": {
+    "msgId": "b", "threadId": "g9", "threadType": "group",
+    "dName": "Người khác", "content": "hi"}}))
+got = {x["id"]: x["name"] for x in r4.list()}
+check("sổ: nhóm hiện TÊN NHÓM chứ không phải tên người gửi", got.get("g9") == "Nhóm Kim Khí")
+check("sổ: người nhắn sau KHÔNG ghi đè mất tên nhóm", got.get("g9") != "Người khác")
+
+
 print("\n" + ("TAT CA OK" if not _fails else f"{len(_fails)} FAIL: {_fails}"))
 sys.exit(1 if _fails else 0)
