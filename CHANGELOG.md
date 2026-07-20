@@ -4,6 +4,13 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.120] - 2026-07-20
+Sửa lỗi ô "Cuộc chat theo dõi" trống trơn không có một chữ hướng dẫn nào, khiến người dùng mở panel ra không biết phải làm gì để có nhóm mà chọn.
+### Sửa lỗi
+- **Ô cuộc chat trống giờ có chỉ dẫn**: biến chống vẽ lại được khởi tạo bằng chuỗi rỗng, mà danh sách rỗng cũng sinh ra khoá rỗng, nên lần vẽ đầu tiên bị chặn ngay và dòng hướng dẫn không bao giờ hiện. Đổi sang khởi tạo bằng null.
+- **Chỉ dẫn nói đúng việc cần làm theo từng trạng thái**: đang tắt thì bảo bấm Bật nghe trước, đang nghe mà chưa ai nhắn thì bảo nhờ người nhắn thử một tin vào nhóm cần theo dõi. Trước đây chỉ có một câu chung cho cả hai.
+- Thêm 4 kiểm tra trong dashboard/test_zalo_panel.js chốt đúng lỗi này để không tái phát.
+
 ## [0.9.119] - 2026-07-20
 Siết listener Zalo theo đúng cách dùng thật: chỉ nghe những cuộc chat được chọn, và rà bảo mật toàn tuyến vì nội dung tin nhắn là do người lạ soạn.
 ### Thay đổi

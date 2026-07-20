@@ -49,6 +49,19 @@ check("roster: KHONG chen thang bien nao vao HTML ma quen esc",
   !/\$\{[^}]*\}/.test(rosterBlock) && rosterBlock.indexOf("+ t.name") === -1
   && rosterBlock.indexOf("+ t.id") === -1);
 
+// ---- 2b. Chong tai phat bug "o cuoc chat trong tron" ----
+// Bug that (0.9.119): rosterKey khoi tao bang "" ma danh sach rong cung cho key "",
+// nen lan ve DAU TIEN bi chan boi guard va dong huong dan khong bao gio hien ra -
+// nguoi dung nhin thay mot o trong tron, khong biet phai lam gi.
+check("guard: rosterKey khoi tao bang null, KHONG phai chuoi rong",
+  /rosterKey = null/.test(src) && !/rosterKey = ""/.test(src));
+check("guard: khoa ve lai co gom trang thai bat/tat (chi dan hai truong hop khac nhau)",
+  /const key = \(st\.enabled \? "on" : "off"\)/.test(src));
+check("o rong: co chi dan cho truong hop DANG TAT (bao bam Bat nghe)",
+  src.indexOf("Danh sách này chỉ có khi đang nghe") !== -1);
+check("o rong: co chi dan cho truong hop DANG NGHE (bao nho ai do nhan thu)",
+  src.indexOf("Đang nghe nhưng chưa ai nhắn") !== -1);
+
 // ---- 3. Dong dau hieu: phai phan biet duoc "chua ai nhan" voi "dang hong" ----
 check("dau hieu: co nhanh da noi nhung chua nhan tin nao",
   src.indexOf("Da noi, chua nhan tin nao") !== -1 || src.indexOf("chưa nhận tin nào") !== -1);

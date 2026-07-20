@@ -2245,7 +2245,9 @@
     const panel = el.querySelector(".zl-panel");
     if (!panel) return;
     const $ = id => panel.querySelector("#" + id);
-    let on = false, selected = new Set(), rosterKey = "";
+    // rosterKey = null chứ KHÔNG phải "": danh sách rỗng cũng cho key "", để "" thì lần vẽ đầu
+    // bị chặn ngay và dòng hướng dẫn "chưa thấy cuộc chat nào" không bao giờ hiện ra.
+    let on = false, selected = new Set(), rosterKey = null;
     const cfgBody = () => ({
       conn_id: $("zlConn").value,
       threads: Array.from(selected),
@@ -2261,12 +2263,16 @@
     };
     const paintRoster = (st) => {
       const list = st.roster || [];
-      const key = list.map(x => x.id).join("|");
+      // Khoá vẽ lại phải gồm cả trạng thái bật/tắt: lời chỉ dẫn khi đang tắt khác khi đang nghe.
+      const key = (st.enabled ? "on" : "off") + "|" + list.map(x => x.id).join("|");
       if (key === rosterKey) return;         // không vẽ lại khi chưa đổi, tránh nhảy ô đang tick
       rosterKey = key;
       const box = $("zlThreads");
       if (!list.length) {
-        box.innerHTML = '<div class="mp-note">Chưa thấy cuộc chat nào. Bật nghe rồi đợi có người nhắn, các cuộc chat sẽ tự hiện ra đây để anh tick chọn.</div>';
+        box.innerHTML = '<div class="mp-note">' + (st.enabled
+          ? 'Đang nghe nhưng chưa ai nhắn. Nhờ ai đó nhắn một tin vào nhóm hoặc cuộc chat anh cần theo dõi, nó sẽ tự hiện ra đây trong vài giây.'
+          : 'Danh sách này chỉ có khi đang nghe. Bấm <b>Bật nghe</b> ở trên, rồi đợi có người nhắn vào cuộc chat anh cần theo dõi, nó sẽ tự hiện ra đây để tick chọn.')
+          + '</div>';
         return;
       }
       // esc() BẮT BUỘC: tên hiển thị do người lạ trên Zalo tự đặt, chèn thẳng vào HTML là hở XSS.
