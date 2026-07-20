@@ -5390,6 +5390,13 @@ async def _warm_mcp_hub():
 @app.on_event("shutdown")
 async def _shutdown_mcp_pool():
     """Đóng các session MCP sống lâu (stdio subprocess, httpx client) khi server tắt."""
+    # Listener Zalo TRƯỚC: nó cần được đóng tử tế để phía Zalo thả phiên ra. Bị giết đột
+    # ngột thì phiên cũ còn treo và lần bật sau báo trùng phiên, chủ tưởng hỏng phải quét
+    # QR lại. Đây chính là triệu chứng "cập nhật xong là báo đỏ".
+    try:
+        zalo_listener_feature.shutdown()
+    except Exception as e:
+        print(f"[zalo listener shutdown] {e}", file=__import__('sys').stderr)
     try:
         await mcp_client.pool.close_all()
     except Exception:

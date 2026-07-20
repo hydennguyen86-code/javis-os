@@ -4,6 +4,13 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.134] - 2026-07-20
+Hết cảnh cập nhật xong là báo đỏ trùng phiên và phải xoá kết nối quét lại mã QR.
+### Sửa lỗi
+- **Không đóng listener tử tế khi tắt app**: lúc cập nhật, tiến trình bị dừng đột ngột mà chưa kịp đóng kết nối, nên phía Zalo vẫn coi phiên cũ đang sống và chặn listener mới. Nay khi server tắt sẽ đóng listener trước, gửi tín hiệu dừng nhẹ để công cụ kịp ngắt kết nối sạch sẽ.
+- **Trùng phiên bị coi là lỗi cứng ngay từ lần đầu**: ngay sau khi khởi động lại thì trùng phiên là chuyện bình thường và tự hết sau vài chục giây, nhưng listener lại dừng hẳn và bắt chủ đi xoá kết nối quét lại mã QR một cách oan uổng. Nay kiên nhẫn thử lại năm lần với khoảng chờ tăng dần, báo rõ đang chờ phiên cũ rụng và đây là chuyện thường sau khi cập nhật. Hết kiên nhẫn mới kết luận, kèm số lần đã thử.
+- **Dọn tiến trình cũ cũng ngắt nhẹ trước**: chính chúng đang giữ phiên Zalo, giết thẳng thì phiên lại treo, đúng cái vòng luẩn quẩn vừa gỡ.
+
 ## [0.9.133] - 2026-07-20
 Javis giờ biết đặt luật Zalo khi được dặn bằng lời, thay vì chỉ ghi vào bộ nhớ rồi thôi.
 ### Sửa lỗi

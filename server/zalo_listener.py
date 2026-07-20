@@ -61,6 +61,10 @@ SECRET_HEADER = "x-javis-zalo-secret"
 # Backoff dựng lại khi socket đứt. Trùng phiên / lỗi xác thực thì KHÔNG quay vòng.
 _BACKOFF = (5, 30, 120, 300)
 _FAST_FAIL_S = 15          # bật lên mà tắt trong ngần này giây = hỏng cứng, không phải rớt mạng
+# Trùng phiên ngay sau khi khởi động lại là tạm thời (phiên cũ chưa rụng) - phải kiên nhẫn
+# chờ thay vì kết luận ngay và bắt chủ quét QR lại.
+_DUP_TRIES = 5
+_DUP_BACKOFF = (15, 30, 60, 90, 120)
 _TEXT_CAP = 400            # trần ký tự nội dung tin đẩy vào Telegram
 _SEEN_CAP = 2000
 _RATE_LIMIT = 20           # trần số thông báo ...
@@ -663,7 +667,15 @@ class _Runner:
                     subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)],
                                    capture_output=True, timeout=15)
                 else:
-                    os.kill(pid, signal.SIGKILL)
+                    # SIGTERM trước: chính mấy tiến trình này đang GIỮ phiên Zalo. Giết
+                    # thẳng thì phiên lại treo phía Zalo, đúng cái vòng luẩn quẩn vừa gỡ.
+                    os.kill(pid, signal.SIGTERM)
+                    time.sleep(1.5)
+                    try:
+                        os.kill(pid, 0)
+                        os.kill(pid, signal.SIGKILL)
+                    except OSError:
+                        pass
             except Exception:
                 pass
         if found:
@@ -737,6 +749,7 @@ class _Runner:
         """Vòng chạy nền: spawn → đọc log → đứt thì backoff dựng lại."""
         attempt = 0
         fast_fails = 0          # số lần chết NGAY khi vừa bật (chưa kịp nghe được gì)
+        dup_tries = 0           # số lần bị phiên cũ chặn - kiên nhẫn trước khi kết luận
         while not self._stop.is_set():
             cfg = read_cfg(self.deps)
             self.state = "starting"
@@ -773,17 +786,31 @@ class _Runner:
             if self._stop.is_set():
                 break
             if fatal:
-                # Trùng phiên: connector `zalo` (mcp start) nhiều khả năng đang giữ socket
-                # của CÙNG tài khoản. Dừng hẳn + báo rõ để chủ thấy va chạm, đừng quay vòng.
                 low = self.error.lower()
-                if "duplicate" in low or "another connection" in low or "another session" in low:
-                    # Thứ khác đang giữ socket của CÙNG tài khoản Zalo. Nói thẳng phải làm
-                    # gì, vì nhìn log thô "Another connection is opened" chủ không đoán ra.
+                is_dup = any(k in low for k in ("duplicate", "another connection",
+                                                "another session"))
+                if is_dup and dup_tries < _DUP_TRIES:
+                    # Trùng phiên NGAY SAU khi khởi động lại là chuyện BÌNH THƯỜNG và tự
+                    # hết: phiên cũ chết đột ngột nên phía Zalo còn coi là đang sống, phải
+                    # chờ nó rụng. Xếp vào lỗi cứng và dừng ngay từ lần đầu là biến một
+                    # trạng thái tạm thành vĩnh viễn, bắt chủ đi xoá kết nối quét QR lại
+                    # một cách oan uổng.
+                    dup_tries += 1
+                    wait = _DUP_BACKOFF[min(dup_tries - 1, len(_DUP_BACKOFF) - 1)]
+                    self.state = "reconnecting"
+                    self.error = (f"Phiên cũ chưa rụng hẳn (thường gặp ngay sau khi cập "
+                                  f"nhật). Đang chờ {wait}s rồi thử lại, lần {dup_tries}/"
+                                  f"{_DUP_TRIES}.")
+                    if self._stop.wait(wait):
+                        break
+                    continue
+                if is_dup:
                     self.state = "duplicate"
-                    self.error = ("Tài khoản Zalo này đang bị một kết nối khác chiếm. "
-                                  "Kiểm tra: đã tắt connector Zalo trong kho Kết nối chưa, "
-                                  "có đang mở Zalo Web trên trình duyệt không, và có listener "
-                                  "cũ nào còn chạy không. Sửa xong bấm Bật nghe lại.")
+                    self.error = ("Tài khoản Zalo này đang bị một kết nối khác chiếm, đã thử "
+                                  f"lại {dup_tries} lần không được. Kiểm tra: đã tắt connector "
+                                  "Zalo trong kho Kết nối chưa, có đang mở Zalo Web trên trình "
+                                  "duyệt không, và có listener cũ nào còn chạy không. Sửa xong "
+                                  "bấm Bật nghe lại.")
                 else:
                     self.state = "error"
                 return
@@ -1260,8 +1287,24 @@ def register(app, deps: ZaloListenerDeps):
             return
         runner.start(home)
 
+    def shutdown():
+        """Đóng listener TỬ TẾ khi app tắt (cập nhật, khởi động lại container).
+
+        Không có bước này thì tiến trình node bị giết đột ngột mà chưa kịp đóng websocket,
+        nên phía Zalo còn coi phiên cũ đang sống. Listener mới bật lên bị chính cái xác đó
+        chặn, chủ thấy báo đỏ trùng phiên và phải đi xoá kết nối quét QR lại. _kill_tree()
+        gửi SIGTERM trước rồi mới SIGKILL, cho zca-js kịp đóng socket.
+        Cố ý KHÔNG ghi enabled=False: lần khởi động sau autostart phải tự bật lại.
+        """
+        try:
+            runner._stop.set()
+            runner._kill_tree()
+        except Exception as e:
+            print(f"[zalo listener] đóng lúc tắt app lỗi: {e}", file=sys.stderr)
+
     return type("ZaloListenerFeature", (), {
         "runner": runner, "autostart": staticmethod(autostart),
+        "shutdown": staticmethod(shutdown),
         "read_cfg": staticmethod(lambda: read_cfg(deps)),
         # Lộ ra để test được CẢ chuỗi lọc → khử trùng → rate → báo, không chỉ vỏ HTTP
         # (endpoint đẩy việc qua create_task nên test qua HTTP không chờ được kết quả).

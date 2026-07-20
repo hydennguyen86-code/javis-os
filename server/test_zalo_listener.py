@@ -694,5 +694,41 @@ got4 = {x["thread_id"]: x["mode"] for x in cl4.get("/zalo-listener/status").json
 check("brain: trùng luật ở hai brain thì lấy bản SỬA GẦN NHẤT", got4.get("gZ") == "im-lang")
 
 
+# ---- 20. Cập nhật xong bị trùng phiên: phải KIÊN NHẪN, đừng bắt quét QR lại ----
+# Chủ tự tìm ra: "cập nhật phiên bản mới xong nó báo đỏ đang đăng nhập phiên khác, anh lại
+# phải xoá kết nối đi quét QR lại". Hai lỗi thiết kế: (1) app tắt mà không đóng listener tử
+# tế nên phía Zalo còn treo phiên cũ; (2) trùng phiên bị xếp vào lỗi CỨNG, dừng ngay lần
+# đầu - biến một trạng thái TẠM THỜI (tự hết sau vài chục giây) thành vĩnh viễn.
+src5 = open("zalo_listener.py", encoding="utf-8").read()
+check("khởi động lại: có thử lại nhiều lần trước khi kết luận trùng phiên",
+      "_DUP_TRIES" in src5 and zl._DUP_TRIES >= 3)
+check("khởi động lại: chờ tăng dần chứ không quay vòng gấp",
+      len(zl._DUP_BACKOFF) >= 3 and zl._DUP_BACKOFF[0] < zl._DUP_BACKOFF[-1])
+check("khởi động lại: lời báo nói rõ đây là chuyện thường sau khi cập nhật",
+      "ngay sau khi cập" in src5 and "lần {dup_tries}/" in src5)
+check("khởi động lại: hết kiên nhẫn mới báo trùng phiên, kèm số lần đã thử",
+      'đã thử "\n                                  f"lại {dup_tries} lần' in src5
+      or "lại {dup_tries} lần không được" in src5)
+
+check("tắt app: có hàm đóng listener tử tế", hasattr(feat, "shutdown"))
+# Soi ĐÚNG trong _kill_tree, không soi cả file: hàm dọn tiến trình lạc cũng có SIGKILL
+# nên so vị trí toàn cục là kết luận sai.
+_kt = src5[src5.index("def _kill_tree"):src5.index("# ---- API ----")]
+check("tắt app: _kill_tree gửi SIGTERM trước rồi mới SIGKILL (cho zca-js kịp đóng socket)",
+      "SIGTERM" in _kt and "SIGKILL" in _kt and _kt.index("SIGTERM") < _kt.index("SIGKILL"))
+_sw = src5[src5.index("def _sweep_strays"):src5.index("def _spawn")]
+check("dọn tiến trình lạc: cũng SIGTERM trước, vì chính chúng đang giữ phiên Zalo",
+      "SIGTERM" in _sw and _sw.index("SIGTERM") < _sw.index("SIGKILL"))
+check("tắt app: KHÔNG tự tắt cờ bật, để lần sau còn tự bật lại",
+      "KHÔNG ghi enabled=False" in src5)
+main_src = open("main.py", encoding="utf-8").read()
+check("tắt app: được gọi trong hook shutdown của server, TRƯỚC khi đóng pool MCP",
+      "zalo_listener_feature.shutdown()" in main_src
+      and main_src.index("zalo_listener_feature.shutdown()")
+          < main_src.index("await mcp_client.pool.close_all()"))
+feat.shutdown()   # gọi thật, không được ném lỗi
+check("tắt app: gọi được mà không nổ", True)
+
+
 print("\n" + ("TAT CA OK" if not _fails else f"{len(_fails)} FAIL: {_fails}"))
 sys.exit(1 if _fails else 0)
