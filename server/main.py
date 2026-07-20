@@ -3255,6 +3255,9 @@ zalo_listener_feature = zalo_listener_mod.register(app, zalo_listener_mod.ZaloLi
     # Luật từng cuộc chat nằm ở <brain>/Javis/zalo/*.md. Listener là dịch vụ NỀN, không có
     # khái niệm "brain đang mở", nên luôn đọc brain mặc định.
     brain_root=lambda: _brain_root(None),
+    # Mọi brain: luật đặt bằng lời qua chat nằm ở brain ĐANG MỞ, không phải brain mặc định.
+    brain_roots=lambda: [str(p) for p in Path(BRAINS_DIR).iterdir()
+                         if p.is_dir() and not p.name.startswith(".")],
     aux_model=_aux_model,                 # model rẻ cho bot trả lời khách
     # enabled_only=False: chủ TẮT được connector Zalo trong kho (tránh va chạm một-socket-mỗi-
     # tài-khoản) mà listener vẫn chạy được, vì sidecar không đi qua tầng MCP.

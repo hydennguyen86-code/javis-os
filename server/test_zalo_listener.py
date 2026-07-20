@@ -98,7 +98,7 @@ async def _fake_notify(owner, text):
 
 def mkdeps(**over):
     d = dict(read_settings=lambda: _settings, write_settings=lambda s: _settings.update(s),
-             brain_root=lambda: BRAIN, aux_model=lambda: None,
+             brain_root=lambda: BRAIN, brain_roots=lambda: [BRAIN], aux_model=lambda: None,
              resolved_conns=lambda: [{"id": "c1", "env": {"HOME": "/khong-ton-tai"}}],
              set_conn_enabled=lambda cid, en: _conn_toggles.append((cid, en)),
              notify=_fake_notify, port=lambda: 7777)
@@ -659,6 +659,39 @@ gC = zr.rule_for(zr.list_rules(B3), "gC")
 check("lưu: tick vào luật chatbot thì chỉ BẬT, không ghi đè chế độ", gC["mode"] == "chatbot")
 check("lưu: kịch bản chủ viết qua chat không bị một cái tick xoá mất",
       "quý giá" in gC["script"] and gC["enabled"] is True)
+
+
+# ---- 19. Luật đặt bằng LỜI phải ăn, dù nằm ở brain nào ----
+# Lỗi thật chủ báo: "đặt luật là không báo nữa mà nó vẫn báo". Vì plugin ghi luật vào
+# brain ĐANG MỞ (ctx.vault_root, vd "My Bullet Journal"), còn listener là dịch vụ nền nên
+# chỉ đọc brain MẶC ĐỊNH ("Brain Default"). Ghi một nơi, đọc một nẻo.
+BR_MAC_DINH = _tf.mkdtemp(prefix="javis-brain-macdinh-")
+BR_DANG_MO = _tf.mkdtemp(prefix="javis-brain-dangmo-")
+app4 = FastAPI()
+feat4 = zl.register(app4, mkdeps(brain_root=lambda: BR_MAC_DINH,
+                                 brain_roots=lambda: [BR_MAC_DINH, BR_DANG_MO]))
+cl4 = TestClient(app4)
+
+# Chủ dặn qua chat: nhóm gZ im lặng. Plugin ghi vào brain ĐANG MỞ.
+zr.save_rule(BR_DANG_MO, {"thread_id": "gZ", "thread_name": "Nhóm Z", "mode": "im-lang",
+                          "enabled": True, "updated": "2026-07-20", "script": ""})
+st4 = cl4.get("/zalo-listener/status").json()
+check("brain: luật đặt ở brain đang mở VẪN được listener nhìn thấy",
+      any(x["thread_id"] == "gZ" for x in st4.get("rules", [])))
+
+cfg4 = {**zl.DEFAULT_CFG, "enabled": True}
+async def _r4():
+    _sent.clear()
+    await feat4.handle_event(zl.normalize_event({"event": "message", "data": {
+        "msgId": "z1", "threadId": "gZ", "content": "giá bao nhiêu"}}), cfg4)
+asyncio.run(_r4())
+check("brain: dặn im lặng ở brain đang mở thì THẬT SỰ không báo nữa", len(_sent) == 0)
+
+# Cùng một cuộc chat có luật ở hai brain: lấy bản sửa gần nhất, không chọn bừa.
+zr.save_rule(BR_MAC_DINH, {"thread_id": "gZ", "thread_name": "Nhóm Z", "mode": "bao-het",
+                           "enabled": True, "updated": "2026-07-01", "script": ""})
+got4 = {x["thread_id"]: x["mode"] for x in cl4.get("/zalo-listener/status").json()["rules"]}
+check("brain: trùng luật ở hai brain thì lấy bản SỬA GẦN NHẤT", got4.get("gZ") == "im-lang")
 
 
 print("\n" + ("TAT CA OK" if not _fails else f"{len(_fails)} FAIL: {_fails}"))

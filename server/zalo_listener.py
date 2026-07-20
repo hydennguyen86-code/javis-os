@@ -524,7 +524,11 @@ def format_message(ev: dict, thread_name=None) -> str:
 class ZaloListenerDeps:
     read_settings: Callable[[], dict]
     write_settings: Callable[[dict], Any]
-    brain_root: Callable[[], str]             # brain mặc định - nơi chứa Javis/zalo/*.md
+    brain_root: Callable[[], str]             # brain MẶC ĐỊNH - nơi giao diện ghi luật
+    # MỌI brain. Luật đặt bằng lời qua chat được ghi vào brain ĐANG MỞ, còn listener là
+    # dịch vụ nền nên trước đây chỉ đọc brain mặc định → luật chủ đặt trong brain khác
+    # rơi vào chỗ không ai đọc, và chủ thấy "dặn rồi mà không ăn". Đọc hết là hết lớp lỗi đó.
+    brain_roots: Callable[[], list]
     aux_model: Callable[[], Any]              # model rẻ cho bot trả lời
     # mcp_store.resolved - KHÔNG dùng get_connection: hàm đó trả bản _public() đã lược mất
     # "config", nên đọc home_dir luôn ra rỗng và listener không bao giờ khởi động nổi.
@@ -944,11 +948,31 @@ def register(app, deps: ZaloListenerDeps):
     bot_rate: dict = {}       # thread_id -> RateLimiter riêng, trần tin bot tự gửi mỗi giờ
 
     def _rules():
+        """Gom luật từ MỌI brain. Cùng một cuộc chat mà có luật ở hai brain thì lấy bản
+        sửa gần nhất - hiếm, nhưng im lặng chọn bừa thì chủ không hiểu vì sao."""
+        seen_r = {}
         try:
-            return zalo_rules.list_rules(deps.brain_root())
-        except Exception as e:
-            print(f"[zalo listener] đọc luật lỗi: {e}", file=sys.stderr)
-            return []
+            roots = list(deps.brain_roots() or [])
+        except Exception:
+            roots = []
+        try:
+            d = deps.brain_root()
+            if d and d not in roots:
+                roots.insert(0, d)
+        except Exception:
+            pass
+        for root in roots:
+            try:
+                for r in zalo_rules.list_rules(root):
+                    tid = r.get("thread_id")
+                    if not tid:
+                        continue
+                    old = seen_r.get(tid)
+                    if not old or str(r.get("updated") or "") >= str(old.get("updated") or ""):
+                        seen_r[tid] = r
+            except Exception as e:
+                print(f"[zalo listener] đọc luật ở {root} lỗi: {e}", file=sys.stderr)
+        return list(seen_r.values())
 
     async def _notify(cfg, text):
         try:

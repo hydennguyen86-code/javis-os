@@ -4,6 +4,14 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.132] - 2026-07-20
+Sửa lỗi đặt luật Zalo bằng lời trong chat nhưng listener không hề áp dụng.
+### Sửa lỗi
+- **Ghi một nơi, đọc một nẻo**: khi chủ dặn bằng lời, công cụ ghi file luật vào brain đang mở, ví dụ My Bullet Journal. Nhưng listener là dịch vụ chạy nền nên chỉ đọc brain mặc định là Brain Default. Luật đặt bằng lời rơi vào chỗ không ai đọc, nên dặn đừng báo nữa mà vẫn báo. Nay listener gom luật từ mọi brain, hết luôn lớp lỗi này.
+- Cùng một cuộc chat mà có luật ở hai brain khác nhau thì lấy bản sửa gần nhất, thay vì chọn bừa một cái.
+### Ghi chú
+- Luật cũ tạo ở bản 0.9.130 vẫn là báo mọi tin, vì đổi mặc định ở bản 0.9.131 chỉ áp cho luật tạo mới. Muốn im lặng thì bấm Lưu theo dõi lại một lần với ô từ khoá để trống, hoặc dặn Javis trong chat.
+
 ## [0.9.131] - 2026-07-20
 Mặc định Javis im lặng khi theo dõi cuộc chat Zalo, không còn dội mọi tin về Telegram.
 ### Thay đổi
