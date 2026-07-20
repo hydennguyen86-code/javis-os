@@ -158,9 +158,15 @@ def register(ctx):
     ctx.register_tool(
         name="javis_zalo_rule",
         description=(
-            "Đặt luật cho MỘT cuộc chat Zalo (nhóm hoặc khách). Gọi khi chủ nói kiểu "
-            "'nhóm X báo hết tin cho anh', 'nhóm Y nếu 30 phút chưa ai trả lời thì nhắc', "
-            "'nhóm Z để Javis tự trả lời khách'. "
+            "Đặt luật cho MỘT cuộc chat Zalo (nhóm hoặc khách). GỌI TOOL NÀY, đừng chỉ ghi "
+            "vào Memory: ghi nhớ KHÔNG đổi hành vi của listener, phải có file luật thì Javis "
+            "mới thật sự im lặng / báo / tự trả lời. "
+            "Gọi khi chủ nói kiểu: 'nhóm X đừng báo telegram nữa' (mode=im-lang), "
+            "'im lặng thôi' (im-lang), 'nhóm X báo hết tin cho anh' (bao-het), "
+            "'có tin gì về giá thì báo' (tu-khoa + keywords), "
+            "'30 phút chưa ai trả lời thì nhắc anh' (nhac-quen), "
+            "'với nick Z cứ trả lời thoải mái' hoặc 'để em tự trả lời khách nhóm này' "
+            "(chatbot + script). "
             "op=list xem tất cả | op=show xem một | op=set đặt hoặc sửa | op=off tắt. "
             "thread nhận TÊN nhóm hoặc thread_id; khớp nhiều hơn một thì tool báo lỗi kèm "
             "danh sách, phải hỏi lại chủ chứ đừng đoán. "

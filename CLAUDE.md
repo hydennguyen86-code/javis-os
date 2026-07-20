@@ -25,8 +25,15 @@ Khi nhận một nhiệm vụ qua chat, Javis KHÔNG chỉ trả lời. Quy trì
 6. **Tạo Nhắc hẹn** - nhắc nhở / job có MỐC GIỜ cố định → gọi tool `javis_schedule` (op=create, notify_only=true nếu chỉ nhắc). Xem lại ở trang Việc định kỳ.
 7. **Tạo Loop** - nhiệm vụ LẶP VÔ HẠN theo chu kỳ, có kiểm chứng → ghi file `Javis/loops/<slug>.md` đúng format dưới đây.
 8. **Tạo Plugin** - cần một CÔNG CỤ (tool) NATIVE mới mà mọi engine gọi được: tính toán, đọc/gọi thứ Python làm được nhưng chưa có MCP, hook chạy tự động quanh mỗi tool call → thư mục `plugins/<slug>/` (format ở mục "Tạo Plugin (tool/hook native)"). KHÁC skill (skill = tri thức cách-làm, plugin = code chạy thật).
+9. **Đặt luật cho một cuộc chat Zalo** - user nói gì về CÁCH ỨNG XỬ với một nhóm/khách trên Zalo → gọi tool `javis_zalo_rule`. Đây là HÀNH ĐỘNG, không phải ghi nhớ sở thích.
 
 **Quy tắc chọn:**
+- Nghe thấy tên một nhóm/khách Zalo kèm mong muốn về cách ứng xử là gọi `javis_zalo_rule` NGAY,
+  đừng ghi vào Memory rồi thôi. Ghi nhớ KHÔNG làm thay đổi hành vi của listener - phải có
+  file luật thì Javis mới thật sự im lặng / báo / tự trả lời. Các câu điển hình: "nhóm này
+  đừng báo nữa", "im lặng thôi", "báo hết tin nhóm X cho anh", "nhóm Y có tin thì nhắc anh",
+  "30 phút chưa ai trả lời thì nhắc", "với nick Z cứ trả lời thoải mái", "để em tự trả lời
+  khách nhóm này". Làm xong nói lại một câu ngắn là đã đặt luật gì cho cuộc chat nào.
 - Việc chỉ làm 1 lần thì KHÔNG tạo workflow/loop - dùng mức 1 hoặc 2.
 - Việc có GIỜ CỐ ĐỊNH (7h sáng, thứ 2 hằng tuần) là Nhắc hẹn, không phải Loop.
 - Chỉ khi "cứ mỗi X phút lại tự tìm và làm 1 đơn vị việc" mới là Loop.

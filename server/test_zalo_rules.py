@@ -175,5 +175,31 @@ check("plugin: không khớp tên thì nói rõ đang thấy những cuộc chat
       out.startswith("ERROR") and "Nhom Kim Khi" in out)
 
 
+# ---- 7. Javis phải BIẾT là có công cụ này ----
+# Lỗi thật: chủ dặn "với nick Minh Quý cứ trả lời thoải mái", Javis đáp "ghi nhớ rồi" và
+# tạo một file preference trong Memory - tức là NGHĨ đây là sở thích chứ không phải hành
+# động. Không luật nào được tạo nên chẳng có gì đổi. Công cụ nạp được nhưng system prompt
+# không hề nhắc tới Zalo, nên Javis không biết mà với tới.
+CLAUDE_MD = (Path(__file__).resolve().parents[1] / "CLAUDE.md").read_text(encoding="utf-8")
+check("prompt: CLAUDE.md có dạy dùng javis_zalo_rule (trước đây không nhắc chữ Zalo nào)",
+      "javis_zalo_rule" in CLAUDE_MD)
+check("prompt: nói rõ đây là HÀNH ĐỘNG, không phải ghi nhớ sở thích",
+      "không phải ghi nhớ" in CLAUDE_MD and "đừng ghi vào Memory" in CLAUDE_MD)
+for cau in ("đừng báo nữa", "trả lời thoải mái", "30 phút chưa ai trả lời"):
+    check(f"prompt: có ví dụ câu thật của chủ - '{cau}'", cau in CLAUDE_MD)
+
+desc = None
+for t in zp.__dict__.get("_LAST_TOOLS", []) or []:
+    pass
+import types as _t2  # noqa: E402
+_captured = {}
+zp.register(_t2.SimpleNamespace(
+    register_tool=lambda **kw: _captured.update(kw), vault_root=B2, data_dir=B2, slug="zalo-rule"))
+desc = _captured.get("description", "")
+check("tool: mô tả dặn thẳng là đừng chỉ ghi Memory", "đừng chỉ ghi" in desc)
+for cau in ("đừng báo telegram nữa", "im lặng thôi", "trả lời thoải mái"):
+    check(f"tool: mô tả có câu kích hoạt thật - '{cau}'", cau in desc)
+
+
 print("\n" + ("TAT CA OK" if not _fails else f"{len(_fails)} FAIL: {_fails}"))
 sys.exit(1 if _fails else 0)

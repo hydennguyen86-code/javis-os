@@ -4,6 +4,13 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.133] - 2026-07-20
+Javis giờ biết đặt luật Zalo khi được dặn bằng lời, thay vì chỉ ghi vào bộ nhớ rồi thôi.
+### Sửa lỗi
+- **Dặn bằng lời chỉ được ghi nhớ chứ không thành hành động**: chủ nói với nick này cứ trả lời thoải mái, Javis đáp đã ghi nhớ và tạo một file sở thích trong bộ nhớ, nhưng không hề tạo luật nào nên hành vi không đổi. Nguyên nhân là hướng dẫn hệ thống không hề nhắc tới Zalo, nên Javis không biết có công cụ đặt luật mà dùng, và rơi về thói quen mặc định là ghi nhớ sở thích.
+- Bổ sung việc đặt luật Zalo vào danh sách các cách xử lý khi nhận yêu cầu qua chat, kèm luật chọn nói thẳng rằng ghi nhớ không làm đổi hành vi, phải có file luật thì listener mới thật sự im lặng, báo, hay tự trả lời.
+- Mô tả công cụ được viết lại bằng đúng những câu người dùng hay nói, ví dụ đừng báo nữa, im lặng thôi, báo hết tin nhóm này, ba mươi phút chưa ai trả lời thì nhắc, với nick này cứ trả lời thoải mái.
+
 ## [0.9.132] - 2026-07-20
 Sửa lỗi đặt luật Zalo bằng lời trong chat nhưng listener không hề áp dụng.
 ### Sửa lỗi
