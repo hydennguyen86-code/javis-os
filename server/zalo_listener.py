@@ -52,6 +52,7 @@ SECRET_HEADER = "x-javis-zalo-secret"
 
 # Backoff dựng lại khi socket đứt. Trùng phiên / lỗi xác thực thì KHÔNG quay vòng.
 _BACKOFF = (5, 30, 120, 300)
+_FAST_FAIL_S = 15          # bật lên mà tắt trong ngần này giây = hỏng cứng, không phải rớt mạng
 _TEXT_CAP = 400            # trần ký tự nội dung tin đẩy vào Telegram
 _SEEN_CAP = 2000
 _RATE_LIMIT = 20           # trần số thông báo ...
@@ -301,7 +302,11 @@ def format_message(ev: dict) -> str:
 class ZaloListenerDeps:
     read_settings: Callable[[], dict]
     write_settings: Callable[[dict], Any]
-    get_connection: Callable[[str], Any]     # mcp_store.get_connection
+    # mcp_store.resolved - KHÔNG dùng get_connection: hàm đó trả bản _public() đã lược mất
+    # "config", nên đọc home_dir luôn ra rỗng và listener không bao giờ khởi động nổi.
+    # resolved() còn là nơi tính HOME thật (kể cả đường mặc định khi config trống), dùng
+    # chung với lúc chạy MCP nên hai bên không lệch nhau.
+    resolved_conns: Callable[[], list]
     notify: Callable                          # async (owner_chat, text) -> (ok, err)
     port: Callable[[], int]                   # cổng Javis đang nghe
 
@@ -376,14 +381,28 @@ class _Runner:
         return None
 
     def _loop(self, home: str):
+        """Bọc ngoài vòng chạy nền. Luồng nền mà chết vì lỗi bất ngờ thì trạng thái sẽ ĐỨNG
+        NGUYÊN ở giá trị cũ và giao diện báo sai (vd vẫn 'Đang tắt' dù chủ đã bật) - phải
+        biến mọi lỗi thành trạng thái đọc được, đừng để chết câm."""
+        try:
+            self._run(home)
+        except BaseException as e:
+            self.state = "error"
+            self.error = f"Luồng nền dừng bất thường: {type(e).__name__}: {e}"
+            print(f"[zalo listener] luồng nền chết: {type(e).__name__}: {e}", file=sys.stderr)
+
+    def _run(self, home: str):
         """Vòng chạy nền: spawn → đọc log → đứt thì backoff dựng lại."""
         attempt = 0
+        fast_fails = 0          # số lần chết NGAY khi vừa bật (chưa kịp nghe được gì)
         while not self._stop.is_set():
             cfg = read_cfg(self.deps)
             self.state = "starting"
             if not self._spawn(home, cfg):
                 return                       # lỗi cứng (thiếu npx) - state đã đặt trong _spawn
             fatal = False
+            saw_listening = False
+            t0 = time.time()
             try:
                 for raw in iter(self.proc.stdout.readline, ""):
                     if self._stop.is_set():
@@ -399,11 +418,14 @@ class _Runner:
                     if st:
                         self.state = st
                         if st == "listening":
+                            saw_listening = True
                             attempt = 0      # nối lại được thì reset backoff
             except Exception as e:
                 self.error = f"{type(e).__name__}: {e}"
+            rc = None
             try:
-                if self.proc and self.proc.poll() is None:
+                rc = self.proc.poll()
+                if rc is None:
                     self.proc.kill()
             except Exception:
                 pass
@@ -414,6 +436,21 @@ class _Runner:
                 # của CÙNG tài khoản. Dừng hẳn + báo rõ để chủ thấy va chạm, đừng quay vòng.
                 self.state = "duplicate" if "duplicate" in self.error.lower() else "error"
                 return
+            # Chết NGAY mà chưa kịp nghe được gì = lệnh sai / CLI không chạy được, KHÁC hẳn
+            # với "đang nghe rồi mới rớt mạng". Thử lại mãi chỉ làm giao diện báo 'đang thử
+            # lại' trong khi thật ra hỏng cứng, nên sau 3 lần thì dừng và phơi log CLI ra.
+            if not saw_listening and (time.time() - t0) < _FAST_FAIL_S:
+                fast_fails += 1
+                if fast_fails >= 3:
+                    tail = " | ".join(list(self._tail)[-3:])[:300]
+                    self.state = "error"
+                    self.error = (f"Sidecar bật lên là tắt ngay {fast_fails} lần"
+                                  + (f" (mã thoát {rc})" if rc is not None else "")
+                                  + (f". CLI nói: {tail}" if tail else
+                                     ". CLI không in ra gì - nhiều khả năng sai tên lệnh hoặc chưa đăng nhập."))
+                    return
+            else:
+                fast_fails = 0
             delay = _BACKOFF[min(attempt, len(_BACKOFF) - 1)]
             attempt += 1
             self.state = "reconnecting"
@@ -475,16 +512,26 @@ def write_cfg(deps: ZaloListenerDeps, patch: dict) -> dict:
 
 
 def _home_of(deps: ZaloListenerDeps, conn_id: str) -> tuple:
-    """Lấy home cô lập của connection Zalo (do zalo_login tạo lúc quét QR)."""
+    """Lấy home cô lập của connection Zalo (do zalo_login tạo lúc quét QR). Trả (home, lỗi).
+
+    Đọc từ mcp_store.resolved() vì đó là nơi tính HOME thật cho connector isolate_home.
+    Lỗi phải kèm ĐƯỜNG DẪN cụ thể - "chưa đăng nhập" chung chung thì không lần ra được.
+    """
+    conn_id = str(conn_id or "").strip()
+    if not conn_id:
+        return "", "Chưa chọn tài khoản Zalo trong ô phía trên"
     try:
-        c = deps.get_connection(conn_id) or {}
-    except Exception:
-        c = {}
-    if not c:
-        return "", "Chưa chọn tài khoản Zalo (hoặc kết nối đã bị xoá)"
-    home = ((c.get("config") or {}).get("home_dir") or "").strip()
-    if not home or not os.path.isdir(home):
-        return "", "Kết nối Zalo này chưa có phiên đăng nhập, quét QR lại giúp em"
+        rows = deps.resolved_conns() or []
+    except Exception as e:
+        return "", f"Không đọc được danh sách kết nối: {type(e).__name__}: {e}"
+    row = next((r for r in rows if r.get("id") == conn_id), None)
+    if not row:
+        return "", "Không tìm thấy kết nối Zalo này (đã bị xoá?). Chọn lại tài khoản giúp em."
+    home = ((row.get("env") or {}).get("HOME") or "").strip()
+    if not home:
+        return "", "Kết nối Zalo này không có thư mục phiên riêng - thử xoá rồi quét QR lại."
+    if not os.path.isdir(home):
+        return "", f"Chưa thấy phiên đăng nhập Zalo ở {home} - quét QR lại giúp em."
     return home, ""
 
 
@@ -561,10 +608,18 @@ def register(app, deps: ZaloListenerDeps):
 
     @router.post("/zalo-listener/start")
     async def start(payload: dict = Body(default={})):
-        cfg = write_cfg(deps, {**(payload or {}), "enabled": True})
+        # Lưu cấu hình nhưng CHƯA bật. Bật trước rồi mới kiểm là để lại trạng thái mâu thuẫn:
+        # settings nói đang bật, tiến trình thì không chạy, giao diện hiện "Đang tắt" ngay
+        # cạnh nút "Tắt". Đúng lỗi đã gặp trên VPS.
+        cfg = write_cfg(deps, {**(payload or {}), "enabled": False})
         home, err = _home_of(deps, cfg.get("conn_id", ""))
         if err:
+            # Ghi vào runner để /status còn phản ánh: nếu không, nhịp hỏi lại 5s sẽ xoá mất
+            # dòng lỗi vừa hiện và chủ không kịp đọc.
+            runner.state, runner.error = "error", err
             return {"ok": False, "error": err}
+        write_cfg(deps, {"enabled": True})
+        runner.error = ""
         return {**runner.start(home), "state": runner.state}
 
     @router.post("/zalo-listener/stop")

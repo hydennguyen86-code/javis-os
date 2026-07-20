@@ -2231,7 +2231,9 @@
       + '<label class="mcp-lb">Chỉ báo khi tin có chứa <span style="opacity:.6">(tuỳ chọn, cách nhau bằng dấu phẩy)</span>'
       + '<input class="js-input" id="zlKw" placeholder="giá, còn hàng, đặt, ship"></label>'
       + '<label class="mcp-lb">Giờ im lặng (tuỳ chọn, vd 23-07)<input class="js-input" id="zlQuiet" placeholder="23-07" style="max-width:140px"></label>'
-      + '<div class="mp-note" id="zlErr" style="color:#c0392b"></div></div></div>';
+      + '<div class="mp-note" id="zlErr" style="color:#c0392b"></div>'
+      + '<pre id="zlLog" style="display:none;white-space:pre-wrap;word-break:break-all;font-size:11px;opacity:.65;margin:0;max-height:110px;overflow:auto"></pre>'
+      + '</div></div>';
   }
   function zlAgo(ts) {
     if (!ts) return "";
@@ -2289,11 +2291,23 @@
     const paint = (st) => {
       const [txt, color] = ZL_STATE[st.state] || ZL_STATE.off;
       on = !!st.enabled;
-      $("zlState").textContent = st.enabled ? txt : "Đang tắt";
-      $("zlState").style.color = st.enabled ? color : "";
+      // Đã bật mà tiến trình nền báo "off" là MÂU THUẪN (luồng chết hoặc chưa kịp chạy).
+      // Hiện "Đang tắt" lúc này là nói dối người dùng - phải gọi đúng tên vấn đề.
+      const stuck = st.enabled && st.state === "off";
+      $("zlState").textContent = !st.enabled ? "Đang tắt"
+        : (stuck ? "Đã bật nhưng tiến trình chưa chạy" : txt);
+      $("zlState").style.color = !st.enabled ? "" : (stuck ? "#c0392b" : color);
       $("zlToggle").textContent = on ? "Tắt" : "Bật nghe";
       $("zlToggle").classList.toggle("primary", !on);
-      $("zlErr").textContent = (st.enabled && st.error) ? st.error : "";
+      // Hiện lỗi KỂ CẢ khi đang tắt: bật thất bại thì cờ enabled không được đặt, mà lý do
+      // thất bại lại chính là thứ cần đọc. Lọc theo enabled là tự xoá mất lời giải thích.
+      $("zlErr").textContent = st.error || "";
+      // Log thô của sidecar: chỉ hiện khi đang trục trặc. Không có nó thì lúc hỏng chỉ
+      // nhìn được mỗi nhãn trạng thái, không đủ để biết vì sao.
+      const bad = st.enabled && (st.error || ["error", "duplicate", "reconnecting"].includes(st.state));
+      const log = (st.log || []).join("\n");
+      $("zlLog").style.display = (bad && log) ? "" : "none";
+      $("zlLog").textContent = log;
       $("zlSignal").textContent = signal(st);
       paintRoster(st);
     };

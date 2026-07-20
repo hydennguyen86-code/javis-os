@@ -4,6 +4,23 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.121] - 2026-07-20
+Sửa lỗi listener Zalo bấm Bật rồi mà vẫn hiện "Đang tắt" và không nhận được tin nào. Đây là lỗi chặn hoàn toàn: ở các bản trước listener CHƯA BAO GIỜ khởi động nổi, không phải chạy rồi hỏng.
+### Sửa lỗi
+- **Lấy sai nguồn thư mục phiên đăng nhập**: chỗ tìm thư mục phiên đọc qua mcp_store.get_connection, mà hàm đó trả bản đã che secret và lược mất trường config, nên đường dẫn luôn rỗng và mọi lần bật đều thất bại ngay từ bước kiểm tra. Chuyển sang đọc từ mcp_store.resolved, cũng chính là nơi tính thư mục home cho connector chạy cô lập, nên listener và connector không còn lệch nhau.
+- **Bật hụt vẫn ghi là đã bật**: endpoint bật ghi cờ enabled trước rồi mới kiểm tra, kiểm tra hỏng thì không hoàn tác, để lại đúng cảnh nhãn "Đang tắt" nằm cạnh nút "Tắt" còn danh sách thì bảo đang nghe. Nay kiểm tra xong mới bật.
+- **Lý do lỗi bị xoá mất sau 5 giây**: nhịp hỏi lại trạng thái ghi đè dòng lỗi vừa hiện, chủ không kịp đọc. Nay lý do được giữ ở tiến trình nền và hiện cả khi đang tắt.
+- **Thông báo lỗi giờ kèm đường dẫn cụ thể** thay vì chỉ nói chung chung là chưa đăng nhập.
+### Cải thiện
+- **Luồng nền không còn chết câm**: mọi lỗi bất ngờ được biến thành trạng thái đọc được thay vì để trạng thái đứng nguyên giá trị cũ và giao diện báo sai.
+- **Phân biệt hỏng cứng với rớt mạng**: sidecar bật lên là tắt ngay 3 lần thì dừng hẳn và phơi log của công cụ ra, thay vì lặp vô tận trong khi vẫn hiện "đang thử lại".
+- **Hiện log thô của sidecar trên giao diện** khi đang trục trặc, để không phải đoán mò nữa.
+- **Nhãn trạng thái nói đúng tên vấn đề**: đã bật mà tiến trình chưa chạy thì nói đúng như vậy, không hiện "Đang tắt".
+### Đã kiểm chứng
+- Chạy thật `zalo-agent-cli --help` và `listen --help`: lệnh listen có thật, các cờ webhook, filter, no-self đều đúng. Ghi nhận thêm là filter chỉ nhận user, group hoặc all; giá trị "dm" dùng ở 0.9.118 là sai, đã thay bằng "all" từ 0.9.119.
+- Chạy listen với thư mục trống: công cụ in "Not logged in" rồi thoát mã 1, khớp với bộ nhận diện lỗi sẵn có.
+- Kiểm trên dữ liệu thật: kết nối Zalo trả về đường dẫn home tồn tại.
+
 ## [0.9.120] - 2026-07-20
 Sửa lỗi ô "Cuộc chat theo dõi" trống trơn không có một chữ hướng dẫn nào, khiến người dùng mở panel ra không biết phải làm gì để có nhóm mà chọn.
 ### Sửa lỗi

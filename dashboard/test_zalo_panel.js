@@ -62,6 +62,17 @@ check("o rong: co chi dan cho truong hop DANG TAT (bao bam Bat nghe)",
 check("o rong: co chi dan cho truong hop DANG NGHE (bao nho ai do nhan thu)",
   src.indexOf("Đang nghe nhưng chưa ai nhắn") !== -1);
 
+// ---- 2c. Bat roi ma tien trinh khong chay: phai noi dung ten van de ----
+// Trieu chung that tren VPS: nut hien "Tat" va o danh sach noi "Dang nghe" (enabled=true)
+// nhung nhan trang thai lai la "Dang tat" (state=off). Hien "Dang tat" luc do la noi doi.
+check("mau thuan: co nhan rieng cho truong hop da bat ma tien trinh chua chay",
+  src.indexOf("Đã bật nhưng tiến trình chưa chạy") !== -1);
+check("mau thuan: co bien stuck phat hien enabled=true nhung state=off",
+  /const stuck = st\.enabled && st\.state === "off"/.test(src));
+check("chan doan: co vung hien log tho cua sidecar", src.indexOf('id="zlLog"') !== -1);
+check("chan doan: log chi hien khi dang truc trac, khong lam roi luc chay ngon",
+  /const bad = st\.enabled && \(st\.error \|\|/.test(src));
+
 // ---- 3. Dong dau hieu: phai phan biet duoc "chua ai nhan" voi "dang hong" ----
 check("dau hieu: co nhanh da noi nhung chua nhan tin nao",
   src.indexOf("Da noi, chua nhan tin nao") !== -1 || src.indexOf("chưa nhận tin nào") !== -1);
