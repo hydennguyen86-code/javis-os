@@ -437,5 +437,28 @@ check("sổ: nhóm hiện TÊN NHÓM chứ không phải tên người gửi", g
 check("sổ: người nhắn sau KHÔNG ghi đè mất tên nhóm", got.get("g9") != "Người khác")
 
 
+# ---- 13. Dọn tiến trình nghe cũ: phải ĐÚNG mục tiêu, tuyệt đối không giết bừa ----
+# Suýt ship một lỗi phá hoại: bản đầu lọc tiến trình chỉ theo dòng lệnh, mà chính câu
+# truy vấn PowerShell lại chứa chữ "zalo-agent" và "listen", nên nó TỰ BẮT CHÍNH MÌNH -
+# rồi taskkill /T giết luôn cả cây tiến trình đang chạy câu đó.
+rn5 = zl._Runner(mkdeps())
+found = rn5._strays()
+check("dọn: máy không chạy listener thật thì KHÔNG tìm ra gì (hết dương tính giả)",
+      isinstance(found, list) and len(found) == 0)
+check("dọn: loại chính câu dò ra khỏi kết quả",
+      all(m in src2b for m in ("Get-CimInstance", "pgrep", "Where-Object"))
+      if (src2b := open("zalo_listener.py", encoding="utf-8").read()) else False)
+check("dọn: trên Windows chỉ soi tiến trình node.exe, không quét mọi tiến trình",
+      "Name='node.exe'" in src2b)
+check("dọn: chạy TRƯỚC khi spawn (tiến trình mồ côi giữ socket sẽ đá cái mới ra ngay)",
+      src2b.index("self._sweep_strays()") < src2b.index("self.proc = subprocess.Popen("))
+
+# Xoá phiên: `zalo-agent logout` CỐ Ý giữ lại thông tin đăng nhập nên không gỡ được
+# phiên đang kẹt. Phải xoá thẳng file, và chỉ được xoá trong thư mục phiên của connector.
+check("xoá phiên: có endpoint xoá hẳn phiên đăng nhập", "/zalo-listener/clear-session" in src2b)
+check("xoá phiên: CHẶN xoá ra ngoài thư mục connector-home (conn_id bậy không xoá bừa được)",
+      'Từ chối xoá' in src2b and "connector-home" in src2b)
+
+
 print("\n" + ("TAT CA OK" if not _fails else f"{len(_fails)} FAIL: {_fails}"))
 sys.exit(1 if _fails else 0)

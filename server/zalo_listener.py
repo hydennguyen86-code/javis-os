@@ -43,6 +43,7 @@ import time
 import unicodedata
 
 import zalo_rules
+from config import STATE_DIR
 from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -467,11 +468,76 @@ class _Runner:
             argv = ["cmd.exe", "/c"] + argv
         return argv
 
+    def _strays(self) -> list:
+        """Tìm tiến trình `zalo-agent-cli listen` CŨ còn sót. Trả [(pid, dòng lệnh)].
+
+        Vì sao cần: một node mồ côi (vd còn sót từ trước bản 0.9.122, khi chưa dọn cả cây
+        tiến trình) vẫn giữ websocket sống và chiếm chỗ của tài khoản. Đăng xuất ở nơi khác
+        KHÔNG giết được nó - websocket đã mở thì cứ sống. Chủ không thể tự đi tìm tiến
+        trình trên VPS, nên Javis phải tự dọn.
+        """
+        out = []
+        try:
+            if os.name == "nt":
+                # CHỈ tiến trình node.exe. Lọc theo dòng lệnh không thôi là TỰ BẮT CHÍNH
+                # MÌNH: câu truy vấn này chứa chữ "zalo-agent" và "listen" nên tiến trình
+                # PowerShell đang chạy nó cũng khớp, và taskkill /T sẽ giết luôn cả cây.
+                ps = ("Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | "
+                      "Where-Object { $_.CommandLine -like '*zalo-agent*' } | "
+                      "ForEach-Object { \"$($_.ProcessId)`t$($_.CommandLine)\" }")
+                r = subprocess.run(["powershell", "-NoProfile", "-Command", ps],
+                                   capture_output=True, text=True, timeout=20)
+            else:
+                r = subprocess.run(["pgrep", "-af", "zalo-agent"],
+                                   capture_output=True, text=True, timeout=20)
+        except Exception:
+            return out
+        me = os.getpid()
+        for line in (r.stdout or "").splitlines():
+            line = line.strip()
+            if not line or "zalo-agent" not in line or "listen" not in line:
+                continue
+            # Loại chính câu dò và mọi thứ chỉ NHẮC TỚI chuỗi này (shell, grep, editor).
+            if any(m in line for m in ("Get-CimInstance", "pgrep", "Where-Object")):
+                continue
+            if os.name != "nt" and "node" not in line:
+                continue
+            head = line.split("\t")[0] if os.name == "nt" else line.split(" ", 1)[0]
+            try:
+                pid = int(head)
+            except ValueError:
+                continue
+            if pid in (me, getattr(self.proc, "pid", None)):
+                continue
+            out.append((pid, line[:160]))
+        return out
+
+    def _sweep_strays(self) -> int:
+        """Dọn tiến trình listen cũ TRƯỚC khi bật cái mới. Trả số tiến trình đã dọn."""
+        found = self._strays()
+        for pid, _cmd in found:
+            try:
+                if os.name == "nt":
+                    subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)],
+                                   capture_output=True, timeout=15)
+                else:
+                    os.kill(pid, signal.SIGKILL)
+            except Exception:
+                pass
+        if found:
+            self._tail.append(f"Đã dọn {len(found)} tiến trình nghe cũ còn sót "
+                              f"(pid {', '.join(str(p) for p, _ in found)})")
+        return len(found)
+
     def _spawn(self, home: str, cfg: dict) -> bool:
         argv = self._argv(cfg)
         if not argv:
             self.state, self.error = "error", "Cần Node.js 20+ (lệnh npx) trên máy chạy Javis"
             return False
+        # Dọn tiến trình nghe cũ TRƯỚC khi bật: tiến trình mồ côi vẫn giữ websocket và sẽ
+        # đá cái mới ra ngay ("Another connection is opened"). Đây là nguyên nhân số một
+        # của trùng phiên, và chủ không tự dọn được trên VPS.
+        self._sweep_strays()
         env = dict(os.environ)
         env["HOME"] = home          # home cô lập = tài khoản Zalo đã quét QR (xem zalo_login.py)
         env["USERPROFILE"] = home
@@ -647,7 +713,10 @@ class _Runner:
     def status(self) -> dict:
         return {"state": self.state, "error": self.error,
                 "last_event": self.last_event_ts, "started": self.started_ts,
-                "log": list(self._tail)[-5:]}
+                # Số tiến trình nghe cũ còn sót - biến "không hiểu sao trùng phiên" thành
+                # một con số nhìn được. Chỉ dò khi ĐANG trùng phiên cho khỏi tốn công.
+                "strays": len(self._strays()) if self.state == "duplicate" else 0,
+                "log": list(self._tail)[-6:]}
 
 
 # ============================================================
@@ -876,6 +945,39 @@ def register(app, deps: ZaloListenerDeps):
     async def stop():
         write_cfg(deps, {"enabled": False})
         return runner.stop()
+
+    @router.post("/zalo-listener/clear-session")
+    async def clear_session():
+        """Dừng nghe, dọn tiến trình cũ, và XOÁ HẲN phiên đăng nhập của tài khoản này.
+
+        Cần vì `zalo-agent logout` CỐ Ý giữ lại thông tin đăng nhập để tự vào lại lần sau -
+        nên "đăng xuất" không hề gỡ được phiên đang bị kẹt. Sau khi xoá phải quét QR lại.
+        """
+        cfg = write_cfg(deps, {"enabled": False})
+        runner.stop()
+        n = runner._sweep_strays()
+        home, err = _home_of(deps, cfg.get("conn_id", ""))
+        if err:
+            return {"ok": False, "error": err}
+        # Rào an toàn: CHỈ được xoá bên trong thư mục home cô lập của connector. Không có
+        # rào này thì một conn_id bị sửa bậy có thể trỏ đi xoá thư mục bất kỳ.
+        base = os.path.realpath(str(STATE_DIR / "connector-home"))
+        real = os.path.realpath(home)
+        if not (real == base or real.startswith(base + os.sep)):
+            return {"ok": False, "error": f"Từ chối xoá: {real} nằm ngoài thư mục phiên của connector."}
+        removed = []
+        for name in os.listdir(real):
+            if "zalo" not in name.lower():
+                continue
+            p = os.path.join(real, name)
+            try:
+                shutil.rmtree(p) if os.path.isdir(p) else os.remove(p)
+                removed.append(name)
+            except OSError:
+                pass
+        return {"ok": True, "swept": n, "removed": removed,
+                "msg": (f"Đã dừng nghe, dọn {n} tiến trình cũ và xoá phiên đăng nhập. "
+                        f"Giờ vào kho Kết nối quét QR lại cho tài khoản này, rồi bật nghe.")}
 
     app.include_router(router)
 

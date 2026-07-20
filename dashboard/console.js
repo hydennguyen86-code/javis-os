@@ -2233,6 +2233,9 @@
       + '<input class="js-input" id="zlKw" placeholder="giá, còn hàng, đặt, ship"></label>'
       + '<label class="mcp-lb">Giờ im lặng (tuỳ chọn, vd 23-07)<input class="js-input" id="zlQuiet" placeholder="23-07" style="max-width:140px"></label>'
       + '<div class="mp-note" id="zlErr" style="color:#c0392b"></div>'
+      // Chỉ hiện khi đang trùng phiên: `zalo-agent logout` cố ý giữ lại thông tin đăng
+      // nhập nên đăng xuất KHÔNG gỡ được phiên đang kẹt, phải xoá thẳng rồi quét QR lại.
+      + '<button class="mp-btn" id="zlClear" style="display:none;font-size:12px">Xoá phiên đăng nhập rồi quét QR lại</button>'
       + '<pre id="zlLog" style="display:none;white-space:pre-wrap;word-break:break-all;font-size:11px;opacity:.65;margin:0;max-height:110px;overflow:auto"></pre>'
       + '</div></div>';
   }
@@ -2328,6 +2331,12 @@
       $("zlLog").style.display = (bad && log) ? "" : "none";
       $("zlLog").textContent = log;
       $("zlSignal").textContent = signal(st);
+      const dup = st.state === "duplicate";
+      $("zlClear").style.display = dup ? "" : "none";
+      if (dup && st.strays) {
+        $("zlErr").textContent = "Tìm thấy " + st.strays + " tiến trình nghe cũ còn sót. "
+          + "Bấm Bật nghe lại là Javis tự dọn trước khi khởi động.";
+      }
       lastSt = st;
       paintRoster(st);
     };
@@ -2346,6 +2355,15 @@
       const r = await postJson(on ? "/zalo-listener/stop" : "/zalo-listener/start", on ? {} : cfgBody());
       $("zlToggle").disabled = false;
       if (r.ok === false) { $("zlErr").textContent = r.error || "Lỗi"; return; }
+      try { paint(await (await fetch("/zalo-listener/status")).json()); } catch (e) {}
+    };
+    $("zlClear").onclick = async () => {
+      if (!confirm("Xoá phiên đăng nhập Zalo của tài khoản này? Sau đó anh phải quét QR lại "
+                   + "trong kho Kết nối. Dùng khi bị trùng phiên mà đăng xuất không ăn thua.")) return;
+      $("zlClear").disabled = true;
+      const r = await postJson("/zalo-listener/clear-session", {});
+      $("zlClear").disabled = false;
+      $("zlErr").textContent = r.ok ? (r.msg || "Đã xoá phiên.") : (r.error || "Lỗi");
       try { paint(await (await fetch("/zalo-listener/status")).json()); } catch (e) {}
     };
     // Trạng thái thật đến từ tiến trình nền (đang nghe / đứt / trùng phiên) nên phải hỏi lại.

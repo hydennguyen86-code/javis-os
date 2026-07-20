@@ -4,6 +4,16 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.125] - 2026-07-20
+Tự dọn tiến trình nghe cũ còn sót, và thêm đường xoá hẳn phiên đăng nhập Zalo khi bị trùng phiên mà đăng xuất không ăn thua.
+### Thêm mới
+- **Bật nghe tự dọn trước khi khởi động**: tiến trình nghe mồ côi từ các bản trước vẫn giữ kết nối sống và đá listener mới ra ngay. Đăng xuất ở nơi khác không giết được nó vì kết nối đã mở thì cứ sống. Nay mỗi lần bật là Javis tự tìm và dọn sạch trước, chủ không phải đi tìm tiến trình trên máy chủ.
+- **Nút xoá phiên đăng nhập**: chỉ hiện khi đang trùng phiên. Cần vì lệnh đăng xuất của công cụ cố ý giữ lại thông tin đăng nhập để tự vào lại lần sau, nên đăng xuất không hề gỡ được phiên đang kẹt. Xoá xong quét QR lại là sạch.
+- **Nói rõ tìm thấy bao nhiêu tiến trình cũ** thay vì để chủ đoán tại sao trùng phiên.
+### Bảo mật
+- **Chặn một lỗi phá hoại trước khi phát hành**: bản đầu của bộ dò tiến trình lọc theo dòng lệnh, mà chính câu truy vấn lại chứa những chữ đang tìm nên nó tự bắt chính mình, và lệnh dọn thì giết cả cây tiến trình. Nay chỉ soi đúng tiến trình node và loại trừ chính câu dò. Có kiểm thử chốt lại.
+- **Xoá phiên bị rào trong đúng thư mục phiên của connector**, nên một mã kết nối bị sửa bậy không thể khiến Javis xoá thư mục khác.
+
 ## [0.9.124] - 2026-07-20
 Xử lý va chạm một kết nối mỗi tài khoản Zalo, thứ đã ghi là chưa kiểm chứng từ bản đầu và nay xảy ra thật trên máy chủ.
 ### Sửa lỗi
