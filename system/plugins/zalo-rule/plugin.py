@@ -7,13 +7,12 @@ THỊ luật, không có form nhập - đúng như chủ yêu cầu.
 Nhất quán với cách loop/agent/skill được tạo: đều là file .md do chat sinh ra, nằm trong
 brain nên có git, sửa tay được.
 
-An toàn: chế độ `chatbot` LUÔN tạo ở trạng thái tắt. Bốn chế độ kia chỉ báo về Telegram
-cho chủ nên sai cũng chỉ phiền chủ; chatbot gửi tin ra ngoài cho khách thật, không rút
-lại được, nên bật phải là một hành động riêng có ý thức.
+An toàn: cả bốn chế độ đều chỉ BÁO về Telegram cho chủ, không tự nhắn cho khách. Javis
+KHÔNG tự trả lời trên Zalo - muốn gửi tin cho khách thì chủ yêu cầu trực tiếp và Javis
+dùng tool javis_zalo_send. Sai luật cũng chỉ phiền chủ chứ không lỡ tay nhắn ra ngoài.
 """
 from __future__ import annotations
 
-import json
 import sys
 import time
 from pathlib import Path
@@ -58,8 +57,6 @@ def _fmt(r):
         bits.append(f"nhắc sau {r['escalate_after_min']} phút")
         if not r["owner_uid"]:
             bits.append("CHƯA khai owner_uid nên sẽ nhắc cả khi chủ đã trả lời")
-    if r["mode"] == "chatbot":
-        bits.append(f"trần {r['max_reply_per_hour']} tin/giờ")
     return " - ".join(bits)
 
 
@@ -88,7 +85,7 @@ def _handler(args, ctx):
                 f"Listener phải đang bật và đã có tin đi qua thì cuộc chat mới hiện ra.")
     if len(hits) > 1:
         ds = "; ".join(f"{h.get('name')} (id {h.get('id')})" for h in hits[:8])
-        # KHÔNG đoán: gắn kịch bản nhầm nhóm là bot đi trả lời khách của nhóm khác.
+        # KHÔNG đoán: gắn luật nhầm nhóm là báo/im nhầm cuộc chat của chủ.
         return (f"ERROR: '{thread}' khớp {len(hits)} cuộc chat: {ds}. "
                 f"Hỏi lại chủ xem là cái nào rồi gọi lại với thread_id chính xác.")
     hit = hits[0]
@@ -98,7 +95,7 @@ def _handler(args, ctx):
     if op == "show":
         if not cur:
             return f"Cuộc chat '{hit.get('name')}' chưa có luật nào."
-        return _fmt(cur) + "\n\nKịch bản:\n" + (cur["script"] or "(chưa có)")
+        return _fmt(cur)
 
     if op == "off":
         if not cur:
@@ -116,37 +113,24 @@ def _handler(args, ctx):
         return f"ERROR: 'mode' phải là một trong: {', '.join(zr.MODES)}."
 
     r = cur or {"thread_id": hit["id"], "thread_name": hit.get("name") or hit["id"],
-                "keywords": [], "escalate_after_min": 30, "owner_uid": "",
-                "max_reply_per_hour": 20, "script": ""}
+                "keywords": [], "escalate_after_min": 30, "owner_uid": "", "script": ""}
     r["mode"] = mode
-    if args.get("script") is not None:
-        r["script"] = str(args["script"])[:zr.MAX_SCRIPT]
     if args.get("keywords") is not None:
         kw = args["keywords"]
         r["keywords"] = [k.strip() for k in (kw.split(",") if isinstance(kw, str) else kw) if str(k).strip()]
-    for k, cast in (("escalate_after_min", int), ("max_reply_per_hour", int)):
-        if args.get(k) is not None:
-            try:
-                r[k] = cast(args[k])
-            except (TypeError, ValueError):
-                return f"ERROR: '{k}' phải là số."
+    if args.get("escalate_after_min") is not None:
+        try:
+            r["escalate_after_min"] = int(args["escalate_after_min"])
+        except (TypeError, ValueError):
+            return "ERROR: 'escalate_after_min' phải là số."
     if args.get("owner_uid") is not None:
         r["owner_uid"] = str(args["owner_uid"]).strip()
 
-    # Chatbot LUÔN tạo ở trạng thái tắt: nó gửi tin cho khách thật, bật phải là hành
-    # động riêng có ý thức của chủ (cùng luật với loop trong CLAUDE.md).
-    if mode == "chatbot" and not (cur and cur.get("mode") == "chatbot" and cur.get("enabled")):
-        r["enabled"] = False
-    else:
-        r["enabled"] = bool(args.get("enabled", True))
+    r["enabled"] = bool(args.get("enabled", True))
     r["updated"] = time.strftime("%Y-%m-%d")
     path = zr.save_rule(brain, r)
 
     msg = f"Đã đặt luật cho {r['thread_name']}: {_fmt(r)}. Ghi ở {path}."
-    if mode == "chatbot" and not r["enabled"]:
-        msg += (" Chế độ chatbot để TẮT sẵn vì nó nhắn thẳng cho khách. "
-                "Đọc lại kịch bản cho chủ nghe rồi hỏi chủ có bật không, "
-                "chủ đồng ý thì gọi lại tool này với enabled=true.")
     if mode == "nhac-quen" and not r["owner_uid"]:
         msg += (" Chưa khai owner_uid nên Javis không biết chủ đã trả lời hay chưa và sẽ "
                 "nhắc cả khi chủ đã trả lời rồi. Hỏi chủ tên hiển thị của chủ trong nhóm "
@@ -160,21 +144,18 @@ def register(ctx):
         description=(
             "Đặt luật cho MỘT cuộc chat Zalo (nhóm hoặc khách). GỌI TOOL NÀY, đừng chỉ ghi "
             "vào Memory: ghi nhớ KHÔNG đổi hành vi của listener, phải có file luật thì Javis "
-            "mới thật sự im lặng / báo / tự trả lời. "
+            "mới thật sự im lặng hay báo. Javis chỉ ĐỌC và BÁO trên Zalo, KHÔNG tự trả lời khách. "
             "Gọi khi chủ nói kiểu: 'nhóm X đừng báo telegram nữa' (mode=im-lang), "
             "'im lặng thôi' (im-lang), 'nhóm X báo hết tin cho anh' (bao-het), "
             "'có tin gì về giá thì báo' (tu-khoa + keywords), "
-            "'30 phút chưa ai trả lời thì nhắc anh' (nhac-quen), "
-            "'với nick Z cứ trả lời thoải mái' hoặc 'để em tự trả lời khách nhóm này' "
-            "(chatbot + script). "
+            "'30 phút chưa ai trả lời thì nhắc anh' (nhac-quen). "
             "op=list xem tất cả | op=show xem một | op=set đặt hoặc sửa | op=off tắt. "
             "thread nhận TÊN nhóm hoặc thread_id; khớp nhiều hơn một thì tool báo lỗi kèm "
             "danh sách, phải hỏi lại chủ chứ đừng đoán. "
             "mode: im-lang (chỉ ghi nhận) | bao-het (mọi tin đều báo Telegram) | "
             "tu-khoa (báo khi tin chứa từ khoá) | nhac-quen (nhắc khi quá N phút chưa ai "
-            "trả lời) | chatbot (Javis tự trả lời khách theo kịch bản). "
-            "Với chatbot BẮT BUỘC truyền 'script' là kịch bản: bot biết gì, trả lời thế nào, "
-            "gặp gì thì đẩy về cho chủ."
+            "trả lời). Muốn Javis GỬI tin cho khách thì chủ yêu cầu trực tiếp - dùng tool "
+            "javis_zalo_send, KHÔNG có chế độ tự trả lời."
         ),
         handler=_handler, min_mode="safe",
         schema={
@@ -183,10 +164,8 @@ def register(ctx):
                 "op": {"type": "string", "enum": ["list", "show", "set", "off"]},
                 "thread": {"type": "string", "description": "Tên nhóm hoặc thread_id"},
                 "mode": {"type": "string", "enum": list(zr.MODES)},
-                "script": {"type": "string", "description": "Kịch bản cho mode chatbot"},
                 "keywords": {"type": "string", "description": "Từ khoá, cách nhau bằng dấu phẩy"},
                 "escalate_after_min": {"type": "integer"},
-                "max_reply_per_hour": {"type": "integer"},
                 "owner_uid": {"type": "string", "description": "uid Zalo của chủ trong nhóm"},
                 "enabled": {"type": "boolean"},
             },

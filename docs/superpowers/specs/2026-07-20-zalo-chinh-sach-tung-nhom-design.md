@@ -4,6 +4,12 @@ Ngày: 2026-07-20
 Trạng thái: đã chốt thiết kế, đang thực thi
 Tiếp nối: [2026-07-20-zalo-listener-design.md](2026-07-20-zalo-listener-design.md)
 
+> **CẬP NHẬT 2026-07-21 - đã BỎ chế độ `chatbot` (tự phản hồi).** Chủ quyết định Javis
+> KHÔNG tự trả lời khách trên Zalo: nó chỉ ĐỌC và BÁO về Telegram. Mọi tin gửi ra đều do
+> chủ yêu cầu trực tiếp (tool `javis_zalo_send`). Bốn chế độ còn lại (im-lang, bao-het,
+> tu-khoa, nhac-quen) giữ nguyên; file luật cũ `mode: chatbot` tự hạ về `im-lang` (im
+> lặng) khi đọc. Phần "chatbot" bên dưới chỉ còn giá trị lịch sử.
+
 ## Vấn đề
 
 Bản listener hiện tại là một **bộ lọc thông báo toàn cục**: một bộ từ khoá, một

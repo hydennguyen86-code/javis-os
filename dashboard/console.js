@@ -2233,7 +2233,7 @@
       + '<b style="font-size:13px">Nghe tin liên tục</b>'
       + '<span id="zlState" class="mp-note">đang tải…</span>'
       + '<button class="mp-btn" id="zlToggle" style="margin-left:auto">…</button></div>'
-      + '<div class="gcard-meta" style="margin-top:6px">Mỗi cuộc chat chọn một trong hai: <b>Chỉ đọc</b> (Javis im lặng, chỉ ghi nhận) hoặc <b>Tự phản hồi</b> (Javis tự nhắn vào cuộc chat, và tự quyết khi nào nên lên tiếng chứ không trả lời mọi tin). Muốn nó nói theo phong cách riêng của từng nhóm thì dặn trong chat.</div>'
+      + '<div class="gcard-meta" style="margin-top:6px">Tick chọn cuộc chat để Javis <b>theo dõi</b> - chỉ đọc và báo về Telegram, KHÔNG tự trả lời khách. Điền từ khoá bên dưới nếu chỉ muốn được báo khi tin có chứa từ đó. Muốn Javis nhắn tin cho ai thì bảo thẳng trong chat.</div>'
       + '<div class="mp-note" id="zlSignal" style="margin-top:6px">đang tải…</div>'
       + '<div id="zlForm" style="margin-top:10px;display:flex;flex-direction:column;gap:8px">'
       + '<label class="mcp-lb">Tài khoản Zalo dùng để nghe<select class="js-input" id="zlConn">' + opts + '</select></label>'
@@ -2286,11 +2286,9 @@
       return "Chưa nhận tin nào.";
     };
     const ZL_SHOW = 8;           // hiện sẵn ngần này, còn lại phải tìm hoặc bấm xem thêm
-    // Hai trạng thái, đúng như chủ thiết kế: chỉ đọc, hoặc để Javis tự phản hồi. Javis tự
-    // quyết có nên lên tiếng hay không chứ không phải cứ có tin là trả lời.
-    const ZL_MODES = [["chi-doc", "Chỉ đọc"], ["tu-phan-hoi", "Tự phản hồi"]];
+    // Tick = theo dõi (chỉ đọc + báo). KHÔNG còn lựa chọn "tự phản hồi": Javis không tự
+    // nhắn cho khách, mọi tin gửi đi đều do chủ yêu cầu trực tiếp trong chat.
     const row = (t) => {
-      const cur = modes[t.id] || "chi-doc";
       const on = !!modes[t.id];
       return '<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:13px">'
         + '<input type="checkbox" class="zl-th" value="' + esc(t.id) + '"' + (on ? " checked" : "") + '>'
@@ -2300,12 +2298,7 @@
         + (t.type === "group"
             ? ' <span style="opacity:.55">' + (t.named ? "(nhóm)" : "(nhóm #" + esc(String(t.id).slice(-4)) + ")") + '</span>'
             : "")
-        + ' <span style="opacity:.45">' + zlAgo(t.last) + '</span></span>'
-        + '<select class="js-input zl-md" data-id="' + esc(t.id) + '"'
-        + (on ? "" : " disabled") + ' style="width:130px;font-size:12px;padding:2px 4px">'
-        + ZL_MODES.map(m => '<option value="' + m[0] + '"' + (cur === m[0] ? " selected" : "") + '>'
-                            + m[1] + '</option>').join("")
-        + '</select></div>';
+        + ' <span style="opacity:.45">' + zlAgo(t.last) + '</span></span></div>';
     };
     // Lưu thành FILE LUẬT qua /watch. Gửi vào settings như trước là mất trắng: write_cfg
     // chỉ nhận khoá có trong DEFAULT_CFG, mà threads/keywords đã bị bỏ khỏi đó.
@@ -2366,18 +2359,6 @@
         rosterKey = null;                       // ghim lại lên đầu ngay
         await saveWatch();
       });
-      box.querySelectorAll(".zl-md").forEach(sel => sel.onchange = async () => {
-        const id = sel.dataset.id;
-        if (sel.value === "tu-phan-hoi" && !confirm(
-            "Cho Javis TỰ NHẮN vào cuộc chat này? Nó tự quyết khi nào nên lên tiếng và tự "
-            + "soạn lời, tin gửi đi không thu hồi được. Muốn nó nói theo phong cách riêng thì "
-            + "dặn trong chat, ví dụ: nhóm này trả lời ngắn gọn, xưng em.")) {
-          sel.value = modes[id] || "chi-doc";
-          return;
-        }
-        modes[id] = sel.value;
-        await saveWatch();
-      });
       const more = box.querySelector("#zlMore");
       if (more) more.onclick = () => { showAll = true; rosterKey = null; paintRoster(st); };
     };
@@ -2416,10 +2397,10 @@
     const c = st.cfg || {};
     if (c.conn_id) $("zlConn").value = c.conn_id;
     // Lấy từ LUẬT đang bật, không lấy từ cfg.threads (trường đó đã bỏ, đọc vào là sai).
-    // Luật đang bật -> trạng thái trên dropdown. chatbot = tự phản hồi, còn lại = chỉ đọc.
+    // Luật nào đang bật = cuộc chat đang theo dõi -> tick sẵn.
     modes = {};
     (st.rules || []).filter(x => x.enabled).forEach(x => {
-      modes[x.thread_id] = x.mode === "chatbot" ? "tu-phan-hoi" : "chi-doc";
+      modes[x.thread_id] = "chi-doc";
     });
     $("zlKw").value = (c.keywords || []).join(", ");
     $("zlQuiet").value = c.quiet_hours || "";

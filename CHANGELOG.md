@@ -4,6 +4,15 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.143] - 2026-07-21
+Bỏ hẳn tính năng Javis tự trả lời khách trên Zalo. Nay Javis chỉ đọc và báo, mọi tin gửi đi đều do chủ yêu cầu trực tiếp.
+### Cải thiện
+- **Zalo chỉ đọc và báo, không còn tự phản hồi**: gỡ bỏ chế độ "Tự phản hồi" (chatbot) cùng toàn bộ phần engine hộp cát soạn tin tự động cho khách. Listener giờ chỉ nghe rồi báo về Telegram theo luật từng cuộc chat, gồm bốn chế độ giữ nguyên: im lặng, báo hết, báo theo từ khoá, và nhắc khi quá lâu chưa ai trả lời. Muốn gửi tin cho ai thì chủ bảo thẳng trong chat, Javis dùng công cụ gửi an toàn javis_zalo_send.
+- Panel "Nghe tin liên tục" gọn lại: mỗi cuộc chat chỉ còn tick theo dõi là đọc và báo, bỏ ô chọn chế độ hai lựa chọn và hộp thoại xác nhận cho tự nhắn.
+- Dọn sạch mã phần Zalo: bỏ hàm soạn tin của bot, các hằng hộp cát, giới hạn tin mỗi giờ, và phụ thuộc model phụ mà chỉ chế độ tự trả lời mới cần.
+### An toàn
+- Không còn đường nào để Javis tự gửi tin cho khách khi đọc được tin nhắn của họ. File luật cũ để chế độ chatbot tự hạ về im lặng khi đọc, nên sau khi cập nhật không nhóm nào còn tự trả lời.
+
 ## [0.9.142] - 2026-07-21
 Sửa lỗi nghiêm trọng: bảo Javis gửi tin Zalo cho một người thì nó nhắn nhầm sang người khác không trong danh sách theo dõi.
 ### Sửa lỗi

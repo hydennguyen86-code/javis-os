@@ -96,18 +96,16 @@ check("dau hieu: co hien moc thoi gian tin gan nhat",
 // ---- 4. Panel khong con o dm_only (da doi sang whitelist cuoc chat) ----
 check("panel: da bo o 'chi tin rieng' (whitelist thay the)", src.indexOf("zlDm") === -1);
 
-// ---- Thiet ke 2 trang thai cua chu: Chi doc / Tu phan hoi ----
-check("2 trang thai: co dropdown dung 2 lua chon",
-  /ZL_MODES = \[\["chi-doc", "Chỉ đọc"\], \["tu-phan-hoi", "Tự phản hồi"\]\]/.test(src));
-check("2 trang thai: bat tu phan hoi PHAI xac nhan (tin gui di khong thu hoi duoc)",
-  src.indexOf("Cho Javis TỰ NHẮN vào cuộc chat này?") !== -1);
-check("2 trang thai: gui len server theo khuon modes (moi cuoc chat mot trang thai)",
-  src.indexOf("modes: modes") !== -1);
-check("2 trang thai: doc nguoc tu luat - chatbot la tu phan hoi",
-  src.indexOf('x.mode === "chatbot" ? "tu-phan-hoi" : "chi-doc"') !== -1);
-check("2 trang thai: chua chon thi dropdown bi khoa, khong bam nham",
-  src.indexOf('(on ? "" : " disabled")') !== -1);
-check("2 trang thai: khoa ve lai gom ca MODE, khong thi doi trang thai khong hien ra",
+// ---- Chi con MOT hanh vi: theo doi = doc + bao. Da BO "Tu phan hoi" (Javis khong tu tra loi) ----
+check("bo tu phan hoi: KHONG con dropdown ZL_MODES", src.indexOf("ZL_MODES") === -1);
+check("bo tu phan hoi: KHONG con lua chon 'Tu phan hoi' hay 'tu-phan-hoi' tren giao dien",
+  src.indexOf("Tự phản hồi") === -1 && src.indexOf("tu-phan-hoi") === -1);
+check("bo tu phan hoi: KHONG con hop thoai xac nhan tu nhan (Javis khong con tu gui)",
+  src.indexOf("Cho Javis TỰ NHẮN vào cuộc chat này?") === -1);
+check("bo tu phan hoi: KHONG con doc nguoc mode chatbot", src.indexOf("chatbot") === -1);
+check("theo doi: tick chon thi ghi vao modes roi gui len server",
+  src.indexOf("modes: modes") !== -1 && src.indexOf('modes[cb.value] = "chi-doc"') !== -1);
+check("theo doi: khoa ve lai van gom MODE de luat doi (vd nhac-quen) thi ve lai dung",
   src.indexOf('x.thread_id + ":" + x.mode') !== -1);
 
 // ---- Chong "va nham nho": doi bien ma sot cho dung cu ----
@@ -117,9 +115,9 @@ check("2 trang thai: khoa ve lai gom ca MODE, khong thi doi trang thai khong hie
 check("khong sot bien cu: cfgBody KHONG tham chieu 'selected' (da doi thanh modes)",
   !/Array\.from\(selected\)/.test(src) && !/selected\s*[),.]/.test(
     src.slice(src.indexOf("const cfgBody"), src.indexOf("const cfgBody") + 200)));
-check("mo ta panel da la thiet ke 2 trang thai, khong con loi van cu",
-  src.indexOf("Mỗi cuộc chat chọn một trong hai") !== -1
-  && src.indexOf("chỉ ghi nhận chứ không báo Telegram") === -1);
+check("mo ta panel: noi ro chi doc + bao, KHONG tu tra loi (bo loi van cu)",
+  src.indexOf("KHÔNG tự trả lời khách") !== -1
+  && src.indexOf("Mỗi cuộc chat chọn một trong hai") === -1);
 check("panel: co noi ro chua chon thi khong bao gi",
   src.indexOf("chưa chọn cái nào thì không báo gì") !== -1);
 

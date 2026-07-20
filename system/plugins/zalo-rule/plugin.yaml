@@ -1,7 +1,7 @@
 name: Luật cho từng cuộc chat Zalo
 slug: zalo-rule
 version: 1.0.0
-description: Đặt luật cho từng nhóm hoặc khách trên Zalo ngay từ chat - im lặng, báo mọi tin, báo theo từ khoá, nhắc khi quên trả lời quá N phút, hoặc để Javis tự trả lời như chatbot. Ghi ra Javis/zalo/<slug>.md nên xem và sửa lại được.
+description: Đặt luật cho từng nhóm hoặc khách trên Zalo ngay từ chat - im lặng, báo mọi tin, báo theo từ khoá, hoặc nhắc khi quên trả lời quá N phút. Javis chỉ đọc và báo, không tự trả lời khách. Ghi ra Javis/zalo/<slug>.md nên xem và sửa lại được.
 author: Javis (bundled)
 enabled: true
 min_mode: safe

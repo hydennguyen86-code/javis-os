@@ -5,16 +5,15 @@ Thay cho bộ lọc thông báo toàn cục của bản listener đầu: mỗi c
 `<brain>/Javis/zalo/<slug>.md`, đặt bằng lời qua chat, giao diện chỉ hiển thị.
 Nhất quán với loop/agent/skill (đều là .md do chat sinh ra), có git nên lần lại được.
 
-Năm chế độ:
+Bốn chế độ:
     im-lang    chỉ ghi nhận, không báo
     bao-het    mọi tin đều báo Telegram
     tu-khoa    báo khi tin chứa từ khoá
     nhac-quen  khách nhắn mà quá N phút không ai đáp thì báo
-    chatbot    engine hộp cát tự trả lời, báo khi bí
 
-BỐN chế độ đầu KHÔNG cần engine đọc nội dung → giữ nguyên rào bảo mật của bản trước
-(nội dung do người lạ soạn không chạm engine). Chỉ `chatbot` mở rào, và nó có rào
-riêng nằm bên zalo_listener (xem spec 2026-07-20-zalo-chinh-sach-tung-nhom-design).
+KHÔNG chế độ nào gọi engine đọc nội dung khách: cả bốn chỉ báo về Telegram cho chủ, nên
+nội dung do người lạ soạn KHÔNG bao giờ chạm engine. Javis KHÔNG tự trả lời khách trên
+Zalo - mọi tin gửi đi đều do chủ yêu cầu trực tiếp (xem zalo_listener.send_from_chat).
 
 Module này CỐ Ý chỉ có hàm thuần + đọc ghi file: không engine, không mạng, không MCP.
 """
@@ -28,12 +27,12 @@ from pathlib import Path
 
 import skill_router   # dùng lại split_frontmatter, khỏi đẻ thêm một bộ bóc YAML nữa
 
-MODES = ("im-lang", "bao-het", "tu-khoa", "nhac-quen", "chatbot")
+MODES = ("im-lang", "bao-het", "tu-khoa", "nhac-quen")
 DEFAULT_MODE = "im-lang"
-MAX_SCRIPT = 8000          # trần độ dài kịch bản (nó đi thẳng vào system prompt)
+MAX_SCRIPT = 8000          # trần độ dài phần thân file luật (chú thích chủ ghi tay)
 
 # Hành động trả về từ decide()
-BO, BAO, CHO, BOT = "bo", "bao", "cho", "bot"
+BO, BAO, CHO = "bo", "bao", "cho"
 
 
 def _fold(s) -> str:
@@ -67,10 +66,6 @@ def _norm(meta: dict, body: str, path=None) -> dict:
         after = int(meta.get("escalate_after_min") or 30)
     except (TypeError, ValueError):
         after = 30
-    try:
-        cap = int(meta.get("max_reply_per_hour") or 20)
-    except (TypeError, ValueError):
-        cap = 20
     return {
         "thread_id": str(meta.get("thread_id") or "").strip(),
         "thread_name": str(meta.get("thread_name") or "").strip(),
@@ -79,7 +74,6 @@ def _norm(meta: dict, body: str, path=None) -> dict:
         "keywords": [str(k).strip() for k in kws if str(k).strip()],
         "escalate_after_min": max(1, after),
         "owner_uid": str(meta.get("owner_uid") or "").strip(),
-        "max_reply_per_hour": max(1, cap),
         "updated": str(meta.get("updated") or ""),
         "script": (body or "").strip()[:MAX_SCRIPT],
         "path": str(path or ""),
@@ -108,8 +102,6 @@ def dump_rule(rule: dict) -> str:
         lines.append(f"escalate_after_min: {rule.get('escalate_after_min') or 30}")
     if rule.get("owner_uid"):
         lines.append(f"owner_uid: {q(rule['owner_uid'])}")
-    if rule.get("mode") == "chatbot":
-        lines.append(f"max_reply_per_hour: {rule.get('max_reply_per_hour') or 20}")
     lines += [f"updated: {rule.get('updated') or time.strftime('%Y-%m-%d')}", "---", "",
               (rule.get("script") or "").strip(), ""]
     return "\n".join(lines)
@@ -171,8 +163,8 @@ def match_threads(candidates: list, query: str) -> list:
 def decide(rule: dict, ev: dict) -> tuple:
     """Sự kiện này thì làm gì. Trả (hành_động, lý_do_bỏ).
 
-    Không đụng giờ im lặng ở đây - cái đó áp lúc SẮP báo, để mode chatbot vẫn trả lời
-    khách trong giờ im lặng (im lặng là để yên cho CHỦ ngủ, không phải bắt khách chờ).
+    Không đụng giờ im lặng ở đây - cái đó áp lúc SẮP báo Telegram, để mốc chờ của
+    nhac-quen vẫn cập nhật trong giờ im lặng (im lặng chỉ là hoãn báo cho CHỦ ngủ).
     """
     if not rule:
         return BO, "chưa có luật cho cuộc chat này"
@@ -194,8 +186,6 @@ def decide(rule: dict, ev: dict) -> tuple:
         return (BAO, "") if any(_fold(k) in body for k in kws) else (BO, "không khớp từ khoá")
     if mode == "nhac-quen":
         return CHO, ""
-    if mode == "chatbot":
-        return BOT, ""
     return BO, "chế độ im lặng"
 
 

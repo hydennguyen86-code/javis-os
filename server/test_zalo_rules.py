@@ -3,8 +3,8 @@
     cd server && python test_zalo_rules.py
 
 KHÔNG mạng, KHÔNG engine, KHÔNG spawn gì. Phủ: đọc ghi file luật (vòng tròn), khớp
-tên nhóm nhập nhằng, năm chế độ quyết định đúng, mốc chờ của nhac-quen, và bất biến
-"bốn chế độ đầu không đụng engine".
+tên nhóm nhập nhằng, bốn chế độ quyết định đúng, mốc chờ của nhac-quen, và bất biến
+"module luật không đụng engine". Không còn chế độ chatbot: Javis chỉ đọc và báo.
 """
 import os
 import sys
@@ -33,31 +33,34 @@ def ev(**kw):
 
 
 # ---- 1. Ghi rồi đọc lại phải ra đúng cái đã ghi ----
-r = {"thread_id": "t1", "thread_name": "Nhóm Kim Khí Hà Lộc", "mode": "chatbot",
-     "enabled": True, "owner_uid": "uOwner", "max_reply_per_hour": 5,
-     "script": "Bot trả lời về giờ mở cửa.\nGặp khiếu nại thì đẩy cho chủ."}
+r = {"thread_id": "t1", "thread_name": "Nhóm Kim Khí Hà Lộc", "mode": "nhac-quen",
+     "enabled": True, "owner_uid": "uOwner", "escalate_after_min": 45,
+     "script": "Ghi chú của chủ về nhóm.\nDòng thứ hai."}
 p = zr.save_rule(BRAIN, r)
 check("file: ghi ra đúng <brain>/Javis/zalo/<slug>.md",
       Path(p).parent == zr.rules_dir(BRAIN) and Path(p).name == "nhom-kim-khi-ha-loc.md")
 
 back = zr.parse_rule(Path(p).read_text(encoding="utf-8"), p)
 check("vòng tròn: thread_id giữ nguyên", back["thread_id"] == "t1")
-check("vòng tròn: mode giữ nguyên", back["mode"] == "chatbot")
+check("vòng tròn: mode giữ nguyên", back["mode"] == "nhac-quen")
 check("vòng tròn: enabled giữ nguyên", back["enabled"] is True)
-check("vòng tròn: kịch bản nhiều dòng không vỡ", "khiếu nại" in back["script"]
+check("vòng tròn: phần thân nhiều dòng không vỡ", "thứ hai" in back["script"]
       and back["script"].count("\n") == 1)
-check("vòng tròn: trần tin mỗi giờ giữ nguyên", back["max_reply_per_hour"] == 5)
-check("kịch bản nằm ở THÂN file, không nhồi vào YAML",
-      Path(p).read_text(encoding="utf-8").split("---")[2].strip().startswith("Bot trả lời"))
+check("vòng tròn: escalate_after_min giữ nguyên", back["escalate_after_min"] == 45)
+check("phần thân nằm ở THÂN file, không nhồi vào YAML",
+      Path(p).read_text(encoding="utf-8").split("---")[2].strip().startswith("Ghi chú"))
 
 check("liệt kê: thấy luật vừa ghi", len(zr.list_rules(BRAIN)) == 1)
 check("brain chưa có thư mục luật thì trả rỗng, không nổ",
       zr.list_rules(tempfile.mkdtemp(prefix="javis-trong-")) == [])
 
-# Mode lạ (gõ sai tay) phải rơi về im lặng, KHÔNG được coi như chatbot
+# Mode lạ (gõ sai tay) phải rơi về im lặng, KHÔNG được đoán thành chế độ nào khác
 odd = zr.parse_rule("---\nmode: tu-tra-loi-het\nenabled: true\n---\nx")
-check("an toàn: mode lạ rơi về im-lang chứ không đoán thành chatbot",
-      odd["mode"] == "im-lang")
+check("an toàn: mode lạ rơi về im-lang", odd["mode"] == "im-lang")
+# File luật CŨ có mode=chatbot (đã bỏ) phải tự hạ về im-lang: im lặng, KHÔNG tự trả lời.
+old_bot = zr.parse_rule("---\nmode: chatbot\nenabled: true\n---\nx")
+check("an toàn: luật chatbot cũ tự hạ về im-lang (bỏ tính năng tự trả lời)",
+      old_bot["mode"] == "im-lang")
 
 
 # ---- 2. Khớp tên nhóm: nhập nhằng thì KHÔNG được đoán ----
@@ -75,7 +78,7 @@ check("khớp tên: không có gì khớp thì rỗng", zr.match_threads(cands, 
 check("khớp tên: chuỗi rỗng thì rỗng (không quét trúng tất cả)", zr.match_threads(cands, "  ") == [])
 
 
-# ---- 3. Năm chế độ ----
+# ---- 3. Bốn chế độ ----
 def rule(**kw):
     base = {"thread_id": "t1", "mode": "bao-het", "enabled": True, "keywords": [],
             "escalate_after_min": 30, "owner_uid": "uOwner"}
@@ -94,7 +97,9 @@ check("tu-khoa: khớp bỏ dấu",
       zr.decide(rule(mode="tu-khoa", keywords=["giá"]), ev(text="GIA BAO NHIEU"))[0] == zr.BAO)
 check("nhac-quen: đặt mốc chờ chứ không báo ngay",
       zr.decide(rule(mode="nhac-quen"), ev())[0] == zr.CHO)
-check("chatbot: chuyển cho bot", zr.decide(rule(mode="chatbot"), ev())[0] == zr.BOT)
+check("bỏ chatbot: không còn hằng BOT trong module", not hasattr(zr, "BOT"))
+check("bỏ chatbot: mode 'chatbot' cũ (nếu còn sót) coi như im lặng, KHÔNG trả lời",
+      zr.decide(rule(mode="chatbot"), ev())[0] == zr.BO)
 check("tin của chính tài khoản Javis thì bỏ (không tự nói chuyện với mình)",
       zr.decide(rule(), ev(is_self=True))[0] == zr.BO)
 for k in ("old_messages", "seen_messages", "delivered_messages"):
@@ -145,21 +150,24 @@ B2 = tempfile.mkdtemp(prefix="javis-zplug-")
 ctx = types.SimpleNamespace(vault_root=B2, data_dir=B2, slug="zalo-rule")
 
 out = zp._handler({"op": "set", "thread": "kim khi", "mode": "bao-het"}, ctx)
-check("plugin: tên mơ hồ thì TỪ CHỐI kèm danh sách, không tự chọn (gắn nhầm nhóm là bot "
-      "đi trả lời khách nhóm khác)",
+check("plugin: tên mơ hồ thì TỪ CHỐI kèm danh sách, không tự chọn (gắn nhầm nhóm là "
+      "báo/im nhầm cuộc chat)",
       out.startswith("ERROR") and "g1" in out and "g2" in out)
 check("plugin: luật KHÔNG được tạo khi tên mơ hồ", zr.list_rules(B2) == [])
 
-out = zp._handler({"op": "set", "thread": "g2", "mode": "chatbot", "script": "Giờ mở cửa 7h-19h."}, ctx)
+# Chatbot đã bị bỏ: plugin phải TỪ CHỐI mode này, không tạo luật.
+out = zp._handler({"op": "set", "thread": "g2", "mode": "chatbot"}, ctx)
+check("plugin: 'chatbot' không còn hợp lệ, bị từ chối", out.startswith("ERROR") and "mode" in out)
+check("plugin: không tạo luật khi mode không hợp lệ", zr.rule_for(zr.list_rules(B2), "g2") is None)
+
+out = zp._handler({"op": "set", "thread": "g2", "mode": "bao-het"}, ctx)
 r2 = zr.rule_for(zr.list_rules(B2), "g2")
-check("plugin: chatbot LUÔN tạo ở trạng thái TẮT (nó nhắn thẳng cho khách thật)",
-      r2 and r2["mode"] == "chatbot" and r2["enabled"] is False)
-check("plugin: dặn engine đọc lại kịch bản cho chủ nghe rồi mới bật", "bật không" in out)
-check("plugin: kịch bản được ghi xuống", "7h-19h" in (r2 or {}).get("script", ""))
+check("plugin: chế độ báo hợp lệ thì bật ngay được (chỉ báo cho chủ, sai cũng chỉ phiền chủ)",
+      r2 and r2["mode"] == "bao-het" and r2["enabled"] is True)
 
 zp._handler({"op": "set", "thread": "g1", "mode": "nhac-quen", "escalate_after_min": 30}, ctx)
 r1 = zr.rule_for(zr.list_rules(B2), "g1")
-check("plugin: bốn chế độ không-chatbot thì bật ngay được", r1 and r1["enabled"] is True)
+check("plugin: chế độ nhac-quen bật ngay được", r1 and r1["enabled"] is True)
 out = zp._handler({"op": "show", "thread": "g1"}, ctx)
 check("plugin: thiếu owner_uid thì CẢNH BÁO là sẽ nhắc cả khi chủ đã trả lời",
       "CHƯA khai owner_uid" in out)
@@ -176,16 +184,16 @@ check("plugin: không khớp tên thì nói rõ đang thấy những cuộc chat
 
 
 # ---- 7. Javis phải BIẾT là có công cụ này ----
-# Lỗi thật: chủ dặn "với nick Minh Quý cứ trả lời thoải mái", Javis đáp "ghi nhớ rồi" và
-# tạo một file preference trong Memory - tức là NGHĨ đây là sở thích chứ không phải hành
-# động. Không luật nào được tạo nên chẳng có gì đổi. Công cụ nạp được nhưng system prompt
-# không hề nhắc tới Zalo, nên Javis không biết mà với tới.
+# Lỗi thật: chủ dặn về cách ứng xử một nhóm, Javis đáp "ghi nhớ rồi" và tạo một file
+# preference trong Memory - tức là NGHĨ đây là sở thích chứ không phải hành động. Không
+# luật nào được tạo nên chẳng có gì đổi. Công cụ nạp được nhưng system prompt không hề
+# nhắc tới Zalo, nên Javis không biết mà với tới.
 CLAUDE_MD = (Path(__file__).resolve().parents[1] / "CLAUDE.md").read_text(encoding="utf-8")
 check("prompt: CLAUDE.md có dạy dùng javis_zalo_rule (trước đây không nhắc chữ Zalo nào)",
       "javis_zalo_rule" in CLAUDE_MD)
 check("prompt: nói rõ đây là HÀNH ĐỘNG, không phải ghi nhớ sở thích",
       "không phải ghi nhớ" in CLAUDE_MD and "đừng ghi vào Memory" in CLAUDE_MD)
-for cau in ("đừng báo nữa", "trả lời thoải mái", "30 phút chưa ai trả lời"):
+for cau in ("đừng báo nữa", "30 phút chưa ai trả lời"):
     check(f"prompt: có ví dụ câu thật của chủ - '{cau}'", cau in CLAUDE_MD)
 
 desc = None
@@ -197,7 +205,9 @@ zp.register(_t2.SimpleNamespace(
     register_tool=lambda **kw: _captured.update(kw), vault_root=B2, data_dir=B2, slug="zalo-rule"))
 desc = _captured.get("description", "")
 check("tool: mô tả dặn thẳng là đừng chỉ ghi Memory", "đừng chỉ ghi" in desc)
-for cau in ("đừng báo telegram nữa", "im lặng thôi", "trả lời thoải mái"):
+check("tool: mô tả nói rõ Javis KHÔNG tự trả lời khách trên Zalo",
+      "KHÔNG tự trả lời" in desc and "javis_zalo_send" in desc)
+for cau in ("đừng báo telegram nữa", "im lặng thôi"):
     check(f"tool: mô tả có câu kích hoạt thật - '{cau}'", cau in desc)
 
 
