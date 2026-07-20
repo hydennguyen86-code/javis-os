@@ -2322,9 +2322,14 @@
 
   function openOauthFlow(el, con) {
     // Provider không tự đăng ký client (vd Google) khai sẵn fields client_id/secret user tự tạo.
+    // Có ô multiline (vd google-ads cho dán sẵn file ADC làm đường lui) nên render y như luồng
+    // apikey, đừng ép hết thành input 1 dòng.
     const fields = (con.fields || []).map(f =>
       '<label class="mcp-lb">' + esc(f.label || f.key)
-      + '<input class="js-input" data-f="' + esc(f.key) + '" placeholder="' + esc(f.placeholder || "") + '"></label>').join("");
+      + (f.multiline
+        ? '<textarea class="js-input" data-f="' + esc(f.key) + '" rows="4" placeholder="' + esc(f.placeholder || "") + '"></textarea>'
+        : '<input class="js-input" data-f="' + esc(f.key) + '" placeholder="' + esc(f.placeholder || "") + '">')
+      + '</label>').join("");
     const m = connModal(mHead("KẾT NỐI " + esc((con.name || "").toUpperCase()))
       + '<div class="conn-form"><div class="conn-guide">' + esc(con.guide || "Đăng nhập bằng tài khoản của nhà cung cấp.")
       + (con.guide_url ? ' <a href="' + esc(con.guide_url) + '" target="_blank">Hướng dẫn ↗</a>' : "") + '</div>'

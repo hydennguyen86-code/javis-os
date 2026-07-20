@@ -86,16 +86,34 @@ Javis tự đổi lấy master token, lưu token, vứt App Password. Không cò
   kiểm bằng `pip install --dry-run`: KHÔNG đụng tới `fastapi`/`starlette`, nên không dẫm vào cái
   pin nguy hiểm đã ghi chú trong `requirements.txt`.
 
-## Ngoài phạm vi (báo cáo riêng)
+## Phần 2: google-ads (ĐÃ LÀM, 0.9.114)
 
-`google-ads` cũng bắt chạy lệnh (`gcloud auth application-default login`) rồi đi tìm file JSON
-trong `%APPDATA%`. Khảo sát cho thấy ĐƯA LÊN UI ĐƯỢC: file ADC thực chất chỉ là
-`{type: authorized_user, client_id, client_secret, refresh_token}`, mà Javis đã có sẵn luồng OAuth
-Google hoàn chỉnh (xem `google-calendar`: `auth.type: oauth`, `authorize_url`, `token_url`,
-`scopes`). Chỉ cần chạy luồng đó với scope `https://www.googleapis.com/auth/adwords` rồi tự dựng
-file ADC.
+`google-ads` bắt cài Google Cloud CLI rồi chạy `gcloud auth application-default login` với một
+chuỗi `--scopes=` rất dài, xong đi tìm file JSON trong `%APPDATA%` mà dán vào. Còn cực hơn Keep.
 
-Vướng: `oauth_mcp.auth_headers()` sinh ra HTTP HEADER, tức được thiết kế cho connector
-`transport: http`. `google-ads` là `stdio` và cần credential dạng FILE + biến môi trường.
-`mcp_store.resolved` đã biết ghi field `file` ra đĩa rồi trỏ env vào (xem đoạn xử lý
-`f.get("file")`), nhưng chưa ai nối đầu OAuth sang đầu file. Đây là việc vừa phải, làm riêng.
+Chìa khoá: file ADC mà gcloud sinh ra thực chất CHỈ LÀ
+`{type: authorized_user, client_id, client_secret, refresh_token}`. Mà Javis đã có sẵn luồng OAuth
+Google hoàn chỉnh đang chạy cho Gmail và Lịch. Nên chỉ cần chạy luồng đó với scope
+`https://www.googleapis.com/auth/adwords` rồi TỰ DỰNG file ADC. Không cần gcloud, không chạy lệnh.
+
+Vướng đã gỡ: `oauth_mcp.auth_headers()` sinh HTTP HEADER, tức thiết kế cho `transport: http`.
+`google-ads` là `stdio`, chỉ nhận credential qua FILE + biến môi trường. Cầu nối gồm hai mảnh:
+
+1. `oauth_mcp.credentials_file(conn_id, fmt)` - ĐỒNG BỘ, không gọi mạng, ghép refresh_token trong
+   kho oauth với client_id/secret trong `mcp_store` thành đúng khuôn ADC. Không refresh ở đây vì
+   file chứa refresh_token, chính tiến trình con sẽ tự đổi lấy access token khi cần.
+2. `mcp_store.resolved()` - connector khai `oauth_file: {format, env, ext}` thì ghi file 0600 vào
+   `connector-files/` rồi trỏ env vào, tái dùng đúng khuôn sẵn có của field `file`.
+
+Import phải TRỄ (`import oauth_mcp` bên trong hàm) vì `oauth_mcp` đã import `mcp_store` ở cấp
+module; import thẳng là vòng lặp. Giống cách `mcp_client._oauth_headers` đang làm.
+
+Giữ ô `adc_json` làm ĐƯỜNG LUI cho ai đã lỡ chạy gcloud, và nó THẮNG: nếu user dán tay thì OAuth
+không ghi đè (kiểm bằng `not env.get(of["env"])`).
+
+Kèm sửa `openOauthFlow` biết render `multiline` thành textarea. Trước đó nó ép mọi field thành
+input một dòng, nên ô dán file ADC sẽ không dùng nổi.
+
+KHÔNG đụng vào `args` của google-ads: nó tải server từ `git+https://...`, mà `google-ads-mcp` trên
+PyPI mới ở 0.0.1 (tháng 10/2025) nên đổi sang PyPI là rước rủi ro không cần thiết. Git vẫn là yêu
+cầu, nhưng Docker image đã cài sẵn `git`.

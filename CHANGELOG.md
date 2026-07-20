@@ -16,6 +16,22 @@ Viết lại hướng dẫn đăng nhập của TẤT CẢ 23 connector cho dễ
 ### Thêm mới
 - Test `server/test_catalog_guides.py` (10 kiểm tra, không mạng): guide dài phải có xuống dòng, không dòng nào quá 200 ký tự, bước đánh số phải mở đầu dòng, CSS phải thật sự khai `pre-line` + `overflow-wrap`, và cấm em dash / en dash trong cả file. Có canary chứng minh luật bắt được chuỗi kiểu cũ.
 
+## [0.9.114] - 2026-07-20
+Đấu **Google Ads** cũng không còn phải chạy lệnh. Trước đây phải cài Google Cloud CLI, chạy `gcloud auth application-default login` với một chuỗi scope rất dài, rồi đi tìm file JSON trong `%APPDATA%` mà dán vào. Giờ điền Client ID/Secret rồi bấm đăng nhập như Gmail và Lịch, Javis tự dựng file đăng nhập.
+### Thêm mới
+- **`oauth_mcp.credentials_file(conn_id, fmt)`**: dựng nội dung file credential cho connector STDIO đăng nhập bằng OAuth. Ghép refresh_token trong kho oauth với client_id/secret trong `mcp_store` thành đúng khuôn ADC mà gcloud vẫn sinh ra (`{type: authorized_user, client_id, client_secret, refresh_token}`). Đồng bộ, không gọi mạng.
+- **`oauth_file` trong catalog**: connector khai `{format, env, ext}` thì `mcp_store.resolved()` ghi file 0600 vào `connector-files/` rồi trỏ biến môi trường vào. Tái dùng đúng khuôn sẵn có của field `file`.
+- Test `server/test_google_ads_oauth.py` (26 kiểm tra, không mạng): khai báo catalog, dựng nội dung ADC, và kiểm ĐẦU-CUỐI rằng `resolved()` ghi được file thật lên đĩa với đúng nội dung. Có canary chứng minh hàm thật sự đọc kho token chứ không bịa file.
+### Sửa lỗi
+- **`openOauthFlow` không render được ô nhiều dòng**: nó ép mọi field thành input một dòng, nên ô dán file ADC (đường lui) sẽ không dùng nổi. Giờ khai `multiline` thì ra textarea, y như luồng apikey.
+### Cải thiện
+- **Bỏ yêu cầu Google Cloud CLI** khỏi `google-ads`. Chỉ còn cần Git (đã có sẵn trong Docker image) vì uvx tải server từ GitHub.
+- **Giữ ô dán tay file ADC làm đường lui** cho ai đã lỡ chạy gcloud, và đường lui THẮNG: dán tay rồi thì OAuth không ghi đè.
+### Ghi chú
+- Import `oauth_mcp` trong `mcp_store` phải TRỄ (gọi bên trong hàm) vì `oauth_mcp` đã import `mcp_store` ở cấp module. Import thẳng là vòng lặp.
+- KHÔNG đụng `args` của google-ads: vẫn tải từ `git+https://...` vì bản trên PyPI mới ở 0.0.1 (10/2025), đổi sang là rước rủi ro không cần thiết.
+- Chưa nghiệm thu với tài khoản Google Ads thật (cần developer token + tài khoản quảng cáo), nên bước đăng nhập phải thử tại chỗ.
+
 ## [0.9.113] - 2026-07-20
 Bỏ hẳn bước bắt người dùng mở terminal để đấu **Google Keep**. Trước đây phải chạy một lệnh dài đổi App Password lấy master token rồi dán vào; giờ dán thẳng App Password vào Javis, server tự đổi. Hai bước còn lại (bật xác minh 2 bước, tạo App Password) là giao diện của chính Google nên không tự động hoá được, nhưng đã có nút mở thẳng tới đó.
 ### Thêm mới

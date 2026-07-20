@@ -416,8 +416,31 @@
       "command": "uvx",
       "args": ["--from", "git+https://github.com/googleads/google-ads-mcp.git", "google-ads-mcp"],
       "auth": {
-        "type": "apikey",
+        "type": "oauth",
+        "provider": "google",
+        "authorize_url": "https://accounts.google.com/o/oauth2/v2/auth",
+        "token_url": "https://oauth2.googleapis.com/token",
+        "scopes": [
+          "openid",
+          "email",
+          "https://www.googleapis.com/auth/adwords"
+        ],
+        "authorize_params": {
+          "access_type": "offline",
+          "prompt": "consent",
+          "include_granted_scopes": "true"
+        },
         "fields": [
+          {
+            "key": "client_id",
+            "label": "OAuth Client ID",
+            "placeholder": "xxxx.apps.googleusercontent.com"
+          },
+          {
+            "key": "client_secret",
+            "label": "OAuth Client Secret",
+            "placeholder": "GOCSPX-..."
+          },
           {
             "key": "developer_token",
             "label": "Developer token (Google Ads API Center)",
@@ -431,28 +454,30 @@
             "env": "GOOGLE_PROJECT_ID"
           },
           {
-            "key": "adc_json",
-            "label": "Nội dung file đăng nhập ADC (application_default_credentials.json)",
-            "placeholder": "{ \"client_id\": ..., \"refresh_token\": ... }",
-            "file": true,
-            "env": "GOOGLE_APPLICATION_CREDENTIALS",
-            "multiline": true
-          },
-          {
             "key": "login_customer_id",
             "label": "ID tài khoản quản lý MCC (tuỳ chọn - khi tài khoản ads nằm dưới MCC/agency)",
             "placeholder": "10 số, bỏ dấu gạch",
             "env": "GOOGLE_ADS_LOGIN_CUSTOMER_ID",
             "optional": true
+          },
+          {
+            "key": "adc_json",
+            "label": "Hoặc dán sẵn file ADC nếu bạn đã tự chạy gcloud (bỏ trống nếu đăng nhập ở trên)",
+            "placeholder": "{ \"type\": \"authorized_user\", \"refresh_token\": ... }",
+            "file": true,
+            "env": "GOOGLE_APPLICATION_CREDENTIALS",
+            "multiline": true,
+            "optional": true
           }
         ],
-        "guide": "Cần trước: cài uv (winget install astral-sh.uv), Git và Google Cloud CLI (gcloud).\n\nLàm 1 lần:\n1. Google Ads > tài khoản quản lý MCC > Công cụ > API Center: lấy developer token, mức Explorer đủ để đọc.\n2. Vào console.cloud.google.com: tạo project, bật Google Ads API, tạo OAuth client loại Desktop app rồi tải file JSON của client.\n3. Chạy lệnh sau rồi đăng nhập Google:\ngcloud auth application-default login --scopes=https://www.googleapis.com/auth/adwords,https://www.googleapis.com/auth/cloud-platform --client-id-file=<file JSON vừa tải>\n4. Dán TOÀN BỘ nội dung file nó tạo ra vào ô trên. Trên Windows file nằm ở:\n%APPDATA%\\gcloud\\application_default_credentials.json\n\nLần kết nối đầu tải gói, có thể mất 1-2 phút.",
-        "guide_url": "https://developers.google.com/google-ads/api/docs/developer-toolkit/mcp-server?hl=vi"
+        "guide": "Cần trước: Git trên máy chạy Javis (uvx tải server từ GitHub).\n\nLàm 1 lần, khoảng 10 phút:\n1. Google Ads > tài khoản quản lý MCC > Công cụ > API Center: lấy developer token, mức Explorer đủ để đọc.\n2. Vào console.cloud.google.com, tạo project rồi bật Google Ads API. Nhớ Project ID để điền bên dưới.\n3. Màn hình đồng ý OAuth: chọn External, thêm email của bạn vào Test users.\n4. Thông tin xác thực > Tạo OAuth client ID loại 'Ứng dụng web'.\n5. Ở phần 'URI chuyển hướng được ủy quyền', thêm đúng địa chỉ này:\nhttp://localhost:7777/connect/oauth/callback\nNếu chạy trên VPS thì thêm cả https://<tên-miền>/connect/oauth/callback\n6. Điền các ô bên dưới rồi bấm nút đăng nhập. Trình duyệt sẽ mở để bạn cho phép Javis đọc Google Ads.\n\nJavis tự dựng file đăng nhập, KHÔNG cần cài Google Cloud CLI và không phải chạy lệnh nào.\n\nGặp cảnh báo 'ứng dụng chưa được xác minh' thì bấm Nâng cao > Tiếp tục, vì đây là app của chính bạn.\n\nĐã tự chạy gcloud rồi thì dán nội dung file application_default_credentials.json vào ô cuối, Javis sẽ dùng luôn.",
+        "guide_url": "https://console.cloud.google.com/apis/credentials"
       },
       "validate": {
         "tool": "customers_list_accessible_customers",
         "args": {}
       },
+      "oauth_file": { "format": "google_adc", "env": "GOOGLE_APPLICATION_CREDENTIALS", "ext": ".json" },
       "tool_meta": {
         "read": ["customers_*", "metadata_*", "search_*"]
       },
