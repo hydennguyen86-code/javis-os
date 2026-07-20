@@ -848,5 +848,80 @@ check("nút: postJson có hạn chờ, quá hạn thì báo lỗi đọc đượ
 check("nút: lệnh bật gọi kèm timeout 30s", "cfgBody(), 30000)" in js)
 
 
+# ---- 25. GUI TIN AN TOAN: khoa vao tai khoan nghe + chi gui cho cuoc chat dang theo doi ----
+# Loi that (dieu tra workflow 2026-07-20): bao gui "Minh Quy" ma nham sang "Dang Vu". Goc re:
+# listener tu tat connector tai khoan nghe -> engine roi sang connector Zalo KHAC -> tra ten
+# trong danh ba tai khoan sai -> gui nham, khong xac nhan. Tool javis_zalo_send vá bang cach
+# khoa CUNG: gui tu cfg.conn_id (tai khoan nghe) + nguoi nhan PHAI trong roster.
+BSEND = _tf.mkdtemp(prefix="javis-send-")
+_st_send = {"zalo_listener": {**zl.DEFAULT_CFG, "enabled": True, "conn_id": "cNGHE"}}
+_sent_calls = []
+async def _fake_send_zalo(deps, conn_id, thread_id, thread_type, text):
+    _sent_calls.append({"conn_id": conn_id, "thread_id": thread_id, "type": thread_type, "text": text})
+    return True, ""
+_orig_send = zl.send_zalo
+zl.send_zalo = _fake_send_zalo    # chan subprocess that
+
+app_s = FastAPI()
+feat_s = zl.register(app_s, mkdeps(read_settings=lambda: _st_send,
+                                   write_settings=lambda s: _st_send.update(s),
+                                   brain_root=lambda: BSEND, brain_roots=lambda: [BSEND]))
+# Do roster bang tin di qua: chi "Minh Quy" (u1) va mot nhom (g1) la DANG NGHE.
+for evd in (
+    {"event": "message", "data": {"msgId": "s1", "threadId": "u1", "content": "hi", "dName": "Minh Quý"}},
+    {"event": "message", "data": {"msgId": "s2", "threadId": "g1", "threadType": "group",
+                                  "groupName": "Nhóm Kim Khí", "dName": "Ai đó", "content": "hi"}},
+):
+    feat_s.runner  # no-op giu ket noi
+    import asyncio as _a
+    _a.run(feat_s.handle_event(zl.normalize_event(evd), zl.read_cfg(mkdeps(
+        read_settings=lambda: _st_send, brain_root=lambda: BSEND, brain_roots=lambda: [BSEND]))))
+
+def _send(target, text="alo"):
+    _sent_calls.clear()
+    return _a.run(feat_s.send_from_chat(target, text))
+
+r = _send("Minh Quý")
+check("gui: khop dung 1 cuoc chat trong roster thi gui", r.get("ok") is True and r.get("sent_to") == "Minh Quý")
+check("gui: gui TU dung tai khoan dang nghe (cNGHE), khong roi sang tai khoan khac",
+      len(_sent_calls) == 1 and _sent_calls[0]["conn_id"] == "cNGHE" and _sent_calls[0]["thread_id"] == "u1")
+
+r = _send("u1")
+check("gui: chi dinh thang thread_id cung duoc", r.get("ok") is True and _sent_calls[0]["thread_id"] == "u1")
+
+r = _send("Đặng Vũ")
+check("gui: nguoi KHONG trong danh sach theo doi thi TU CHOI (dung loi Minh Quy->Dang Vu)",
+      r.get("ok") is False and "Không có cuộc chat" in r.get("error", "") and len(_sent_calls) == 0)
+
+# HAI cuoc chat cung hien ten "Minh Quý" (hai nguoi khac nhau, id khac) - dung canh mo ho
+# that: khop chinh xac ca hai -> phai tu choi, bat hoi lai.
+_a.run(feat_s.handle_event(zl.normalize_event(
+    {"event": "message", "data": {"msgId": "s3", "threadId": "u2", "content": "hi", "dName": "Minh Quý"}}),
+    zl.read_cfg(mkdeps(read_settings=lambda: _st_send, brain_root=lambda: BSEND, brain_roots=lambda: [BSEND]))))
+r = _send("Minh Quý")
+check("gui: ten khop NHIEU thi tu choi, bat hoi lai, KHONG gui (dung doan)",
+      r.get("ok") is False and "khớp 2" in r.get("error", "") and len(_sent_calls) == 0)
+
+_st_send["zalo_listener"]["conn_id"] = ""
+r = _send("u1")
+check("gui: chua chon tai khoan nghe thi bao ro, khong gui", r.get("ok") is False and "Chưa chọn tài khoản" in r.get("error", ""))
+_st_send["zalo_listener"]["conn_id"] = "cNGHE"
+
+zl.send_zalo = _orig_send
+
+# Plugin javis_zalo_send: min_mode safe -> loop nen (readonly) KHONG goi duoc.
+src8 = open("zalo_listener.py", encoding="utf-8").read()
+check("gui: co ham send_from_chat khoa cung vao cfg.conn_id, khong nhan tai khoan tu ben ngoai",
+      "async def send_from_chat" in src8 and "conn_id = cfg.get(\"conn_id\")" in src8)
+psrc = open("../system/plugins/zalo-send/plugin.py", encoding="utf-8").read()
+check("gui: plugin min_mode safe (loop readonly khong tu gui), goi send_from_chat chu khong tool tho",
+      "min_mode=\"safe\"" in psrc
+      and "zalo_listener_feature.send_from_chat" in psrc
+      and "api.sendMessage" not in psrc and "zalo__zalo_send_message" not in psrc)
+cmd = open("../CLAUDE.md", encoding="utf-8").read()
+check("gui: CLAUDE.md dan dung javis_zalo_send, cam tool tho",
+      "javis_zalo_send" in cmd and "KHÔNG dùng `zalo_send_message` thô" in cmd)
+
+
 print("\n" + ("TAT CA OK" if not _fails else f"{len(_fails)} FAIL: {_fails}"))
 sys.exit(1 if _fails else 0)

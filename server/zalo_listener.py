@@ -1402,6 +1402,46 @@ def register(app, deps: ZaloListenerDeps):
         except Exception as e:
             print(f"[zalo listener] đóng lúc tắt app lỗi: {e}", file=sys.stderr)
 
+    async def send_from_chat(target, text) -> dict:
+        """Gửi tin Zalo AN TOÀN theo yêu cầu chủ trong chat. Trả dict {ok, ...}.
+
+        Vá đúng lỗi gửi nhầm người (Minh Quý -> Đặng Vũ). Hai rào CỨNG bằng cấu trúc, không
+        dựa vào engine tự giữ mình:
+          1. Luôn gửi TỪ tài khoản đang nghe (cfg.conn_id) qua lệnh một lần - KHÔNG rơi sang
+             connector Zalo khác đang bật như đường tool thô. Không đụng va chạm phiên vì
+             lệnh một lần chỉ mở kết nối tích tắc.
+          2. Người nhận PHẢI là cuộc chat trong danh sách đang theo dõi (roster của đúng tài
+             khoản đó). Không tra tên trong danh bạ tài khoản khác -> không thể ra "Đặng Vũ".
+        Tên khớp nhiều thì TỪ CHỐI và bắt hỏi lại, y như đường đặt luật - đoán bừa là gửi
+        nhầm không thu hồi được.
+        """
+        cfg = read_cfg(deps)
+        conn_id = cfg.get("conn_id")
+        if not conn_id:
+            return {"ok": False, "error": "Chưa chọn tài khoản Zalo để nghe. Vào trang Kết nối chọn tài khoản trước."}
+        text = str(text or "").strip()
+        if not text:
+            return {"ok": False, "error": "Chưa có nội dung tin để gửi."}
+        cands = [{"id": x.get("id"), "name": x.get("name")} for x in roster.list()]
+        if not cands:
+            return {"ok": False, "error": "Danh sách theo dõi đang trống. Chỉ gửi được cho cuộc "
+                    "chat Javis đang nghe; đợi có tin đi qua để cuộc chat hiện ra, hoặc kiểm tra listener đã bật chưa."}
+        hits = zalo_rules.match_threads(cands, str(target))
+        if not hits:
+            seen = ", ".join((c.get("name") or c.get("id")) for c in cands[:12])
+            return {"ok": False, "error": f"Không có cuộc chat nào tên '{target}' trong danh sách "
+                    f"đang theo dõi. Chỉ gửi được cho cuộc chat Javis đang nghe. Đang thấy: {seen}."}
+        if len(hits) > 1:
+            ds = "; ".join(f"{h.get('name')} (id {h.get('id')})" for h in hits[:8])
+            return {"ok": False, "error": f"'{target}' khớp {len(hits)} cuộc chat: {ds}. Hỏi lại "
+                    f"chủ đúng cái nào rồi gọi lại với thread_id chính xác - đừng đoán."}
+        hit = hits[0]
+        tt = next((x.get("type") for x in roster.list() if str(x.get("id")) == str(hit["id"])), "user")
+        ok, err = await send_zalo(deps, conn_id, hit["id"], tt or "user", text)
+        if not ok:
+            return {"ok": False, "error": f"Gửi không được: {err}"}
+        return {"ok": True, "sent_to": hit.get("name") or hit["id"], "thread_id": hit["id"]}
+
     return type("ZaloListenerFeature", (), {
         "runner": runner, "autostart": staticmethod(autostart),
         "shutdown": staticmethod(shutdown),
@@ -1413,4 +1453,7 @@ def register(app, deps: ZaloListenerDeps):
         "pending": pending,
         # Plugin javis_zalo_rule đọc để khớp TÊN nhóm chủ nói sang thread_id.
         "roster_list": staticmethod(roster.list),
+        # Plugin javis_zalo_send gọi để gửi tin AN TOÀN: khoá cứng vào tài khoản đang nghe,
+        # chỉ gửi cho cuộc chat đang theo dõi. KHÔNG dùng tool Zalo thô (dễ nhầm tài khoản).
+        "send_from_chat": staticmethod(send_from_chat),
     })()

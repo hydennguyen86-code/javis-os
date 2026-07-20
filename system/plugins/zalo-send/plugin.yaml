@@ -1,0 +1,10 @@
+name: Gửi tin Zalo an toàn
+slug: zalo-send
+version: 1.0.0
+description: Gửi tin nhắn Zalo THAY cho tool thô. Khoá cứng vào tài khoản đang nghe và chỉ gửi được cho cuộc chat trong danh sách đang theo dõi, nên không thể nhầm tài khoản hay nhầm người. Tên khớp nhiều thì từ chối, bắt hỏi lại.
+author: Javis (bundled)
+enabled: true
+min_mode: safe
+tools:
+  - javis_zalo_send
+hooks: []

@@ -4,6 +4,15 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.142] - 2026-07-21
+Sửa lỗi nghiêm trọng: bảo Javis gửi tin Zalo cho một người thì nó nhắn nhầm sang người khác không trong danh sách theo dõi.
+### Sửa lỗi
+- **Gửi tin Zalo qua chat có thể ra nhầm tài khoản và nhầm người**: khi bật nghe một tài khoản, listener tự tắt connector của tài khoản đó, nên khi chủ bảo gửi tin, engine lặng lẽ rơi sang một tài khoản Zalo khác đang bật, tra tên người nhận trong danh bạ của tài khoản sai rồi gửi từ tài khoản sai. Không có bước xác nhận nên tin bay đi luôn, không thu hồi được. Đây là hệ quả của cơ chế tự tắt connector thêm việc engine được tự do gửi mà không phải chắc đúng người.
+- Thêm công cụ gửi Zalo an toàn riêng, khoá cứng vào tài khoản đang nghe và chỉ gửi được cho cuộc chat trong danh sách đang theo dõi, nên về mặt cấu trúc không thể gửi nhầm tài khoản hay nhầm người. Tên khớp nhiều thì công cụ từ chối và bắt hỏi lại, không đoán. Không có trong danh sách theo dõi thì từ chối.
+- Dặn Javis trong hướng dẫn hệ thống dùng công cụ an toàn này khi được yêu cầu gửi tin, tuyệt đối không dùng công cụ thô.
+### An toàn
+- Công cụ gửi ở mức quyền an toàn, nên vòng lặp nền chạy chế độ chỉ đọc không thể tự gửi tin. Chỉ khi chủ yêu cầu trực tiếp trong chat mới gửi.
+
 ## [0.9.141] - 2026-07-20
 Sửa lỗi ảnh Javis tạo trong lúc chat Telegram cứ gửi về tài khoản Telegram đầu tiên thay vì người đang hỏi.
 ### Sửa lỗi
