@@ -4,6 +4,12 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.139] - 2026-07-20
+Sửa lỗi gốc khiến mọi thay đổi giao diện của nhiều bản gần đây trở nên vô hình với trình duyệt.
+### Sửa lỗi
+- **Trình duyệt giữ mãi bản giao diện cũ trong cache**: mỗi file javascript và css được đánh số phiên bản bằng tay trong trang chủ, và con số của console.js đứng yên suốt hàng chục bản. Vì địa chỉ tải không đổi nên trình duyệt cứ dùng bản cũ trong bộ nhớ đệm, máy chủ cập nhật thật mà giao diện đóng băng. Đây là lý do các sửa đổi như thiết kế hai trạng thái, nút không còn chìm, hạn chờ, đều có trên máy chủ nhưng người dùng không hề thấy.
+- Nay trang chủ tự gắn phiên bản app vào mọi file javascript và css khi phục vụ, nên mỗi lần cập nhật là trình duyệt tải lại toàn bộ, không phải nhớ tăng số bằng tay nữa và không thể quên.
+
 ## [0.9.138] - 2026-07-20
 Sửa lỗi nút Bật nghe bấm vào rồi chìm mãi, không bật được cũng không hồi lại.
 ### Sửa lỗi

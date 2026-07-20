@@ -149,6 +149,20 @@ _p = _sp.run([sys.executable, _upd, "--dry-run", "--port", "7777"],
 check("updater --dry-run thoát 0", _p.returncode == 0)
 check("updater --dry-run in PLAN", "PLAN:" in (_p.stdout or ""))
 
+# Khoá cache tĩnh phải gắn theo PHIÊN BẢN, không phải số gõ tay. Bug thật: console.js?v=72
+# đứng yên suốt hàng chục bản nên trình duyệt dùng bản CŨ trong cache, mọi sửa frontend vô
+# hình. Test này chốt: trang chủ phục vụ .js/.css với ?v=<phiên bản app>.
+import asyncio as _aio  # noqa: E402
+_html = _aio.run(main.root()).body.decode("utf-8")
+_ver = main._app_version()
+check("trang chủ gắn phiên bản app vào console.js (chống cache giao diện cũ)",
+      f"console.js?v={_ver}" in _html)
+check("KHÔNG còn khoá cache gõ tay ?v=72 (đã thay bằng phiên bản)",
+      "?v=72" not in _html)
+import re as _re2  # noqa: E402
+_stale = [m for m in _re2.findall(r'/static/\S+?\.(?:js|css)\?v=([\w.]+)', _html) if m != _ver]
+check("mọi file .js/.css đều mang đúng phiên bản, không sót cái nào", not _stale)
+
 print()
 if _fails:
     print(f"{len(_fails)} FAIL: {_fails}"); sys.exit(1)
