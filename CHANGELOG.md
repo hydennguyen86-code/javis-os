@@ -4,6 +4,18 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.111] - 2026-07-20
+Viết lại hướng dẫn đăng nhập của TẤT CẢ 23 connector cho dễ đọc, và sửa lỗi hộp hướng dẫn bị tràn ngang. Trước đây cả 23 guide đều là MỘT đoạn văn chạy dài không ngắt dòng, các bước (1)(2)(3) chen ngang giữa câu; gặp chuỗi dài không khoảng trắng (lệnh shell, URL callback) thì hộp bị đẩy tràn ra ngoài modal, phải kéo ngang mới đọc hết.
+### Sửa lỗi
+- **Hộp hướng dẫn không tràn ngang nữa**: thêm `overflow-wrap: anywhere` cho `.conn-guide` và `.conn-risk`, nên lệnh shell dài hay URL callback tự bẻ dòng thay vì đẩy tràn. Đã đo trên modal thật rộng 520px: `scrollWidth == clientWidth`, không còn thanh cuộn ngang.
+- **Xuống dòng trong catalog giờ hiện đúng**: thêm `white-space: pre-line`, nên ký tự xuống dòng viết trong `mcp-catalog.json` hiện thành xuống dòng thật trên giao diện (guide là chuỗi thuần đi qua `esc()`, trước đây HTML nuốt hết).
+### Cải thiện
+- **23/23 guide viết lại theo một khuôn**: dòng "Cần trước:" cho thứ phải cài sẵn, rồi "Làm 1 lần:" với mỗi bước một dòng đánh số, cuối cùng là ghi chú và cảnh báo tách đoạn riêng. Nội dung sự thật giữ nguyên, chỉ đổi cách trình bày.
+- **Tách các đoạn quá dài**: `meta-ads` (226 ký tự), `facebook-personal` (235), `google-keep` (204) được cắt thành đoạn ngắn hơn. Bước 2 của `facebook-personal` vốn nhồi cả quy trình DevTools vào một câu, nay tách thành 3 bước riêng.
+- **Entry `google-keep` khớp style file**: mảng gọn trên một dòng như 22 connector còn lại, thay vì mỗi phần tử một dòng.
+### Thêm mới
+- Test `server/test_catalog_guides.py` (10 kiểm tra, không mạng): guide dài phải có xuống dòng, không dòng nào quá 200 ký tự, bước đánh số phải mở đầu dòng, CSS phải thật sự khai `pre-line` + `overflow-wrap`, và cấm em dash / en dash trong cả file. Có canary chứng minh luật bắt được chuỗi kiểu cũ.
+
 ## [0.9.110] - 2026-07-20
 Thêm connector **Google Keep** để Javis đọc và thao tác ghi chú Keep, kèm việc thêm `uv` vào Docker image (vá luôn 4 connector `uvx` khác vốn không chạy được trên VPS). Google Keep không có API chính chủ cho tài khoản gmail thường nên connector này đi qua thư viện không chính thức và đòi Google master token, loại token có TOÀN QUYỀN tài khoản Google chứ không giới hạn phạm vi như OAuth. Rủi ro này được ghi thẳng vào phần cảnh báo của connector.
 ### Thêm mới

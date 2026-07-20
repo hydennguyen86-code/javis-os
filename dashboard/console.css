@@ -428,10 +428,15 @@ body.has-rail .hud { margin-left: var(--rail-w); width: calc(100% - var(--rail-w
 .conn-form::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; border: 2px solid transparent; background-clip: content-box; }
 .conn-form::-webkit-scrollbar-thumb:hover { background: var(--accent); background-clip: content-box; }
 .conn-form .mcp-lb { display: flex; flex-direction: column; gap: 4px; font-size: 14px; opacity: .85; }
+/* white-space: pre-line -> xuống dòng viết trong mcp-catalog.json hiện ĐÚNG thành xuống dòng
+   (guide là chuỗi thuần đi qua esc(), không phải HTML). overflow-wrap: anywhere -> chuỗi dài
+   không khoảng trắng (lệnh shell, URL callback) bẻ dòng thay vì đẩy tràn ngang cả modal. */
 .conn-guide { font-size: 13px; opacity: .8; background: rgba(77,163,255,.08);
-  border: 1px solid rgba(77,163,255,.25); border-radius: 8px; padding: 9px 12px; line-height: 1.5; }
+  border: 1px solid rgba(77,163,255,.25); border-radius: 8px; padding: 9px 12px; line-height: 1.6;
+  white-space: pre-line; overflow-wrap: anywhere; }
 .conn-risk { font-size: 13px; background: rgba(217,165,33,.10); border: 1px solid rgba(217,165,33,.45);
-  border-radius: 8px; padding: 10px 12px; line-height: 1.55; }
+  border-radius: 8px; padding: 10px 12px; line-height: 1.55;
+  white-space: pre-line; overflow-wrap: anywhere; }
 .conn-wizard { display: flex; flex-direction: column; gap: 10px; }
 .wiz-links { display: flex; flex-wrap: wrap; gap: 8px; }
 .wiz-links .wiz-open { margin-left: 0; font-size: 13px; padding: 7px 12px; }
