@@ -4,6 +4,13 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.138] - 2026-07-20
+Sửa lỗi nút Bật nghe bấm vào rồi chìm mãi, không bật được cũng không hồi lại.
+### Sửa lỗi
+- **Endpoint bật nghe chặn cả vòng lặp sự kiện**: nó ghi cấu hình, giải mã kết nối và chờ luồng cũ dừng, tất cả làm đồng bộ ngay trong hàm bất đồng bộ, nên trong lúc đó máy chủ không phục vụ được gì khác và nút treo. Nay phần nặng chạy trong luồng riêng, vòng lặp không bị nghẽn.
+- **Chờ luồng cũ quá lâu**: khi bật lại ngay sau khi tắt, trước đây chờ tới mười lăm giây. Nay giết tiến trình con trước rồi chỉ chờ bốn giây, vì dừng xong là nó thoát ngay.
+- **Nút không tự hồi khi request lỗi**: thiếu bước bật lại nút trong mọi trường hợp, nên chỉ cần request chậm hay lỗi là nút kẹt vĩnh viễn. Nay nút luôn được bật lại, và lệnh gọi có hạn chờ ba mươi giây, quá hạn thì báo máy chủ không phản hồi thay vì chìm mãi.
+
 ## [0.9.137] - 2026-07-20
 Sửa lỗi báo chưa chọn tài khoản Zalo trong khi ô chọn rõ ràng đang hiện tên tài khoản.
 ### Sửa lỗi

@@ -885,8 +885,10 @@ class _Runner:
                 return {"ok": True, "already": True}
             # Luồng cũ đang dừng DỞ: nếu cứ trả "đã chạy rồi" thì cờ dừng vẫn còn bật,
             # luồng cũ thoát và đặt state="off" trong khi settings nói đang bật. Phải
-            # chờ nó thoát hẳn rồi mới dựng luồng mới.
-            self._thread.join(timeout=15)
+            # chờ nó thoát hẳn rồi mới dựng luồng mới. _kill_tree() vừa gọi đã giết tiến
+            # trình con nên luồng thoát nhanh - chờ 4s là đủ, đừng để endpoint treo lâu.
+            self._kill_tree()
+            self._thread.join(timeout=4)
         self._stop.clear()
         self.error = ""
         self._thread = threading.Thread(target=self._loop, args=(home,), daemon=True)
@@ -1154,6 +1156,12 @@ def register(app, deps: ZaloListenerDeps):
 
     @router.post("/zalo-listener/start")
     async def start(payload: dict = Body(default={})):
+        # Chạy trong luồng riêng: thân hàm đụng nhiều I/O đồng bộ (ghi settings, giải mã
+        # secret, chờ luồng cũ thoát) - để thẳng trong endpoint async thì nó chặn cả vòng
+        # lặp sự kiện, làm nhịp /status treo theo và nút "Bật nghe" chìm mãi không hồi.
+        return await asyncio.to_thread(_start_sync, payload or {})
+
+    def _start_sync(payload: dict) -> dict:
         # Lưu cấu hình nhưng CHƯA bật. Bật trước rồi mới kiểm là để lại trạng thái mâu thuẫn:
         # settings nói đang bật, tiến trình thì không chạy, giao diện hiện "Đang tắt" ngay
         # cạnh nút "Tắt". Đúng lỗi đã gặp trên VPS.
@@ -1185,6 +1193,9 @@ def register(app, deps: ZaloListenerDeps):
 
     @router.post("/zalo-listener/stop")
     async def stop():
+        return await asyncio.to_thread(_stop_sync)
+
+    def _stop_sync() -> dict:
         cfg = read_cfg(deps)
         write_cfg(deps, {"enabled": False})
         res = runner.stop()

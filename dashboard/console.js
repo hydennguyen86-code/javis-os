@@ -2139,9 +2139,20 @@
   }
 
   // ---- Trang MCP - quản lý server công cụ ngoài cho engine Claude Code ----
-  async function postJson(url, obj) {
-    try { return await (await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(obj || {}) })).json(); }
-    catch (e) { return { ok: false, error: String(e) }; }
+  async function postJson(url, obj, timeoutMs) {
+    // Hạn chờ: request treo (vd server bận vòng lặp sự kiện) phải nổi lên thành lỗi đọc
+    // được, chứ không để nút bấm chìm mãi. 0 = không giới hạn (giữ hành vi cũ cho chỗ khác).
+    const ctl = timeoutMs ? new AbortController() : null;
+    const timer = ctl ? setTimeout(() => ctl.abort(), timeoutMs) : null;
+    try {
+      const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" },
+                                   body: JSON.stringify(obj || {}), signal: ctl ? ctl.signal : undefined });
+      return await r.json();
+    } catch (e) {
+      return { ok: false, error: (ctl && e && e.name === "AbortError")
+        ? "Máy chủ không phản hồi sau " + Math.round(timeoutMs / 1000) + "s. Thử lại giúp em."
+        : String(e) };
+    } finally { if (timer) clearTimeout(timer); }
   }
   function parseKV(text, sep) {
     const o = {};
@@ -2437,10 +2448,17 @@
     $("zlToggle").onclick = async () => {
       $("zlErr").textContent = "";
       $("zlToggle").disabled = true;
-      const r = await postJson(on ? "/zalo-listener/stop" : "/zalo-listener/start", on ? {} : cfgBody());
-      $("zlToggle").disabled = false;
-      if (r.ok === false) { $("zlErr").textContent = r.error || "Lỗi"; return; }
-      try { paint(await (await fetch("/zalo-listener/status")).json()); } catch (e) {}
+      $("zlToggle").textContent = on ? "Đang tắt…" : "Đang bật…";
+      try {
+        const r = await postJson(on ? "/zalo-listener/stop" : "/zalo-listener/start",
+                                 on ? {} : cfgBody(), 30000);
+        if (r.ok === false) { $("zlErr").textContent = r.error || "Lỗi"; }
+        try { paint(await (await fetch("/zalo-listener/status")).json()); } catch (e) {}
+      } finally {
+        // LUÔN bật lại nút dù có lỗi gì - trước đây thiếu finally nên request treo là
+        // nút chìm mãi, không bấm lại được.
+        $("zlToggle").disabled = false;
+      }
     };
     $("zlClear").onclick = async () => {
       if (!confirm("Xoá phiên đăng nhập Zalo của tài khoản này? Sau đó anh phải quét QR lại "
