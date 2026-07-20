@@ -4,6 +4,17 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.118] - 2026-07-20
+Thêm khả năng nghe tin Zalo LIÊN TỤC. Trước đây connector Zalo là pull-only: phải gọi tool mới biết có tin, mà pool MCP lại đóng tiến trình sau 10 phút không dùng (`mcp_client._IDLE_TTL`), nên websocket và bộ đệm tin của `zalo-agent-cli mcp start` không sống sót. Giờ Javis chạy một tiến trình sidecar riêng, độc lập với pool, nhận tin ngay khi khách nhắn rồi báo về Telegram.
+### Thêm mới
+- **Listener Zalo chạy nền**: sidecar `zalo-agent-cli listen --webhook` đẩy từng sự kiện về `/hook/zalo`, Javis lọc rồi bắn Telegram. Bật tắt ngay trong thẻ Zalo ở trang Kết nối, có hiện trạng thái thật (đang nghe, mất kết nối đang thử lại, trùng phiên). Tự dựng lại khi đứt với backoff 5s rồi 30s rồi 120s rồi 300s, và tự bật lại sau khi khởi động lại app.
+- **Lọc mặc định chặt**: chỉ báo tin nhắn riêng có chứa từ khoá, không báo nhóm. Khớp từ khoá bỏ dấu và không phân biệt hoa thường nên khách gõ "gia" vẫn khớp "giá". Có danh sách cuộc chat theo dõi riêng, giờ im lặng, khử trùng msgId, và trần 20 thông báo mỗi 10 phút để nhóm đông không làm nổ Telegram.
+### Bảo mật
+- **`/hook/zalo` hai tầng rào**: chỉ nhận từ loopback (`_AUTH_LOCAL_EXACT`), cộng shared secret sinh tự động. Secret đi trong query chứ không phải header, vì `--webhook` của CLI chỉ POST JSON trần và không đặt được header tuỳ ý; gác bằng header sẽ chặn sạch tin. Loopback một mình không đủ vì tiến trình khác trên cùng VPS cũng là loopback. Secret không bao giờ trả ra frontend.
+- **Javis vẫn không tự trả lời khách**: listener chỉ đọc và báo. Gửi tin Zalo vẫn phải do chủ yêu cầu trực tiếp trong chat.
+### Đã biết
+- Zalo chỉ cho MỘT socket mỗi tài khoản, nên connector `zalo` và sidecar có thể đá nhau nếu dùng chung tài khoản. Chưa kiểm chứng được nên thiết kế chọn làm va chạm hiện rõ: bắt chuỗi trùng phiên trong log, đẩy lên giao diện và dừng hẳn thay vì quay vòng vô ích.
+
 ## [0.9.117] - 2026-07-20
 Sửa lỗi báo nhầm "Chưa cài Codex CLI" khiến không chat được bằng gói ChatGPT dù đã đăng nhập thành công. Nguyên nhân: binary codex không nằm trong PATH nên Javis phải dò nó trong thư mục home, mà home lại lấy mỗi từ biến môi trường USERPROFILE; khi server được bật lại bởi tự-cập-nhật hay tác vụ nền thì biến này có thể trống, home thành rỗng nên mọi đường dẫn ~/.codex/... hoá ra tương đối và không khớp, dù binary vẫn nằm nguyên chỗ cũ.
 ### Sửa lỗi

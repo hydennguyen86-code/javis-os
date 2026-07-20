@@ -79,7 +79,10 @@ _AUTH_PUBLIC_EXACT = ("/", "/favicon.ico", "/auth/status", "/auth/login", "/auth
 # /reminders/cancel đi cùng nhóm với /reminders (TẠO nhắc): huỷ là thao tác YẾU HƠN tạo, nên
 # miễn cùng mức là nhất quán chứ không nới rào - thiếu nó thì javis_schedule (plugin in-process,
 # gọi localhost không cookie) huỷ nhắc hẹn LUÔN lỗi 401 khi đã bật mật khẩu (gate_active()=True).
-_AUTH_LOCAL_EXACT = ("/telegram/send-file", "/reminders", "/reminders/cancel")
+# /hook/zalo: sidecar `zalo-agent-cli listen` (tiến trình con cùng máy/container) POST sự kiện
+# tin nhắn vào đây - không có cookie. Vẫn KHÔNG hở: ngoài rào loopback này còn phải khớp
+# secret trong header X-Javis-Zalo-Secret (xem zalo_listener.register).
+_AUTH_LOCAL_EXACT = ("/telegram/send-file", "/reminders", "/reminders/cancel", "/hook/zalo")
 
 
 @app.middleware("http")
@@ -3238,6 +3241,23 @@ reminders_feature = reminders_mod.register(app, reminders_mod.RemindersDeps(
 ))
 
 
+# ============================================================
+# LISTENER ZALO LIÊN TỤC (zalo_listener.py) - sidecar `zalo-agent-cli listen`.
+# Connector `zalo` qua MCP là PULL-ONLY và bị mcp_client._IDLE_TTL=600 giết sau 10 phút
+# không dùng, nên nghe liên tục phải có tiến trình sống ĐỘC LẬP với pool MCP: nó POST
+# mỗi tin về /hook/zalo → lọc theo từ khoá → báo Telegram. KHÔNG tự trả lời khách.
+# ============================================================
+import zalo_listener as zalo_listener_mod
+
+zalo_listener_feature = zalo_listener_mod.register(app, zalo_listener_mod.ZaloListenerDeps(
+    read_settings=cfgmod.read_settings,
+    write_settings=cfgmod.write_settings,
+    get_connection=mcp_store.get_connection,
+    notify=_notify_owner,                 # báo cho CHỦ (owner_chat rỗng → ID Telegram đầu tiên)
+    port=lambda: _javis_port(),           # định nghĩa phía dưới - lambda nên resolve lúc gọi
+))
+
+
 @app.get("/viec/all")
 async def viec_all():
     """Gộp MỌI brain cho trang Việc: mỗi brain kèm loop + nhắc hẹn đang chờ, mỗi item gắn
@@ -3650,6 +3670,12 @@ async def _start_scheduler():
                   "=" * 66 + "\n", file=_sys.stderr)
     except Exception as e:
         print(f"[auth bootstrap] {e}", file=_sys.stderr)
+    try:
+        # Listener Zalo: chủ đã bật trước đó thì dựng lại sidecar sau khi app khởi động lại
+        # (VPS reboot / cập nhật) - không bắt chủ vào bấm bật tay mỗi lần.
+        await zalo_listener_feature.autostart()
+    except Exception as e:
+        print(f"[zalo listener autostart] {e}", file=_sys.stderr)
 
     async def _scheduler_loop():
         while True:

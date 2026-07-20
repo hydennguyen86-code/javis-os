@@ -156,6 +156,14 @@ check("rào: /reminders (tạo nhắc) vẫn còn được miễn (không mất 
 # self_improve; chính plugin javis_schedule đã lý luận "KHÔNG dùng POST /loops vì cần đăng nhập").
 check("rào: /loops KHÔNG nằm trong _AUTH_LOCAL_EXACT (path lạ không tự nhiên được miễn)",
       "/loops" not in main._AUTH_LOCAL_EXACT)
+# /hook/zalo: sidecar `zalo-agent-cli listen` là tiến trình CON cùng máy, POST sự kiện tin nhắn
+# vào đây mà không có cookie. Miễn loopback là BẮT BUỘC, nhưng loopback KHÔNG đủ làm rào (tiến
+# trình khác trên cùng VPS cũng là loopback) → tầng hai là secret trong header, xem test_zalo_listener.
+check("rào: /hook/zalo được miễn đăng nhập localhost (sidecar không có cookie)",
+      "/hook/zalo" in main._AUTH_LOCAL_EXACT)
+import zalo_listener as _zl  # noqa: E402
+check("rào: /hook/zalo còn tầng hai là secret header (loopback một mình không đủ)",
+      bool(_zl.SECRET_HEADER) and "secret" in _zl.DEFAULT_CFG)
 
 print()
 if _fails:

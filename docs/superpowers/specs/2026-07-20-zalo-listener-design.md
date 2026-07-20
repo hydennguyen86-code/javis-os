@@ -110,8 +110,15 @@ trạng thái thật: đang nghe, mất kết nối đang thử lại, hay trùn
 
 ## An toàn
 
-- Endpoint chỉ nhận từ `127.0.0.1`/`::1`, kèm shared secret trong header
-  `X-Javis-Zalo-Secret` phòng tiến trình khác trên VPS gọi bừa.
+- Endpoint chỉ nhận từ `127.0.0.1`/`::1`, kèm shared secret phòng tiến trình khác
+  trên cùng VPS gọi bừa.
+
+  Secret đi trong **query** (`/hook/zalo?k=...`), không phải header. Lý do: cờ
+  `--webhook <url>` của `zalo-agent-cli` chỉ POST JSON trần, không có cách đặt
+  header tuỳ ý, nên gác bằng header là chặn sạch tin và tính năng chết câm.
+  Đánh đổi chấp nhận được vì kênh này chỉ sống trên loopback: rào CHÍNH là
+  `_AUTH_LOCAL_EXACT` cộng loopback, secret chỉ là tầng hai. Endpoint vẫn nhận
+  cả header cho ai tự dựng nguồn đẩy khác.
 - Javis vẫn **không tự gửi tin Zalo**. Loop nền vẫn bị cấm gửi như hiện tại.
 - Giới hạn tần suất thông báo để một nhóm đông không làm nổ Telegram.
 - `home_dir` chứa `zalo-session.json`, tương đương quyền đăng nhập đầy đủ. Đã

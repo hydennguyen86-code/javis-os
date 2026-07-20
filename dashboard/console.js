@@ -2200,7 +2200,79 @@
       + '<div class="prov-head"><span class="conn-ico">' + iconInner(con) + '</span>'
       + '<div class="prov-info"><div class="prov-name">' + esc(con.name || con.id) + '</div>'
       + '<div class="prov-status">' + esc(con.description || "") + '</div></div></div>'
-      + '<div class="conn-accounts">' + chips + '</div></div>';
+      + '<div class="conn-accounts">' + chips + '</div>'
+      + (con.id === "zalo" ? zaloListenerPanel(conns) : "")
+      + '</div>';
+  }
+
+  // Panel "Nghe tin liên tục" trong thẻ Zalo. Sidecar `zalo-agent-cli listen` chạy nền,
+  // đẩy tin về /hook/zalo → lọc từ khoá → báo Telegram. Javis KHÔNG tự trả lời khách.
+  const ZL_STATE = {
+    off: ["Đang tắt", ""],
+    starting: ["Đang khởi động…", "#d9a521"],
+    listening: ["● Đang nghe", "#2c7a4b"],
+    reconnecting: ["Mất kết nối, đang thử lại…", "#d9a521"],
+    duplicate: ["Trùng phiên - tài khoản này đang bị dùng ở nơi khác", "#c0392b"],
+    error: ["Lỗi", "#c0392b"],
+  };
+  function zaloListenerPanel(conns) {
+    const opts = conns.map(c => '<option value="' + esc(c.id) + '">' + esc(c.label || c.id) + '</option>').join("");
+    return '<div class="zl-panel" style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.08)">'
+      + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+      + '<b style="font-size:13px">Nghe tin liên tục</b>'
+      + '<span id="zlState" class="mp-note">đang tải…</span>'
+      + '<button class="mp-btn" id="zlToggle" style="margin-left:auto">…</button></div>'
+      + '<div class="gcard-meta" style="margin-top:6px">Chạy nền một tiến trình riêng để nhận tin ngay khi khách nhắn, rồi báo về Telegram. Javis không tự trả lời khách.</div>'
+      + '<div id="zlForm" style="margin-top:10px;display:flex;flex-direction:column;gap:8px">'
+      + '<label class="mcp-lb">Tài khoản Zalo dùng để nghe<select class="js-input" id="zlConn">' + opts + '</select></label>'
+      + '<label class="mcp-lb">Chỉ báo khi tin có chứa (cách nhau bằng dấu phẩy - để trống là báo mọi tin)'
+      + '<input class="js-input" id="zlKw" placeholder="giá, còn hàng, đặt, ship"></label>'
+      + '<label class="mcp-lb">Giờ im lặng (tuỳ chọn, vd 23-07)<input class="js-input" id="zlQuiet" placeholder="23-07" style="max-width:140px"></label>'
+      + '<label style="font-size:13px;cursor:pointer"><input type="checkbox" id="zlDm"> Bỏ qua tin nhóm, chỉ báo tin nhắn riêng</label>'
+      + '<div class="mp-note" id="zlErr" style="color:#c0392b"></div></div></div>';
+  }
+  async function wireZaloListener(el) {
+    const panel = el.querySelector(".zl-panel");
+    if (!panel) return;
+    const $ = id => panel.querySelector("#" + id);
+    let on = false;
+    const paint = (st) => {
+      const [txt, color] = ZL_STATE[st.state] || ZL_STATE.off;
+      on = !!st.enabled;
+      $("zlState").textContent = st.enabled ? txt : "Đang tắt";
+      $("zlState").style.color = st.enabled ? color : "";
+      $("zlToggle").textContent = on ? "Tắt" : "Bật nghe";
+      $("zlToggle").classList.toggle("primary", !on);
+      $("zlErr").textContent = (st.enabled && st.error) ? st.error : "";
+    };
+    let st;
+    try { st = await (await fetch("/zalo-listener/status")).json(); } catch (e) { return; }
+    const c = st.cfg || {};
+    if (c.conn_id) $("zlConn").value = c.conn_id;
+    $("zlKw").value = (c.keywords || []).join(", ");
+    $("zlQuiet").value = c.quiet_hours || "";
+    $("zlDm").checked = c.dm_only !== false;
+    paint(st);
+    $("zlToggle").onclick = async () => {
+      $("zlErr").textContent = "";
+      $("zlToggle").disabled = true;
+      const body = {
+        conn_id: $("zlConn").value,
+        keywords: $("zlKw").value.split(",").map(s => s.trim()).filter(Boolean),
+        quiet_hours: $("zlQuiet").value.trim(),
+        dm_only: $("zlDm").checked,
+      };
+      const r = await postJson(on ? "/zalo-listener/stop" : "/zalo-listener/start", on ? {} : body);
+      $("zlToggle").disabled = false;
+      if (r.ok === false) { $("zlErr").textContent = r.error || "Lỗi"; return; }
+      try { paint(await (await fetch("/zalo-listener/status")).json()); } catch (e) {}
+    };
+    // Trạng thái thật đến từ tiến trình nền (đang nghe / đứt / trùng phiên) nên phải hỏi lại.
+    clearInterval(window._zlPoll);
+    window._zlPoll = setInterval(async () => {
+      if (!document.body.contains(panel)) { clearInterval(window._zlPoll); return; }
+      try { paint(await (await fetch("/zalo-listener/status")).json()); } catch (e) {}
+    }, 5000);
   }
   function catalogCard(con) {
     const soon = con.status === "soon";
@@ -2504,6 +2576,7 @@
       + '<div class="gcard-meta" style="max-width:740px">Các MCP anh đã kết nối sẵn trong Claude Code (đồng bộ từ claude.ai). Engine Claude Code tự dùng các cái "Connected". Đăng nhập/quản lý trong app Claude, không sửa ở đây.</div>'
       + '<div class="prov-list" id="mcpAmbient" style="margin-top:12px"><div class="mp-empty">Đang tải… (kiểm tra sức khoẻ MCP, hơi lâu)</div></div></div>';
     document.getElementById("mcpStrict").onchange = (e) => postJson("/mcp/strict", { strict: e.target.checked });
+    wireZaloListener(el);   // panel "Nghe tin liên tục" trong thẻ Zalo (chỉ có khi đã nối Zalo)
     const isFirst = conns.length === 0;
     el.querySelectorAll("[data-connect]").forEach(b => b.onclick = () => openAddFlow(el, byId[b.dataset.connect], isFirst));
     el.querySelectorAll("[data-addacc]").forEach(b => b.onclick = () => openAddFlow(el, byId[b.dataset.addacc], false));
