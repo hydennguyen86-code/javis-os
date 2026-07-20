@@ -360,5 +360,41 @@ check("bật hụt: /status vẫn giữ lý do để nhịp hỏi lại 5s khôn
       bool(st_after.get("error")))
 
 
+# ---- 10. Tin NHÓM phải lên được danh sách, và không spam lúc nối lại ----
+# Chủ thêm tài khoản vào một nhóm rồi mà nhóm không hiện ra để chọn. Hai nguyên nhân:
+# CLI mặc định chỉ gửi "message,friend" (thiếu group), và sổ cũ chỉ ghi đúng kind=="message"
+# nên sự kiện nhóm bị bỏ - mà lúc vừa được thêm vào nhóm thì CHƯA có tin nào cả.
+check("nhóm: CLI được khai đủ 4 loại sự kiện (mặc định thiếu 'group')",
+      "message,friend,group,reaction" in src_zl)
+
+r3 = zl.Roster()
+r3.note(zl.normalize_event({"event": "group_event", "data": {
+    "threadId": "gr1", "threadType": "group", "dName": "Nhóm Kim Khí"}}))
+check("nhóm: sự kiện nhóm (chưa có tin nào) vẫn vào sổ để chủ chọn được ngay",
+      any(x["id"] == "gr1" for x in r3.list()))
+
+W2 = {**zl.DEFAULT_CFG, "enabled": True, "threads": ["gr1"]}
+ok, _ = zl.should_notify({"kind": "group_message", "msg_id": "g1", "thread_id": "gr1",
+                          "thread_type": "group", "text": "cho hỏi giá", "is_self": False}, W2)
+check("nhóm: kind biến thể 'group_message' vẫn tính là tin nhắn", ok)
+
+# old_messages là lịch sử phát lại khi nối lại - báo thì dội cả trăm tin cũ vào Telegram.
+for bad_kind in ("old_messages", "seen_messages", "delivered_messages"):
+    ok, why = zl.should_notify({"kind": bad_kind, "msg_id": "x", "thread_id": "gr1",
+                                "text": "giá", "is_self": False}, W2)
+    check(f"nhóm: '{bad_kind}' KHÔNG báo (tránh dội tin cũ lúc nối lại)",
+          not ok and why == "không phải tin nhắn")
+
+check("chẩn đoán: /status có đếm loại sự kiện thật sự nhận được", "kinds" in src_zl)
+
+# Tiến trình con: npx chỉ là vỏ, node mới giữ websocket. Giết mỗi vỏ thì node sống mồ côi
+# và VẪN đẩy webhook - đúng triệu chứng 'báo chưa chạy mà tin vẫn về'.
+check("tiến trình: có dọn cả cây (taskkill /T trên Windows, killpg trên Linux)",
+      "_kill_tree" in src_zl and "taskkill" in src_zl and "killpg" in src_zl)
+check("tiến trình: Linux tách nhóm riêng thì mới killpg được", "start_new_session" in src_zl)
+check("tiến trình: bật lại lúc luồng cũ đang dừng dở thì phải chờ, không trả 'đã chạy rồi'",
+      "self._thread.join(timeout=15)" in src_zl)
+
+
 print("\n" + ("TAT CA OK" if not _fails else f"{len(_fails)} FAIL: {_fails}"))
 sys.exit(1 if _fails else 0)

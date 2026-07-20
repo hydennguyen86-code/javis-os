@@ -31,6 +31,7 @@ import os
 import re
 import secrets as _secrets
 import shutil
+import signal
 import subprocess
 import sys
 import threading
@@ -73,7 +74,7 @@ DEFAULT_CFG = {
 }
 
 MAX_BODY = 256 * 1024      # trần kích thước 1 payload webhook (chống nhồi bộ nhớ)
-ROSTER_CAP = 60            # trần số cuộc chat ghi nhớ để chọn
+ROSTER_CAP = 300           # trần số cuộc chat ghi nhớ (tài khoản thật có thể hàng trăm nhóm)
 
 
 # ============================================================
@@ -167,7 +168,11 @@ def should_notify(ev: dict, cfg: dict, now: Optional[datetime] = None) -> tuple:
     now = now or datetime.now(VN_TZ)
     if not cfg.get("enabled"):
         return False, "tắt"
-    if (ev.get("kind") or "message") != "message":
+    # Nhận cả biến thể như "group_message": tên sự kiện của CLI chưa chốt nên so khớp
+    # CHÍNH XÁC là dễ hụt. Nhưng phải loại "old_messages" (phát lại lịch sử lúc nối lại -
+    # báo thì spam cả trăm tin cũ) cùng seen/delivered (báo đã xem, không phải tin mới).
+    kind = str(ev.get("kind") or "message").lower()
+    if "message" not in kind or kind.startswith("old") or "seen" in kind or "delivered" in kind:
         return False, "không phải tin nhắn"
     if ev.get("is_self"):
         return False, "tin của mình"
@@ -201,8 +206,11 @@ class Roster:
         self._items: dict = {}
 
     def note(self, ev: dict) -> None:
+        # Ghi sổ MỌI sự kiện có thread_id, không riêng tin nhắn. Lý do: khi chủ vừa thêm
+        # tài khoản vào một nhóm, cái về trước là sự kiện nhóm chứ chưa có tin nào - chờ
+        # đúng "message" thì nhóm mới không bao giờ hiện ra để mà chọn.
         tid = str(ev.get("thread_id") or "")
-        if not tid or (ev.get("kind") or "message") != "message" or ev.get("is_self"):
+        if not tid or ev.get("is_self"):
             return
         it = self._items.get(tid) or {"id": tid, "count": 0}
         # Tên người gửi là dữ liệu KHÔNG tin được (khách tự đặt) - cắt ngắn ở đây,
@@ -340,7 +348,10 @@ class _Runner:
         url = f"http://127.0.0.1:{self.deps.port()}{HOOK_PATH}?k={quote(cfg.get('secret', ''))}"
         # --filter all: sidecar nhận cả tin riêng lẫn nhóm để CÒN THẤY mà liệt kê cho chủ
         # chọn. Việc chặn nằm ở should_notify (whitelist cuộc chat), không phải ở đây.
+        # --events: MẶC ĐỊNH của CLI chỉ là "message,friend" - thiếu "group", nên sự kiện
+        # nhóm không về và nhóm không bao giờ hiện ra để chọn. Khai đủ cả bốn loại.
         argv = [npx, "-y", "zalo-agent-cli", "listen", "--webhook", url,
+                "--events", "message,friend,group,reaction",
                 "--filter", "all", "--no-self"]
         if str(npx).lower().endswith((".cmd", ".bat")):
             argv = ["cmd.exe", "/c"] + argv
@@ -357,6 +368,9 @@ class _Runner:
         kwargs = {}
         if os.name == "nt":
             kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        else:
+            # Nhóm tiến trình riêng để _kill_tree() dọn được cả `node` con của `npx`.
+            kwargs["start_new_session"] = True
         try:
             self.proc = subprocess.Popen(
                 argv, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -425,10 +439,9 @@ class _Runner:
             rc = None
             try:
                 rc = self.proc.poll()
-                if rc is None:
-                    self.proc.kill()
             except Exception:
                 pass
+            self._kill_tree()      # phải dọn cả cây, không thì `node` sống mồ côi
             if self._stop.is_set():
                 break
             if fatal:
@@ -459,10 +472,46 @@ class _Runner:
                 break
         self.state = "off"
 
+    def _kill_tree(self) -> None:
+        """Giết CẢ CÂY tiến trình, không chỉ tiến trình trực tiếp.
+
+        `npx` chỉ là vỏ, nó sinh ra `node` mới là thứ giữ websocket. Gọi proc.kill()
+        trần chỉ giết cái vỏ, còn node sống mồ côi và VẪN đẩy webhook về - triệu chứng
+        đã gặp: giao diện báo tiến trình không chạy trong khi tin vẫn chảy về đều.
+        """
+        p = self.proc
+        if not p:
+            return
+        try:
+            if p.poll() is not None:
+                return
+        except Exception:
+            return
+        try:
+            if os.name == "nt":
+                subprocess.run(["taskkill", "/F", "/T", "/PID", str(p.pid)],
+                               capture_output=True, timeout=15)
+            else:
+                os.killpg(os.getpgid(p.pid), signal.SIGTERM)
+                try:
+                    p.wait(timeout=5)
+                except Exception:
+                    os.killpg(os.getpgid(p.pid), signal.SIGKILL)
+        except Exception:
+            try:
+                p.kill()          # cùng lắm thì giết được cái vỏ còn hơn không
+            except Exception:
+                pass
+
     # ---- API ----
     def start(self, home: str) -> dict:
         if self._thread and self._thread.is_alive():
-            return {"ok": True, "already": True}
+            if not self._stop.is_set():
+                return {"ok": True, "already": True}
+            # Luồng cũ đang dừng DỞ: nếu cứ trả "đã chạy rồi" thì cờ dừng vẫn còn bật,
+            # luồng cũ thoát và đặt state="off" trong khi settings nói đang bật. Phải
+            # chờ nó thoát hẳn rồi mới dựng luồng mới.
+            self._thread.join(timeout=15)
         self._stop.clear()
         self.error = ""
         self._thread = threading.Thread(target=self._loop, args=(home,), daemon=True)
@@ -471,11 +520,7 @@ class _Runner:
 
     def stop(self) -> dict:
         self._stop.set()
-        try:
-            if self.proc and self.proc.poll() is None:
-                self.proc.kill()
-        except Exception:
-            pass
+        self._kill_tree()
         self.state = "off"
         return {"ok": True}
 
@@ -544,8 +589,14 @@ def register(app, deps: ZaloListenerDeps):
     seen = SeenSet()
     rate = RateLimiter()
     roster = Roster()
+    # Đếm loại sự kiện thật sự nhận được. Tên sự kiện của CLI chưa có tài liệu chốt, nên
+    # khi có thứ "đáng lẽ phải hiện mà không hiện" thì đây là chỗ NHÌN ra sự thật thay vì
+    # đoán tiếp. Lộ qua /zalo-listener/status.
+    kinds: dict = {}
 
     async def _handle(ev: dict, cfg: dict):
+        k = str(ev.get("kind") or "?")[:40]
+        kinds[k] = kinds.get(k, 0) + 1
         # Ghi sổ TRƯỚC khi lọc: cuộc chat chưa được chọn vẫn phải hiện ra để chủ tick,
         # nếu không thì không bao giờ chọn được cái gì (vòng luẩn quẩn).
         roster.note(ev)
@@ -599,6 +650,7 @@ def register(app, deps: ZaloListenerDeps):
         return {**runner.status(), "enabled": bool(cfg.get("enabled")),
                 "conn_id": cfg.get("conn_id", ""),
                 "roster": roster.list(),      # cuộc chat đã thấy, để chủ tick chọn
+                "kinds": kinds,               # loại sự kiện thật sự nhận được (để chẩn đoán)
                 "cfg": {k: v for k, v in cfg.items() if k != "secret"}}
 
     @router.post("/zalo-listener/config")

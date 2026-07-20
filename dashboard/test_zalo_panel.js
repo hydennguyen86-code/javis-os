@@ -38,9 +38,11 @@ check("esc: dau & escape truoc, khong tao entity kep",
 check("esc: chu tieng Viet co dau giu nguyen", esc("Khach hang Ha Loc gia") === "Khach hang Ha Loc gia");
 
 // ---- 2. Chot nguon: cho ve roster phai boc esc() ----
-const rosterBlock = src.slice(src.indexOf("box.innerHTML = list.map"),
-                              src.indexOf("box.querySelectorAll(\".zl-th\")"));
-check("tim thay doan ve danh sach cuoc chat", rosterBlock.length > 0);
+// Phan ve mot dong roster nam trong ham row(). Neu doi ten/cau truc thi test nay phai
+// duoc tro lai dung cho - dung xoa, vi day la rao XSS duy nhat cho du lieu tu Zalo.
+const rosterStart = src.indexOf("const row = (t) =>");
+const rosterBlock = src.slice(rosterStart, src.indexOf("const paintRoster"));
+check("tim thay ham ve mot dong cuoc chat (row)", rosterStart !== -1 && rosterBlock.length > 0);
 check("roster: ten cuoc chat duoc boc esc() (ten do nguoi la dat)",
   rosterBlock.indexOf("esc(t.name") !== -1);
 check("roster: id cuoc chat trong value= duoc boc esc()",
@@ -72,6 +74,18 @@ check("mau thuan: co bien stuck phat hien enabled=true nhung state=off",
 check("chan doan: co vung hien log tho cua sidecar", src.indexOf('id="zlLog"') !== -1);
 check("chan doan: log chi hien khi dang truc trac, khong lam roi luc chay ngon",
   /const bad = st\.enabled && \(st\.error \|\|/.test(src));
+
+// ---- 2d. Danh sach cuoc chat phai chiu duoc HANG TRAM nhom ----
+check("danh sach: co o tim kiem", src.indexOf('id="zlSearch"') !== -1);
+check("danh sach: chi hien san mot so it, con lai bam xem them",
+  /const ZL_SHOW = \d+/.test(src) && src.indexOf("Xem thêm") !== -1);
+check("danh sach: cai DA CHON luon ghim len dau va khong bi cat",
+  src.indexOf("list.filter(t => selected.has(t.id))") !== -1);
+check("danh sach: tim kiem chi loc phan CHUA chon (da chon van phai bo tick duoc)",
+  /rest = rest\.filter\(t => \(t\.name \|\| t\.id\)\.toLowerCase\(\)\.includes\(q\)\)/.test(src));
+check("danh sach: khoa ve lai gom ca tu khoa tim va co xem-them, khong thi thao tac bi guard chan",
+  /const key = \(st\.enabled \? "on" : "off"\) \+ "\|" \+ \(showAll \? "all" : "top"\) \+ "\|" \+ q/.test(src));
+check("danh sach: tim khong ra thi noi ro, khong de o trong", src.indexOf("Không có cuộc chat nào khớp") !== -1);
 
 // ---- 3. Dong dau hieu: phai phan biet duoc "chua ai nhan" voi "dang hong" ----
 check("dau hieu: co nhanh da noi nhung chua nhan tin nao",

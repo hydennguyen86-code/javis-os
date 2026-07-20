@@ -2227,7 +2227,8 @@
       + '<div id="zlForm" style="margin-top:10px;display:flex;flex-direction:column;gap:8px">'
       + '<label class="mcp-lb">Tài khoản Zalo dùng để nghe<select class="js-input" id="zlConn">' + opts + '</select></label>'
       + '<div class="mcp-lb">Cuộc chat theo dõi <span style="opacity:.6">(chưa chọn cái nào thì không báo gì)</span>'
-      + '<div id="zlThreads" style="max-height:170px;overflow:auto;border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:6px;margin-top:4px"></div></div>'
+      + '<input class="js-input" id="zlSearch" placeholder="Tìm tên nhóm hoặc người…" style="margin-top:4px">'
+      + '<div id="zlThreads" style="max-height:200px;overflow:auto;border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:6px;margin-top:4px"></div></div>'
       + '<label class="mcp-lb">Chỉ báo khi tin có chứa <span style="opacity:.6">(tuỳ chọn, cách nhau bằng dấu phẩy)</span>'
       + '<input class="js-input" id="zlKw" placeholder="giá, còn hàng, đặt, ship"></label>'
       + '<label class="mcp-lb">Giờ im lặng (tuỳ chọn, vd 23-07)<input class="js-input" id="zlQuiet" placeholder="23-07" style="max-width:140px"></label>'
@@ -2249,7 +2250,7 @@
     const $ = id => panel.querySelector("#" + id);
     // rosterKey = null chứ KHÔNG phải "": danh sách rỗng cũng cho key "", để "" thì lần vẽ đầu
     // bị chặn ngay và dòng hướng dẫn "chưa thấy cuộc chat nào" không bao giờ hiện ra.
-    let on = false, selected = new Set(), rosterKey = null;
+    let on = false, selected = new Set(), rosterKey = null, showAll = false, lastSt = null;
     const cfgBody = () => ({
       conn_id: $("zlConn").value,
       threads: Array.from(selected),
@@ -2263,10 +2264,19 @@
       if (st.state === "listening") return "Đã nối, chưa nhận tin nào. Nhắn thử một tin để kiểm tra.";
       return "Chưa nhận tin nào.";
     };
+    const ZL_SHOW = 8;           // hiện sẵn ngần này, còn lại phải tìm hoặc bấm xem thêm
+    const row = (t) => '<label style="display:block;font-size:13px;padding:3px 0;cursor:pointer">'
+      // esc() BẮT BUỘC: tên hiển thị do người lạ trên Zalo tự đặt, chèn thẳng vào HTML là hở XSS.
+      + '<input type="checkbox" class="zl-th" value="' + esc(t.id) + '"' + (selected.has(t.id) ? " checked" : "") + '> '
+      + esc(t.name || t.id) + (t.type === "group" ? ' <span style="opacity:.55">(nhóm)</span>' : "")
+      + ' <span style="opacity:.45">' + zlAgo(t.last) + '</span></label>';
     const paintRoster = (st) => {
       const list = st.roster || [];
-      // Khoá vẽ lại phải gồm cả trạng thái bật/tắt: lời chỉ dẫn khi đang tắt khác khi đang nghe.
-      const key = (st.enabled ? "on" : "off") + "|" + list.map(x => x.id).join("|");
+      const q = ($("zlSearch").value || "").trim().toLowerCase();
+      // Khoá vẽ lại gồm cả trạng thái bật/tắt, từ khoá tìm và cờ xem-thêm: thiếu cái nào
+      // thì thao tác đó không có tác dụng vì bị guard chặn.
+      const key = (st.enabled ? "on" : "off") + "|" + (showAll ? "all" : "top") + "|" + q
+        + "|" + list.map(x => x.id).join("|");
       if (key === rosterKey) return;         // không vẽ lại khi chưa đổi, tránh nhảy ô đang tick
       rosterKey = key;
       const box = $("zlThreads");
@@ -2277,16 +2287,25 @@
           + '</div>';
         return;
       }
-      // esc() BẮT BUỘC: tên hiển thị do người lạ trên Zalo tự đặt, chèn thẳng vào HTML là hở XSS.
-      box.innerHTML = list.map(t =>
-        '<label style="display:block;font-size:13px;padding:3px 0;cursor:pointer">'
-        + '<input type="checkbox" class="zl-th" value="' + esc(t.id) + '"' + (selected.has(t.id) ? " checked" : "") + '> '
-        + esc(t.name || t.id) + (t.type === "group" ? ' <span style="opacity:.55">(nhóm)</span>' : "")
-        + ' <span style="opacity:.45">' + zlAgo(t.last) + '</span></label>').join("");
+      // Cái ĐÃ CHỌN luôn ghim lên đầu và không bao giờ bị cắt: đang theo dõi mà trôi mất
+      // khỏi danh sách thì không bỏ tick được nữa.
+      const picked = list.filter(t => selected.has(t.id));
+      let rest = list.filter(t => !selected.has(t.id));
+      if (q) rest = rest.filter(t => (t.name || t.id).toLowerCase().includes(q));
+      const hidden = showAll ? 0 : Math.max(0, rest.length - ZL_SHOW);
+      const shown = showAll ? rest : rest.slice(0, ZL_SHOW);
+      box.innerHTML = picked.map(row).join("")
+        + (picked.length && shown.length ? '<div style="border-top:1px solid rgba(255,255,255,.08);margin:4px 0"></div>' : "")
+        + shown.map(row).join("")
+        + (!shown.length && q ? '<div class="mp-note">Không có cuộc chat nào khớp "' + esc(q) + '".</div>' : "")
+        + (hidden ? '<button class="mp-btn" id="zlMore" style="margin-top:6px;font-size:12px">Xem thêm ' + hidden + ' cuộc chat</button>' : "");
       box.querySelectorAll(".zl-th").forEach(cb => cb.onchange = async () => {
         cb.checked ? selected.add(cb.value) : selected.delete(cb.value);
+        rosterKey = null;                                     // ghim lại lên đầu ngay
         await postJson("/zalo-listener/config", cfgBody());   // ăn ngay, không cần tắt bật lại
       });
+      const more = box.querySelector("#zlMore");
+      if (more) more.onclick = () => { showAll = true; rosterKey = null; paintRoster(st); };
     };
     const paint = (st) => {
       const [txt, color] = ZL_STATE[st.state] || ZL_STATE.off;
@@ -2309,6 +2328,7 @@
       $("zlLog").style.display = (bad && log) ? "" : "none";
       $("zlLog").textContent = log;
       $("zlSignal").textContent = signal(st);
+      lastSt = st;
       paintRoster(st);
     };
     let st;
@@ -2318,6 +2338,7 @@
     selected = new Set(c.threads || []);
     $("zlKw").value = (c.keywords || []).join(", ");
     $("zlQuiet").value = c.quiet_hours || "";
+    $("zlSearch").oninput = () => { rosterKey = null; if (lastSt) paintRoster(lastSt); };
     paint(st);
     $("zlToggle").onclick = async () => {
       $("zlErr").textContent = "";

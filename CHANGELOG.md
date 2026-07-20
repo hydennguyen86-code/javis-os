@@ -4,6 +4,18 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.122] - 2026-07-20
+Nhóm Zalo giờ hiện ra để chọn được, danh sách cuộc chat chịu được hàng trăm nhóm, và dọn nốt lỗi tiến trình con sống mồ côi.
+### Sửa lỗi
+- **Tin nhóm không bao giờ hiện ra**: công cụ nghe mặc định chỉ gửi hai loại sự kiện là tin nhắn và bạn bè, thiếu hẳn loại nhóm. Nay khai đủ cả bốn loại. Ngoài ra sổ cuộc chat trước đây chỉ ghi đúng sự kiện tin nhắn, nên lúc vừa thêm tài khoản vào một nhóm mà chưa ai nhắn gì thì nhóm không xuất hiện. Nay mọi sự kiện có cuộc chat đều được ghi, thêm vào nhóm là thấy ngay.
+- **Tiến trình con sống mồ côi**: npx chỉ là lớp vỏ, node bên trong mới là thứ giữ kết nối. Lệnh dừng cũ chỉ giết cái vỏ nên node vẫn chạy và vẫn đẩy tin về, gây ra cảnh giao diện báo tiến trình chưa chạy trong khi tin vẫn chảy đều. Nay dọn cả cây tiến trình, bằng taskkill trên Windows và killpg trên Linux.
+- **Bật lại lúc luồng cũ đang dừng dở**: trước đây trả về "đã chạy rồi" mà không dựng luồng mới, cờ dừng vẫn còn bật nên luồng cũ thoát và để lại trạng thái tắt trong khi cấu hình nói đang bật. Nay chờ luồng cũ thoát hẳn rồi mới dựng luồng mới.
+- **Không dội tin cũ khi nối lại**: loại trừ các sự kiện phát lại lịch sử và báo đã xem, tránh dồn hàng loạt tin cũ vào Telegram mỗi lần kết nối lại.
+### Cải thiện
+- **Danh sách cuộc chat dùng được khi có hàng trăm nhóm**: thêm ô tìm kiếm, chỉ hiện sẵn 8 cuộc chat gần nhất và có nút xem thêm. Cuộc chat đang theo dõi luôn ghim lên đầu và không bao giờ bị cắt, để lúc nào cũng bỏ tick được. Trần ghi nhớ nâng từ 60 lên 300.
+- **Nhận diện tin nhắn rộng hơn**: chấp nhận cả biến thể tên sự kiện như tin nhắn nhóm, vì tên sự kiện của công cụ chưa có tài liệu chốt.
+- **Thêm bộ đếm loại sự kiện** trong trang trạng thái, để lần sau có thứ đáng lẽ phải hiện mà không hiện thì nhìn ra sự thật thay vì đoán.
+
 ## [0.9.121] - 2026-07-20
 Sửa lỗi listener Zalo bấm Bật rồi mà vẫn hiện "Đang tắt" và không nhận được tin nào. Đây là lỗi chặn hoàn toàn: ở các bản trước listener CHƯA BAO GIỜ khởi động nổi, không phải chạy rồi hỏng.
 ### Sửa lỗi
