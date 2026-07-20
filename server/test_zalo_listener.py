@@ -631,34 +631,44 @@ app3 = FastAPI()
 feat3 = zl.register(app3, mkdeps(brain_root=lambda: B3))
 cl3 = TestClient(app3)
 
-r = cl3.post("/zalo-listener/watch", json={"threads": ["gA", "gB"], "keywords": []}).json()
+# Khuôn MỚI: mỗi cuộc chat một trạng thái ("chi-doc" | "tu-phan-hoi") thay vì danh sách phẳng.
+r = cl3.post("/zalo-listener/watch",
+             json={"modes": {"gA": "chi-doc", "gB": "chi-doc"}, "keywords": []}).json()
 rules3 = {x["thread_id"]: x for x in zr.list_rules(B3)}
-check("lưu: tick 2 cuộc chat thì đẻ ra 2 file luật THẬT", len(rules3) == 2 and r["on"] == 2)
-# Mặc định IM LẶNG: nghe là để Javis biết chuyện, còn báo Telegram phải do chủ yêu cầu
-# cho từng nhóm. Báo mọi tin của mọi nhóm thì điện thoại nổ tung và chẳng ai đọc nữa.
-check("lưu: không nhập từ khoá thì MẶC ĐỊNH IM LẶNG, không báo Telegram",
+check("lưu: chọn 2 cuộc chat thì đẻ ra 2 file luật THẬT", len(rules3) == 2 and r["doc"] == 2)
+check("lưu: 'chỉ đọc' không từ khoá = IM LẶNG, không báo Telegram",
       all(x["mode"] == "im-lang" and x["enabled"] for x in rules3.values()))
-check("lưu: câu xác nhận nói rõ là đang im lặng, chủ không hiểu nhầm là sẽ được báo",
-      "Đã lưu" in r.get("msg", "") and "KHÔNG báo Telegram" in r.get("msg", ""))
+check("lưu: câu xác nhận nói rõ là không báo gì",
+      "Đã lưu" in r.get("msg", "") and "không báo gì" in r.get("msg", ""))
 check("lưu: chế độ im lặng thì tin tới KHÔNG sinh thông báo",
       zr.decide({**rules3["gA"]}, {"kind": "message", "thread_id": "gA",
                                    "text": "giá bao nhiêu", "is_self": False})[0] == zr.BO)
 
-r = cl3.post("/zalo-listener/watch", json={"threads": ["gA"], "keywords": ["giá", "ship"]}).json()
+r = cl3.post("/zalo-listener/watch",
+             json={"modes": {"gA": "tu-phan-hoi"}, "keywords": []}).json()
 rules3 = {x["thread_id"]: x for x in zr.list_rules(B3)}
-check("lưu: có từ khoá thì chuyển sang chế độ lọc từ khoá",
-      rules3["gA"]["mode"] == "tu-khoa" and rules3["gA"]["keywords"] == ["giá", "ship"])
-check("lưu: bỏ tick thì TẮT luật chứ không xoá file (giữ lại kịch bản đã viết)",
+check("lưu: chọn 'tự phản hồi' thì thành chế độ bot",
+      rules3["gA"]["mode"] == "chatbot" and r["bot"] == 1)
+check("lưu: bỏ chọn thì TẮT luật chứ không xoá file (giữ lại kịch bản đã viết)",
       rules3["gB"]["enabled"] is False and r["off"] == 1)
 
-# Luật chủ đặt kỹ qua chat (chatbot/nhac-quen) KHÔNG được một cái tick ghi đè mất.
+r = cl3.post("/zalo-listener/watch",
+             json={"modes": {"gA": "chi-doc"}, "keywords": ["giá", "ship"]}).json()
+rules3 = {x["thread_id"]: x for x in zr.list_rules(B3)}
+check("lưu: 'chỉ đọc' + có từ khoá thì báo theo từ khoá",
+      rules3["gA"]["mode"] == "tu-khoa" and rules3["gA"]["keywords"] == ["giá", "ship"])
+
+# Kịch bản chủ viết qua chat phải sống sót mọi thao tác trên giao diện.
 zr.save_rule(B3, {"thread_id": "gC", "thread_name": "Nhóm bot", "mode": "chatbot",
                   "enabled": False, "script": "Kịch bản quý giá của chủ."})
-cl3.post("/zalo-listener/watch", json={"threads": ["gA", "gC"], "keywords": ["giá"]})
+cl3.post("/zalo-listener/watch", json={"modes": {"gA": "chi-doc", "gC": "tu-phan-hoi"}})
 gC = zr.rule_for(zr.list_rules(B3), "gC")
-check("lưu: tick vào luật chatbot thì chỉ BẬT, không ghi đè chế độ", gC["mode"] == "chatbot")
-check("lưu: kịch bản chủ viết qua chat không bị một cái tick xoá mất",
-      "quý giá" in gC["script"] and gC["enabled"] is True)
+check("lưu: kịch bản chủ viết qua chat không bị thao tác giao diện xoá mất",
+      "quý giá" in gC["script"] and gC["enabled"] is True and gC["mode"] == "chatbot")
+
+# Khuôn CŨ (mảng threads) vẫn phải chạy, để bản web chưa nạp lại không gãy.
+r = cl3.post("/zalo-listener/watch", json={"threads": ["gA"], "keywords": []}).json()
+check("lưu: vẫn nhận khuôn cũ (mảng threads) cho bản web chưa nạp lại", r.get("ok") is True)
 
 
 # ---- 19. Luật đặt bằng LỜI phải ăn, dù nằm ở brain nào ----
@@ -765,6 +775,29 @@ zr.save_rule(BR5, {"thread_id": "m1", "thread_name": "Minh Quý", "mode": "bao-h
 asyncio.run(feat5.autostart())
 check("dọn: chỉ chạy MỘT lần, sau đó không đè luật chủ tự đặt lại nữa",
       zr.rule_for(zr.list_rules(BR5), "m1")["mode"] == "bao-het")
+
+
+# ---- 22. Bot được quyền IM LẶNG, không phải cứ có tin là trả lời ----
+# Thiết kế của chủ: "tự quyết định có nên phản hồi hay không. Không phải là cứ chat gì là
+# phản hồi". Trước đó bot luôn phải đẻ ra một câu, mà một con bot xen vào mọi câu chuyện
+# trong nhóm còn phiền hơn không có bot.
+src6 = open("zalo_listener.py", encoding="utf-8").read()
+check("im lặng: có lối để bot chọn KHÔNG nói gì", bool(zl.SKIP_MARK) and "SKIP_MARK" in src6)
+check("im lặng: prompt dặn thẳng đây là quyền quan trọng nhất", "QUYỀN IM LẶNG" in src6)
+check("im lặng: nêu rõ khi nào nên im (người ta nói với nhau, tán gẫu, không liên quan)",
+      "tán gẫu" in src6 and "Xen vào mọi câu chuyện còn phiền hơn im lặng" in src6)
+check("im lặng: bot im thì KHÔNG gửi gì và KHÔNG báo chủ (đây là kết quả đúng, không phải lỗi)",
+      "text.startswith(SKIP_MARK)" in src6 and "không phải lỗi" in src6)
+
+# Tự do sáng tạo, nhưng vẫn không được bịa thứ làm chủ mất tiền thật.
+check("tự do: được diễn đạt theo ngữ cảnh, không bám câu chữ có sẵn",
+      "tự do diễn đạt theo" in src6 and "không cần bám câu chữ có sẵn" in src6)
+check("tự do: nhưng KHÔNG bịa giá/tồn kho/giao hàng (sai một câu là mất tiền thật)",
+      "KHÔNG BỊA" in src6 and "mất tiền thật" in src6)
+check("phong cách: kịch bản của chủ vào prompt như PHONG CÁCH riêng của nhóm",
+      "PHONG CÁCH VÀ HIỂU BIẾT CHO CUỘC CHAT NÀY" in src6)
+check("an toàn: hộp cát giữ nguyên - vẫn không tool nào",
+      "allowed_tools=[NO_TOOL]" in src6)
 
 
 print("\n" + ("TAT CA OK" if not _fails else f"{len(_fails)} FAIL: {_fails}"))

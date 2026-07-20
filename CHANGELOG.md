@@ -4,6 +4,18 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.136] - 2026-07-20
+Mỗi cuộc chat Zalo giờ chỉ có hai trạng thái dễ hiểu, và Javis tự quyết khi nào nên lên tiếng.
+### Thay đổi
+- **Hai trạng thái thay cho năm chế độ**: mỗi cuộc chat trong danh sách có một ô chọn với hai lựa chọn là Chỉ đọc và Tự phản hồi. Đơn giản hơn hẳn cách cũ, và mọi thứ tinh vi hơn thì dặn thẳng trong chat.
+### Thêm mới
+- **Javis được quyền im lặng**: ở chế độ tự phản hồi, nó tự quyết có nên lên tiếng hay không chứ không phải cứ có tin là trả lời. Người ta đang nói chuyện với nhau, tán gẫu, hay chuyện chẳng liên quan thì nó im. Trước đây bot luôn phải sinh ra một câu trả lời, mà một con bot xen vào mọi câu chuyện trong nhóm còn phiền hơn là không có bot.
+- **Được tự do diễn đạt theo ngữ cảnh** thay vì bám câu chữ có sẵn, và nói theo phong cách riêng của từng nhóm nếu chủ đã dặn trong luật.
+- **Bật tự phản hồi phải xác nhận một lần**, vì tin gửi đi không thu hồi được.
+### Bảo mật
+- Vẫn giữ nguyên hộp cát: bot không có công cụ nào, không thấy dữ liệu kinh doanh, chỉ sinh ra chữ còn gửi đi đâu là do mã Javis quyết.
+- Giữ một rào cứng dù chủ cho tự do sáng tạo: không được bịa giá, tồn kho, thời gian giao hàng hay cam kết với khách. Sai một câu ở đó là mất tiền thật, nên gặp là hỏi lại chủ.
+
 ## [0.9.135] - 2026-07-20
 Javis tự dọn đống luật ồn do chính mặc định hỏng của nó sinh ra, thay vì bắt chủ đi sửa tay từng cái.
 ### Sửa lỗi

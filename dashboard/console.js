@@ -2258,7 +2258,7 @@
     const $ = id => panel.querySelector("#" + id);
     // rosterKey = null chứ KHÔNG phải "": danh sách rỗng cũng cho key "", để "" thì lần vẽ đầu
     // bị chặn ngay và dòng hướng dẫn "chưa thấy cuộc chat nào" không bao giờ hiện ra.
-    let on = false, selected = new Set(), rosterKey = null, showAll = false, lastSt = null;
+    let on = false, modes = {}, rosterKey = null, showAll = false, lastSt = null;
     const cfgBody = () => ({
       conn_id: $("zlConn").value,
       threads: Array.from(selected),
@@ -2273,23 +2273,34 @@
       return "Chưa nhận tin nào.";
     };
     const ZL_SHOW = 8;           // hiện sẵn ngần này, còn lại phải tìm hoặc bấm xem thêm
-    const row = (t) => '<label style="display:block;font-size:13px;padding:3px 0;cursor:pointer">'
-      // esc() BẮT BUỘC: tên hiển thị do người lạ trên Zalo tự đặt, chèn thẳng vào HTML là hở XSS.
-      + '<input type="checkbox" class="zl-th" value="' + esc(t.id) + '"' + (selected.has(t.id) ? " checked" : "") + '> '
-      + esc(t.name || t.id)
-      // Payload webhook không kèm tên nhóm nên tên đang hiện là của NGƯỜI NHẮN. Hai nhóm
-      // khác nhau mà cùng một người nhắn sẽ trùng tên y hệt, phải kèm mã để phân biệt.
-      + (t.type === "group"
-          ? ' <span style="opacity:.55">' + (t.named ? "(nhóm)" : "(nhóm #" + esc(String(t.id).slice(-4)) + ")") + '</span>'
-          : "")
-      + ' <span style="opacity:.45">' + zlAgo(t.last) + '</span></label>';
+    // Hai trạng thái, đúng như chủ thiết kế: chỉ đọc, hoặc để Javis tự phản hồi. Javis tự
+    // quyết có nên lên tiếng hay không chứ không phải cứ có tin là trả lời.
+    const ZL_MODES = [["chi-doc", "Chỉ đọc"], ["tu-phan-hoi", "Tự phản hồi"]];
+    const row = (t) => {
+      const cur = modes[t.id] || "chi-doc";
+      const on = !!modes[t.id];
+      return '<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:13px">'
+        + '<input type="checkbox" class="zl-th" value="' + esc(t.id) + '"' + (on ? " checked" : "") + '>'
+        // esc() BẮT BUỘC: tên do người lạ trên Zalo tự đặt, chèn thẳng vào HTML là hở XSS.
+        + '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
+        + esc(t.name || t.id)
+        + (t.type === "group"
+            ? ' <span style="opacity:.55">' + (t.named ? "(nhóm)" : "(nhóm #" + esc(String(t.id).slice(-4)) + ")") + '</span>'
+            : "")
+        + ' <span style="opacity:.45">' + zlAgo(t.last) + '</span></span>'
+        + '<select class="js-input zl-md" data-id="' + esc(t.id) + '"'
+        + (on ? "" : " disabled") + ' style="width:130px;font-size:12px;padding:2px 4px">'
+        + ZL_MODES.map(m => '<option value="' + m[0] + '"' + (cur === m[0] ? " selected" : "") + '>'
+                            + m[1] + '</option>').join("")
+        + '</select></div>';
+    };
     // Lưu thành FILE LUẬT qua /watch. Gửi vào settings như trước là mất trắng: write_cfg
     // chỉ nhận khoá có trong DEFAULT_CFG, mà threads/keywords đã bị bỏ khỏi đó.
     const saveWatch = async () => {
       $("zlSaved").textContent = "đang lưu…";
       $("zlSaved").style.color = "";
       const r = await postJson("/zalo-listener/watch", {
-        threads: Array.from(selected),
+        modes: modes,
         keywords: $("zlKw").value.split(",").map(s => s.trim()).filter(Boolean),
         quiet_hours: $("zlQuiet").value.trim(),
       });
@@ -2312,7 +2323,8 @@
       const key = (st.enabled ? "on" : "off") + "|" + (showAll ? "all" : "top") + "|" + q
         + "|" + list.map(x => x.id).join("|")
         // Luật đổi (vd chủ đặt qua chat) thì ô tick phải vẽ lại theo, không thì hiện sai.
-        + "|" + (st.rules || []).filter(x => x.enabled).map(x => x.thread_id).sort().join(",");
+        + "|" + (st.rules || []).filter(x => x.enabled)
+            .map(x => x.thread_id + ":" + x.mode).sort().join(",");
       if (key === rosterKey) return;         // không vẽ lại khi chưa đổi, tránh nhảy ô đang tick
       rosterKey = key;
       const box = $("zlThreads");
@@ -2325,8 +2337,8 @@
       }
       // Cái ĐÃ CHỌN luôn ghim lên đầu và không bao giờ bị cắt: đang theo dõi mà trôi mất
       // khỏi danh sách thì không bỏ tick được nữa.
-      const picked = list.filter(t => selected.has(t.id));
-      let rest = list.filter(t => !selected.has(t.id));
+      const picked = list.filter(t => modes[t.id]);
+      let rest = list.filter(t => !modes[t.id]);
       if (q) rest = rest.filter(t => (t.name || t.id).toLowerCase().includes(q));
       const hidden = showAll ? 0 : Math.max(0, rest.length - ZL_SHOW);
       const shown = showAll ? rest : rest.slice(0, ZL_SHOW);
@@ -2336,9 +2348,21 @@
         + (!shown.length && q ? '<div class="mp-note">Không có cuộc chat nào khớp "' + esc(q) + '".</div>' : "")
         + (hidden ? '<button class="mp-btn" id="zlMore" style="margin-top:6px;font-size:12px">Xem thêm ' + hidden + ' cuộc chat</button>' : "");
       box.querySelectorAll(".zl-th").forEach(cb => cb.onchange = async () => {
-        cb.checked ? selected.add(cb.value) : selected.delete(cb.value);
+        if (cb.checked) modes[cb.value] = "chi-doc"; else delete modes[cb.value];
         rosterKey = null;                       // ghim lại lên đầu ngay
-        await saveWatch();                      // tick là lưu luôn, và PHẢI báo cho thấy
+        await saveWatch();
+      });
+      box.querySelectorAll(".zl-md").forEach(sel => sel.onchange = async () => {
+        const id = sel.dataset.id;
+        if (sel.value === "tu-phan-hoi" && !confirm(
+            "Cho Javis TỰ NHẮN vào cuộc chat này? Nó tự quyết khi nào nên lên tiếng và tự "
+            + "soạn lời, tin gửi đi không thu hồi được. Muốn nó nói theo phong cách riêng thì "
+            + "dặn trong chat, ví dụ: nhóm này trả lời ngắn gọn, xưng em.")) {
+          sel.value = modes[id] || "chi-doc";
+          return;
+        }
+        modes[id] = sel.value;
+        await saveWatch();
       });
       const more = box.querySelector("#zlMore");
       if (more) more.onclick = () => { showAll = true; rosterKey = null; paintRoster(st); };
@@ -2378,7 +2402,11 @@
     const c = st.cfg || {};
     if (c.conn_id) $("zlConn").value = c.conn_id;
     // Lấy từ LUẬT đang bật, không lấy từ cfg.threads (trường đó đã bỏ, đọc vào là sai).
-    selected = new Set((st.rules || []).filter(x => x.enabled).map(x => x.thread_id));
+    // Luật đang bật -> trạng thái trên dropdown. chatbot = tự phản hồi, còn lại = chỉ đọc.
+    modes = {};
+    (st.rules || []).filter(x => x.enabled).forEach(x => {
+      modes[x.thread_id] = x.mode === "chatbot" ? "tu-phan-hoi" : "chi-doc";
+    });
     $("zlKw").value = (c.keywords || []).join(", ");
     $("zlQuiet").value = c.quiet_hours || "";
     $("zlSearch").oninput = () => { rosterKey = null; if (lastSt) paintRoster(lastSt); };

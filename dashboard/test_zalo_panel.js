@@ -80,7 +80,7 @@ check("danh sach: co o tim kiem", src.indexOf('id="zlSearch"') !== -1);
 check("danh sach: chi hien san mot so it, con lai bam xem them",
   /const ZL_SHOW = \d+/.test(src) && src.indexOf("Xem thêm") !== -1);
 check("danh sach: cai DA CHON luon ghim len dau va khong bi cat",
-  src.indexOf("list.filter(t => selected.has(t.id))") !== -1);
+  src.indexOf("list.filter(t => modes[t.id])") !== -1);
 check("danh sach: tim kiem chi loc phan CHUA chon (da chon van phai bo tick duoc)",
   /rest = rest\.filter\(t => \(t\.name \|\| t\.id\)\.toLowerCase\(\)\.includes\(q\)\)/.test(src));
 check("danh sach: khoa ve lai gom ca tu khoa tim va co xem-them, khong thi thao tac bi guard chan",
@@ -95,6 +95,20 @@ check("dau hieu: co hien moc thoi gian tin gan nhat",
 
 // ---- 4. Panel khong con o dm_only (da doi sang whitelist cuoc chat) ----
 check("panel: da bo o 'chi tin rieng' (whitelist thay the)", src.indexOf("zlDm") === -1);
+
+// ---- Thiet ke 2 trang thai cua chu: Chi doc / Tu phan hoi ----
+check("2 trang thai: co dropdown dung 2 lua chon",
+  /ZL_MODES = \[\["chi-doc", "Chỉ đọc"\], \["tu-phan-hoi", "Tự phản hồi"\]\]/.test(src));
+check("2 trang thai: bat tu phan hoi PHAI xac nhan (tin gui di khong thu hoi duoc)",
+  src.indexOf("Cho Javis TỰ NHẮN vào cuộc chat này?") !== -1);
+check("2 trang thai: gui len server theo khuon modes (moi cuoc chat mot trang thai)",
+  src.indexOf("modes: modes") !== -1);
+check("2 trang thai: doc nguoc tu luat - chatbot la tu phan hoi",
+  src.indexOf('x.mode === "chatbot" ? "tu-phan-hoi" : "chi-doc"') !== -1);
+check("2 trang thai: chua chon thi dropdown bi khoa, khong bam nham",
+  src.indexOf('(on ? "" : " disabled")') !== -1);
+check("2 trang thai: khoa ve lai gom ca MODE, khong thi doi trang thai khong hien ra",
+  src.indexOf('x.thread_id + ":" + x.mode') !== -1);
 check("panel: co noi ro chua chon thi khong bao gi",
   src.indexOf("chưa chọn cái nào thì không báo gì") !== -1);
 
