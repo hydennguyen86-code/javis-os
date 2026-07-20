@@ -82,6 +82,13 @@ def _strip_ansi(s) -> str:
     ký tự rác kiểu '[31mERROR[0m'."""
     return _ANSI_RE.sub("", str(s or ""))
 
+
+# Tách thành hằng để TEST ĐƯỢC nhánh Linux ngay trên máy Windows. Bộ dò tiến trình bản
+# trước gọi `pgrep`, mà image Docker (python:3.12-slim) không cài procps nên lệnh ném lỗi,
+# bị nuốt, và mọi lần dò đều trả rỗng. Lỗi mù kiểu đó chỉ lộ ra khi chạy thật - lần này
+# phải test được ở CI.
+_PROC_DIR = "/proc"
+
 DEFAULT_CFG = {
     "enabled": False,
     "conn_id": "",
@@ -474,51 +481,76 @@ class _Runner:
         return argv
 
     def _strays(self) -> list:
-        """Tìm tiến trình `zalo-agent-cli listen` CŨ còn sót. Trả [(pid, dòng lệnh)].
+        """Tìm tiến trình Zalo KHÁC còn sót đang chiếm kết nối. Trả [(pid, dòng lệnh)].
 
-        Vì sao cần: một node mồ côi (vd còn sót từ trước bản 0.9.122, khi chưa dọn cả cây
-        tiến trình) vẫn giữ websocket sống và chiếm chỗ của tài khoản. Đăng xuất ở nơi khác
-        KHÔNG giết được nó - websocket đã mở thì cứ sống. Chủ không thể tự đi tìm tiến
-        trình trên VPS, nên Javis phải tự dọn.
+        Vì sao cần: Zalo chỉ cho MỘT kết nối mỗi tài khoản. Một tiến trình mồ côi (listener
+        cũ, connector mcp, hay phiên `login` quét QR chưa thoát) vẫn giữ websocket sống và
+        đá listener mới ra ngay. Đăng xuất ở nơi khác KHÔNG giết được nó.
+
+        Linux đọc THẲNG /proc, KHÔNG dùng pgrep: image Docker (python:3.12-slim) không cài
+        procps nên `pgrep` không tồn tại → lệnh ném lỗi, bị nuốt, và mọi lần dò đều trả về
+        rỗng. Đã xác nhận trên VPS: strays luôn bằng 0 trong khi thực tế vẫn bị chiếm chỗ.
+        Số 0 giả còn tệ hơn không có số, vì nó khiến cả hai chúng ta loại nhầm giả thuyết.
         """
         out = []
-        try:
-            if os.name == "nt":
-                # CHỈ tiến trình node.exe. Lọc theo dòng lệnh không thôi là TỰ BẮT CHÍNH
-                # MÌNH: câu truy vấn này chứa chữ "zalo-agent" và "listen" nên tiến trình
-                # PowerShell đang chạy nó cũng khớp, và taskkill /T sẽ giết luôn cả cây.
+        me = os.getpid()
+        mine = getattr(self.proc, "pid", None)
+
+        def _keep(pid, cmd):
+            if pid in (me, mine) or "zalo-agent" not in cmd:
+                return False
+            # Cả `listen`, `mcp start` LẪN `login` đều mở kết nối cho cùng tài khoản.
+            if not any(k in cmd for k in ("listen", "mcp", "login")):
+                return False
+            return not any(m in cmd for m in ("Get-CimInstance", "pgrep", "Where-Object"))
+
+        if os.name == "nt":
+            try:
                 ps = ("Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | "
                       "Where-Object { $_.CommandLine -like '*zalo-agent*' } | "
-                      "ForEach-Object { \"$($_.ProcessId)`t$($_.CommandLine)\" }")
+                      "ForEach-Object { \"$($_.ProcessId)`t$($_.ParentProcessId)`t$($_.CommandLine)\" }")
                 r = subprocess.run(["powershell", "-NoProfile", "-Command", ps],
                                    capture_output=True, text=True, timeout=20)
-            else:
-                r = subprocess.run(["pgrep", "-af", "zalo-agent"],
-                                   capture_output=True, text=True, timeout=20)
-        except Exception:
+            except Exception:
+                return out
+            for line in (r.stdout or "").splitlines():
+                parts = line.strip().split("	", 2)
+                if len(parts) < 3:
+                    continue
+                try:
+                    pid, ppid = int(parts[0]), int(parts[1])
+                except ValueError:
+                    continue
+                if mine and ppid == mine:      # node CON của chính mình
+                    continue
+                if _keep(pid, parts[2]):
+                    out.append((pid, parts[2][:160]))
             return out
-        me = os.getpid()
-        for line in (r.stdout or "").splitlines():
-            line = line.strip()
-            # Quet CA `listen` LAN `mcp start`: tien trinh MCP cua connector cung giu mot
-            # websocket cho cung tai khoan, va no chinh la thu da listener ra.
-            if not line or "zalo-agent" not in line:
-                continue
-            if not ("listen" in line or "mcp" in line):
-                continue
-            # Loại chính câu dò và mọi thứ chỉ NHẮC TỚI chuỗi này (shell, grep, editor).
-            if any(m in line for m in ("Get-CimInstance", "pgrep", "Where-Object")):
-                continue
-            if os.name != "nt" and "node" not in line:
-                continue
-            head = line.split("\t")[0] if os.name == "nt" else line.split(" ", 1)[0]
+
+        try:
+            pids = [d for d in os.listdir(_PROC_DIR) if d.isdigit()]
+        except OSError:
+            return out
+        for d in pids:
             try:
-                pid = int(head)
-            except ValueError:
+                with open(os.path.join(_PROC_DIR, d, "cmdline"), "rb") as f:
+                    cmd = f.read().replace(b"\0", b" ").decode("utf-8", "replace").strip()
+            except OSError:
                 continue
-            if pid in (me, getattr(self.proc, "pid", None)):
+            if not cmd:
                 continue
-            out.append((pid, line[:160]))
+            pid = int(d)
+            # Tiến trình con của CHÍNH MÌNH: spawn với start_new_session nên cả cây mang
+            # pgid = pid của tiến trình mình đẻ ra. Không loại thì tự giết chính mình.
+            if mine:
+                try:
+                    with open(os.path.join(_PROC_DIR, d, "stat"), "rb") as f:
+                        if int(f.read().decode("utf-8", "replace").rsplit(")", 1)[1].split()[2]) == mine:
+                            continue
+                except (OSError, IndexError, ValueError):
+                    pass
+            if _keep(pid, cmd):
+                out.append((pid, cmd[:160]))
         return out
 
     def _sweep_strays(self) -> int:

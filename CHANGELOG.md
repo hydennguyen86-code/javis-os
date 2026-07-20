@@ -4,6 +4,15 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.127] - 2026-07-20
+Sửa lỗi mù của bộ dò tiến trình Zalo trên máy chủ: nó luôn báo không tìm thấy gì, kể cả khi thực tế đang có tiến trình chiếm kết nối.
+### Sửa lỗi
+- **Bộ dò tiến trình không chạy được trong Docker**: nó gọi lệnh pgrep, mà ảnh Docker chỉ cài ca-certificates, curl, git, ripgrep, ffmpeg và tini, không có gói chứa pgrep. Lệnh ném lỗi, bị nuốt, nên trang trạng thái luôn báo không có tiến trình lạ nào trong khi listener vẫn bị đá ra liên tục. Một con số không giả còn tệ hơn không có số vì nó khiến loại nhầm nguyên nhân. Nay đọc thẳng thư mục tiến trình của hệ thống, luôn có sẵn không cần cài gói.
+- **Bỏ sót phiên đăng nhập quét QR**: bộ dọn trước đây chỉ tìm tiến trình nghe và tiến trình của connector, trong khi phiên quét QR chưa thoát cũng giữ một kết nối cho cùng tài khoản. Nay quét cả ba loại.
+- **Không tự giết tiến trình con của chính mình**: loại trừ theo nhóm tiến trình, tránh vừa bật đã tự tắt.
+### Cải thiện
+- Đường dẫn thư mục tiến trình được tách thành hằng số để kiểm thử chạy được trên cả Windows lẫn Linux. Trước đây nhánh Linux không hề được kiểm thử, đó chính là lý do lỗi mù lọt qua.
+
 ## [0.9.126] - 2026-07-20
 Dứt điểm trùng phiên Zalo: listener tự tắt connector của chính tài khoản đó khi bật, và dọn cả tiến trình của connector chứ không riêng tiến trình nghe.
 ### Sửa lỗi
