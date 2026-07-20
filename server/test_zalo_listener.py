@@ -634,10 +634,15 @@ cl3 = TestClient(app3)
 r = cl3.post("/zalo-listener/watch", json={"threads": ["gA", "gB"], "keywords": []}).json()
 rules3 = {x["thread_id"]: x for x in zr.list_rules(B3)}
 check("lưu: tick 2 cuộc chat thì đẻ ra 2 file luật THẬT", len(rules3) == 2 and r["on"] == 2)
-check("lưu: không nhập từ khoá thì mặc định báo mọi tin",
-      all(x["mode"] == "bao-het" and x["enabled"] for x in rules3.values()))
-check("lưu: trả về câu xác nhận đọc được cho chủ, không im lặng",
-      "Đã lưu" in r.get("msg", "") and "báo mọi tin" in r.get("msg", ""))
+# Mặc định IM LẶNG: nghe là để Javis biết chuyện, còn báo Telegram phải do chủ yêu cầu
+# cho từng nhóm. Báo mọi tin của mọi nhóm thì điện thoại nổ tung và chẳng ai đọc nữa.
+check("lưu: không nhập từ khoá thì MẶC ĐỊNH IM LẶNG, không báo Telegram",
+      all(x["mode"] == "im-lang" and x["enabled"] for x in rules3.values()))
+check("lưu: câu xác nhận nói rõ là đang im lặng, chủ không hiểu nhầm là sẽ được báo",
+      "Đã lưu" in r.get("msg", "") and "KHÔNG báo Telegram" in r.get("msg", ""))
+check("lưu: chế độ im lặng thì tin tới KHÔNG sinh thông báo",
+      zr.decide({**rules3["gA"]}, {"kind": "message", "thread_id": "gA",
+                                   "text": "giá bao nhiêu", "is_self": False})[0] == zr.BO)
 
 r = cl3.post("/zalo-listener/watch", json={"threads": ["gA"], "keywords": ["giá", "ship"]}).json()
 rules3 = {x["thread_id"]: x for x in zr.list_rules(B3)}

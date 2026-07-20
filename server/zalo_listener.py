@@ -1144,7 +1144,10 @@ def register(app, deps: ZaloListenerDeps):
         write_cfg(deps, {"quiet_hours": payload.get("quiet_hours") or ""})
         names = {x["id"]: x.get("name") for x in roster.list()}
         rules = zalo_rules.list_rules(brain)
-        mode = "tu-khoa" if kws else "bao-het"
+        # Mặc định IM LẶNG. Tick chỉ có nghĩa "theo dõi cuộc chat này", còn báo Telegram
+        # phải là thứ chủ chủ động yêu cầu cho từng nhóm - báo mọi tin của mọi nhóm thì
+        # điện thoại chủ nổ tung và chẳng ai đọc nữa. Nhập từ khoá = đã yêu cầu rõ.
+        mode = "tu-khoa" if kws else "im-lang"
         on = off = 0
         for tid in threads:
             r = zalo_rules.rule_for(rules, tid)
@@ -1169,7 +1172,8 @@ def register(app, deps: ZaloListenerDeps):
                 off += 1
         return {"ok": True, "on": on, "off": off,
                 "msg": (f"Đã lưu: theo dõi {on} cuộc chat"
-                        + (f" khi tin có chứa {', '.join(kws)}" if kws else " (báo mọi tin)")
+                        + (f", báo Telegram khi tin có chứa {', '.join(kws)}" if kws
+                           else " (im lặng, KHÔNG báo Telegram)")
                         + (f", ngừng theo dõi {off} cuộc chat." if off else "."))}
 
     @router.post("/zalo-listener/group-names")

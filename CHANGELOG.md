@@ -4,6 +4,13 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.131] - 2026-07-20
+Mặc định Javis im lặng khi theo dõi cuộc chat Zalo, không còn dội mọi tin về Telegram.
+### Thay đổi
+- **Tick theo dõi giờ mặc định là im lặng**: chỉ ghi nhận cuộc chat chứ không báo Telegram. Trước đây tick vào là báo mọi tin, mà theo dõi vài nhóm đông thì điện thoại nổ tung và cuối cùng chẳng ai đọc nữa. Nghe là để Javis biết chuyện, còn báo phải là thứ chủ chủ động yêu cầu cho từng nhóm.
+- **Muốn được báo thì nói rõ**: nhập từ khoá vào ô bên dưới để chỉ báo khi tin có chứa những chữ đó, hoặc dặn Javis trong chat cho từng nhóm, ví dụ báo hết tin của nhóm này, hay nhắc khi ba mươi phút chưa ai trả lời.
+- Dòng xác nhận sau khi lưu nói rõ đang im lặng hay đang báo theo từ khoá nào, để không hiểu nhầm là sẽ được báo.
+
 ## [0.9.130] - 2026-07-20
 Sửa lỗi tick chọn cuộc chat theo dõi nhưng không lưu được gì, và thêm nút lưu có xác nhận nhìn thấy được.
 ### Sửa lỗi
