@@ -4,6 +4,13 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.140] - 2026-07-20
+Sửa lỗi bấm Bật nghe hiện Đang bật rồi lập tức quay về Bật nghe mà không có gì diễn ra.
+### Sửa lỗi
+- **Nút Bật nghe văng lỗi ngầm rồi tự hồi**: bản 0.9.136 đổi tên một biến trong giao diện nhưng sót lại một chỗ dùng tên cũ, nên khi bấm Bật nghe thì đoạn dựng dữ liệu gửi đi tham chiếu một biến không còn tồn tại và văng lỗi. Nút được lập trình luôn tự bật lại nên nó quay về Bật nghe, còn lệnh thì chưa bao giờ được gửi tới máy chủ. Không có thông báo gì nên nhìn như không phản ứng.
+- Sửa chỗ sót đó, và cập nhật nốt phần mô tả cùng bố cục panel sang thiết kế hai trạng thái Chỉ đọc và Tự phản hồi mà bản 0.9.136 áp dụng thiếu.
+- Thêm kiểm thử chốt để kiểu lỗi đổi tên biến sót chỗ này không lọt qua lần nữa.
+
 ## [0.9.139] - 2026-07-20
 Sửa lỗi gốc khiến mọi thay đổi giao diện của nhiều bản gần đây trở nên vô hình với trình duyệt.
 ### Sửa lỗi

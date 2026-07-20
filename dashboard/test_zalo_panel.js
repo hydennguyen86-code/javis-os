@@ -109,6 +109,17 @@ check("2 trang thai: chua chon thi dropdown bi khoa, khong bam nham",
   src.indexOf('(on ? "" : " disabled")') !== -1);
 check("2 trang thai: khoa ve lai gom ca MODE, khong thi doi trang thai khong hien ra",
   src.indexOf('x.thread_id + ":" + x.mode') !== -1);
+
+// ---- Chong "va nham nho": doi bien ma sot cho dung cu ----
+// Bug that (0.9.136): doi `selected` -> `modes` o phan khai bao nhung cfgBody() con dung
+// `selected` -> ReferenceError khi bam Bat nghe -> nut van ve "Bat nghe", khong gi dien ra.
+// Bien state duy nhat gio la `modes`; `selected` chi con la thuoc tinh HTML <option selected>.
+check("khong sot bien cu: cfgBody KHONG tham chieu 'selected' (da doi thanh modes)",
+  !/Array\.from\(selected\)/.test(src) && !/selected\s*[),.]/.test(
+    src.slice(src.indexOf("const cfgBody"), src.indexOf("const cfgBody") + 200)));
+check("mo ta panel da la thiet ke 2 trang thai, khong con loi van cu",
+  src.indexOf("Mỗi cuộc chat chọn một trong hai") !== -1
+  && src.indexOf("chỉ ghi nhận chứ không báo Telegram") === -1);
 check("panel: co noi ro chua chon thi khong bao gi",
   src.indexOf("chưa chọn cái nào thì không báo gì") !== -1);
 

@@ -2233,7 +2233,7 @@
       + '<b style="font-size:13px">Nghe tin liên tục</b>'
       + '<span id="zlState" class="mp-note">đang tải…</span>'
       + '<button class="mp-btn" id="zlToggle" style="margin-left:auto">…</button></div>'
-      + '<div class="gcard-meta" style="margin-top:6px">Chỉ theo dõi đúng những cuộc chat anh chọn bên dưới. Mặc định Javis <b>im lặng</b>, chỉ ghi nhận chứ không báo Telegram. Muốn được báo thì nhập từ khoá bên dưới, hoặc dặn Javis trong chat (vd "nhóm Kim Khí báo hết tin cho anh", "30 phút chưa ai trả lời thì nhắc anh").</div>'
+      + '<div class="gcard-meta" style="margin-top:6px">Mỗi cuộc chat chọn một trong hai: <b>Chỉ đọc</b> (Javis im lặng, chỉ ghi nhận) hoặc <b>Tự phản hồi</b> (Javis tự nhắn vào cuộc chat, và tự quyết khi nào nên lên tiếng chứ không trả lời mọi tin). Muốn nó nói theo phong cách riêng của từng nhóm thì dặn trong chat.</div>'
       + '<div class="mp-note" id="zlSignal" style="margin-top:6px">đang tải…</div>'
       + '<div id="zlForm" style="margin-top:10px;display:flex;flex-direction:column;gap:8px">'
       + '<label class="mcp-lb">Tài khoản Zalo dùng để nghe<select class="js-input" id="zlConn">' + opts + '</select></label>'
@@ -2270,10 +2270,12 @@
     // rosterKey = null chứ KHÔNG phải "": danh sách rỗng cũng cho key "", để "" thì lần vẽ đầu
     // bị chặn ngay và dòng hướng dẫn "chưa thấy cuộc chat nào" không bao giờ hiện ra.
     let on = false, modes = {}, rosterKey = null, showAll = false, lastSt = null;
+    // Lệnh Bật nghe chỉ cần tài khoản và giờ im lặng. KHÔNG tham chiếu biến cũ "selected"
+    // (đã đổi thành "modes" ở 0.9.136 nhưng dòng này sót lại) - nó ném ReferenceError khiến
+    // bấm Bật nghe là văng lỗi, finally hồi nút về "Bật nghe", không có gì diễn ra. Đúng
+    // triệu chứng đã gặp. Cuộc chat theo dõi lưu riêng qua /watch bằng "modes".
     const cfgBody = () => ({
       conn_id: $("zlConn").value,
-      threads: Array.from(selected),
-      keywords: $("zlKw").value.split(",").map(s => s.trim()).filter(Boolean),
       quiet_hours: $("zlQuiet").value.trim(),
     });
     // Dấu hiệu MỘT DÒNG: đủ để phân biệt "không ai nhắn" với "đang hỏng mà vẫn báo đang nghe".
