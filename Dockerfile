@@ -60,11 +60,6 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# uv: runner cho các connector MCP khai `command: uvx` trong system/mcp-catalog.json
-# (google-keep, google-sheets, google-search-console, google-ads, tiktok-ads). Không nằm trong
-# requirements.txt vì nó là công cụ chạy tiến trình con, không phải thư viện app import.
-RUN pip install --no-cache-dir uv && uv --version && uvx --version
-
 # App source.
 COPY . .
 
