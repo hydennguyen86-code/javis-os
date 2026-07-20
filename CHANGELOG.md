@@ -16,6 +16,21 @@ Viết lại hướng dẫn đăng nhập của TẤT CẢ 23 connector cho dễ
 ### Thêm mới
 - Test `server/test_catalog_guides.py` (10 kiểm tra, không mạng): guide dài phải có xuống dòng, không dòng nào quá 200 ký tự, bước đánh số phải mở đầu dòng, CSS phải thật sự khai `pre-line` + `overflow-wrap`, và cấm em dash / en dash trong cả file. Có canary chứng minh luật bắt được chuỗi kiểu cũ.
 
+## [0.9.116] - 2026-07-20
+Rà soát toàn bộ cảnh báo rủi ro của 23 connector. Từ khi viết ra tới nay chưa ai kiểm lại, mà chúng lại không hiện trên giao diện (sửa ở 0.9.115) nên lỗi tích lại không ai thấy. Tìm được ba connector có tool nguy hiểm mà không một chữ cảnh báo, một chỗ xếp loại mâu thuẫn, và một chỗ mô tả nhẹ hơn thực tế.
+### Bảo mật
+- **Ba connector có tool nguy hiểm mà KHÔNG có cảnh báo, nay đã có**: `pancake-pos` (tạo đơn hàng, ghi giao dịch thu chi, sửa công nợ, xuất hoá đơn điện tử, chạy quảng cáo, tạo voucher), `botcake` (gửi tin thật tới khách qua chatbot), `webcake-landing` (đăng trang công khai, lại đang mặc định ở mức Ghi nháp).
+- **Siết `*share*` của `google-sheets` từ mức Ghi lên mức NGUY HIỂM**: connector này mặc định ở mức Ghi nháp, nghĩa là trước đây Javis chia sẻ được bảng tính chứa số liệu kinh doanh ra người ngoài ngay từ mặc định. Nay thống nhất một chuẩn với `google-keep` (đã xếp `add_note_collaborator` là nguy hiểm): đẩy dữ liệu ra người ngoài luôn là mức Toàn quyền.
+### Sửa lỗi
+- **`google-workspace` mô tả nhẹ hơn thực tế**: cảnh báo viết mức Ghi nháp "chỉ soạn nháp, tạo lịch, tạo tài liệu", trong khi danh sách ghi có cả `*modify*` và `*move*`, tức sửa tài liệu có sẵn và di chuyển file Drive cũng được. Đã viết đúng lại.
+- **`zalo` là connector DUY NHẤT mặc định Toàn quyền** (17 cái Chỉ đọc, 5 cái Ghi nháp, 1 cái Toàn quyền) mà cảnh báo cũ không nói rõ điều đó. Giữ nguyên mức mặc định vì đấu Zalo vào chủ yếu để nhắn tin, nhưng cảnh báo nay nói thẳng là quyền gửi tin đang bật sẵn và chỉ cách hạ xuống.
+### Cải thiện
+- **Viết lại cả 20 cảnh báo theo một khuôn, có ngắt đoạn**: trước đây tất cả đều là một đoạn chạy dài không xuống dòng, y hệt vấn đề của phần hướng dẫn đã sửa ở 0.9.111. Nay mỗi mức quyền một đoạn, cảnh báo nặng nhất đứng đầu.
+### Thêm mới
+- Bổ sung 5 luật vào `server/test_canh_bao_rui_ro.py`: có tool nguy hiểm thì bắt buộc có cảnh báo; tool chia sẻ dữ liệu không được xếp mức Ghi; cảnh báo dài phải ngắt dòng và không dòng nào quá 200 ký tự; cảnh báo không được dùng chữ hạ thấp mức quyền so với thực tế; connector mặc định Toàn quyền phải nói rõ và chỉ cách hạ.
+### Ghi chú
+- Ba connector còn lại không có cảnh báo (`google-search-console`, `google-ads`, `tiktok-ads`) đều không khai tool nguy hiểm nào và mặc định Chỉ đọc, nên đúng là chưa cần.
+
 ## [0.9.115] - 2026-07-20
 Sửa một lỗ hổng trình bày nghiêm trọng: **15 trong 16 connector có cảnh báo rủi ro thì không bao giờ hiện cảnh báo lúc bấm Kết nối**. Trường `risk` chỉ được vẽ ở luồng QR (Zalo) và ở hộp thoại đổi quyền, nên cảnh báo mạnh nhất lại vắng mặt đúng lúc người dùng ra quyết định.
 ### Sửa lỗi

@@ -43,6 +43,7 @@
         "danger": ["pos_order", "pos_purchase", "pos_transaction", "pos_debt", "pos_e_invoice",
                    "pos_ads_manager", "pos_voucher", "pos_promotion"]
       },
+      "risk": "Mức Chỉ đọc (mặc định) chỉ xem đơn, doanh thu, tồn kho, khách hàng. An toàn.\n\nMức Toàn quyền cho phép Javis TẠO ĐƠN HÀNG, ghi GIAO DỊCH THU CHI, sửa CÔNG NỢ, xuất HOÁ ĐƠN ĐIỆN TỬ, chạy QUẢNG CÁO và tạo voucher/khuyến mãi.\n\nĐây là tiền thật và đơn thật của cửa hàng, nhiều thao tác không hoàn tác được. Chỉ nâng quyền khi bạn thật sự cần Javis thao tác thay mình.\n\nLoop chạy nền không bao giờ được tự tạo đơn hay tiêu tiền, kể cả khi kết nối đã ở mức Toàn quyền.",
       "default_perm": "readonly"
     },
     {
@@ -68,7 +69,7 @@
         "danger": ["*send*"]
       },
       "default_perm": "full",
-      "risk": "Zalo KHÔNG hỗ trợ chính thức công cụ này (API không chính thức qua zca-js). Tài khoản của bạn CÓ THỂ bị Zalo hạn chế hoặc KHOÁ, nhất là khi gửi tin tự động số lượng lớn. Khuyến nghị dùng tài khoản phụ. Quyền GỬI TIN đang bật - Javis chỉ gửi khi bạn yêu cầu trực tiếp trong chat; loop chạy nền không bao giờ được tự gửi.",
+      "risk": "Connector này MẶC ĐỊNH ở mức TOÀN QUYỀN, tức quyền GỬI TIN đang bật sẵn. Muốn chặn thì tự hạ xuống Ghi nháp hoặc Chỉ đọc ở trang Kết nối.\n\nZalo KHÔNG hỗ trợ chính thức công cụ này (API không chính thức qua zca-js). Tài khoản của bạn CÓ THỂ bị Zalo hạn chế hoặc KHOÁ, nhất là khi gửi tin tự động số lượng lớn.\n\nKhuyến nghị dùng tài khoản phụ.\n\nJavis chỉ gửi khi bạn yêu cầu trực tiếp trong chat; loop chạy nền không bao giờ được tự gửi.",
       "rate_limit": { "calls_per_min": 20 }
     },
     {
@@ -111,6 +112,7 @@
         "write": ["create_page", "update_page", "patch_page", "add_section", "new_element", "new_page_skeleton", "layout", "ingest_html", "ingest_url", "upload_images"],
         "danger": ["publish_page"]
       },
+      "risk": "Mức Ghi nháp (mặc định) cho phép Javis TẠO và SỬA trang landing thật trong tài khoản của bạn, kể cả trang đang có.\n\nMức Toàn quyền thêm quyền ĐĂNG trang lên công khai. Trang đã đăng là người ngoài xem được ngay.\n\nCoi JWT như mật khẩu: nó vào thẳng tài khoản Webcake của bạn.",
       "default_perm": "safe"
     },
     {
@@ -148,6 +150,7 @@
         "write": ["botcake_send_flow", "botcake_send_content", "botcake_keyword_create", "botcake_keyword_update", "botcake_customer_fields_set", "botcake_upload_media"],
         "danger": ["botcake_send_flow", "botcake_send_content"]
       },
+      "risk": "Mức Chỉ đọc (mặc định) chỉ xem khách hàng, tag và flow.\n\nMức Toàn quyền cho phép Javis GỬI TIN THẬT tới khách hàng qua chatbot, bằng flow có sẵn hoặc nội dung tự soạn. Tin đã gửi không rút lại được.\n\nChỉ cần xem dữ liệu thì giữ mức Chỉ đọc.",
       "default_perm": "readonly"
     },
     {
@@ -182,9 +185,19 @@
         "guide_url": "https://github.com/xing5/mcp-google-sheets"
       },
       "tool_meta": {
-        "write": ["*create*", "*update*", "*add*", "*write*", "*batch*", "*share*", "*copy*"],
-        "danger": []
+        "write": [
+          "*create*",
+          "*update*",
+          "*add*",
+          "*write*",
+          "*batch*",
+          "*copy*"
+        ],
+        "danger": [
+          "*share*"
+        ]
       },
+      "risk": "Mức Ghi nháp (mặc định) cho phép Javis TẠO và SỬA bảng tính thật trong Drive, kể cả ghi đè dữ liệu đang có.\n\nMức Toàn quyền thêm quyền CHIA SẺ bảng tính cho người khác. Chia sẻ là đẩy số liệu kinh doanh ra ngoài nên xếp mức nguy hiểm, giống việc chia sẻ ghi chú ở Google Keep.\n\nJavis chỉ đụng được thư mục Drive mà bạn đã share cho service account.",
       "default_perm": "safe"
     },
     {
@@ -256,7 +269,7 @@
         "danger": ["*send*", "*delete*"]
       },
       "default_perm": "safe",
-      "risk": "Mức Toàn quyền cho phép Javis GỬI EMAIL THẬT và XOÁ file/thư/lịch bằng tài khoản Google của bạn. Mức Ghi nháp (mặc định) chỉ soạn nháp, tạo lịch, tạo tài liệu - an toàn hơn."
+      "risk": "Mức Ghi nháp (mặc định) cho phép Javis soạn nháp thư, tạo lịch, tạo tài liệu, và cả SỬA tài liệu có sẵn lẫn DI CHUYỂN file trong Drive.\n\nMức Toàn quyền thêm quyền GỬI EMAIL THẬT và XOÁ file, thư, lịch bằng tài khoản Google của bạn.\n\nChỉ cần đọc thì hạ xuống Chỉ đọc."
     },
     {
       "id": "meta-ads",
@@ -284,7 +297,7 @@
         "danger": ["ads_create_*", "ads_update_entity", "ads_activate_entity"]
       },
       "default_perm": "readonly",
-      "risk": "Mức Toàn quyền cho phép Javis tạo/sửa chiến dịch quảng cáo tiêu TIỀN THẬT trên tài khoản của bạn (chiến dịch tạo qua đây luôn ở trạng thái TẠM DỪNG, bạn phải tự bật trong Ads Manager). Chỉ cần xem số liệu thì giữ mức Chỉ đọc."
+      "risk": "Mức Toàn quyền cho phép Javis tạo và sửa chiến dịch quảng cáo tiêu TIỀN THẬT trên tài khoản của bạn.\n\nChiến dịch tạo qua đây luôn ở trạng thái TẠM DỪNG, bạn phải tự bật trong Ads Manager.\n\nChỉ cần xem số liệu thì giữ mức Chỉ đọc."
     },
     {
       "id": "meta-ads-graph",
@@ -319,7 +332,7 @@
         "read": ["meta_ads_*"]
       },
       "default_perm": "readonly",
-      "risk": "Connector này CHỈ ĐỌC số liệu quảng cáo - không tạo/sửa chiến dịch, không tiêu tiền. Token chỉ thao tác được trên tài khoản quảng cáo mà chính bạn là admin."
+      "risk": "Connector này CHỈ ĐỌC số liệu quảng cáo: không tạo hay sửa chiến dịch, không tiêu tiền.\n\nToken chỉ thao tác được trên tài khoản quảng cáo mà chính bạn là admin."
     },
     {
       "id": "facebook-pages",
@@ -355,7 +368,7 @@
         "danger": ["fb_page_post", "fb_page_reply"]
       },
       "default_perm": "readonly",
-      "risk": "Mức Toàn quyền cho phép Javis ĐĂNG BÀI và TRẢ LỜI BÌNH LUẬN công khai trên Trang của bạn - hành động thật, khó rút lại. Giữ mức Chỉ đọc thì Javis chỉ xem Trang, bài và bình luận, không đăng hay trả lời gì. Token chỉ thao tác được trên Trang mà chính bạn là admin."
+      "risk": "Mức Toàn quyền cho phép Javis ĐĂNG BÀI và TRẢ LỜI BÌNH LUẬN công khai trên Trang của bạn. Hành động thật, khó rút lại.\n\nGiữ mức Chỉ đọc thì Javis chỉ xem Trang, bài và bình luận, không đăng hay trả lời gì.\n\nToken chỉ thao tác được trên Trang mà chính bạn là admin."
     },
     {
       "id": "facebook-personal",
@@ -380,7 +393,7 @@
         "danger": ["fb_personal_post", "fb_personal_comment"]
       },
       "default_perm": "readonly",
-      "risk": "Mức Toàn quyền cho phép Javis ĐĂNG BÀI và BÌNH LUẬN THẬT bằng tài khoản Facebook CÁ NHÂN của bạn. Đây là tự động hoá tài khoản cá nhân - vi phạm điều khoản Facebook, RỦI RO BỊ KHOÁ TÀI KHOẢN là có thật. Cookie phiên lưu trên server (đã mã hoá) là chìa khoá toàn quyền tài khoản. Giữ mức Chỉ đọc thì Javis chỉ lướt/đọc feed, không đăng hay bình luận gì. Chỉ bật Toàn quyền khi bạn hiểu và tự chịu rủi ro."
+      "risk": "Mức Toàn quyền cho phép Javis ĐĂNG BÀI và BÌNH LUẬN THẬT bằng tài khoản Facebook CÁ NHÂN của bạn.\n\nĐây là tự động hoá tài khoản cá nhân, vi phạm điều khoản Facebook. RỦI RO BỊ KHOÁ TÀI KHOẢN là có thật.\n\nCookie phiên lưu trên server (đã mã hoá) là chìa khoá toàn quyền tài khoản của bạn.\n\nGiữ mức Chỉ đọc thì Javis chỉ lướt và đọc feed. Chỉ bật Toàn quyền khi bạn hiểu và tự chịu rủi ro."
     },
     {
       "id": "facebook-monitor",
@@ -403,7 +416,7 @@
         "read": ["fb_monitor"]
       },
       "default_perm": "readonly",
-      "risk": "Connector này CHỈ ĐỌC - quét dữ liệu CÔNG KHAI qua dịch vụ Apify, KHÔNG đụng tài khoản Facebook của bạn, không đăng hay bình luận gì nên không có rủi ro khoá tài khoản. Lưu ý mỗi lượt quét tốn một ít phí Apify tính theo số bài."
+      "risk": "Connector này CHỈ ĐỌC: quét dữ liệu CÔNG KHAI qua dịch vụ Apify, KHÔNG đụng tài khoản Facebook của bạn.\n\nKhông đăng, không bình luận, nên không có rủi ro khoá tài khoản.\n\nLưu ý mỗi lượt quét tốn một ít phí Apify tính theo số bài."
     },
     {
       "id": "google-ads",
@@ -562,7 +575,7 @@
         "danger": ["delete_event"]
       },
       "default_perm": "readonly",
-      "risk": "Mức Ghi nháp cho phép Javis TẠO và SỬA sự kiện thật trên lịch của bạn (tiện để nhờ 'nhắc tôi gọi nhà cung cấp thứ 5'). Mức Toàn quyền thêm quyền XOÁ sự kiện. Chỉ cần xem lịch thì giữ mức Chỉ đọc."
+      "risk": "Mức Ghi nháp cho phép Javis TẠO và SỬA sự kiện thật trên lịch của bạn (tiện để nhờ \"nhắc tôi gọi nhà cung cấp thứ 5\").\n\nMức Toàn quyền thêm quyền XOÁ sự kiện.\n\nChỉ cần xem lịch thì giữ mức Chỉ đọc."
     },
     {
       "id": "gmail",
@@ -597,7 +610,7 @@
         "danger": []
       },
       "default_perm": "readonly",
-      "risk": "Mức Ghi nháp cho phép Javis SOẠN NHÁP thư và gắn/gỡ nhãn trong hộp thư của bạn. Server Gmail chính chủ không có tool gửi thẳng nên Javis không tự gửi được - luôn dừng ở bản nháp để bạn tự bấm gửi. Chỉ cần đọc/tìm thư thì giữ mức Chỉ đọc."
+      "risk": "Mức Ghi nháp cho phép Javis SOẠN NHÁP thư và gắn, gỡ nhãn trong hộp thư của bạn.\n\nServer Gmail chính chủ không có tool gửi thẳng nên Javis không tự gửi được, luôn dừng ở bản nháp để bạn tự bấm gửi.\n\nChỉ cần đọc và tìm thư thì giữ mức Chỉ đọc."
     },
     {
       "id": "slack",
@@ -627,7 +640,7 @@
         "danger": ["*send*", "*post*", "*add_message*", "*create*", "*update*", "*archive*", "*upload*", "*invite*"]
       },
       "default_perm": "readonly",
-      "risk": "Mức Toàn quyền cho phép Javis GỬI TIN NHẮN THẬT và tạo/sửa canvas bằng tài khoản Slack của bạn. Chỉ cần đọc/tìm tin thì giữ mức Chỉ đọc. Lưu ý: tên tool chính xác của Slack MCP chưa công bố nên phân loại quyền dựa trên heuristic (mọi tool có động từ hành động bị coi là GHI và chặn ở mức Chỉ đọc); nếu một công cụ đọc bị chặn nhầm, nâng quyền hoặc báo lại để chỉnh."
+      "risk": "Mức Toàn quyền cho phép Javis GỬI TIN NHẮN THẬT và tạo, sửa canvas bằng tài khoản Slack của bạn.\n\nChỉ cần đọc và tìm tin thì giữ mức Chỉ đọc.\n\nLưu ý: tên tool chính xác của Slack MCP chưa công bố nên phân loại quyền dựa trên heuristic, mọi tool có động từ hành động đều bị coi là GHI.\n\nNếu một công cụ đọc bị chặn nhầm ở mức Chỉ đọc, nâng quyền hoặc báo lại để chỉnh."
     },
     {
       "id": "systeme-io",
@@ -656,7 +669,7 @@
         "danger": ["delete_*", "*_delete"]
       },
       "default_perm": "readonly",
-      "risk": "Mức Ghi nháp cho phép Javis TẠO/SỬA liên hệ, tag, newsletter, phễu thật trên Systeme.io. Mức Toàn quyền thêm quyền XOÁ. Chỉ cần xem dữ liệu thì giữ mức Chỉ đọc. Lưu ý: tên tool chính xác chưa công bố nên phân loại dựa trên heuristic (tool có động từ hành động bị coi là GHI, xoá là NGUY HIỂM); nếu công cụ đọc bị chặn nhầm ở mức Chỉ đọc, báo lại để chỉnh."
+      "risk": "Mức Ghi nháp cho phép Javis TẠO và SỬA liên hệ, tag, newsletter, phễu thật trên Systeme.io.\n\nMức Toàn quyền thêm quyền XOÁ.\n\nChỉ cần xem dữ liệu thì giữ mức Chỉ đọc.\n\nLưu ý: tên tool chính xác chưa công bố nên phân loại dựa trên heuristic, tool có động từ hành động bị coi là GHI và xoá là NGUY HIỂM. Nếu công cụ đọc bị chặn nhầm, báo lại để chỉnh."
     },
     {
       "id": "lark",
@@ -694,7 +707,7 @@
         "danger": ["im_v1_message_create", "drive_v1_permissionMember_create"]
       },
       "default_perm": "readonly",
-      "risk": "Mức Ghi nháp cho phép Javis TẠO/SỬA bảng dữ liệu, tài liệu, nhóm chat thật trong Lark. Mức Toàn quyền thêm quyền GỬI TIN NHẮN vào chat và CẤP QUYỀN truy cập file. Chỉ cần xem/tìm thì giữ mức Chỉ đọc. Javis chỉ làm được đúng phạm vi quyền bạn cấp cho Lark app."
+      "risk": "Mức Ghi nháp cho phép Javis TẠO và SỬA bảng dữ liệu, tài liệu, nhóm chat thật trong Lark.\n\nMức Toàn quyền thêm quyền GỬI TIN NHẮN vào chat và CẤP QUYỀN truy cập file.\n\nChỉ cần xem và tìm thì giữ mức Chỉ đọc. Javis chỉ làm được đúng phạm vi quyền bạn cấp cho Lark app."
     },
     {
       "id": "higgsfield",
@@ -717,7 +730,7 @@
         "danger": ["*delete*", "*cancel*", "*billing*", "*purchase*", "*subscription*"]
       },
       "default_perm": "safe",
-      "risk": "Higgsfield là công cụ TẠO nội dung - mỗi lần sinh/chỉnh ảnh hoặc video sẽ TIÊU CREDIT trả trước trong tài khoản Higgsfield của bạn (không trừ tiền trực tiếp mỗi lần). Mặc định để mức Ghi nháp để Javis tạo được nội dung ngay và chặn các thao tác xoá/thanh toán. Muốn Javis chỉ xem lịch sử/kết quả mà không tự tạo (đỡ tốn credit) thì hạ xuống Chỉ đọc; muốn mở tất cả thì nâng Toàn quyền. Tên tool chính xác của Higgsfield chưa công bố nên phân loại quyền dựa trên heuristic."
+      "risk": "Higgsfield là công cụ TẠO nội dung: mỗi lần sinh hoặc chỉnh ảnh, video sẽ TIÊU CREDIT trả trước trong tài khoản Higgsfield của bạn.\n\nMặc định để mức Ghi nháp để Javis tạo được nội dung ngay, đồng thời chặn các thao tác xoá và thanh toán.\n\nMuốn Javis chỉ xem lịch sử và kết quả mà không tự tạo (đỡ tốn credit) thì hạ xuống Chỉ đọc. Muốn mở tất cả thì nâng Toàn quyền.\n\nTên tool chính xác của Higgsfield chưa công bố nên phân loại quyền dựa trên heuristic."
     },
     {
       "id": "x-twitter",
@@ -747,7 +760,7 @@
         "danger": ["*delete*", "*remove*", "*dm*", "*message*", "*block*", "*mute*"]
       },
       "default_perm": "readonly",
-      "risk": "Token App-only chỉ ĐỌC/TÌM bài đăng và hồ sơ công khai của X - không đăng bài, không nhắn tin, nên rất an toàn ở mức Chỉ đọc (mặc định). Tên tool chính xác của X MCP chưa công bố nên phân loại quyền dựa trên heuristic; nếu sau này đấu OAuth để đăng bài thì cân nhắc mức quyền kỹ hơn."
+      "risk": "Token App-only chỉ ĐỌC và TÌM bài đăng, hồ sơ công khai của X. Không đăng bài, không nhắn tin, nên rất an toàn ở mức Chỉ đọc (mặc định).\n\nTên tool chính xác của X MCP chưa công bố nên phân loại quyền dựa trên heuristic.\n\nNếu sau này đấu OAuth để đăng bài thì cân nhắc mức quyền kỹ hơn."
     },
     {
       "id": "substack",
@@ -790,7 +803,7 @@
         "danger": ["substack_publish"]
       },
       "default_perm": "safe",
-      "risk": "Mức Ghi nháp (mặc định) cho phép Javis TẠO NHÁP bài viết trên Substack của bạn - chưa đăng, chưa gửi ai. Muốn Javis ĐĂNG BÀI THẬT thì phải nâng kết nối này lên Toàn quyền; khi đó Javis vẫn chỉ đăng khi bạn yêu cầu trực tiếp trong chat (loop chạy nền không bao giờ tự đăng). Đăng mặc định chỉ lên web, KHÔNG gửi email; chỉ khi bạn nói rõ 'gửi email cho người đăng ký' thì Javis mới bật cờ gửi mail - và việc đã gửi mail KHÔNG hoàn tác được. Session token cho toàn quyền tài khoản Substack nên giữ kín như mật khẩu; hết hạn khi đăng xuất thì kết nối lại."
+      "risk": "Mức Ghi nháp (mặc định) cho phép Javis TẠO NHÁP bài viết trên Substack của bạn. Chưa đăng, chưa gửi ai.\n\nMuốn Javis ĐĂNG BÀI THẬT thì phải nâng kết nối này lên Toàn quyền. Khi đó Javis vẫn chỉ đăng khi bạn yêu cầu trực tiếp trong chat, loop chạy nền không bao giờ tự đăng.\n\nĐăng mặc định chỉ lên web, KHÔNG gửi email. Chỉ khi bạn nói rõ \"gửi email cho người đăng ký\" thì Javis mới bật cờ gửi mail, và việc đã gửi mail KHÔNG hoàn tác được.\n\nSession token cho toàn quyền tài khoản Substack nên giữ kín như mật khẩu. Hết hạn khi đăng xuất thì kết nối lại."
     },
     {
       "id": "google-keep",
@@ -852,7 +865,7 @@
                    "add_note_collaborator", "remove_note_collaborator"]
       },
       "default_perm": "readonly",
-      "risk": "Kết nối này dùng Google MASTER TOKEN - token có TOÀN QUYỀN tài khoản Google (Gmail, Drive, Photos), không phải OAuth giới hạn phạm vi. Mức Ghi nháp cho Javis tạo/sửa note, ghim, lưu trữ, gắn nhãn thật trong Keep. Mức Toàn quyền thêm quyền VỨT/XOÁ note và CHIA SẺ note cho người khác. Nếu đã gõ true vào ô UNSAFE_MODE thì Javis đụng được cả note bạn viết tay, không riêng note nó tạo."
+      "risk": "Kết nối này dùng Google MASTER TOKEN, loại token có TOÀN QUYỀN tài khoản Google (Gmail, Drive, Photos), không phải OAuth giới hạn phạm vi như Gmail hay Lịch.\n\nMức Ghi nháp cho Javis tạo và sửa note, ghim, lưu trữ, gắn nhãn thật trong Keep.\n\nMức Toàn quyền thêm quyền VỨT, XOÁ note và CHIA SẺ note cho người khác.\n\nNếu đã gõ true vào ô UNSAFE_MODE thì Javis đụng được cả note bạn viết tay, không riêng note nó tạo."
     }
   ]
 }
