@@ -766,6 +766,90 @@
       },
       "default_perm": "safe",
       "risk": "Mức Ghi nháp (mặc định) cho phép Javis TẠO NHÁP bài viết trên Substack của bạn - chưa đăng, chưa gửi ai. Muốn Javis ĐĂNG BÀI THẬT thì phải nâng kết nối này lên Toàn quyền; khi đó Javis vẫn chỉ đăng khi bạn yêu cầu trực tiếp trong chat (loop chạy nền không bao giờ tự đăng). Đăng mặc định chỉ lên web, KHÔNG gửi email; chỉ khi bạn nói rõ 'gửi email cho người đăng ký' thì Javis mới bật cờ gửi mail - và việc đã gửi mail KHÔNG hoàn tác được. Session token cho toàn quyền tài khoản Substack nên giữ kín như mật khẩu; hết hạn khi đăng xuất thì kết nối lại."
+    },
+    {
+      "id": "google-keep",
+      "name": "Google Keep",
+      "icon": "📒",
+      "category": "Văn phòng",
+      "description": "Đọc và sửa ghi chú Google Keep: tìm note, tạo note và danh sách việc, gắn nhãn, ghim, lưu trữ. Chạy local qua thư viện không chính thức - cần Google master token.",
+      "status": "beta",
+      "transport": "stdio",
+      "command": "uvx",
+      "_args_doc": "KHÔNG dùng `uvx keep-mcp`: package keep-mcp khai console script tên `mcp` (server.cli:main), trùng tên với CLI của MCP SDK (mcp.cli:app) vốn là dependency của nó, nên chạy nhầm sang CLI của SDK. Module `server/__main__.py` là đường duy nhất không mơ hồ.",
+      "args": [
+        "--from",
+        "keep-mcp",
+        "python",
+        "-m",
+        "server"
+      ],
+      "requires": {
+        "uv": true
+      },
+      "auth": {
+        "type": "apikey",
+        "fields": [
+          {
+            "key": "google_email",
+            "label": "Email Google",
+            "placeholder": "ten@gmail.com",
+            "env": "GOOGLE_EMAIL"
+          },
+          {
+            "key": "master_token",
+            "label": "Google master token (aas_et/...)",
+            "placeholder": "aas_et/...",
+            "env": "GOOGLE_MASTER_TOKEN"
+          },
+          {
+            "key": "unsafe_mode",
+            "label": "Cho sửa MỌI note - gõ true nếu muốn (để trống = chỉ sửa note do Javis tạo)",
+            "placeholder": "để trống cho an toàn",
+            "optional": true,
+            "env": "UNSAFE_MODE"
+          }
+        ],
+        "guide": "Google Keep KHÔNG có API chính chủ cho gmail thường nên phải dùng master token. CẢNH BÁO: token này có TOÀN QUYỀN tài khoản Google của bạn (Gmail, Drive, Photos...), tương đương mật khẩu - đừng đưa cho ai. Lấy 1 lần: (1) Bật xác minh 2 bước cho tài khoản. (2) Vào myaccount.google.com/apppasswords tạo App Password 16 ký tự. (3) Cài uv (Windows: winget install astral-sh.uv) rồi chạy trong terminal: uv run --no-project --with gpsoauth python -c \"import gpsoauth; print(gpsoauth.perform_master_login('EMAIL_CUA_BAN','APP_PASSWORD_16_KY_TU','0123456789abcdef')['Token'])\" (4) Dán chuỗi bắt đầu bằng aas_et/ vào ô Master token. Ô cuối để trống thì Javis chỉ sửa được note do chính nó tạo (gắn nhãn keep-mcp); gõ true thì Javis sửa được mọi note kể cả note bạn viết tay.",
+        "guide_url": "https://github.com/feuerdev/keep-mcp"
+      },
+      "validate": {
+        "tool": "list_labels",
+        "args": {}
+      },
+      "tool_meta": {
+        "read": [
+          "find",
+          "get_note",
+          "list_labels",
+          "list_note_collaborators",
+          "list_note_media"
+        ],
+        "write": [
+          "create_note",
+          "create_list",
+          "update_note",
+          "add_list_item",
+          "update_list_item",
+          "delete_list_item",
+          "set_note_color",
+          "pin_note",
+          "archive_note",
+          "restore_note",
+          "create_label",
+          "add_label_to_note",
+          "remove_label_from_note"
+        ],
+        "danger": [
+          "trash_note",
+          "delete_note",
+          "delete_label",
+          "add_note_collaborator",
+          "remove_note_collaborator"
+        ]
+      },
+      "default_perm": "readonly",
+      "risk": "Kết nối này dùng Google MASTER TOKEN - token có TOÀN QUYỀN tài khoản Google (Gmail, Drive, Photos), không phải OAuth giới hạn phạm vi. Mức Ghi nháp cho Javis tạo/sửa note, ghim, lưu trữ, gắn nhãn thật trong Keep. Mức Toàn quyền thêm quyền VỨT/XOÁ note và CHIA SẺ note cho người khác. Nếu đã gõ true vào ô UNSAFE_MODE thì Javis đụng được cả note bạn viết tay, không riêng note nó tạo."
     }
   ]
 }

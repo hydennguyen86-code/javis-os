@@ -65,7 +65,7 @@ Giữ lại cho khớp tiền lệ và để người sau biết connector cần
   "status": "beta",
   "transport": "stdio",
   "command": "uvx",
-  "args": ["keep-mcp"],
+  "args": ["--from", "keep-mcp", "python", "-m", "server"],
   "requires": { "uv": true },
   "auth": {
     "type": "apikey",
@@ -111,6 +111,30 @@ Giữ lại cho khớp tiền lệ và để người sau biết connector cần
   "risk": "Kết nối này dùng Google MASTER TOKEN - token có TOÀN QUYỀN tài khoản Google (Gmail, Drive, Photos), không phải OAuth giới hạn phạm vi. Mức Ghi nháp cho Javis tạo/sửa note, ghim, lưu trữ, gắn nhãn thật trong Keep. Mức Toàn quyền thêm quyền VỨT/XOÁ note và CHIA SẺ note cho người khác. Nếu đã gõ true vào ô UNSAFE_MODE thì Javis đụng được cả note bạn viết tay, không chỉ note nó tạo."
 }
 ```
+
+### Cách gọi: vì sao KHÔNG phải `uvx keep-mcp`
+
+Bản thiết kế đầu tiên khai `args: ["keep-mcp"]` theo README. Kiểm chứng thực tế cho thấy nó HỎNG,
+và hỏng theo kiểu âm thầm nên đáng ghi lại.
+
+Package `keep-mcp` 0.3.1 khai console script tên `mcp` (`server.cli:main`). Nhưng chính dependency
+của nó, MCP Python SDK (`mcp` 1.28.1), cũng khai console script tên `mcp` (`mcp.cli:app`). Hai cái
+trùng tên nên cài xong thì SDK thắng.
+
+Hậu quả theo từng cách gọi:
+
+- `uvx keep-mcp` → uv báo lỗi thẳng: "An executable named `keep-mcp` is not provided by package
+  `keep-mcp`". Hỏng ồn ào, dễ phát hiện.
+- `uvx --from keep-mcp mcp` → CHẠY, nhưng chạy nhầm sang CLI của MCP SDK ("MCP development tools",
+  các lệnh version/dev/run). Hỏng ÂM THẦM, đây mới là cái bẫy: nó không báo lỗi gì cả.
+- `uvx --from keep-mcp python -m server` → đúng server keep-mcp, qua `server/__main__.py`.
+
+Đã xác minh bằng bắt tay MCP stdio thật (initialize + tools/list, không cần credential):
+server trả về ĐÚNG 23 tool, trùng khít danh sách README, không có tool ẩn nào ngoài `tool_meta`.
+Đây là điều quan trọng với bảo mật, vì tool không khai trong `tool_meta` sẽ rơi xuống heuristic
+`WRITE_HINTS` và có thể lọt qua lớp chặn.
+
+Có ghi chú `_args_doc` ngay trong entry catalog để người sau đừng "dọn gọn" nó về `uvx keep-mcp`.
 
 ### Phân loại tool và lý do
 
@@ -174,8 +198,29 @@ tiến trình con, không phải thư viện app import.
 5. Thủ công: đấu kết nối thật trên trang Kết nối, bấm Test, xác nhận `validate` không báo fail oan.
    Rồi thử `find` qua chat.
 
-Điểm 1 tới 3 viết được thành test tự động trong `server/test_*.py` theo lối sẵn có. Điểm 4 và 5
-phải làm tay.
+### Đã kiểm chứng được gì (2026-07-20)
+
+Điểm 1 tới 3 đã thành `server/test_google_keep.py`, 40 check, chạy bằng
+`cd server && ../.venv/Scripts/python.exe test_google_keep.py`. Có canary chứng minh
+`mcp_catalog.allowed` thật sự đang chặn chứ không trả True vô điều kiện. Đã chạy lại
+`test_fb_monitor`, `test_fb_personal`, `test_meta_graph`, `test_meta_pages`, `test_security`,
+`test_plugins_host`, `test_skill_caps` đều xanh.
+
+Ngoài ra đã kiểm bằng tay ngoài test suite:
+
+- `pip install uv` trên venv sạch có sinh ra `uvx` chạy được, nên cơ chế trong Dockerfile là đúng.
+- `uvx --from keep-mcp python -m server` khởi động đúng server keep-mcp và nói giao thức MCP.
+- Bắt tay `initialize` + `tools/list` trả về đúng 23 tool, khớp `tool_meta`.
+
+### CHƯA kiểm chứng được, phải làm khi nghiệm thu
+
+- **`docker build` chưa chạy.** Máy phát triển không cài Docker. Việc `pip install uv` cho ra
+  `uvx` mới chỉ được chứng minh trên Windows venv, chưa chứng minh trên `python:3.12-slim`.
+  Rủi ro thấp vì uv có wheel manylinux, nhưng chưa phải sự thật đã kiểm.
+- **Khối `validate` chưa chạy thật** vì cần master token. Nếu tài khoản chưa có nhãn nào mà
+  `list_labels` trả lỗi thì nút Test sẽ báo fail oan và phải bỏ khối `validate` đi.
+- **Chưa gọi tool nào chạm Keep thật.** Toàn bộ kiểm chứng ở trên không cần credential, nên chưa
+  chứng minh được master token chạy thông hay `UNSAFE_MODE` có tác dụng đúng như tài liệu.
 
 ## Ngoài phạm vi
 

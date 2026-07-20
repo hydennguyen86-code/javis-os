@@ -4,6 +4,19 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.110] - 2026-07-20
+Thêm connector **Google Keep** để Javis đọc và thao tác ghi chú Keep, kèm việc thêm `uv` vào Docker image (vá luôn 4 connector `uvx` khác vốn không chạy được trên VPS). Google Keep không có API chính chủ cho tài khoản gmail thường nên connector này đi qua thư viện không chính thức và đòi Google master token, loại token có TOÀN QUYỀN tài khoản Google chứ không giới hạn phạm vi như OAuth. Rủi ro này được ghi thẳng vào phần cảnh báo của connector.
+### Thêm mới
+- **Connector `google-keep`** (apikey, 3 ô: `google_email`, `master_token`, `unsafe_mode`): chạy local qua `uvx` với server cộng đồng `keep-mcp`. Phủ 23 tool: tìm/đọc note, tạo note và danh sách việc, sửa, gắn nhãn, ghim, lưu trữ, vứt, xoá, chia sẻ. Khai trong `system/mcp-catalog.json`, mặc định `readonly`.
+- **`UNSAFE_MODE` là opt-in, mặc định TẮT**: để trống thì Javis chỉ sửa được note do chính nó tạo (gắn nhãn `keep-mcp`); gõ `true` mới cho đụng note người dùng viết tay. Giữ bản fork sạch đúng nguyên tắc năng lực chạm dữ liệu cá nhân phải tự bật.
+- **Phân loại quyền có chủ ý**: `restore_note` ở mức Ghi nháp nhưng `trash_note` ở mức Toàn quyền, nên mức Ghi nháp luôn gỡ lại được note bị vứt nhầm mà không tự vứt được. Hai tool collaborator xếp mức nguy hiểm vì chúng chia sẻ note ra người khác, khác chất với sửa nội dung trong nhà.
+- Test `server/test_google_keep.py` (40 kiểm tra, không mạng, không cần token): map env, luật opt-in của `UNSAFE_MODE`, lớp chặn theo 3 mức quyền và trần của mode, kèm canary chứng minh lớp chặn có quyền lực thật.
+### Sửa lỗi
+- **Docker image thiếu `uv`**: image chỉ có `node`/`npx`/`pip`, không có `uv` lẫn `pipx`, nên mọi connector khai `command: uvx` đều chết trên VPS. Thêm `pip install uv` vào `Dockerfile`, thông cho cả `google-keep`, `google-sheets`, `google-search-console`, `google-ads`, `tiktok-ads`.
+### Ghi chú
+- **Bẫy entry point của keep-mcp**: package này khai console script tên `mcp`, TRÙNG tên với CLI của MCP SDK vốn là dependency của nó. Nên `uvx keep-mcp` báo lỗi, còn `uvx --from keep-mcp mcp` thì chạy nhầm sang CLI của SDK mà KHÔNG báo lỗi gì. Cách đúng là `uvx --from keep-mcp python -m server`, đã xác minh bằng bắt tay MCP thật (trả đúng 23 tool). Có ghi chú `_args_doc` trong catalog để người sau đừng "dọn gọn" nó lại.
+- Chưa kiểm chứng được trên Docker thật (máy phát triển không có Docker) và chưa gọi tool nào chạm Keep thật (cần master token). Xem `docs/superpowers/specs/2026-07-20-google-keep-connector-design.md` mục "CHƯA kiểm chứng được".
+
 ## [0.9.109] - 2026-07-20
 Thêm connector **Theo dõi Facebook (Apify)** và plugin `fb-monitor-apify`: theo dõi Trang và Nhóm CÔNG KHAI để tìm bài viral (nhiều share) qua dịch vụ quét Apify, thay vì tự cào bằng cookie cá nhân. Không đụng tài khoản Facebook của user nên không lo khoá, chạy tốt trên VPS 24/7, trả về số share/react/bình luận để lọc bài hot. Đây là hướng đúng cho nhu cầu "theo dõi nhóm/trang tìm bài nhiều share" mà cookie cá nhân không kham nổi 24/7.
 ### Thêm mới
