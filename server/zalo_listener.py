@@ -605,10 +605,20 @@ class _Runner:
         if any(m in low for m in _FATAL_MARKS):
             self.error = _strip_ansi(line).strip()[:200]
             return "fatal"
-        if "connected" in low or "listening" in low or "đang nghe" in low:
+        # Dòng KHAI BÁO NĂNG LỰC, không phải sự kiện. "Auto-reconnect enabled" chỉ nói là
+        # CÓ BẬT tính năng tự nối lại, nhưng khớp thô chữ "reconnect" thì hoá thành "đang
+        # mất kết nối". Nó lại in NGAY SAU dòng "Listening..." nên ghi đè và kẹt luôn ở
+        # trạng thái sai dù mọi thứ vẫn chạy. Đây là lỗi thật đã gặp.
+        if "enabled" in low or "events:" in low or "webhook:" in low:
+            return None
+        if "listening" in low or "đang nghe" in low or "logged in" in low:
             return "listening"
-        if "disconnect" in low or "closed" in low or "reconnect" in low:
+        # Chỉ nhận sự kiện đứt THẬT, không nhận mọi dòng có chứa mấy chữ này.
+        if any(m in low for m in ("disconnected", "connection closed", "auto-retrying",
+                                  "re-login in", "reconnecting")):
             return "reconnecting"
+        if "connected" in low:          # sau các luật trên: "disconnected" đã bị bắt rồi
+            return "listening"
         return None
 
     def _loop(self, home: str):
@@ -751,8 +761,18 @@ class _Runner:
         self.state = "off"
         return {"ok": True}
 
+    LIVE_S = 180        # có tin trong ngần này giây = chắc chắn đang nối được
+
     def status(self) -> dict:
-        return {"state": self.state, "error": self.error,
+        # Đọc log để đoán trạng thái vốn mong manh (chuỗi của CLI đổi lúc nào không hay).
+        # Tin nhắn VỀ ĐƯỢC là bằng chứng cứng: kết nối đang sống, không cần suy diễn.
+        # Chỉ đè lên các trạng thái "đang loay hoay", KHÔNG đè lên lỗi cứng như trùng
+        # phiên - cái đó phải do người sửa rồi bật lại.
+        state, error = self.state, self.error
+        if state in ("starting", "reconnecting") and self.last_event_ts and \
+                (time.time() - self.last_event_ts) < self.LIVE_S:
+            state, error = "listening", ""
+        return {"state": state, "error": error,
                 "last_event": self.last_event_ts, "started": self.started_ts,
                 # Số tiến trình nghe cũ còn sót - biến "không hiểu sao trùng phiên" thành
                 # một con số nhìn được. Chỉ dò khi ĐANG trùng phiên cho khỏi tốn công.

@@ -4,6 +4,12 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.128] - 2026-07-20
+Sửa lỗi báo mất kết nối trong khi thực tế vẫn đang nghe bình thường và tin vẫn về đều.
+### Sửa lỗi
+- **Đọc nhầm dòng khai báo thành sự cố**: công cụ in dòng thông báo có bật tính năng tự nối lại, ngay sau dòng báo đã bắt đầu nghe. Bộ đọc log khớp chuỗi quá thô nên hiểu dòng khai báo đó thành đang mất kết nối, ghi đè trạng thái đúng và kẹt luôn ở đó. Nay chỉ nhận đúng những dòng báo sự cố thật, và bỏ qua các dòng liệt kê năng lực, sự kiện hay địa chỉ webhook.
+- **Thêm một nguồn sự thật chắc chắn hơn log**: nếu vừa có tin nhắn về trong ba phút gần đây thì kết nối chắc chắn đang sống, nên trạng thái báo đang nghe bất kể log đoán gì. Đọc log để suy ra trạng thái vốn mong manh vì chuỗi chữ của công cụ có thể đổi bất cứ lúc nào. Riêng lỗi cứng như trùng phiên thì không bị che, vì cái đó phải do người sửa rồi bật lại.
+
 ## [0.9.127] - 2026-07-20
 Sửa lỗi mù của bộ dò tiến trình Zalo trên máy chủ: nó luôn báo không tìm thấy gì, kể cả khi thực tế đang có tiến trình chiếm kết nối.
 ### Sửa lỗi
