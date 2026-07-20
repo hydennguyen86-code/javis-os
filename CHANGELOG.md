@@ -4,6 +4,14 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.126] - 2026-07-20
+Dứt điểm trùng phiên Zalo: listener tự tắt connector của chính tài khoản đó khi bật, và dọn cả tiến trình của connector chứ không riêng tiến trình nghe.
+### Sửa lỗi
+- **Connector Zalo chính là thứ đá listener**: nó giữ một kết nối lâu dài cho cùng tài khoản, mà Zalo chỉ cho một kết nối mỗi tài khoản. Bản trước mới chỉ đổi đường gửi tin, còn bản thân connector vẫn bật nên vẫn tranh chỗ. Nay bật nghe là Javis tự tắt connector của đúng tài khoản đó, dừng nghe thì bật lại như cũ, và nói rõ cho chủ biết chứ không im lặng làm mất công cụ.
+- **Bộ dọn tiến trình cũ bỏ sót**: bản trước chỉ tìm tiến trình nghe, không đụng tới tiến trình của connector, nên thứ đang giữ kết nối vẫn sống. Nay quét cả hai.
+### Ghi chú
+- Từ bản 0.9.124 listener không cần connector nữa, cả nghe lẫn gửi đều tự lo, nên việc tạm tắt connector không mất chức năng gì.
+
 ## [0.9.125] - 2026-07-20
 Tự dọn tiến trình nghe cũ còn sót, và thêm đường xoá hẳn phiên đăng nhập Zalo khi bị trùng phiên mà đăng xuất không ăn thua.
 ### Thêm mới

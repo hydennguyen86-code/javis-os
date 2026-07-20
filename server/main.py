@@ -3259,6 +3259,9 @@ zalo_listener_feature = zalo_listener_mod.register(app, zalo_listener_mod.ZaloLi
     # enabled_only=False: chủ TẮT được connector Zalo trong kho (tránh va chạm một-socket-mỗi-
     # tài-khoản) mà listener vẫn chạy được, vì sidecar không đi qua tầng MCP.
     resolved_conns=lambda: mcp_store.resolved(enabled_only=False),
+    # Listener tự tắt connector Zalo của chính tài khoản đó khi bật (một kết nối mỗi tài
+    # khoản), và bật lại khi dừng nghe.
+    set_conn_enabled=lambda cid, en: mcp_store.update_connection(cid, {"enabled": en}),
     notify=_notify_owner,                 # báo cho CHỦ (owner_chat rỗng → ID Telegram đầu tiên)
     port=lambda: _javis_port(),           # định nghĩa phía dưới - lambda nên resolve lúc gọi
 ))

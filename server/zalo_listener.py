@@ -88,6 +88,7 @@ DEFAULT_CFG = {
     "quiet_hours": "",
     "secret": "",
     "owner_chat": "",
+    "conn_was_enabled": False,   # nhớ để dừng nghe thì trả connector Zalo về như cũ
 }
 
 MAX_BODY = 256 * 1024      # trần kích thước 1 payload webhook (chống nhồi bộ nhớ)
@@ -426,6 +427,10 @@ class ZaloListenerDeps:
     # resolved() còn là nơi tính HOME thật (kể cả đường mặc định khi config trống), dùng
     # chung với lúc chạy MCP nên hai bên không lệch nhau.
     resolved_conns: Callable[[], list]
+    # Tat connector Zalo khi listener chay: Zalo chi cho MOT ket noi moi tai khoan, ma
+    # connector MCP giu mot websocket lau dai -> chinh no da listener ra. Tu 0.9.124
+    # listener khong can connector nua (nghe va gui deu tu lo), nen tat la dung.
+    set_conn_enabled: Callable[[str, bool], Any]
     notify: Callable                          # async (owner_chat, text) -> (ok, err)
     port: Callable[[], int]                   # cổng Javis đang nghe
 
@@ -495,7 +500,11 @@ class _Runner:
         me = os.getpid()
         for line in (r.stdout or "").splitlines():
             line = line.strip()
-            if not line or "zalo-agent" not in line or "listen" not in line:
+            # Quet CA `listen` LAN `mcp start`: tien trinh MCP cua connector cung giu mot
+            # websocket cho cung tai khoan, va no chinh la thu da listener ra.
+            if not line or "zalo-agent" not in line:
+                continue
+            if not ("listen" in line or "mcp" in line):
                 continue
             # Loại chính câu dò và mọi thứ chỉ NHẮC TỚI chuỗi này (shell, grep, editor).
             if any(m in line for m in ("Get-CimInstance", "pgrep", "Where-Object")):
@@ -937,14 +946,40 @@ def register(app, deps: ZaloListenerDeps):
             # dòng lỗi vừa hiện và chủ không kịp đọc.
             runner.state, runner.error = "error", err
             return {"ok": False, "error": err}
+        # TẮT connector Zalo của chính tài khoản này. Zalo chỉ cho MỘT kết nối mỗi tài
+        # khoản, mà connector MCP giữ một websocket lâu dài nên chính nó đá listener ra
+        # ("Another connection is opened"). Từ 0.9.124 listener không cần connector nữa:
+        # nghe qua sidecar, gửi bằng lệnh một lần. Dừng nghe thì bật lại như cũ.
+        note = ""
+        try:
+            row = next((r for r in (deps.resolved_conns() or [])
+                        if r.get("id") == cfg.get("conn_id")), None)
+            if row and row.get("enabled", True):
+                deps.set_conn_enabled(cfg["conn_id"], False)
+                write_cfg(deps, {"conn_was_enabled": True})
+                note = (" Đã tạm tắt connector Zalo của tài khoản này vì nó giữ kết nối "
+                        "riêng và sẽ đá listener ra. Dừng nghe thì Javis bật lại.")
+        except Exception as e:
+            note = f" (không tắt được connector Zalo: {type(e).__name__})"
         write_cfg(deps, {"enabled": True})
         runner.error = ""
-        return {**runner.start(home), "state": runner.state}
+        return {**runner.start(home), "state": runner.state, "note": note}
 
     @router.post("/zalo-listener/stop")
     async def stop():
+        cfg = read_cfg(deps)
         write_cfg(deps, {"enabled": False})
-        return runner.stop()
+        res = runner.stop()
+        # Trả connector Zalo về đúng trạng thái trước khi bật nghe - không im lặng để
+        # chủ mất công cụ Zalo mà không hiểu vì sao.
+        if cfg.get("conn_was_enabled"):
+            try:
+                deps.set_conn_enabled(cfg.get("conn_id", ""), True)
+                write_cfg(deps, {"conn_was_enabled": False})
+                res["note"] = "Đã bật lại connector Zalo của tài khoản này."
+            except Exception:
+                pass
+        return res
 
     @router.post("/zalo-listener/clear-session")
     async def clear_session():
