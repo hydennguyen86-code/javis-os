@@ -55,10 +55,12 @@ def build_channel_block(source: str, meta: dict = None, telegram_running: bool =
             "đậm/nghiêng/`code`, KHÔNG hiển thị bảng markdown - đừng dùng bảng.",
             "",
             "## Gửi file cho user qua Telegram (2 cách)",
-            "1. TỰ ĐỘNG: file bạn tạo bằng tool Write trong lượt này, hoặc file có ĐƯỜNG DẪN TUYỆT ĐỐI "
-            "xuất hiện trong câu trả lời cuối cùng, sẽ được Javis tự đính kèm gửi qua Telegram ngay sau "
-            f"câu trả lời (tối đa {MAX_FILES_PER_TURN} file/lượt, mỗi file dưới {MAX_FILE_MB}MB). "
-            "Muốn user nhận file nào, cứ nhắc đường dẫn tuyệt đối của nó trong câu trả lời.",
+            "1. TỰ ĐỘNG (nên dùng - luôn về ĐÚNG người đang hỏi): file bạn tạo bằng tool Write trong "
+            "lượt này, file có ĐƯỜNG DẪN TUYỆT ĐỐI trong câu trả lời cuối, HOẶC ảnh/tệp trong vault "
+            "nhúng dạng markdown ![](attachments/...) (vd ẢNH Javis vừa tạo) - đều được Javis tự đính "
+            f"kèm gửi qua Telegram ngay sau câu trả lời (tối đa {MAX_FILES_PER_TURN} file/lượt, mỗi file "
+            f"dưới {MAX_FILE_MB}MB). Ảnh bạn vừa tạo: CHỈ cần nhúng ![](attachments/...) là đủ để user "
+            "nhận, KHÔNG cần curl (curl dễ gửi nhầm cho chủ bot).",
             "2. GỬI NGAY / file có sẵn từ trước: dùng tool Bash gọi "
             f"`curl -s -X POST http://127.0.0.1:{port}/telegram/send-file "
             "-H \"Content-Type: application/json\" "
@@ -139,15 +141,50 @@ def extract_paths(text: str) -> list:
     return out
 
 
+# Media/liên kết NHÚNG trong markdown: ![alt](path) hoặc [text](path) (cho phép tiêu đề "..").
+# Dùng để bắt đường dẫn TƯƠNG ĐỐI trong vault - vd ảnh Javis tạo: ![](attachments/x.png).
+_MD_LINK_RE = re.compile(r"!?\[[^\]\n]*\]\(\s*<?([^)>\s]+)>?\s*(?:\"[^\"]*\")?\)")
+
+
+def resolve_vault_relative(text: str, vault_root: str) -> list:
+    """Đường dẫn TƯƠNG ĐỐI nhúng trong câu trả lời (markdown ![]()/[]()) → path tuyệt đối NẰM
+    TRONG vault. Bỏ URL (http/data/mailto/#) và path tuyệt đối (đã do extract_paths lo). Chặn
+    '../' thoát vault. Đây là cách để ảnh Javis tạo (lưu attachments/ dạng tương đối) tự đính kèm
+    về ĐÚNG phiên chat, khỏi phải nhờ engine curl - vốn dễ rơi về ID Telegram đầu tiên."""
+    out = []
+    if not vault_root:
+        return out
+    try:
+        vroot = os.path.normpath(os.path.abspath(vault_root))
+    except Exception:
+        return out
+    vroot_nc = os.path.normcase(vroot)
+    for m in _MD_LINK_RE.finditer(text or ""):
+        raw = (m.group(1) or "").strip().strip("'\"")
+        if not raw or "://" in raw or raw.startswith(("#", "mailto:", "data:", "tel:")):
+            continue
+        if raw.startswith(("/", "\\")) or re.match(r"^[A-Za-z]:[\\/]", raw):
+            continue   # tuyệt đối → extract_paths đã lo, khỏi trùng
+        try:
+            cand = os.path.normpath(os.path.abspath(os.path.join(vault_root, raw)))
+        except Exception:
+            continue
+        cand_nc = os.path.normcase(cand)
+        if cand_nc == vroot_nc or cand_nc.startswith(vroot_nc + os.sep):
+            out.append(cand)
+    return out
+
+
 def collect_turn_files(reply_text: str, written_paths: list, t0: float,
-                       cwd: str = None, exclude: set = None) -> list:
+                       cwd: str = None, exclude: set = None, vault_root: str = None) -> list:
     """Danh sách file đáng gửi trả về kênh chat sau 1 lượt.
 
     Ứng viên = file agent ghi bằng tool Write (written_paths) + đường dẫn tuyệt đối
-    nhắc trong câu trả lời cuối. Chỉ giữ file THẬT SỰ vừa thay đổi trong lượt
-    (mtime >= t0) - nhắc tới file cũ sẽ không spam gửi lại; muốn gửi file cũ thì
-    agent gọi endpoint /telegram/send-file. exclude = set path (normcase) đã gửi
-    trong lượt qua endpoint, tránh gửi trùng.
+    nhắc trong câu trả lời cuối + đường dẫn TƯƠNG ĐỐI trong vault nhúng dạng markdown
+    (![](attachments/x.png) - ảnh Javis tạo) khi có vault_root. Chỉ giữ file THẬT SỰ
+    vừa thay đổi trong lượt (mtime >= t0) - nhắc tới file cũ sẽ không spam gửi lại; muốn
+    gửi file cũ thì agent gọi endpoint /telegram/send-file. exclude = set path (normcase)
+    đã gửi trong lượt qua endpoint, tránh gửi trùng.
     """
     cands = []
     for p in (written_paths or []):
@@ -159,6 +196,9 @@ def collect_turn_files(reply_text: str, written_paths: list, t0: float,
         except Exception:
             continue
     cands += extract_paths(reply_text)
+    # Ảnh/tệp Javis tạo trong lượt thường được NHÚNG dạng path tương đối trong vault
+    # (![](attachments/x.png)); resolve về gốc vault để tự đính kèm về ĐÚNG phiên chat.
+    cands += resolve_vault_relative(reply_text, vault_root)
 
     seen = set(exclude or ())
     out = []

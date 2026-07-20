@@ -4942,9 +4942,12 @@ async def _tg_answer(text, meta=None, progress=None):
                     _pinged = True; await _p("✍ Đang soạn câu trả lời…")
             elif et == "error":
                 return "⚠ " + ev["content"]
-        # File sinh ra trong lượt → bot gửi đính kèm SAU câu trả lời (xem telegram_bot._handle_turn)
+        # File sinh ra trong lượt → bot gửi đính kèm SAU câu trả lời (xem telegram_bot._handle_turn).
+        # vault_root = brain phiên này: ảnh Javis tạo nhúng dạng ![](attachments/x.png) (path tương
+        # đối) được resolve về gốc vault để tự đính kèm về ĐÚNG người đang chat, khỏi phải curl.
         files = channel_context.collect_turn_files(out, written, t0,
-                                                   cwd=CLAUDE_CWD, exclude=sess["sent"])
+                                                   cwd=CLAUDE_CWD, exclude=sess["sent"],
+                                                   vault_root=_brain_root(brain))
         # Lọc SAU collect_turn_files: hàm đó dò đường dẫn file trong text gốc, lọc trước là mất dấu.
         return {"text": channel_context.strip_control_blocks(out), "files": files}
 
@@ -5357,7 +5360,8 @@ async def telegram_send_file(payload: dict = Body(...)):
     (miễn đăng nhập qua _AUTH_LOCAL_EXACT - request từ ngoài vẫn bị chặn).
     Body: {"path": "<đường dẫn tuyệt đối>", "caption": "<mô tả ngắn>", "chat_id": "<id người hỏi>"}.
     ĐA PHIÊN: có chat_id (và trong whitelist) → gửi ĐÚNG người đang hỏi + dedupe theo phiên họ;
-    thiếu chat_id → gửi chủ bot (ID đầu whitelist) như cũ."""
+    thiếu chat_id → gửi chủ bot (ID đầu whitelist) như cũ. Ảnh/tệp Javis tạo trong lượt nay tự đính
+    kèm về đúng người qua auto-attach (collect_turn_files), nên đường curl này ít khi cần cho chat."""
     path = str((payload or {}).get("path", "")).strip().strip('"')
     caption = str((payload or {}).get("caption", "")).strip()
     chat_id = str((payload or {}).get("chat_id", "")).strip()

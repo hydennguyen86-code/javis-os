@@ -4,6 +4,13 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.141] - 2026-07-20
+Sửa lỗi ảnh Javis tạo trong lúc chat Telegram cứ gửi về tài khoản Telegram đầu tiên thay vì người đang hỏi.
+### Sửa lỗi
+- **Ảnh gửi nhầm về chủ bot khi hai người cùng chat**: khi Javis tạo ảnh, ảnh được lưu vào thư mục attachments của brain và nhúng vào câu trả lời bằng đường dẫn tương đối như `![](attachments/anh.png)`. Cơ chế tự đính kèm file về Telegram trước đây chỉ nhận đường dẫn TUYỆT ĐỐI hoặc file viết bằng công cụ Write, nên ảnh tạo ra không được tự đính kèm. Engine đành gửi ảnh bằng lệnh curl, mà lệnh này thiếu mã người nhận thì rơi về tài khoản Telegram đầu tiên trong danh sách. Kết quả là người thứ hai đang chat vẫn thấy ảnh của mình bay về máy người đầu.
+- Nay cơ chế tự đính kèm hiểu luôn đường dẫn tương đối trong vault (ví dụ `attachments/...`), giải về gốc brain của đúng phiên đang chat và gửi thẳng cho người đang hỏi, không cần curl nữa. Có chặn thoát vault (không cho `../` ra ngoài) và bỏ qua liên kết web. Gateway cũng nhắc engine rằng ảnh vừa tạo chỉ cần nhúng là đủ, khỏi curl (curl dễ gửi nhầm chủ bot).
+- Thêm kiểm thử chốt cho việc thu file: ảnh nhúng tương đối được bắt đúng, đường dẫn tuyệt đối vẫn chạy, URL không bị nhầm là file, chặn thoát vault, và file cũ không bị gửi lại.
+
 ## [0.9.140] - 2026-07-20
 Sửa lỗi bấm Bật nghe hiện Đang bật rồi lập tức quay về Bật nghe mà không có gì diễn ra.
 ### Sửa lỗi
