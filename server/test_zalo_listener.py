@@ -800,5 +800,32 @@ check("an toàn: hộp cát giữ nguyên - vẫn không tool nào",
       "allowed_tools=[NO_TOOL]" in src6)
 
 
+# ---- 23. "Chưa chọn tài khoản Zalo" dù ô rõ ràng đang có tên ----
+# Hai lớp lỗi: (a) ô chọn tài khoản chỉ được LƯU khi bấm "Bật nghe", nên bấm "Lưu theo
+# dõi" thì cấu hình vẫn trống dù ô hiện tên; (b) lỗi cũ không bao giờ được xoá, nên một
+# lần bật hụt từ trước nằm lì trên màn hình mãi (từ 0.9.132 giao diện hiện error kể cả
+# khi đang tắt).
+B6 = _tf.mkdtemp(prefix="javis-connid-")
+_st6 = {"zalo_listener": {**zl.DEFAULT_CFG, "secret": "s3cret"}}   # conn_id RỖNG
+app6 = FastAPI()
+feat6 = zl.register(app6, mkdeps(read_settings=lambda: _st6,
+                                 write_settings=lambda s: _st6.update(s),
+                                 brain_root=lambda: B6, brain_roots=lambda: [B6]))
+cl6 = TestClient(app6)
+
+cl6.post("/zalo-listener/watch", json={"conn_id": "cABC", "modes": {}, "keywords": []})
+check("tài khoản: bấm Lưu theo dõi là ghi luôn tài khoản đang chọn",
+      _st6["zalo_listener"].get("conn_id") == "cABC")
+
+cl6.post("/zalo-listener/watch", json={"modes": {}, "keywords": []})
+check("tài khoản: lần lưu sau không gửi conn_id thì GIỮ nguyên, không xoá mất",
+      _st6["zalo_listener"].get("conn_id") == "cABC")
+
+feat6.runner.state, feat6.runner.error = "error", "Chưa chọn tài khoản Zalo trong ô phía trên"
+feat6.runner.stop()
+check("lỗi cũ: dừng nghe thì xoá lời lỗi, không để nằm lì trên màn hình",
+      feat6.runner.error == "" and feat6.runner.status()["error"] == "")
+
+
 print("\n" + ("TAT CA OK" if not _fails else f"{len(_fails)} FAIL: {_fails}"))
 sys.exit(1 if _fails else 0)

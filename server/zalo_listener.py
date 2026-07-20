@@ -897,6 +897,9 @@ class _Runner:
         self._stop.set()
         self._kill_tree()
         self.state = "off"
+        # Xoá lỗi cũ: từ khi giao diện hiện error kể cả lúc đang tắt, một lần bật hụt
+        # trước đó sẽ nằm lì trên màn hình mãi và làm chủ tưởng đang hỏng.
+        self.error = ""
         return {"ok": True}
 
     LIVE_S = 180        # có tin trong ngần này giây = chắc chắn đang nối được
@@ -1211,7 +1214,11 @@ def register(app, deps: ZaloListenerDeps):
         if not isinstance(modes, dict):
             modes = {str(t): "chi-doc" for t in (payload.get("threads") or [])}
         kws = [str(k).strip() for k in (payload.get("keywords") or []) if str(k).strip()]
-        write_cfg(deps, {"quiet_hours": payload.get("quiet_hours") or ""})
+        # Lưu LUÔN tài khoản đang chọn. Trước đây ô này chỉ được ghi khi bấm "Bật nghe",
+        # nên chủ thấy tên hiện trong ô mà cấu hình vẫn trống, rồi bị báo "chưa chọn tài
+        # khoản" một cách vô lý.
+        write_cfg(deps, {"quiet_hours": payload.get("quiet_hours") or "",
+                         "conn_id": payload.get("conn_id") or None})
         names = {x["id"]: x.get("name") for x in roster.list()}
         rules = zalo_rules.list_rules(brain)
         n_doc = n_bot = off = 0

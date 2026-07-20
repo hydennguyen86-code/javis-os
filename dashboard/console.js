@@ -2300,6 +2300,7 @@
       $("zlSaved").textContent = "đang lưu…";
       $("zlSaved").style.color = "";
       const r = await postJson("/zalo-listener/watch", {
+        conn_id: $("zlConn").value,   // lưu luôn tài khoản đang chọn, không đợi bấm Bật nghe
         modes: modes,
         keywords: $("zlKw").value.split(",").map(s => s.trim()).filter(Boolean),
         quiet_hours: $("zlQuiet").value.trim(),
@@ -2410,6 +2411,9 @@
     $("zlKw").value = (c.keywords || []).join(", ");
     $("zlQuiet").value = c.quiet_hours || "";
     $("zlSearch").oninput = () => { rosterKey = null; if (lastSt) paintRoster(lastSt); };
+    // Đổi tài khoản là lưu ngay: để ô hiện một đằng mà cấu hình một nẻo là gốc của lỗi
+    // "chưa chọn tài khoản Zalo" dù trong ô rõ ràng đang có tên.
+    $("zlConn").onchange = () => saveWatch();
     // Tên nhóm KHÔNG có trong dữ liệu tin nhắn nên phải hỏi Zalo riêng. Là nút bấm tay vì
     // nó mở một kết nối ngắn, làm listener phải nối lại một nhịp.
     $("zlSave").onclick = async () => {

@@ -4,6 +4,12 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.137] - 2026-07-20
+Sửa lỗi báo chưa chọn tài khoản Zalo trong khi ô chọn rõ ràng đang hiện tên tài khoản.
+### Sửa lỗi
+- **Ô chọn tài khoản hiện tên nhưng chưa hề được lưu**: giá trị đó chỉ được ghi xuống khi bấm Bật nghe, còn bấm Lưu theo dõi thì không gửi, nên cấu hình vẫn trống và lời báo tuy khó hiểu nhưng đúng. Nay lưu theo dõi ghi luôn tài khoản đang chọn, và đổi tài khoản trong ô là lưu ngay.
+- **Thông báo lỗi cũ nằm lì trên màn hình**: từ bản 0.9.132 giao diện hiện lỗi kể cả khi đang tắt, nhưng lệnh dừng lại không xoá lỗi cũ, nên một lần bật hụt từ lúc nào đó cứ hiện mãi và làm tưởng đang hỏng. Nay dừng nghe là xoá luôn.
+
 ## [0.9.136] - 2026-07-20
 Mỗi cuộc chat Zalo giờ chỉ có hai trạng thái dễ hiểu, và Javis tự quyết khi nào nên lên tiếng.
 ### Thay đổi
