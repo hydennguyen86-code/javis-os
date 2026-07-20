@@ -789,9 +789,16 @@
             "env": "GOOGLE_EMAIL"
           },
           {
+            "key": "app_password",
+            "label": "App Password 16 ký tự (Javis tự đổi thành token, KHÔNG lưu lại chuỗi này)",
+            "placeholder": "abcd efgh ijkl mnop",
+            "optional": true
+          },
+          {
             "key": "master_token",
-            "label": "Google master token (aas_et/...)",
+            "label": "Hoặc dán sẵn master token nếu bạn đã tự lấy (bỏ trống nếu dùng App Password ở trên)",
             "placeholder": "aas_et/...",
+            "optional": true,
             "env": "GOOGLE_MASTER_TOKEN"
           },
           {
@@ -802,7 +809,9 @@
             "env": "UNSAFE_MODE"
           }
         ],
-        "guide": "CẢNH BÁO: Google Keep không có API chính chủ cho gmail thường nên phải dùng master token.\n\nToken này có TOÀN QUYỀN tài khoản Google của bạn (Gmail, Drive, Photos...), tương đương mật khẩu. Đừng đưa cho ai.\n\nLấy token 1 lần:\n1. Bật xác minh 2 bước cho tài khoản Google.\n2. Vào myaccount.google.com/apppasswords tạo App Password 16 ký tự.\n3. Cài uv (Windows: winget install astral-sh.uv) rồi chạy lệnh sau trong terminal, thay EMAIL và APP_PASSWORD của bạn vào:\nuv run --no-project --with gpsoauth python -c \"import gpsoauth; print(gpsoauth.perform_master_login('EMAIL','APP_PASSWORD','0123456789abcdef')['Token'])\"\n4. Dán chuỗi bắt đầu bằng aas_et/ vào ô Master token bên dưới.\n\nÔ cuối để trống thì Javis chỉ sửa được note do chính nó tạo (gắn nhãn keep-mcp). Gõ true thì Javis sửa được mọi note, kể cả note bạn viết tay.",
+        "guide": "Google Keep không có API chính chủ cho gmail thường, nên Javis phải đăng nhập bằng App Password rồi tự đổi thành token.\n\nCẢNH BÁO: token đổi ra có TOÀN QUYỀN tài khoản Google của bạn (Gmail, Drive, Photos...), tương đương mật khẩu.\n\nLàm 1 lần:\n1. Bật xác minh 2 bước cho tài khoản Google.\n2. Bấm nút bên dưới, tạo App Password rồi copy chuỗi 16 ký tự.\n3. Dán email + chuỗi đó vào ô dưới, bấm Kết nối.\n\nJavis đổi lấy token, lưu token, và KHÔNG lưu lại App Password. Copy cả dấu cách cũng được.\n\nNếu Google từ chối (hay gặp khi Javis chạy trên VPS), hãy tự lấy master token ở máy cá nhân rồi dán vào ô Master token.\n\nÔ cuối để trống thì Javis chỉ sửa được note do chính nó tạo. Gõ true thì Javis sửa được mọi note, kể cả note bạn viết tay.",
+        "exchange": { "handler": "google_master_token", "inputs": ["google_email", "app_password"], "output": "master_token", "drop": ["app_password"] },
+        "setup": { "links": [{ "label": "Tạo App Password", "url": "https://myaccount.google.com/apppasswords" }] },
         "guide_url": "https://github.com/feuerdev/keep-mcp"
       },
       "validate": {

@@ -20,3 +20,7 @@ cryptography>=42.0
 # tiktok-ads). Cài qua đây là đủ cho cả Docker lẫn máy cá nhân - `pip install uv` sinh ra sẵn
 # lệnh `uvx`. ĐỪNG gỡ dòng này, mấy connector đó sẽ chết lặng lẽ.
 uv>=0.5
+# gpsoauth: đổi Google App Password -> master token NGAY TRÊN UI (server/cred_exchange.py), để
+# connector google-keep khỏi bắt user mở terminal chạy lệnh. Kéo theo pycryptodomex/requests/
+# urllib3; đã kiểm bằng `pip install --dry-run`: KHÔNG đụng tới pin fastapi/starlette ở trên.
+gpsoauth>=1.0

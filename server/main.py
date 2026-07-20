@@ -41,6 +41,7 @@ import mcp_store
 import mcp_client
 import mcp_catalog
 import mcp_hub
+import cred_exchange   # đổi credential hộ user (vd App Password -> Google master token) khi đấu
 import plugins_host   # hệ PLUGIN: thư mục Python thả vào, tự thêm tool/hook cho mọi engine qua hub
 import web_security   # chống CSRF-to-localhost + DNS-rebinding cho web API cục bộ
 import image_gen      # tạo ảnh bằng gói ChatGPT (OAuth) - Codex Responses + tool image_generation
@@ -907,8 +908,15 @@ async def connect_add(request: Request):
     """Thêm tài khoản cho 1 connector trong kho: lưu tạm → VALIDATE ngay (gọi tool xác minh,
     tự lấy tên shop làm label) → key sai thì xoá, không lưu rác."""
     data = await request.json()
-    cid, err = mcp_store.add_connection((data.get("connector_id") or "").strip(), {
-        "label": (data.get("label") or "").strip(), "fields": data.get("fields") or {}})
+    con_id = (data.get("connector_id") or "").strip()
+    # Bước ĐỔI CREDENTIAL (nếu connector khai auth.exchange): vd Google Keep đổi App Password
+    # thành master token ngay tại đây, để người dùng khỏi phải mở terminal. Hàm này LUÔN xoá các
+    # field khai trong `drop` (như app_password) nên thứ đó không bao giờ xuống tới mcp_store.
+    fields, ex_err = cred_exchange.run(mcp_catalog.get(con_id), data.get("fields") or {})
+    if ex_err:
+        return {"ok": False, "error": ex_err}
+    cid, err = mcp_store.add_connection(con_id, {
+        "label": (data.get("label") or "").strip(), "fields": fields})
     if err:
         return {"ok": False, "error": err}
     val = await mcp_hub.validate_connection(cid)

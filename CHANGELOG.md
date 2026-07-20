@@ -16,6 +16,21 @@ Viết lại hướng dẫn đăng nhập của TẤT CẢ 23 connector cho dễ
 ### Thêm mới
 - Test `server/test_catalog_guides.py` (10 kiểm tra, không mạng): guide dài phải có xuống dòng, không dòng nào quá 200 ký tự, bước đánh số phải mở đầu dòng, CSS phải thật sự khai `pre-line` + `overflow-wrap`, và cấm em dash / en dash trong cả file. Có canary chứng minh luật bắt được chuỗi kiểu cũ.
 
+## [0.9.113] - 2026-07-20
+Bỏ hẳn bước bắt người dùng mở terminal để đấu **Google Keep**. Trước đây phải chạy một lệnh dài đổi App Password lấy master token rồi dán vào; giờ dán thẳng App Password vào Javis, server tự đổi. Hai bước còn lại (bật xác minh 2 bước, tạo App Password) là giao diện của chính Google nên không tự động hoá được, nhưng đã có nút mở thẳng tới đó.
+### Thêm mới
+- **Bước đổi credential khai báo từ catalog** (`server/cred_exchange.py`): connector khai `auth.exchange` gồm `handler` / `inputs` / `output` / `drop`; khi đấu, Javis tự đổi rồi XOÁ các field trong `drop` trước khi lưu. Làm tổng quát thay vì nhét cứng cho Keep, vì `google-ads` sẽ cần đúng cơ chế này.
+- **Handler `google_master_token`**: gọi `gpsoauth.perform_master_login`, tự bỏ dấu cách trong App Password (Google hiển thị thành 4 nhóm 4 ký tự), kiểm đủ 16 ký tự, và dịch mã lỗi Google sang tiếng Việt (sai mật khẩu, chưa bật 2 bước, đòi xác minh trình duyệt, bị chặn vì chạy trên VPS).
+- **Nút mở trang ngoài cho connector dạng apikey**: `openApikeyFlow` giờ gọi `oauthWizard(con)` nên mọi connector khai `auth.setup.links` đều hiện được nút, không riêng luồng OAuth. Google Keep có nút "Tạo App Password".
+- Test `server/test_cred_exchange.py` (25 kiểm tra, không mạng): phủ đổi thành công/thất bại, bỏ qua khi đã dán sẵn token, thiếu đầu vào, handler lạ, và kiểm ĐẦU-CUỐI rằng App Password không lọt xuống đĩa lẫn env. Có canary chứng minh check xoá là thật.
+### Bảo mật
+- **App Password KHÔNG BAO GIỜ được lưu**: bị xoá dù đổi thành công hay thất bại, không map ra biến môi trường, không xuất hiện trong thông báo lỗi. Đã kiểm bằng cách đọc thẳng file `mcp_servers.json` trên đĩa tìm chuỗi bí mật.
+- **Giữ nguyên đường lui dán master token thủ công**: quan trọng vì Google hay chặn đăng nhập từ IP trung tâm dữ liệu, nên bản chạy VPS vẫn có lối đi.
+### Ghi chú
+- Thêm `gpsoauth` vào `requirements.txt` (kéo theo pycryptodomex, requests, urllib3). Đã kiểm bằng `pip install --dry-run`: không đụng tới pin `fastapi`/`starlette`.
+- Chưa chạy thử với App Password thật (cần tài khoản Google thật), nên bước đổi token vẫn phải nghiệm thu tại chỗ.
+- Khảo sát `google-ads`: đưa lên UI ĐƯỢC, chi tiết trong `docs/superpowers/specs/2026-07-20-doi-credential-tren-ui-design.md`.
+
 ## [0.9.112] - 2026-07-20
 Đính chính một khẳng định SAI ở bản 0.9.110 và gỡ dòng Dockerfile thừa đi kèm.
 ### Sửa lỗi

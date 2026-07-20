@@ -63,9 +63,13 @@ check("ô token -> GOOGLE_MASTER_TOKEN",
 check("ô unsafe -> UNSAFE_MODE", (fields.get("unsafe_mode") or {}).get("env") == "UNSAFE_MODE")
 check("ô unsafe là TUỲ CHỌN (bỏ trống vẫn đấu được)",
       bool((fields.get("unsafe_mode") or {}).get("optional")))
-check("email và token là BẮT BUỘC",
-      not fields.get("google_email", {}).get("optional")
-      and not fields.get("master_token", {}).get("optional"))
+check("email là BẮT BUỘC", not fields.get("google_email", {}).get("optional"))
+# Từ 0.9.113 có ô App Password và Javis tự đổi ra token, nên master_token KHÔNG còn bắt buộc.
+# Luật "phải có ÍT NHẤT MỘT trong hai" do cred_exchange kiểm phía server (xem test_cred_exchange),
+# vì schema field hiện chỉ diễn đạt được bắt-buộc/tuỳ-chọn cho TỪNG ô, không diễn đạt được "một trong hai".
+check("app_password và master_token đều TUỲ CHỌN (một trong hai là đủ)",
+      bool(fields.get("app_password", {}).get("optional"))
+      and bool(fields.get("master_token", {}).get("optional")))
 
 # ---- luật opt-in của UNSAFE_MODE: mấu chốt giữ bản fork sạch ----
 env_safe = mcp_catalog.build_env(con, {"google_email": "a@gmail.com", "master_token": "aas_et/x"})
@@ -130,7 +134,10 @@ check("mode auto: full + delete_note vẫn BỊ CHẶN",
 # ---- bản cho UI không lộ secret ----
 pub = next((c for c in mcp_catalog.public_catalog() if c["id"] == "google-keep"), None)
 check("public_catalog có google-keep", pub is not None)
-check("public_catalog trả đủ 3 ô nhập", len((pub or {}).get("fields") or []) == 3)
+check("public_catalog trả đủ 4 ô nhập (email, app password, master token, unsafe)",
+      len((pub or {}).get("fields") or []) == 4)
+check("public_catalog trả nút setup để UI vẽ 'Tạo App Password'",
+      bool(((pub or {}).get("setup") or {}).get("links")))
 check("public_catalog KHÔNG lộ tool_meta/validate nội bộ",
       "tool_meta" not in (pub or {}) and "validate" not in (pub or {}))
 
