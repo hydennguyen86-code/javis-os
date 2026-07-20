@@ -797,7 +797,7 @@
       "name": "Google Keep",
       "icon": "📒",
       "category": "Văn phòng",
-      "description": "Đọc và sửa ghi chú Google Keep: tìm note, tạo note và danh sách việc, gắn nhãn, ghim, lưu trữ. Chạy local qua thư viện không chính thức - cần Google master token.",
+      "description": "Đọc và sửa ghi chú Google Keep: tìm note, tạo note và danh sách việc, gắn nhãn, ghim, lưu trữ. LƯU Ý: Keep không có API chính chủ nên phải dùng master token có TOÀN QUYỀN tài khoản Google, không phải OAuth giới hạn phạm vi như Gmail hay Lịch. Javis chỉ thao tác được ghi chú, nhưng token thì mở cả tài khoản nếu bị lộ.",
       "status": "beta",
       "transport": "stdio",
       "command": "uvx",

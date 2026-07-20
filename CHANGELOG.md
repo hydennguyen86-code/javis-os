@@ -16,6 +16,18 @@ Viết lại hướng dẫn đăng nhập của TẤT CẢ 23 connector cho dễ
 ### Thêm mới
 - Test `server/test_catalog_guides.py` (10 kiểm tra, không mạng): guide dài phải có xuống dòng, không dòng nào quá 200 ký tự, bước đánh số phải mở đầu dòng, CSS phải thật sự khai `pre-line` + `overflow-wrap`, và cấm em dash / en dash trong cả file. Có canary chứng minh luật bắt được chuỗi kiểu cũ.
 
+## [0.9.115] - 2026-07-20
+Sửa một lỗ hổng trình bày nghiêm trọng: **15 trong 16 connector có cảnh báo rủi ro thì không bao giờ hiện cảnh báo lúc bấm Kết nối**. Trường `risk` chỉ được vẽ ở luồng QR (Zalo) và ở hộp thoại đổi quyền, nên cảnh báo mạnh nhất lại vắng mặt đúng lúc người dùng ra quyết định.
+### Sửa lỗi
+- **Cảnh báo rủi ro hiện ở CẢ ba luồng đấu nối**: `openApikeyFlow` và `openOauthFlow` giờ vẽ khối `conn-risk` như `openQrFlow` vẫn làm, đặt NGAY TRÊN phần hướng dẫn để đọc trước. Ảnh hưởng 15 connector, trong đó có `facebook-personal` (dán cookie tài khoản thật), `google-workspace`, `slack`, `gmail`, `google-keep`.
+### Cải thiện
+- **Mô tả thẻ `google-keep` nói thẳng về bán kính thiệt hại**: Keep không có API chính chủ nên phải dùng master token có TOÀN QUYỀN tài khoản Google, khác hẳn `gmail` / `google-calendar` / `google-ads` vốn xin đúng một scope. Javis chỉ thao tác được ghi chú, nhưng token thì mở cả tài khoản nếu bị lộ. Nói ngay trên thẻ để thấy trước khi bấm vào.
+### Thêm mới
+- Test `server/test_canh_bao_rui_ro.py` (12 kiểm tra, không mạng): cắt thân từng hàm JS để xác nhận cả ba luồng đều vẽ `conn-risk` và chỉ vẽ khi thật sự có cảnh báo; kiểm mô tả thẻ Keep có nêu rủi ro; kiểm `google-keep` vẫn chỉ khai tool Keep chứ không lan sang Gmail/Drive. Có canary chứng minh phép cắt thân hàm đang soi đúng một hàm.
+### Ghi chú
+- Giữ nguyên tên "Google Keep" vì đó đúng với NĂNG LỰC (server chỉ phơi 23 tool Keep, đã bắt tay MCP đếm thật). Vấn đề nằm ở CREDENTIAL chứ không ở năng lực, nên xử bằng cảnh báo thay vì đổi tên.
+- KHÔNG mở rộng `google-keep` thành connector kiểu Workspace. Javis đã có `gmail`, `google-calendar`, `google-workspace` dùng OAuth có scope, an toàn hơn hẳn. Master token nên bị nhốt vào đúng chỗ duy nhất không có đường thay thế.
+
 ## [0.9.114] - 2026-07-20
 Đấu **Google Ads** cũng không còn phải chạy lệnh. Trước đây phải cài Google Cloud CLI, chạy `gcloud auth application-default login` với một chuỗi scope rất dài, rồi đi tìm file JSON trong `%APPDATA%` mà dán vào. Giờ điền Client ID/Secret rồi bấm đăng nhập như Gmail và Lịch, Javis tự dựng file đăng nhập.
 ### Thêm mới

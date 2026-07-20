@@ -2235,6 +2235,8 @@
       + '</label>').join("");
     const m = connModal(mHead("KẾT NỐI " + esc((con.name || "").toUpperCase()))
       + '<div class="conn-form">'
+      // Cảnh báo rủi ro phải hiện NGAY LÚC QUYẾT ĐỊNH, không đợi tới hộp thoại đổi quyền.
+      + (con.risk ? '<div class="conn-risk">⚠ ' + esc(con.risk) + '</div>' : "")
       + (con.guide ? '<div class="conn-guide">' + esc(con.guide) + (con.guide_url ? ' <a href="' + esc(con.guide_url) + '" target="_blank">Hướng dẫn ↗</a>' : "") + '</div>' : "")
       + oauthWizard(con)   // nút mở trang ngoài (vd "Tạo App Password") khi catalog khai auth.setup.links
       + fields
@@ -2331,7 +2333,10 @@
         : '<input class="js-input" data-f="' + esc(f.key) + '" placeholder="' + esc(f.placeholder || "") + '">')
       + '</label>').join("");
     const m = connModal(mHead("KẾT NỐI " + esc((con.name || "").toUpperCase()))
-      + '<div class="conn-form"><div class="conn-guide">' + esc(con.guide || "Đăng nhập bằng tài khoản của nhà cung cấp.")
+      + '<div class="conn-form">'
+      // Cảnh báo rủi ro phải hiện NGAY LÚC QUYẾT ĐỊNH, không đợi tới hộp thoại đổi quyền.
+      + (con.risk ? '<div class="conn-risk">⚠ ' + esc(con.risk) + '</div>' : "")
+      + '<div class="conn-guide">' + esc(con.guide || "Đăng nhập bằng tài khoản của nhà cung cấp.")
       + (con.guide_url ? ' <a href="' + esc(con.guide_url) + '" target="_blank">Hướng dẫn ↗</a>' : "") + '</div>'
       + oauthWizard(con)
       + fields
