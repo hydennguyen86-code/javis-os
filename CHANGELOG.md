@@ -4,6 +4,12 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.117] - 2026-07-20
+Sửa lỗi báo nhầm "Chưa cài Codex CLI" khiến không chat được bằng gói ChatGPT dù đã đăng nhập thành công. Nguyên nhân: binary codex không nằm trong PATH nên Javis phải dò nó trong thư mục home, mà home lại lấy mỗi từ biến môi trường USERPROFILE; khi server được bật lại bởi tự-cập-nhật hay tác vụ nền thì biến này có thể trống, home thành rỗng nên mọi đường dẫn ~/.codex/... hoá ra tương đối và không khớp, dù binary vẫn nằm nguyên chỗ cũ.
+### Sửa lỗi
+- **Dò Codex CLI không còn phụ thuộc mỗi USERPROFILE**: thêm các đường lùi lần lượt là HOME, HOMEDRIVE cộng HOMEPATH, rồi Path.home(). Đã kiểm bằng cách bỏ lần lượt cả ba biến môi trường, vẫn dò ra đúng binary.
+- **Thêm biến JAVIS_CODEX_BIN**: trỏ thẳng tới file codex nếu máy cài ở chỗ lạ; trỏ sai đường dẫn thì bỏ qua và dò tiếp như thường.
+
 ## [0.9.111] - 2026-07-20
 Viết lại hướng dẫn đăng nhập của TẤT CẢ 23 connector cho dễ đọc, và sửa lỗi hộp hướng dẫn bị tràn ngang. Trước đây cả 23 guide đều là MỘT đoạn văn chạy dài không ngắt dòng, các bước (1)(2)(3) chen ngang giữa câu; gặp chuỗi dài không khoảng trắng (lệnh shell, URL callback) thì hộp bị đẩy tràn ra ngoài modal, phải kéo ngang mới đọc hết.
 ### Sửa lỗi
