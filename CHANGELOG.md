@@ -4,6 +4,19 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.123] - 2026-07-20
+Zalo chuyển từ một bộ lọc thông báo dùng chung sang chính sách riêng cho từng cuộc chat, đặt bằng lời qua chat. Thêm chế độ Javis tự trả lời khách như một chatbot, chạy trong hộp cát.
+### Thêm mới
+- **Mỗi cuộc chat một luật riêng**, ghi ở `Javis/zalo/<slug>.md` trong brain nên có git, xem lại và sửa tay được. Năm chế độ: chỉ ghi nhận, báo mọi tin, báo theo từ khoá, nhắc khi quá N phút chưa ai trả lời, và tự trả lời khách theo kịch bản.
+- **Đặt luật bằng lời**: tool `javis_zalo_rule` để nói thẳng trong chat hoặc Telegram, ví dụ nhóm này nếu 30 phút chưa ai trả lời thì nhắc. Giao diện chỉ hiển thị luật, không có form nhập. Gọi tên nhóm mà khớp nhiều hơn một thì tool từ chối kèm danh sách chứ không đoán, vì gắn kịch bản nhầm nhóm là bot đi trả lời khách của nhóm khác.
+- **Nhắc khi quên trả lời**: khách nhắn mà quá N phút không ai đáp thì báo Telegram đúng một lần. Làm được là nhờ Javis có tài khoản Zalo riêng, nên chủ trả lời bằng tài khoản của mình sẽ là một thành viên khác trong nhóm và tin của chủ về đầy đủ.
+- **Chế độ chatbot**: Javis tự trả lời khách theo kịch bản riêng của từng nhóm, có trần số tin mỗi giờ, và tự đẩy về cho chủ khi gặp việc ngoài kịch bản.
+### Bảo mật
+- **Hộp cát cho chatbot**: engine chạy không có tool nào, không thấy MCP nào, không mang theo bộ nhớ hay brain. Model chỉ sinh ra chữ, còn gửi đi đâu là do mã Javis quyết và luôn gửi về đúng cuộc chat vừa phát sinh tin, nên dù bị dụ hoàn toàn cũng không nhắn được cho người khác.
+- **Vá một bẫy nguy hiểm của lớp engine**: điều kiện kiểm tra danh sách tool cho phép coi danh sách rỗng là chưa đặt gì, nên cách viết trực giác nhất để tạo hộp cát lại mở toàn quyền kèm nạp cả MCP sẵn của máy, đúng lúc nội dung do người lạ soạn đi vào engine. Nay truyền một tên tool không tồn tại để cổng kiểm quyền thực sự bật, và có kiểm thử chốt lại.
+- Bốn chế độ còn lại vẫn không đụng tới engine, giữ nguyên rào của bản trước.
+- Chế độ chatbot luôn được tạo ở trạng thái tắt, chủ phải bật riêng sau khi nghe lại kịch bản.
+
 ## [0.9.122] - 2026-07-20
 Nhóm Zalo giờ hiện ra để chọn được, danh sách cuộc chat chịu được hàng trăm nhóm, và dọn nốt lỗi tiến trình con sống mồ côi.
 ### Sửa lỗi

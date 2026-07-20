@@ -3252,6 +3252,10 @@ import zalo_listener as zalo_listener_mod
 zalo_listener_feature = zalo_listener_mod.register(app, zalo_listener_mod.ZaloListenerDeps(
     read_settings=cfgmod.read_settings,
     write_settings=cfgmod.write_settings,
+    # Luật từng cuộc chat nằm ở <brain>/Javis/zalo/*.md. Listener là dịch vụ NỀN, không có
+    # khái niệm "brain đang mở", nên luôn đọc brain mặc định.
+    brain_root=lambda: _brain_root(None),
+    aux_model=_aux_model,                 # model rẻ cho bot trả lời khách
     # enabled_only=False: chủ TẮT được connector Zalo trong kho (tránh va chạm một-socket-mỗi-
     # tài-khoản) mà listener vẫn chạy được, vì sidecar không đi qua tầng MCP.
     resolved_conns=lambda: mcp_store.resolved(enabled_only=False),
@@ -3689,6 +3693,12 @@ async def _start_scheduler():
                     await loop_feature.tick()
                 except Exception as lpe:
                     print(f"[loop tick] {type(lpe).__name__}: {lpe}", file=__import__('sys').stderr)
+                # 1b) Listener Zalo: nhắc chủ khi có tin khách quá lâu chưa ai trả lời
+                #     (chế độ nhac-quen). Rẻ - chỉ so mốc thời gian, không gọi model.
+                try:
+                    await zalo_listener_feature.tick()
+                except Exception as zle:
+                    print(f"[zalo tick] {type(zle).__name__}: {zle}", file=__import__('sys').stderr)
                 # 2) Engine tự học: debounce tick (rewire sau lượt) + curator định kỳ
                 try:
                     await learn_feature.tick()
