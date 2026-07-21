@@ -888,5 +888,66 @@ check("gui: CLAUDE.md dan dung javis_zalo_send, cam tool tho",
       "javis_zalo_send" in cmd and "KHÔNG dùng `zalo_send_message` thô" in cmd)
 
 
+# ---- 26. Kẹt ở "Mất kết nối" dù đang nghe ngon (zca-js nối lại IM LẶNG) ----
+# Bằng chứng từ nguồn zalo-agent-cli (commands/listen.js): khi websocket blip, sự kiện
+# `disconnected` in "Disconnected (code: X). Auto-retrying..." rồi zca-js tự nối lại Ở TẦNG
+# WS. Lúc nối lại, `connected` chỉ in gì đó nếu reconnectCount>0 (biến này chỉ tăng ở nhánh
+# `closed`), nên blip thường KHÔNG có dòng hồi phục nào. Thêm nữa, dòng hồi phục của nhánh
+# closed là "Reconnected (..., events: N)" lại chứa "events:" nên bị bộ lọc dòng-khai-báo
+# nuốt mất. Hậu quả: state kẹt ở "reconnecting" mãi dù tiến trình vẫn sống và đang nghe -
+# chủ thấy "Mất kết nối, đang thử lại..." đỏ lè trong khi mọi thứ vẫn chạy.
+import types as _ty26
+
+# (a) _scan_line phải nhận các dòng HỒI PHỤC, kể cả khi chúng có chứa "events:".
+rnR = zl._Runner(mkdeps())
+check("hoi phuc: 'Reconnected (#1, uptime: 2m3s, events: 3)' = dang nghe (khong bi 'events:' nuot)",
+      rnR._scan_line("  ℹ Reconnected (#1, uptime: 2m3s, events: 3)") == "listening")
+check("hoi phuc: 'Re-login successful. Restarting listener...' = dang nghe lai",
+      rnR._scan_line("  ℹ Re-login successful. Restarting listener...") == "listening")
+check("blip: 'Disconnected (code: 1006). Auto-retrying...' van la mat ket noi (bat dau blip)",
+      rnR._scan_line("  ⚠ Disconnected (code: 1006). Auto-retrying...") == "reconnecting")
+# Dòng khai báo lúc khởi động vẫn KHÔNG được nhận nhầm là nghe/đứt.
+check("khong nham: 'Auto-reconnect enabled.' van khong doi trang thai",
+      rnR._scan_line("  • Auto-reconnect enabled.") is None)
+check("khong nham: dong 'Events: message,friend,group,reaction' van khong doi trang thai",
+      rnR._scan_line("  • Events: message,friend,group,reaction") is None)
+
+# (b) status(): blip im lặng để lại state=reconnecting. Nếu tiến trình CÒN SỐNG và đã qua
+# thời gian ân hạn mà không có dòng đứt mới, coi như đã nối lại (đứt thật thì zca-js in lại
+# dòng đứt đều đặn, làm mới mốc, nên vẫn giữ "reconnecting").
+rnA = zl._Runner(mkdeps())
+rnA.state = "reconnecting"
+rnA.proc = _ty26.SimpleNamespace(poll=lambda: None)                       # tiến trình còn sống
+rnA.last_event_ts = 0                                                      # chat im, override theo tin không cứu
+rnA.last_reconnect_ts = time.time() - (zl._Runner.RECOVER_S + 5)          # blip đã lâu, không đứt lại
+check("blip: tien trinh song + qua an han khong dut lai = coi nhu dang nghe",
+      rnA.status()["state"] == "listening" and not rnA.status()["error"])
+
+rnB = zl._Runner(mkdeps())
+rnB.state = "reconnecting"
+rnB.proc = _ty26.SimpleNamespace(poll=lambda: 1)                          # tiến trình đã chết
+rnB.last_event_ts = 0
+rnB.last_reconnect_ts = time.time() - 999
+check("dut that: tien trinh chet thi giu 'reconnecting', khong tu nhan la nghe",
+      rnB.status()["state"] == "reconnecting")
+
+rnC = zl._Runner(mkdeps())
+rnC.state = "reconnecting"
+rnC.proc = _ty26.SimpleNamespace(poll=lambda: None)
+rnC.last_event_ts = 0
+rnC.last_reconnect_ts = time.time() - 3                                   # vừa có dòng đứt 3s trước
+check("truc trac that: vua co dong dut moi thi van bao 'reconnecting'",
+      rnC.status()["state"] == "reconnecting")
+
+# Vẫn giữ lối cũ: có tin về gần đây thì báo đang nghe ngay (không đợi ân hạn).
+rnE = zl._Runner(mkdeps())
+rnE.state = "reconnecting"
+rnE.proc = _ty26.SimpleNamespace(poll=lambda: None)
+rnE.last_event_ts = time.time() - 10
+rnE.last_reconnect_ts = time.time() - 2
+check("tin moi ve: bang chung cung, bao dang nghe ngay du vua co dong dut",
+      rnE.status()["state"] == "listening")
+
+
 print("\n" + ("TAT CA OK" if not _fails else f"{len(_fails)} FAIL: {_fails}"))
 sys.exit(1 if _fails else 0)

@@ -484,6 +484,7 @@ class _Runner:
         self.error = ""
         self.last_event_ts = 0.0
         self.started_ts = 0.0
+        self.last_reconnect_ts = 0.0   # lúc thấy dòng ĐỨT gần nhất (blip ở tầng websocket)
         self._stop = threading.Event()
         self._thread = None
         self._tail = deque(maxlen=15)
@@ -643,15 +644,25 @@ class _Runner:
         if any(m in low for m in _FATAL_MARKS):
             self.error = _strip_ansi(line).strip()[:200]
             return "fatal"
+        # ĐANG NGHE / HỒI PHỤC: bắt TRƯỚC bộ lọc dòng-khai-báo bên dưới. Sau một cú đứt,
+        # zalo-agent-cli in dòng hồi phục "Reconnected (#N, uptime: ..., events: N)" và
+        # "Re-login successful. Restarting listener..." (xem commands/listen.js). Dòng đầu
+        # có chứa "events:" nên nếu để bộ lọc chạy trước thì nó bị nuốt, và trạng thái KẸT
+        # mãi ở "reconnecting" dù đã nối lại xong. Đây là lỗi thật: chủ thấy "Mất kết nối"
+        # đỏ lè trong khi vẫn đang nghe ngon.
+        if ("listening" in low or "đang nghe" in low or "logged in" in low
+                or "reconnected" in low or "re-login successful" in low
+                or "restarting listener" in low):
+            return "listening"
         # Dòng KHAI BÁO NĂNG LỰC, không phải sự kiện. "Auto-reconnect enabled" chỉ nói là
         # CÓ BẬT tính năng tự nối lại, nhưng khớp thô chữ "reconnect" thì hoá thành "đang
         # mất kết nối". Nó lại in NGAY SAU dòng "Listening..." nên ghi đè và kẹt luôn ở
         # trạng thái sai dù mọi thứ vẫn chạy. Đây là lỗi thật đã gặp.
         if "enabled" in low or "events:" in low or "webhook:" in low:
             return None
-        if "listening" in low or "đang nghe" in low or "logged in" in low:
-            return "listening"
-        # Chỉ nhận sự kiện đứt THẬT, không nhận mọi dòng có chứa mấy chữ này.
+        # Bắt đầu một cú đứt. zca-js tự nối lại ở tầng websocket; nếu nối lại IM LẶNG (không
+        # in dòng hồi phục) thì status() sẽ tự kéo về "listening" khi tiến trình còn sống và
+        # đã qua RECOVER_S không thấy dòng đứt mới (xem status).
         if any(m in low for m in ("disconnected", "connection closed", "auto-retrying",
                                   "re-login in", "reconnecting")):
             return "reconnecting"
@@ -700,6 +711,11 @@ class _Runner:
                         if st == "listening":
                             saw_listening = True
                             attempt = 0      # nối lại được thì reset backoff
+                        elif st == "reconnecting":
+                            # Mốc đứt gần nhất: đứt THẬT thì zca-js in dòng đứt đều đặn nên
+                            # mốc luôn mới (status giữ "reconnecting"); blip rồi nối lại im
+                            # lặng thì mốc cũ dần và status kéo về "listening" sau RECOVER_S.
+                            self.last_reconnect_ts = time.time()
             except Exception as e:
                 self.error = f"{type(e).__name__}: {e}"
             rc = None
@@ -820,6 +836,14 @@ class _Runner:
         return {"ok": True}
 
     LIVE_S = 180        # có tin trong ngần này giây = chắc chắn đang nối được
+    RECOVER_S = 45      # blip xong, tiến trình còn sống, quá ngần này không đứt lại = đã nối lại
+
+    def _proc_alive(self) -> bool:
+        p = self.proc
+        try:
+            return bool(p) and p.poll() is None
+        except Exception:
+            return False
 
     def status(self) -> dict:
         # Đọc log để đoán trạng thái vốn mong manh (chuỗi của CLI đổi lúc nào không hay).
@@ -829,6 +853,15 @@ class _Runner:
         state, error = self.state, self.error
         if state in ("starting", "reconnecting") and self.last_event_ts and \
                 (time.time() - self.last_event_ts) < self.LIVE_S:
+            state, error = "listening", ""
+        # zca-js nối lại ở tầng websocket mà KHÔNG in dòng "listening" mới (sự kiện
+        # `connected` im lặng khi chưa từng `closed`), nên một cú blip mạng để state kẹt ở
+        # "reconnecting" mãi dù đang nghe ngon. Nếu tiến trình CÒN SỐNG và đã qua RECOVER_S
+        # kể từ dòng đứt gần nhất mà không có dòng đứt mới, coi như đã nối lại. Đứt THẬT thì
+        # zca-js in dòng đứt/re-login đều đặn nên mốc luôn mới → vẫn giữ "reconnecting"; còn
+        # tiến trình chết thì _proc_alive() sai → để _run respawn lo, không nhận nhầm.
+        if state == "reconnecting" and self._proc_alive() and self.last_reconnect_ts \
+                and (time.time() - self.last_reconnect_ts) >= self.RECOVER_S:
             state, error = "listening", ""
         return {"state": state, "error": error,
                 "last_event": self.last_event_ts, "started": self.started_ts,

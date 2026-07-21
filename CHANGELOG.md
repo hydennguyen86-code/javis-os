@@ -4,6 +4,13 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.144] - 2026-07-21
+Sửa lỗi bảng nghe Zalo cứ hiện "Mất kết nối, đang thử lại" dù thực ra vẫn đang nghe bình thường.
+### Sửa lỗi
+- **Kẹt ở trạng thái "Mất kết nối" dù kết nối vẫn sống**: mỗi khi mạng chớp một cái, thư viện Zalo tự nối lại ngay ở bên dưới mà KHÔNG in ra dòng thông báo nào, nên bảng điều khiển không có gì để biết là đã nối lại và cứ đứng ở "đang thử lại" mãi. Thêm nữa, dòng báo nối lại thành công của nhánh đăng nhập lại có kèm chữ "events:" nên bị bộ lọc dòng khởi động nuốt mất. Kết quả là chỉ cần rớt mạng một lần là nhãn đỏ nằm lì, chỉ tạm hết khi có tin mới về trong vòng ba phút, dù tiến trình nghe vẫn sống và tin vẫn về.
+- Nay Javis nhận đúng các dòng hồi phục để kéo trạng thái về đang nghe. Với trường hợp nối lại im lặng (không in dòng nào), nếu tiến trình nghe vẫn còn sống và đã qua một khoảng lặng không thấy dòng rớt mới thì tự coi là đã nối lại. Rớt thật thì thư viện in dòng rớt đều đặn nên vẫn báo đúng là đang thử lại; còn tiến trình chết hẳn thì vẫn để cơ chế dựng lại lo, không nhận nhầm.
+- Thêm kiểm thử chốt cho cả hai đường hồi phục và cho trường hợp nối lại im lặng.
+
 ## [0.9.143] - 2026-07-21
 Bỏ hẳn tính năng Javis tự trả lời khách trên Zalo. Nay Javis chỉ đọc và báo, mọi tin gửi đi đều do chủ yêu cầu trực tiếp.
 ### Cải thiện
