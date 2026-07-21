@@ -20,12 +20,30 @@ from datetime import datetime, timezone, timedelta
 from config import STATE_DIR
 
 _PATH = STATE_DIR / "usage.json"
+_EVENTS_PATH = STATE_DIR / "usage-events.jsonl"   # append-only, forward-log cho dashboard token
 _LOCK = threading.Lock()
 _KEEP_DAYS = 30
 
 
 def _today() -> str:
     return datetime.now(timezone(timedelta(hours=7))).strftime("%Y-%m-%d")
+
+
+def _append_event(provider: str, model: str, tin: int, tout: int, cost: float) -> None:
+    """Ghi them 1 dong vao usage-events.jsonl (append-only) cho indexer dashboard token doc.
+    Best-effort: loi thi bo qua, KHONG duoc lam hong luong chat. Nhanh API (openrouter/openai/
+    anthropic) khong co log tho nen day la nguon DUY NHAT cho chung; claude/codex indexer lay
+    tu log tho nen dong claude/codex o day chi bi indexer bo qua (tranh dem trung)."""
+    try:
+        now = datetime.now(timezone.utc)
+        line = json.dumps({"ts": int(now.timestamp()), "day": _today(),
+                           "provider": provider or "?", "model": model or "?",
+                           "in": int(tin or 0), "out": int(tout or 0), "cost": float(cost or 0.0)},
+                          ensure_ascii=False)
+        with open(_EVENTS_PATH, "a", encoding="utf-8") as fh:
+            fh.write(line + "\n")
+    except Exception:
+        pass
 
 
 def _load() -> dict:
@@ -69,6 +87,7 @@ def record(provider: str, model: str, tin=0, tout=0, cost=0.0) -> None:
         for old in sorted(d["days"])[:-_KEEP_DAYS]:   # dọn ngày cũ
             d["days"].pop(old, None)
         _save(d)
+    _append_event(provider, model, tin, tout, cost)   # forward-log rieng (khong prune) cho dashboard token
 
 
 def _rollup(bucket: dict) -> dict:
@@ -80,6 +99,27 @@ def _rollup(bucket: dict) -> dict:
         for k in tot:
             tot[k] += e.get(k, 0)
     return {"items": items, "total": tot}
+
+
+def daily(n: int = 14) -> list:
+    """Chuỗi n ngày gần nhất (cũ -> mới) để vẽ đồ thị, lấp cả ngày trống cho trục liền mạch:
+    [{day, in, out, cost, turns}]."""
+    d = _load()
+    days = d.get("days", {})
+    tz = timezone(timedelta(hours=7))
+    today = datetime.now(tz).date()
+    out = []
+    for i in range(n - 1, -1, -1):
+        day = (today - timedelta(days=i)).strftime("%Y-%m-%d")
+        bucket = days.get(day, {})
+        tot = {"in": 0, "out": 0, "cost": 0.0, "turns": 0}
+        for e in bucket.values():
+            tot["in"] += e.get("in", 0)
+            tot["out"] += e.get("out", 0)
+            tot["cost"] += e.get("cost", 0.0)
+            tot["turns"] += e.get("turns", 0)
+        out.append({"day": day, **tot})
+    return out
 
 
 def summary() -> dict:

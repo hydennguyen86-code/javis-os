@@ -65,6 +65,11 @@ services:
       retries: 3
       start_period: 25s
 
+# GHI CHÚ: bản Hostinger CỐ TÌNH không kèm Watchtower. Đã thử (2026-07-18): trên Hostinger Docker
+# Manager, container Watchtower bị Restarting liên tục (không đụng được Docker socket), nên nút
+# "Cập nhật ngay" trong app KHÔNG chạy được ở đây. Bản Hostinger cập nhật bằng REDEPLOY.
+# Muốn nút bấm-là-chạy: dùng VPS tự quản (docker-compose.yml, profile update) hoặc bản Windows/native.
+
 volumes:
   javis-data:
   javis-brains:

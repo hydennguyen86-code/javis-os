@@ -158,16 +158,19 @@ function handleMessage(data) {
     }
   } else if (data.type === "response") {
     const { clean, cards } = extractMetrics(data.content);
-    const finalText = clean || (t && t.text) || "";
+    const { clean: askClean, ask } = window.JavisAsk.extract(clean);
+    const finalText = askClean || (t && t.text) || "";
     const shownText = finalText || "_(không có nội dung trả về - thử lại hoặc đổi model)_";
     if (t) t.text = shownText;
     if (isActive) {
       hideActivity();
       if (cards) pushMetricsToPanel(cards);
-      if (!t || !t.bubble) appendJavisMessage(shownText);
-      else t.bubble.querySelector(".bubble").innerHTML = markdownToHtml(shownText);
+      let msgEl = t && t.bubble;
+      if (!msgEl) msgEl = appendJavisMessage(shownText);
+      else msgEl.querySelector(".bubble").innerHTML = markdownToHtml(shownText);
+      if (ask) window.JavisAsk.render(msgEl, ask, true);   // chip chỉ mọc khi lượt xong
       if (data.engine) setEngineBadge(data.engine, data.model);   // sự thật engine+model của lượt này
-      if (finalText.trim()) recordTurn("javis", finalText);
+      if (finalText.trim()) recordTurn("javis", finalText, null, ask);
       if (voice.ttsEnabled && t && !t.spoke && finalText) { setOrbState("speaking", "ĐANG NÓI"); voice.speak(finalText); }
       else if (!voice.ttsEnabled) setOrbState("", "SẴN SÀNG");
       maybeAutoLearn();
@@ -193,27 +196,42 @@ function handleMessage(data) {
 function sendMessage(text) {
   const msg = (text || chatInput.value).trim();
   const atts = pendingAttachments.filter(a => a.path);  // chỉ file đã upload xong
+  // Lệnh / : session-command chạy tại chỗ; skill-command bung thành lời gọi skill.
+  const _slash = (window.JavisSlash && msg) ? window.JavisSlash.route(msg) : { type: "passthrough" };
+  if (_slash.type === "session") {
+    chatInput.value = ""; chatInput.style.height = "auto";
+    if (_slash.cmd === "stop") { try { stopCurrent(); } catch (e) {} }
+    else { try { newChat(); } catch (e) {} }   // new | reset -> hội thoại mới trên web
+    return;
+  }
   if ((!msg && atts.length === 0) || !ws || ws.readyState !== WebSocket.OPEN) return;
   if (!savedSessionId) savedSessionId = newSid();        // hội thoại mới → mint id để định tuyến
   const sid = savedSessionId;
   if (turns[sid] && turns[sid].running) return;          // phiên này đang trả lời → chưa gửi tiếp
   voice.stopSpeaking();
+  window.JavisAsk.freezeAll();   // trả lời rồi thì chip của lượt trước hết bấm được
   appendUserMessage(msg, atts);
   recordTurn("user", msg, atts.map(a => ({ name: a.name, kind: a.kind })));
 
   // Soạn message gửi Javis (kèm đường dẫn file trong Sources)
-  let outMsg = msg;
+  const _isSkill = _slash.type === "skill";
+  let outMsg = _isSkill ? _slash.message : msg;
   if (atts.length) {
     const lines = atts.map(a => `- ${a.path}`).join("\n");
     const src = atts[0].sources || "", attDir = atts[0].attachments || "";
-    const ctx =
-      `[File đính kèm để ĐỌC (đường dẫn):\n${lines}\n` +
-      `Mặc định: chỉ đọc file rồi trả lời, KHÔNG tự lưu đi đâu.\n` +
-      `CHỈ khi user yêu cầu rõ (vd "lưu vào source", "ingest", "ghi vào second brain") thì mới: ` +
-      `chuyển thành .md (ảnh thì đọc hiểu + mô tả) lưu vào Sources="${src}" (ảnh gốc chuyển vào Attachments="${attDir}"), kèm frontmatter source.]`;
-    outMsg = msg
-      ? `${ctx}\n\n${msg}`
-      : `${ctx}\n\nHãy đọc (các) file trên và phản hồi / tóm tắt nội dung chính.`;
+    if (_isSkill) {
+      // Với lệnh skill (vd /notes): đưa path như dữ liệu, để chính skill quyết định lưu.
+      outMsg = `[File đính kèm (đường dẫn), Sources="${src}", Attachments="${attDir}":\n${lines}]\n\n${_slash.message}`;
+    } else {
+      const ctx =
+        `[File đính kèm để ĐỌC (đường dẫn):\n${lines}\n` +
+        `Mặc định: chỉ đọc file rồi trả lời, KHÔNG tự lưu đi đâu.\n` +
+        `CHỈ khi user yêu cầu rõ (vd "lưu vào source", "ingest", "ghi vào second brain") thì mới: ` +
+        `chuyển thành .md (ảnh thì đọc hiểu + mô tả) lưu vào Sources="${src}" (ảnh gốc chuyển vào Attachments="${attDir}"), kèm frontmatter source.]`;
+      outMsg = msg
+        ? `${ctx}\n\n${msg}`
+        : `${ctx}\n\nHãy đọc (các) file trên và phản hồi / tóm tắt nội dung chính.`;
+    }
   }
 
   chatInput.value = ""; chatInput.style.height = "auto";
@@ -225,6 +243,8 @@ function sendMessage(text) {
   syncActiveUI();
   ws.send(JSON.stringify({ message: outMsg, brain: currentBrainPath(), session_id: sid }));
 }
+// Chip lựa chọn (chat-ask.js) gửi đáp án qua đây: bấm chip = y như người dùng gõ tay nhãn đó.
+window.JavisSend = sendMessage;
 
 // ============================================
 // Lưu / khôi phục phiên
@@ -239,8 +259,8 @@ function persistSession() {
     }));
   } catch (e) {}
 }
-function recordTurn(role, text, atts) {
-  convo.push({ role, text: text || "", atts: atts || [] });
+function recordTurn(role, text, atts, ask) {
+  convo.push({ role, text: text || "", atts: atts || [], ask: ask || null });
   if (convo.length > 200) convo = convo.slice(-200);
   persistSession();
 }
@@ -252,9 +272,11 @@ function restoreSession() {
   savedSessionId = s.sessionId || null;
   savedMetrics = s.metrics || null;
   // Dựng lại bong bóng hội thoại
-  convo.forEach(t => {
-    if (t.role === "user") appendUserMessage(t.text, t.atts || []);
-    else appendJavisMessage(t.text);
+  convo.forEach((t, i) => {
+    if (t.role === "user") { appendUserMessage(t.text, t.atts || []); return; }
+    const el = appendJavisMessage(t.text);
+    // Chip chỉ sống lại ở tin CUỐI: có tin sau nó nghĩa là câu hỏi đã được trả lời rồi.
+    if (t.ask) window.JavisAsk.render(el, t.ask, i === convo.length - 1);
   });
   if (convo.length) scrollBottom(true);
   // Dựng lại số liệu kinh doanh (đánh dấu là của phiên trước)
@@ -334,6 +356,7 @@ function appendJavisMessage(text) {
   div.innerHTML = `<div class="bubble">${markdownToHtml(text)}</div>` +
     `<button class="msg-copy" type="button" title="Copy cả tin nhắn">⧉</button>`;
   chatAppend(div); scrollBottom();
+  return div;
 }
 function createStreamingBubble() {
   const div = document.createElement("div");
@@ -707,7 +730,6 @@ graphSource.addEventListener("change", () => {
   connectGraphWatch();   // theo dõi realtime trên nguồn mới
   loadMemStats();   // bộ nhớ theo vault → đổi vault thì đổi số ký ức
   loadBrainStats(); // agent/skill/workflow theo vault
-  loadLoopLog();    // nhật ký loop theo vault
   // Nếu panel số liệu đang ở fallback Agentic → cập nhật số theo vault mới (không gọi lại MCP)
   if (savedMetrics && savedMetrics.agentic) {
     agenticFallbackCards().then(fb => {
@@ -1185,16 +1207,14 @@ function _setStat(id, n) {
 async function loadBrainStats() {
   const b = encodeURIComponent(currentBrainPath());
   try {
-    const [a, s, w, au] = await Promise.all([
+    const [a, s, w] = await Promise.all([
       fetch(`/agents?brain=${b}`).then(r => r.json()).catch(() => ({})),
       fetch(`/skills?brain=${b}`).then(r => r.json()).catch(() => ({})),
       fetch(`/workflows?brain=${b}`).then(r => r.json()).catch(() => ({})),
-      fetch(`/automations?brain=${b}`).then(r => r.json()).catch(() => ({})),
     ]);
     _setStat("statAgents", (a.agents || []).length);
     _setStat("statSkills", (s.skills || []).length);
     _setStat("statWorkflows", (w.workflows || []).length);
-    _setStat("statRoutines", au.running != null ? au.running : 0);   // routines đang chạy
   } catch (e) {}
 }
 window.loadBrainStats = loadBrainStats;   // Studio gọi lại sau khi tạo/xoá
@@ -1454,101 +1474,6 @@ function resumeAudio() {
 }
 document.addEventListener("click", resumeAudio, { once: true });
 document.addEventListener("keydown", resumeAudio, { once: true });
-
-// ============================================
-// Vòng lặp tự cải thiện (Beta)
-// ============================================
-const loopEnabled = document.getElementById("loopEnabled");
-const loopGoal = document.getElementById("loopGoal");
-const loopCustomGoal = document.getElementById("loopCustomGoal");
-const loopMode = document.getElementById("loopMode");
-const loopInterval = document.getElementById("loopInterval");
-function _syncCustomGoalVis() { if (loopCustomGoal) loopCustomGoal.style.display = (loopGoal.value === "custom") ? "block" : "none"; }
-const loopStatus = document.getElementById("loopStatus");
-const loopLog = document.getElementById("loopLog");
-const loopRunNow = document.getElementById("loopRunNow");
-const lintBtn = document.getElementById("lintBtn");
-
-function fmtClock(ts) {
-  if (!ts) return "-";
-  return new Date(ts * 1000).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
-}
-function renderLoopStatus(c) {
-  loopStatus.className = "loop-status";
-  if (c.running) { loopStatus.classList.add("running"); loopStatus.textContent = "⏳ Đang chạy một vòng..."; return; }
-  if (!c.enabled) { loopStatus.textContent = "Tắt - bật để Javis tự chạy nền"; return; }
-  loopStatus.classList.add("on");
-  const goalTxt = c.goal === "brain" ? "bộ não" : "chỉ số KD";
-  const last = c.last_run ? `lần cuối ${fmtClock(c.last_run)}` : "chưa chạy";
-  const next = c.next_run ? ` · kế tiếp ~${fmtClock(c.next_run)}` : "";
-  loopStatus.textContent = `● Bật · ${goalTxt} · ${c.mode === "auto" ? "tự làm" : "đề xuất"} · ${last}${next}`;
-}
-async function loadLoopConfig() {
-  try {
-    const c = await (await fetch("/loop/config")).json();
-    loopEnabled.checked = !!c.enabled;
-    if (c.goal) loopGoal.value = c.goal;
-    if (loopCustomGoal) loopCustomGoal.value = c.custom_goal || "";
-    _syncCustomGoalVis();
-    if (c.mode) loopMode.value = c.mode;
-    if (c.interval_min) loopInterval.value = c.interval_min;
-    renderLoopStatus(c);
-  } catch (e) {}
-}
-async function saveLoopConfig() {
-  const fd = new FormData();
-  fd.append("enabled", loopEnabled.checked ? "1" : "0");
-  fd.append("goal", loopGoal.value);
-  fd.append("custom_goal", loopCustomGoal ? loopCustomGoal.value : "");
-  fd.append("mode", loopMode.value);
-  fd.append("interval_min", loopInterval.value || "60");
-  fd.append("brain", currentBrainPath());   // scheduler chạy trên vault đang chọn
-  try { await fetch("/loop/config", { method: "POST", body: fd }); } catch (e) {}
-  loadLoopConfig();
-}
-async function loadLoopLog() {
-  try {
-    const d = await (await fetch(`/loop/log?brain=${encodeURIComponent(currentBrainPath())}&limit=8`)).json();
-    loopLog.innerHTML = "";
-    (d.entries || []).forEach(e => {
-      const div = document.createElement("div");
-      div.className = "loop-log-item";
-      const m = e.match(/^##\s*\[([^\]]+)\]\s*(.*)/);
-      const head = m ? `<span class="lli-time">${escapeHtml(m[1])}</span> ${escapeHtml(m[2])}` : "";
-      const body = e.replace(/^##.*\n?/, "").trim().slice(0, 400);
-      div.innerHTML = head + (body ? "<br>" + escapeHtml(body) : "");
-      loopLog.appendChild(div);
-    });
-  } catch (e) {}
-}
-if (loopEnabled) {
-  loopEnabled.addEventListener("change", saveLoopConfig);
-  loopGoal.addEventListener("change", () => { _syncCustomGoalVis(); saveLoopConfig(); });
-  if (loopCustomGoal) loopCustomGoal.addEventListener("change", saveLoopConfig);
-  loopMode.addEventListener("change", saveLoopConfig);
-  loopInterval.addEventListener("change", saveLoopConfig);
-  loopRunNow.addEventListener("click", async () => {
-    loopRunNow.disabled = true;
-    loopStatus.className = "loop-status running"; loopStatus.textContent = "⏳ Đang chạy một vòng...";
-    try { await fetch("/loop/run-now", { method: "POST" }); } catch (e) {}
-    const poll = setInterval(async () => {
-      try {
-        const c = await (await fetch("/loop/config")).json();
-        if (!c.running) { clearInterval(poll); loopRunNow.disabled = false; renderLoopStatus(c); loadLoopLog(); loadMemStats(); loadBrainStats(); }
-      } catch (e) { clearInterval(poll); loopRunNow.disabled = false; }
-    }, 3000);
-  });
-  lintBtn.addEventListener("click", async () => {
-    const old = lintBtn.textContent; lintBtn.disabled = true; lintBtn.textContent = "🩺 Đang quét...";
-    try {
-      const d = await (await fetch(`/lint?brain=${encodeURIComponent(currentBrainPath())}`)).json();
-      appendJavisMessage(d.ok ? ("🩺 **LINT Wiki**\n\n" + d.report) : ("⚠ " + (d.error || "lỗi LINT")));
-    } catch (e) { appendJavisMessage("⚠ LINT lỗi mạng"); }
-    lintBtn.textContent = old; lintBtn.disabled = false;
-  });
-  // Tự cập nhật trạng thái khi loop đang bật (nhẹ)
-  setInterval(() => { if (loopEnabled.checked) { loadLoopConfig(); } }, 20000);
-}
 
 // ============================================
 // Badge engine+model (sự thật, không hỏi model)
@@ -1896,11 +1821,11 @@ initGraph().then(connectGraphWatch).catch(connectGraphWatch);
 pumpAudioLevel();
 loadMemStats();
 loadBrainStats();
-loadLoopConfig();
-loadLoopLog();
 checkVault();
-// Khôi phục phiên gần nhất (hội thoại + số liệu) để hiện ngay
-restoreSession();
+// Mặc định: mỗi lần tải trang là VÀO HỘI THOẠI MỚI (không khôi phục phiên cũ vào khung chat).
+// Hội thoại cũ KHÔNG mất - vẫn nằm trong panel Lịch sử (lưu ở server), bấm để mở lại.
+try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
+savedSessionId = null;
 // Mặc định: TỰ tải số liệu kinh doanh khi vào.
 // Có số liệu phiên trước → hiện ngay rồi refresh ngầm (silent) cho đỡ nháy.
 loadMetrics({ silent: !!(savedMetrics && (savedMetrics.cards || []).length) });

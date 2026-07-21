@@ -356,6 +356,32 @@ async def auth_headers(conn_id):
     return {"Authorization": f"Bearer {tok}"} if tok else {}
 
 
+def credentials_file(conn_id, fmt):
+    """Nội dung file credential cho connector STDIO dùng OAuth. Trả chuỗi JSON, hoặc "" nếu chưa
+    đăng nhập / thiếu dữ kiện / format không biết.
+
+    Vì sao cần: auth_headers() ở trên phục vụ connector transport=http (nhét Bearer vào header).
+    Connector stdio (vd google-ads) chạy tiến trình con và chỉ nhận credential qua FILE + biến môi
+    trường. Hàm này bắc cầu giữa hai kiểu đó.
+
+    ĐỒNG BỘ, không gọi mạng: file ADC chứa refresh_token, chính tiến trình con sẽ tự đổi lấy
+    access token khi cần. Nên KHÔNG refresh ở đây."""
+    if fmt != "google_adc":
+        return ""
+    ent = _load().get(conn_id) or {}
+    rt = secrets_store.decrypt(ent.get("refresh_token", ""))
+    if not rt:
+        return ""
+    sec = mcp_store.connection_secrets(conn_id) or {}
+    cid = sec.get("client_id") or ent.get("client_id") or ""
+    cs = sec.get("client_secret") or ""
+    if not (cid and cs):
+        return ""
+    # Đúng khuôn file gcloud sinh ra ở ~/.config/gcloud/application_default_credentials.json
+    return json.dumps({"type": "authorized_user", "client_id": cid,
+                       "client_secret": cs, "refresh_token": rt}, ensure_ascii=False, indent=2)
+
+
 def status(conn_id):
     ent = _load().get(conn_id) or {}
     return {"connected": bool(ent.get("access_token")), "expires_at": float(ent.get("expires_at") or 0)}

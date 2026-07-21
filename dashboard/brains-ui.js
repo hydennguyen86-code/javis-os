@@ -14,6 +14,61 @@
     return "🧠 " + b.name + (b.notes ? " · " + b.notes : "");
   }
 
+  // Chuẩn hoá path để so trùng: bỏ dấu phân cách cuối, \ -> /, thường hoá (Windows không phân biệt hoa/thường).
+  function normPath(p) {
+    return (p || "").replace(/[\\/]+$/, "").replace(/\\/g, "/").toLowerCase();
+  }
+
+  // Hỏi server 1 path còn là thư mục không. FAIL-SAFE: mọi trường hợp không CHẮC CHẮN (lỗi
+  // mạng, endpoint thiếu/404 vì server chưa restart, JSON méo) → {is_dir:null} = CHƯA xác định
+  // → GIỮ entry. Chỉ dọn khi server trả rõ is_dir=false. Tránh xoá nhầm folder ngoài hợp lệ.
+  async function pathExists(p) {
+    try {
+      const resp = await fetch("/path/exists?path=" + encodeURIComponent(p));
+      if (!resp.ok) return { exists: null, is_dir: null };
+      const j = await resp.json();
+      if (!j || typeof j.is_dir === "undefined") return { exists: null, is_dir: null };
+      return j;
+    } catch (e) {
+      return { exists: null, is_dir: null };
+    }
+  }
+
+  // Dọn danh sách folder ngoài (📁, localStorage) đã hỏng: bỏ entry TRÙNG path với 1 não thật,
+  // và entry mà path KHÔNG còn là thư mục (đã xoá khỏi ổ đĩa). Giữ folder ngoài hợp lệ + entry
+  // chưa xác định được (tránh xoá nhầm khi server chớp lỗi). Nguồn sự thật là localStorage nên
+  // dọn cả nó → lần app.js render sau vẫn đúng, không "sống lại" qua update.
+  async function pruneCustomBrains(realBrains) {
+    let list;
+    try { list = JSON.parse(localStorage.getItem("javis.brains") || "[]"); }
+    catch (e) { list = []; }
+    if (!Array.isArray(list)) list = [];
+    const realPaths = new Set((realBrains || []).map((b) => normPath(b.path)));
+    const kept = [];
+    for (const b of list) {
+      if (!b || !b.path) continue;
+      if (realPaths.has(normPath(b.path))) continue;   // đã là 🧠 não thật → bỏ 📁 trùng
+      const chk = await pathExists(b.path);
+      if (chk && chk.is_dir === true) { kept.push(b); continue; }   // còn thư mục → giữ
+      if (chk && chk.exists === null) { kept.push(b); continue; }   // chưa xác định → giữ
+      // còn lại: đã bị xoá / không phải thư mục → loại
+    }
+    if (kept.length !== list.length) {
+      localStorage.setItem("javis.brains", JSON.stringify(kept));
+    }
+    // Gỡ các option 📁 (do app.js đã render) không còn trong danh sách giữ lại.
+    const keepVals = new Set(kept.map((b) => "path:" + b.path));
+    [...sel.querySelectorAll("option[data-custom]")].forEach((o) => {
+      if (keepVals.has(o.value)) return;
+      if (sel.value === o.value) {           // đang chọn đúng cái bị gỡ → về brain mặc định
+        sel.value = "brain";
+        localStorage.setItem("javis.graphSource", "brain");
+        sel.dispatchEvent(new Event("change"));
+      }
+      o.remove();
+    });
+  }
+
   async function loadBrains(selectPath, restoreSaved) {
     let data;
     try {
@@ -40,6 +95,9 @@
     });
     if (defOpt && defOpt.nextSibling) sel.insertBefore(frag, defOpt.nextSibling);
     else sel.appendChild(frag);
+
+    // Dọn folder ngoài hỏng/trùng TRƯỚC khi khôi phục lựa chọn (đừng khôi phục về path đã chết).
+    await pruneCustomBrains(brains);
 
     if (selectPath) {
       const want = "path:" + selectPath;
@@ -69,10 +127,32 @@
     await loadBrains(r.path, false);
   }
 
+  // Gỡ 1 folder ngoài (📁) khỏi danh sách - CHỈ khỏi menu + localStorage, KHÔNG đụng ổ đĩa.
+  function removeCustomFromList(opt) {
+    const name = opt.textContent.replace(/^📁\s*/, "");
+    if (!window.confirm('Bỏ folder ngoài "' + name + '" khỏi danh sách?\n\n' +
+        "Chỉ gỡ khỏi menu chọn não, KHÔNG xoá dữ liệu trên ổ đĩa.")) return;
+    let list;
+    try { list = JSON.parse(localStorage.getItem("javis.brains") || "[]"); } catch (e) { list = []; }
+    if (!Array.isArray(list)) list = [];
+    list = list.filter((b) => b && ("path:" + b.path) !== opt.value);
+    localStorage.setItem("javis.brains", JSON.stringify(list));
+    if (sel.value === opt.value) {
+      sel.value = "brain";
+      localStorage.setItem("javis.graphSource", "brain");
+    }
+    opt.remove();
+    sel.dispatchEvent(new Event("change"));
+    alert('Đã bỏ "' + name + '" khỏi danh sách.');
+  }
+
   async function deleteBrain() {
     const opt = sel.options[sel.selectedIndex];
     if (sel.value === "brain") { alert("Không thể xoá Brain mặc định (não khởi đầu)."); return; }
     if (!opt || !opt.dataset.brain) {
+      // Folder ngoài (📁): cho GỠ khỏi danh sách (không xoá ổ đĩa). Trước đây chỉ báo lỗi mà
+      // không có cách gỡ nào → entry kẹt vĩnh viễn kể cả sau khi folder đã bị xoá.
+      if (opt && opt.dataset.custom) { removeCustomFromList(opt); return; }
       alert("Chỉ xoá được brain trong danh sách. Folder ngoài (📁) thì bỏ khỏi danh sách, không xoá ổ đĩa.");
       return;
     }
@@ -80,7 +160,7 @@
     // Xác nhận KỸ: gõ đúng tên - vì đây là TOÀN BỘ tri thức trong não này, mất là không lấy lại được.
     const typed = window.prompt(
       "⚠️ XOÁ BRAIN \"" + name + "\"\n\n" +
-      "Toàn bộ tri thức (sources, wiki, agents, workflows, bộ nhớ...) trong não này sẽ bị XOÁ VĨNH VIỄN, KHÔNG khôi phục được.\n\n" +
+      "Não này sẽ được chuyển vào THÙNG RÁC (giữ 30 ngày rồi tự xoá hẳn), và việc xoá sẽ ĐỒNG BỘ sang mọi máy khác.\n\n" +
       "Gõ CHÍNH XÁC tên brain để xác nhận:"
     );
     if (typed === null) return;
@@ -97,7 +177,7 @@
     localStorage.setItem("javis.graphSource", "brain");
     await loadBrains(null, false);
     sel.dispatchEvent(new Event("change"));
-    alert('Đã xoá brain "' + name + '".');
+    alert('Đã xoá brain "' + name + '" (đưa vào thùng rác 30 ngày, đồng bộ xoá sang các máy khác).');
   }
 
   const nb = document.getElementById("newBrainBtn");

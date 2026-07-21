@@ -43,7 +43,7 @@
   // cho nút header & dải số liệu .bstat ở đáy graph). Console gọi loader qua window.JavisStudio.
   window.openStudio = (tab) => { if (window.Alpine) Alpine.store("nav").go(tab || "workflows"); };
   window.JavisStudio = {
-    workflows: loadWorkflows, agents: loadAgents, skills: loadSkills, automations: loadAutomations,
+    workflows: loadWorkflows, agents: loadAgents, skills: loadSkills,
   };
   const _studioBtn = document.getElementById("studioOpenBtn");
   if (_studioBtn) _studioBtn.addEventListener("click", () => window.openStudio("workflows"));
@@ -52,29 +52,30 @@
 
   function switchTab(tab) {
     document.querySelectorAll(".stab").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
-    ["workflows", "agents", "skills", "automations"].forEach(t => document.getElementById("panel-" + t).hidden = (t !== tab));
+    ["workflows", "agents", "skills"].forEach(t => document.getElementById("panel-" + t).hidden = (t !== tab));
     if (tab === "workflows") loadWorkflows();
     else if (tab === "agents") loadAgents();
-    else if (tab === "automations") loadAutomations();
     else loadSkills();
   }
 
   // ===== Workflows =====
+  // Biến workflow đọc thành lời cho ô bước: thay "…" (cũ) vì "Nhận …, tạo project folder"
+  // đọc lên cụt nghĩa. Biến lạ thì hiện thẳng tên biến, đừng nuốt thành dấu ba chấm.
+  const WF_VARS = { input: "đầu vào", prev: "kết quả bước trước" };
   function renderPipeline(steps) {
     return (steps || []).map((s, i) => {
-      const preview = (s.task || "").replace(/\{\{[^}]+\}\}/g, "…").slice(0, 32);
-      return `${i > 0 ? '<div class="wf-parrow">→</div>' : ''}
-        <div class="wf-pstep" data-i="${i}">
-          <div class="wps-num">0${i + 1}</div>
+      const task = (s.task || "").replace(/\{\{\s*([\w.-]+)\s*\}\}/g, (m, v) => WF_VARS[v] || v);
+      return `<div class="wf-pstep" data-i="${i}">
+          <div class="wps-num">${String(i + 1).padStart(2, "0")}</div>
+          ${task ? `<div class="wps-task" title="${esc(task)}">${esc(task)}</div>` : ''}
           <div class="wps-name">${esc(s.agent)}</div>
-          ${preview ? `<div class="wps-task">${esc(preview)}…</div>` : ''}
         </div>`;
     }).join('');
   }
 
   async function loadWorkflows() {
     const panel = document.getElementById("panel-workflows");
-    panel.innerHTML = `<div class="panel-bar"><h3>Workflows</h3><div class="pb-actions"><button class="s-btn-ghost" id="wfImport">⤒ Nhập</button><button class="s-btn-ghost" id="seedBtn">Tạo mẫu</button><button class="s-btn" id="newWf">+ Workflow</button></div></div><div class="cards" id="wfCards">Đang tải...</div>`;
+    panel.innerHTML = `<div class="panel-bar"><h3>Workflows</h3><div class="pb-actions"><button class="s-btn-ghost" id="wfImport">⤒ Nhập</button><button class="s-btn-ghost" id="seedBtn">Tạo mẫu</button><button class="s-btn" id="newWf">+ Workflow</button></div></div><div class="wf-list" id="wfCards">Đang tải...</div>`;
     document.getElementById("newWf").onclick = () => editWorkflow(null);
     document.getElementById("wfImport").onclick = () => importItems(loadWorkflows);
     document.getElementById("seedBtn").onclick = async () => { await api("/studio/seed", { method: "POST", body: fd({ brain: brain() }) }); loadWorkflows(); };
@@ -87,22 +88,24 @@
     wfs.forEach(w => {
       const active = w.status === "active";
       const div = document.createElement("div");
-      div.className = "wf-card" + (active ? "" : " archived");
+      div.className = "wf-row" + (active ? "" : " archived");
       div.dataset.slug = w.slug;
       div.innerHTML = `
         <div class="wf-header">
           <div class="wf-name">${esc(w.name)}</div>
           <span class="wf-badge ${active ? "ready" : "off"}">${active ? "● Sẵn sàng" : "Lưu trữ"}</span>
+          <span class="wf-count">${(w.steps || []).length} bước</span>
+          <div class="wf-spacer"></div>
+          <div class="wf-actions">
+            <button class="s-btn run" ${active ? "" : "disabled"}>▶ Chạy</button>
+            <button class="s-btn-ghost edit">Sửa</button>
+            <button class="s-btn-ghost archive">${active ? "Lưu trữ" : "Kích hoạt"}</button>
+            <button class="s-btn-ghost exp" title="Xuất gói .zip (kèm agent + skill phụ thuộc) để chia sẻ">⤓ Xuất</button>
+            <button class="s-btn-ghost del">Xoá</button>
+          </div>
         </div>
         ${w.description ? `<div class="wf-desc">${esc(w.description)}</div>` : ''}
-        <div class="wf-pipeline">${renderPipeline(w.steps)}</div>
-        <div class="wf-actions">
-          <button class="s-btn run" ${active ? "" : "disabled"}>▶ Chạy</button>
-          <button class="s-btn-ghost edit">Sửa</button>
-          <button class="s-btn-ghost archive">${active ? "Lưu trữ" : "Kích hoạt"}</button>
-          <button class="s-btn-ghost exp" title="Xuất gói .zip (kèm agent + skill phụ thuộc) để chia sẻ">⤓ Xuất</button>
-          <button class="s-btn-ghost del">Xoá</button>
-        </div>`;
+        <div class="wf-pipeline">${renderPipeline(w.steps)}</div>`;
       div.querySelector(".exp").onclick = () => exportItem("workflow", w.slug);
       div.querySelector(".archive").onclick = async () => { await api("/workflows/toggle", { method: "POST", body: fd({ slug: w.slug, brain: brain() }) }); loadWorkflows(); };
       div.querySelector(".run").onclick = () => runWorkflow(w, div);
@@ -205,6 +208,19 @@
     const steps = w ? JSON.parse(JSON.stringify(w.steps || [])) : [{ agent: agentsCache[0].slug, task: "" }];
     const opts = (sel) => agentsCache.map(a => `<option value="${a.slug}" ${a.slug === sel ? "selected" : ""}>${esc(a.name)}</option>`).join("");
     const optsV = (sel) => `<option value="">- không kiểm chứng -</option>` + agentsCache.map(a => `<option value="${a.slug}" ${a.slug === sel ? "selected" : ""}>${esc(a.name)}</option>`).join("");
+    const agentName = (slug) => { const a = agentsCache.find(x => x.slug === slug); return a ? a.name : (slug || "?"); };
+    // Bước gập lại để thấy toàn cảnh; bấm vào bước nào thì mở bước đó ra sửa. Workflow mới
+    // chỉ có 1 bước nên mở sẵn. Các ô input VẪN nằm trong DOM khi gập (chỉ ẩn bằng CSS) -
+    // captureSteps() đọc value của chúng, render kiểu chỉ-vẽ-bước-đang-mở sẽ làm nó vỡ.
+    let openIdx = w ? null : 0;
+    function move(i, d) {
+      const j = i + d;
+      if (j < 0 || j >= steps.length) return;
+      captureSteps();
+      const t = steps[i]; steps[i] = steps[j]; steps[j] = t;
+      if (openIdx === i) openIdx = j; else if (openIdx === j) openIdx = i;
+      render();
+    }
     function render() {
       box.innerHTML = `
         <h3>${w ? "Sửa" : "Tạo"} Workflow</h3>
@@ -216,24 +232,44 @@
         <div class="editor-actions"><button class="s-btn-ghost" id="cancelEd">Huỷ</button><button class="s-btn" id="saveWf">Lưu</button></div>`;
       const sl = box.querySelector("#stepList"); sl.innerHTML = "";
       steps.forEach((st, i) => {
-        const row = document.createElement("div"); row.className = "step-row";
+        const open = i === openIdx;
+        const row = document.createElement("div"); row.className = "step-row" + (open ? " open" : "");
+        const sum = (st.task || "").replace(/\s+/g, " ").trim();
         row.innerHTML = `
           <div class="step-header">
             <span class="step-num">${i + 1}</span>
+            <span class="step-sum">${esc(agentName(st.agent))}${sum ? ` · ${esc(sum)}` : ""}</span>
             <select class="st-agent">${opts(st.agent)}</select>
-            <button class="st-del">✕</button>
+            <button class="st-move" data-d="-1" title="Lên" ${i === 0 ? "disabled" : ""}>↑</button>
+            <button class="st-move" data-d="1" title="Xuống" ${i === steps.length - 1 ? "disabled" : ""}>↓</button>
+            <button class="st-del" title="Xoá bước">✕</button>
           </div>
-          <textarea class="st-task" rows="3" placeholder="Nhiệm vụ... dùng {{input}} = đầu vào, {{prev}} = kết quả bước trước">${esc(st.task)}</textarea>
-          <div class="st-verify">
-            <span class="stv-lbl">Kiểm chứng:</span>
-            <select class="st-verify-agent">${optsV(st.verify_agent || "")}</select>
-            <input class="st-retries" type="number" min="0" max="5" value="${st.max_retries != null ? st.max_retries : 1}">
-            <span class="stv-lbl">lần</span>
+          <div class="step-body">
+            <textarea class="st-task" rows="3" placeholder="Nhiệm vụ... dùng {{input}} = đầu vào, {{prev}} = kết quả bước trước">${esc(st.task)}</textarea>
+            <div class="st-verify">
+              <span class="stv-lbl">Kiểm chứng:</span>
+              <select class="st-verify-agent">${optsV(st.verify_agent || "")}</select>
+              <input class="st-retries" type="number" min="0" max="5" value="${st.max_retries != null ? st.max_retries : 1}">
+              <span class="stv-lbl">lần</span>
+            </div>
           </div>`;
-        row.querySelector(".st-del").onclick = () => { steps.splice(i, 1); if (!steps.length) steps.push({ agent: agentsCache[0].slug, task: "" }); render(); };
+        row.querySelector(".step-header").onclick = (e) => {
+          if (e.target.closest("button, select")) return;
+          captureSteps(); openIdx = open ? null : i; render();
+        };
+        row.querySelectorAll(".st-move").forEach(b => { b.onclick = () => move(i, parseInt(b.dataset.d, 10)); });
+        // captureSteps() TRƯỚC khi splice: thiếu nó thì chữ đang gõ dở ở các bước khác
+        // bị render() vẽ đè lại bằng giá trị cũ trong mảng steps, tức mất trắng.
+        row.querySelector(".st-del").onclick = () => {
+          captureSteps();
+          steps.splice(i, 1);
+          if (!steps.length) steps.push({ agent: agentsCache[0].slug, task: "" });
+          if (openIdx !== null) { if (openIdx === i) openIdx = null; else if (openIdx > i) openIdx--; }
+          render();
+        };
         sl.appendChild(row);
       });
-      box.querySelector("#addStep").onclick = () => { captureSteps(); steps.push({ agent: agentsCache[0].slug, task: "" }); render(); };
+      box.querySelector("#addStep").onclick = () => { captureSteps(); steps.push({ agent: agentsCache[0].slug, task: "" }); openIdx = steps.length - 1; render(); };
       box.querySelector("#cancelEd").onclick = () => editor.classList.remove("open");
       box.querySelector("#saveWf").onclick = async () => {
         const name = box.querySelector("#wfName").value.trim(); if (!name) return alert("Nhập tên");
@@ -300,85 +336,6 @@
     editor.classList.add("open");
   }
 
-  // ===== Lịch tự động (cron / trigger / routine) =====
-  async function loadAutomations() {
-    const panel = document.getElementById("panel-automations");
-    panel.innerHTML = `<div class="panel-bar"><h3>Lịch tự động <span class="dim" id="autoRunning"></span></h3><div class="pb-actions"><button class="s-btn-ghost" id="syncAuto">↻ Đồng bộ cloud</button><button class="s-btn" id="newAuto">+ Lịch</button></div></div>`
-      + `<div class="auto-hint">Bấm <b>↻ Đồng bộ cloud</b> để Javis hỏi Claude (CronList / scheduled tasks) lấy routine THẬT đang chạy trên cloud. Mục ☁ là tự đồng bộ; mục ghi tay vẫn giữ. Các loop 🔁 (trang Tự cải thiện) bật/tắt được ngay tại đây.</div>`
-      + `<div class="cards" id="autoCards">Đang tải...</div>`;
-    document.getElementById("newAuto").onclick = () => editAutomation(null);
-    document.getElementById("syncAuto").onclick = async (e) => {
-      const btn = e.target; btn.disabled = true; const old = btn.textContent; btn.textContent = "↻ Đang hỏi Claude...";
-      try {
-        const r = await api("/automations/sync", { method: "POST", body: fd({ brain: brain() }) });
-        if (!r.ok) alert("Đồng bộ lỗi: " + (r.error || r.detail || "không rõ") + (r.raw ? "\n\nClaude trả về:\n" + r.raw : ""));
-        else if (r.found === 0) alert("Không tìm thấy routine/cron nào (Claude CLI nền có thể chưa truy cập được danh sách lịch cloud).");
-        else alert(`Đã đồng bộ ${r.found} routine từ cloud.`);
-      } catch (e) { alert("Lỗi mạng khi đồng bộ"); }
-      btn.textContent = old; btn.disabled = false;
-      loadAutomations(); if (window.loadBrainStats) window.loadBrainStats();
-    };
-    const d = await api(`/automations?brain=${encodeURIComponent(brain())}`);
-    refreshStats();
-    document.getElementById("autoRunning").textContent = `· ${d.running} đang chạy`;
-    const cards = document.getElementById("autoCards");
-    const all = (d.builtin || []).concat(d.automations || []);
-    if (!all.length) { cards.innerHTML = `<div class="empty">Chưa có lịch nào. Bấm <b>+ Lịch</b> ghi lại cron/trigger/routine đã tạo (vd Morning Briefing 7h).</div>`; return; }
-    cards.innerHTML = "";
-    all.forEach(a => {
-      const active = a.status === "active";
-      const isRem = a.type === "reminder" || a.type === "script";
-      const typeLabel = a.type === "script" ? "Script (không AI)" : a.type === "reminder" ? "Nhắc hẹn" : a.type === "trigger" ? "Trigger" : a.type === "routine" ? "Routine" : "Cron";
-      const prefix = a.type === "script" ? "🖥 " : isRem ? "⏰ " : a.builtin ? "🔁 " : (a.source === "cloud" ? "☁ " : "");
-      const div = document.createElement("div");
-      div.className = "wf-card" + (active ? "" : " off");
-      div.innerHTML = `
-        <div class="wf-top">
-          <div class="wf-name">${prefix}${esc(a.name)} <span class="wf-status ${active ? "on" : "off"}">${active ? "ĐANG CHẠY" : "TẮT"}</span></div>
-          <label class="toggle"><input type="checkbox" ${active ? "checked" : ""}><span></span></label>
-        </div>
-        <div class="wf-desc">⏰ ${esc(a.schedule || "-")} · <span class="dim">${typeLabel}</span></div>
-        ${a.note ? `<div class="wf-steps">${esc(a.note)}</div>` : ""}
-        <div class="wf-actions">${isRem
-          ? `<span class="dim" style="font-size:13px">${a.type === "script" ? "Job script" : "Nhắc hẹn"} - gạt công tắc để huỷ</span>`
-          : a.builtin
-          ? `<span class="dim" style="font-size:13px">Loop - cấu hình/xoá ở trang Tự cải thiện</span>`
-          : `<button class="s-btn-ghost edit">Sửa</button><button class="s-btn-ghost del">Xoá</button>`}</div>`;
-      div.querySelector(".toggle input").onchange = async () => {
-        await api("/automations/toggle", { method: "POST", body: fd({ id: a.id, brain: brain() }) }); loadAutomations();
-      };
-      if (!a.builtin) {
-        div.querySelector(".edit").onclick = () => editAutomation(a);
-        div.querySelector(".del").onclick = async () => { if (confirm(`Xoá "${a.name}"?`)) { await api("/automations/delete", { method: "POST", body: fd({ id: a.id, brain: brain() }) }); loadAutomations(); } };
-      }
-      cards.appendChild(div);
-    });
-  }
-
-  function editAutomation(a) {
-    const box = document.getElementById("editorBox");
-    box.innerHTML = `<h3>${a ? "Sửa" : "Thêm"} lịch tự động</h3>
-      <label>Tên</label><input id="auName" value="${esc(a ? a.name : "")}">
-      <label>Loại</label><select id="auType">
-        <option value="cron">Cron - lịch giờ cố định</option>
-        <option value="trigger">Trigger - RemoteTrigger / sự kiện</option>
-        <option value="routine">Routine - scheduled agent</option>
-      </select>
-      <label>Lịch / mô tả (vd "7h sáng hằng ngày")</label><input id="auSched" value="${esc(a ? a.schedule : "")}">
-      <label>Ghi chú / ID (vd trig_01A9...)</label><input id="auNote" value="${esc(a ? a.note : "")}">
-      <div class="editor-actions"><button class="s-btn-ghost" id="cancelEd">Huỷ</button><button class="s-btn" id="saveAu">Lưu</button></div>`;
-    if (a && a.type) box.querySelector("#auType").value = a.type;
-    box.querySelector("#cancelEd").onclick = () => editor.classList.remove("open");
-    box.querySelector("#saveAu").onclick = async () => {
-      const name = box.querySelector("#auName").value.trim(); if (!name) return alert("Nhập tên");
-      await api("/automations", { method: "POST", body: fd({
-        name, type: box.querySelector("#auType").value, schedule: box.querySelector("#auSched").value,
-        note: box.querySelector("#auNote").value, status: a ? a.status : "active", id: a ? a.id : "", brain: brain() }) });
-      editor.classList.remove("open"); loadAutomations();
-    };
-    editor.classList.add("open");
-  }
-
   // ===== Skills (quản lý kiểu Hermes: cột nhóm + tìm kiếm + bật/tắt) =====
   const _skState = { cat: "ALL", q: "", skills: [] };
   function _injectSkillCss() {
@@ -404,7 +361,31 @@
     .sk2-act{display:flex;gap:5px;opacity:0;transition:.15s;flex:none} .sk2-card:hover .sk2-act{opacity:1}
     .sk2-act button{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);color:#aebbd6;border-radius:6px;cursor:pointer;font-size:13px;padding:3px 9px} .sk2-act button:hover{color:#fff;border-color:rgba(120,180,255,.5)}
     .sk2-act button.danger:hover{color:#ff9a9a;border-color:rgba(255,120,120,.5)}
-    .sysb{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.02em;color:#8fd0ff;background:rgba(90,170,255,.12);border:1px solid rgba(90,170,255,.35);vertical-align:2px}`;
+    .sysb{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.02em;color:#8fd0ff;background:rgba(90,170,255,.12);border:1px solid rgba(90,170,255,.35);vertical-align:2px}
+    .sk-usage{font-size:11px;color:var(--muted,#888);margin-left:8px}
+    .sk-stale{opacity:.75;font-style:italic;cursor:help}
+    /* ===== Mobile (<=860px) ===== xep DOC: nhom thanh dai chip cuon ngang o tren, danh sach
+       skill full-width ben duoi (truoc day cot nhom 210px bop cot skill con ~150px -> chu vo
+       tung tu). Nut thao tac luon hien (truoc day opacity:0 + chi hien khi :hover -> tren dien
+       thoai khong co hover nen Sua/Xuat/Xoa khong bao gio bam duoc). */
+    @media (max-width:860px){
+      .sk2{flex-direction:column;gap:12px}
+      .sk2-side{width:auto;max-height:none;display:flex;flex-direction:row;gap:6px;padding:6px;
+        overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch}
+      .sk2-side::-webkit-scrollbar{height:0}
+      .sk2-side .sec{display:none}
+      .sk2-side .cat{flex:none;padding:8px 13px;border:1px solid rgba(255,255,255,.1);
+        border-radius:999px;white-space:nowrap}
+      .sk2-side .cat .n{padding:1px 6px;border-radius:9px;background:rgba(255,255,255,.07)}
+      .sk2-side .cat.sel{border-color:rgba(120,180,255,.4)}
+      .sk2-bar input{max-width:none;font-size:16px}   /* 16px: chan iOS tu zoom khi focus */
+      .sk2-tog{width:20px;height:20px;margin-top:2px}  /* vung cham lon hon */
+      .sk2-card{flex-wrap:wrap;padding:12px 13px}
+      .sk2-info .nm{font-size:16px}
+      .sk2-act{flex:1 1 100%;opacity:1;margin-top:11px;padding-top:11px;gap:8px;
+        border-top:1px solid rgba(255,255,255,.06);justify-content:flex-end}
+      .sk2-act button{padding:7px 14px;font-size:14px}
+    }`;
     const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
   }
 
@@ -464,8 +445,17 @@
       const on = s.enabled !== false;
       const div = document.createElement("div"); div.className = "sk2-card" + (on ? "" : " off");
       const sysBadge = s.system ? ` <span class="sysb" title="Skill hệ thống Javis OS - có ở mọi brain, tự cập nhật theo phiên bản app. Sửa nội dung thì giữ bản của bạn (ngừng tự cập nhật). Không xoá được - chỉ tắt.">hệ thống</span>` : "";
+      // Telemetry: use_count là tín hiệu DƯƠNG một chiều. Skill nạp native qua .claude/skills
+      // không đi qua bộ đếm, nên "chưa thấy dùng" là tham khảo, KHÔNG phải phán quyết.
+      let usageHtml = "";
+      if (s.use_count > 0) {
+        const when = s.last_used_at ? new Date(s.last_used_at * 1000).toLocaleDateString("vi-VN") : "";
+        usageHtml = ` · <span class="sk-usage">đã dùng ${s.use_count} lần${when ? ", gần nhất " + when : ""}</span>`;
+      } else if (s.stale) {
+        usageHtml = ` · <span class="sk-usage sk-stale" title="Javis chỉ đếm được skill nạp qua tool javis_use_skill. Claude Code nạp native qua .claude/skills thì không đếm được, nên đây chỉ là tham khảo - không có nghĩa skill vô dụng.">chưa thấy dùng</span>`;
+      }
       div.innerHTML = `<input type="checkbox" class="sk2-tog" ${on ? "checked" : ""} title="${on ? "Đang bật - bấm để tắt" : "Đang tắt - bấm để bật"}">
-        <div class="sk2-info"><div class="nm">🧩 ${esc(s.name)}${sysBadge}</div><div class="ds">${esc(s.description || "")}</div><div class="gp">📂 ${esc(s.group || "Chung")} · ${esc(s.slug)}${s.source === ".agents" ? " · .agents" : ""}</div></div>
+        <div class="sk2-info"><div class="nm">🧩 ${esc(s.name)}${sysBadge}</div><div class="ds">${esc(s.description || "")}</div><div class="gp">📂 ${esc(s.group || "Chung")} · ${esc(s.slug)}${s.source === ".agents" ? " · .agents" : ""}${usageHtml}</div></div>
         <div class="sk2-act"><button class="edit">Sửa</button>${s.system ? "" : `<button class="exp" title="Xuất gói .zip để chia sẻ">⤓ Xuất</button><button class="del danger">Xoá</button>`}</div>`;
       div.querySelector(".sk2-tog").onchange = (e) => toggleSkill(s, e.target.checked);
       div.querySelector(".edit").onclick = () => openSkillForm(s.slug);

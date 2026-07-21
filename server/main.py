@@ -27,6 +27,13 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 from claude_cli import CodexCLI, claude_engine, find_claude_cli, find_codex_cli, cancel_all, _empty_mcp_file, auth_status as claude_auth_status, auth_login as claude_auth_login, auth_logout as claude_auth_logout, auth_login_ui_start, auth_login_ui_code, mcp_native_add, mcp_native_remove, mcp_native_status, mcp_open_auth_terminal, mcp_native_list
 from graph_builder import build_graph, _color_for, _top_folder, WIKILINK_RE
 import config as cfgmod
+import update_state
+_ver_tuple = update_state.ver_tuple
+_ver_newer = update_state.ver_newer
+_read_update_state = update_state.read_state
+_write_update_state = update_state.write_state
+_record_boot_version = update_state.record_boot_version
+_update_outcome = update_state.update_outcome
 import git_brain
 import engine
 import openai_oauth
@@ -34,6 +41,7 @@ import mcp_store
 import mcp_client
 import mcp_catalog
 import mcp_hub
+import cred_exchange   # đổi credential hộ user (vd App Password -> Google master token) khi đấu
 import plugins_host   # hệ PLUGIN: thư mục Python thả vào, tự thêm tool/hook cho mọi engine qua hub
 import web_security   # chống CSRF-to-localhost + DNS-rebinding cho web API cục bộ
 import image_gen      # tạo ảnh bằng gói ChatGPT (OAuth) - Codex Responses + tool image_generation
@@ -41,8 +49,10 @@ import zalo_login
 import oauth_mcp
 import system_sync   # tầng năng lực HỆ THỐNG (skill/loop mặc định) - update theo phiên bản app
 import skill_router   # nguồn chân lý khám phá skill (canonical <brain>/skills) dùng chung mọi engine
+import skill_usage     # telemetry: đếm skill nào THẬT SỰ được dùng qua javis_use_skill (tín hiệu DƯƠNG một chiều)
 import share_bundle   # xuất/nhập gói agent/skill/workflow (.zip) để chia sẻ giữa brain/người dùng
 import usage_store   # đếm token/chi phí Javis tự đo (đa nhà cung cấp)
+import usage_index   # dashboard token: index log thô Claude+Codex + query summary/insights
 from telegram_bot import TelegramBot, parse_chat_ids as tg_parse_ids
 import channel_context   # metadata kênh + gom file trả về kênh chat (port gateway hermes-agent)
 from sessions import get_store   # kho phiên hội thoại (sqlite + fts5): list/resume/search
@@ -66,7 +76,13 @@ _AUTH_PUBLIC_EXACT = ("/", "/favicon.ico", "/auth/status", "/auth/login", "/auth
                       "/hub/mcp", "/connect/oauth/callback")
 # Endpoint CHỈ-LOCALHOST: agent (Claude CLI chạy cùng máy/container) curl được mà không cần
 # cookie đăng nhập; request từ ngoài (qua Traefik/Caddy/LAN) đến từ IP khác loopback → vẫn bị chặn.
-_AUTH_LOCAL_EXACT = ("/telegram/send-file", "/reminders")
+# /reminders/cancel đi cùng nhóm với /reminders (TẠO nhắc): huỷ là thao tác YẾU HƠN tạo, nên
+# miễn cùng mức là nhất quán chứ không nới rào - thiếu nó thì javis_schedule (plugin in-process,
+# gọi localhost không cookie) huỷ nhắc hẹn LUÔN lỗi 401 khi đã bật mật khẩu (gate_active()=True).
+# /hook/zalo: sidecar `zalo-agent-cli listen` (tiến trình con cùng máy/container) POST sự kiện
+# tin nhắn vào đây - không có cookie. Vẫn KHÔNG hở: ngoài rào loopback này còn phải khớp
+# secret trong header X-Javis-Zalo-Secret (xem zalo_listener.register).
+_AUTH_LOCAL_EXACT = ("/telegram/send-file", "/reminders", "/reminders/cancel", "/hook/zalo")
 
 
 @app.middleware("http")
@@ -180,7 +196,8 @@ def build_system_prompt(brain: str = "brain") -> str:
     system_sync.ensure_synced(root)   # brain nào cũng có đủ năng lực hệ thống (1 lần/process, rẻ)
     try:
         # Mirror skills/ → .claude/skills để fork Claude cwd=brain (workflow/loop/learn/lint) nạp
-        # native được skill viết giữa phiên (rẻ: bỏ qua nếu trùng hash).
+        # native được skill viết giữa phiên (rẻ: cổng chữ ký stat-only bỏ qua nếu cây nguồn
+        # không đổi, xem system_sync._mirror_signature - KHÔNG còn so hash nội dung nữa).
         system_sync.mirror_skills(root)
     except Exception:
         pass
@@ -339,6 +356,12 @@ for _p in (BRAINS_DIR, OBSIDIAN_VAULT_PATH):
 @app.get("/")
 async def root():
     html = (DASHBOARD_PATH / "index.html").read_text(encoding="utf-8")
+    # Ép khoá cache của MỌI file .js/.css theo phiên bản app. Trước đây mỗi file có ?v=NN
+    # gõ tay, và suốt hàng chục bản không ai nhớ tăng console.js?v=72 nên trình duyệt cứ
+    # dùng console.js CŨ trong cache - máy chủ cập nhật thật mà giao diện đóng băng, mọi
+    # sửa đổi frontend trở nên vô hình. Gắn phiên bản vào đây thì mỗi lần bump là tự bể cache.
+    ver = _app_version() or "0"
+    html = re.sub(r'(/static/[\w./-]+\.(?:js|css))\?v=[\w.]+', r'\1?v=' + ver, html)
     return HTMLResponse(html, headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 
 
@@ -705,12 +728,16 @@ def _write_codex_profile():
     return None
 
 
-def _apply_mcp(cli, mode="full"):
+def _apply_mcp(cli, mode="full", brain=None):
     """Gắn MCP do Javis quản lý vào 1 engine Claude (registry rỗng → không đổi gì, dùng MCP sẵn của máy).
     Hub bật: config 1 entry trỏ hub kèm X-Javis-Mode - deny/perm/audit chặn TẠI hub (lớp cứng),
     không cần --disallowedTools. Hub tắt: per-server + --disallowedTools như cũ."""
     try:
         cli.javis_mode = mode   # engine SDK dùng để enforce min_mode plugin in-process
+        # Brain đang làm việc → engine truyền xuống ctx của plugin. KHÔNG suy từ cwd: chat chạy
+        # với cwd=CLAUDE_CWD (gốc project, main.py:318) chứ không phải thư mục brain, nên suy từ
+        # cwd là luôn trượt đúng ở đường chat - nơi bug thật sự xảy ra.
+        cli.javis_vault = _brain_root(brain) if brain else None
         if _hub_enabled():
             cli.mcp_config = mcp_hub.claude_config_path(mode)
             cli.mcp_strict = bool(cfgmod.read_settings().get("mcp", {}).get("strict")) and cli.mcp_config is not None
@@ -744,6 +771,25 @@ def oauth_openai_start():
 @app.post("/oauth/openai/poll")
 def oauth_openai_poll():
     return openai_oauth.poll()
+
+
+# Browser OAuth (Authorization Code + PKCE) - cho Workspace chặn device-code.
+@app.post("/oauth/openai/browser/start")
+def oauth_openai_browser_start():
+    try:
+        return openai_oauth.start_browser()
+    except Exception as e:
+        return JSONResponse({"error": f"{type(e).__name__}: {e}"}, status_code=400)
+
+
+@app.post("/oauth/openai/browser/finish")
+async def oauth_openai_browser_finish(request: Request):
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    callback = (body or {}).get("callback") or (body or {}).get("url") or ""
+    return openai_oauth.finish_browser(callback)
 
 
 @app.post("/oauth/openai/disconnect")
@@ -888,8 +934,15 @@ async def connect_add(request: Request):
     """Thêm tài khoản cho 1 connector trong kho: lưu tạm → VALIDATE ngay (gọi tool xác minh,
     tự lấy tên shop làm label) → key sai thì xoá, không lưu rác."""
     data = await request.json()
-    cid, err = mcp_store.add_connection((data.get("connector_id") or "").strip(), {
-        "label": (data.get("label") or "").strip(), "fields": data.get("fields") or {}})
+    con_id = (data.get("connector_id") or "").strip()
+    # Bước ĐỔI CREDENTIAL (nếu connector khai auth.exchange): vd Google Keep đổi App Password
+    # thành master token ngay tại đây, để người dùng khỏi phải mở terminal. Hàm này LUÔN xoá các
+    # field khai trong `drop` (như app_password) nên thứ đó không bao giờ xuống tới mcp_store.
+    fields, ex_err = cred_exchange.run(mcp_catalog.get(con_id), data.get("fields") or {})
+    if ex_err:
+        return {"ok": False, "error": ex_err}
+    cid, err = mcp_store.add_connection(con_id, {
+        "label": (data.get("label") or "").strip(), "fields": fields})
     if err:
         return {"ok": False, "error": err}
     val = await mcp_hub.validate_connection(cid)
@@ -1214,7 +1267,9 @@ def _do_backup(brain: str = "") -> dict:
     if not (b.get("repo_url") and b.get("token")):
         return {"ok": False, "error": "Chưa cấu hình repo URL + token"}
     mirror = str(cfgmod.STATE_DIR / "brains-backup")   # repo mirror riêng (tránh nested git từng brain)
-    res = git_brain.sync_brains(BRAINS_DIR, mirror, b["repo_url"], b["token"], b.get("branch") or "main")
+    res = git_brain.sync_brains(BRAINS_DIR, mirror, b["repo_url"], b["token"], b.get("branch") or "main",
+                                trash_dir=str(cfgmod.STATE_DIR / "brain-trash"),
+                                protected_names={_default_brain_dir().name})
     # Ghi lại trạng thái (đọc lại cfg mới nhất để không đè thay đổi song song)
     cfg = cfgmod.read_settings()
     cfg.setdefault("backup", {})
@@ -2046,13 +2101,17 @@ async def new_brain(name: str = Form(...)):
         _ensure_brain_scaffold(root)
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+    git_brain.clear_tombstone(BRAINS_DIR, safe)   # dựng lại não cùng tên -> gỡ giấy báo tử để không bị xoá oan
     return {"ok": True, "name": safe, "path": str(root)}
+
+
+_DELETE_SYNC_TASKS = set()   # giữ ref mạnh cho eager-sync sau khi xóa não (tránh GC nuốt task)
 
 
 @app.post("/brains/delete")
 async def delete_brain(name: str = Form(...), confirm: str = Form("")):
-    """Xoá HẲN 1 brain (cả thư mục) - toàn bộ tri thức trong não đó. Yêu cầu confirm == name (gõ tay).
-    CHẶN xoá brain mặc định + chỉ xoá folder NẰM TRONG BRAINS_DIR (không đụng folder ngoài)."""
+    """Xoá 1 brain: CHUYỂN vào thùng rác cục bộ (giữ 30 ngày) + ghi giấy báo tử để lan việc xoá
+    sang mọi máy đồng bộ. Yêu cầu confirm == name. Chặn xoá não mặc định + chỉ trong BRAINS_DIR."""
     safe = _safe_brain_name(name)
     if not safe:
         return JSONResponse({"ok": False, "error": "Tên brain không hợp lệ"}, status_code=400)
@@ -2066,11 +2125,37 @@ async def delete_brain(name: str = Form(...), confirm: str = Form("")):
         return JSONResponse({"ok": False, "error": "Không thể xoá Brain mặc định"}, status_code=400)
     if not root.is_dir():
         return JSONResponse({"ok": False, "error": "Brain không tồn tại"}, status_code=404)
+    trash_dir = str(cfgmod.STATE_DIR / "brain-trash")
+
+    def _trash_and_mark():
+        dest = git_brain.move_to_trash(str(root), trash_dir, safe)   # có retry cho Windows
+        try:
+            git_brain.write_tombstone(BRAINS_DIR, safe)              # giấy báo tử -> lan việc xoá
+        except Exception:
+            # Nguyên tử: ghi giấy báo tử lỗi thì ĐƯA brain trở lại - tránh trạng thái "mất mà không
+            # có tombstone" (lần sync sau _restore_missing_brains sẽ hồi sinh nó).
+            if dest:
+                shutil.move(dest, str(root))
+            raise
+        return dest
+
     try:
-        shutil.rmtree(str(root))
+        dest = await asyncio.to_thread(_trash_and_mark)
     except Exception as e:
-        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
-    return {"ok": True, "name": safe}
+        return JSONResponse({"ok": False, "error": f"Không xoá được (brain đang bận?): {e}"},
+                            status_code=500)
+
+    # Eager sync (nền, best-effort): đẩy lệnh xoá + tombstone lên remote NGAY thay vì chờ chu kỳ 6h.
+    try:
+        _b = cfgmod.read_settings().get("backup", {}) or {}
+        if _b.get("enabled") and _b.get("repo_url") and _b.get("token") and git_brain.has_git():
+            _t = asyncio.create_task(asyncio.to_thread(_do_backup))
+            _DELETE_SYNC_TASKS.add(_t)
+            _t.add_done_callback(_DELETE_SYNC_TASKS.discard)
+    except Exception:
+        pass
+
+    return {"ok": True, "name": safe, "trashed": bool(dest)}
 
 # ============================================================
 # STUDIO - Agents / Skills / Workflows
@@ -2172,7 +2257,33 @@ async def list_skills(brain: str = Query("brain")):
     # NHÓM = field `group` trong frontmatter (mặc định "Chung"). Skill TẮT = <base>/.disabled/<slug>.
     root = _brain_root(brain)
     sys_slugs = system_sync.system_skill_slugs()   # skill HỆ THỐNG (đi theo phiên bản app)
-    out = [{**s, "system": s["slug"] in sys_slugs} for s in skill_router.list_skills(root)]
+    usage = skill_usage.read_usage(root)           # telemetry (tín hiệu DƯƠNG một chiều)
+    now = time.time()
+
+    def _mtime(p):
+        try:
+            return Path(p).stat().st_mtime
+        except OSError:
+            return None
+
+    out = []
+    for s in skill_router.list_skills(root):
+        rec = usage.get(s["slug"])
+        if not isinstance(rec, dict):   # sidecar tay-sửa hỏng dạng: {"slug": "khong-phai-dict"}
+            rec = {}
+        try:
+            use_count = int(rec.get("use_count", 0) or 0)
+        except (TypeError, ValueError):  # vd use_count: "abc" - coi như chưa đếm được, không sập trang
+            use_count = 0
+        out.append({**s,
+                    "system": s["slug"] in sys_slugs,
+                    "use_count": use_count,
+                    "last_used_at": rec.get("last_used_at"),
+                    "pinned": bool(rec.get("pinned", False)),
+                    # stale = "chưa thấy dùng + đủ già". CHỈ để hiển thị tham khảo: skill nạp
+                    # native qua .claude/skills không đi qua bộ đếm nên use=0 KHÔNG có nghĩa
+                    # là vô dụng. Không có gì tự tắt dựa trên cờ này.
+                    "stale": skill_usage.is_stale(rec, _mtime(s["path"]), now)})
     return {"skills": out}
 
 
@@ -2185,7 +2296,9 @@ def _skills_dir(brain):
 @app.post("/skills/toggle")
 async def skill_toggle(slug: str = Form(...), enabled: str = Form(...), brain: str = Form("brain")):
     """Bật/tắt skill = di chuyển folder giữa <brain>/skills/<slug> và <brain>/skills/.disabled/<slug>.
-    Đồng bộ bản mirror .claude/skills (bật→copy, tắt→gỡ) để Claude native cwd=brain khớp trạng thái."""
+    Đồng bộ bản mirror .claude/skills (bật→copy, tắt→gỡ) để Claude native cwd=brain khớp trạng thái.
+    CẢ HAI nhánh đều gọi lại mirror_skills (không chỉ nhánh bật) - xem lý do ở comment trong nhánh
+    tắt bên dưới, đây là chỗ vá CRITICAL 1 của bản 0.9.64 (tắt rồi bật lại làm mất mirror vĩnh viễn)."""
     want = enabled in ("1", "true", "True", "on")
     if not skill_router.valid_slug(slug):   # chống traversal: slug 1 đoạn, dùng cho rmtree/rename bên dưới
         return JSONResponse({"error": "slug không hợp lệ"}, status_code=400)
@@ -2208,8 +2321,18 @@ async def skill_toggle(slug: str = Form(...), enabled: str = Form(...), brain: s
         mirror_slug = Path(root) / ".claude" / "skills" / slug
         if want:
             system_sync.mirror_skills(root)      # bật → tạo/cập nhật bản mirror cho Claude native
-        elif mirror_slug.is_dir():
-            shutil.rmtree(mirror_slug)           # tắt → gỡ mirror để native không còn nạp
+        else:
+            if mirror_slug.is_dir():
+                shutil.rmtree(mirror_slug)       # tắt → gỡ mirror để native không còn nạp
+            # Gọi lại mirror_skills NGAY ở đây, không chỉ chờ lượt gọi tự nhiên kế tiếp (CRITICAL 1
+            # đã vá): rename ở trên vừa đổi cây <root>/skills nên chữ ký của nó đã đổi, và lệnh này
+            # ép cache ghi nhận đúng chữ ký-đã-tắt NGAY LẬP TỨC. Thiếu dòng này: `rename` giữ nguyên
+            # st_mtime_ns/st_size, nên BẬT lại sau đó (rename ngược) làm chữ ký quay về Y HỆT giá
+            # trị cache còn nhớ từ TRƯỚC KHI TẮT (vì tắt chưa từng gọi mirror_skills để cache thấy
+            # trạng thái tắt ở giữa) → tầng 1 tưởng "cây không đổi gì" → bỏ qua → bản mirror vừa
+            # rmtree ở trên KHÔNG BAO GIỜ được tạo lại, cho tới khi khởi động lại tiến trình. Xem
+            # test_system_sync.py (chuỗi tắt->bật) và CHANGELOG 0.9.64.
+            system_sync.mirror_skills(root)
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
     return {"ok": True}
@@ -2242,6 +2365,12 @@ async def save_skill(name: str = Form(...), description: str = Form(""), group: 
     slug = (slug or _ascii_slug(name)).strip()
     if not skill_router.valid_slug(slug):
         return JSONResponse({"error": "Tên skill không hợp lệ"}, status_code=400)
+    # Ép trần description NGAY, trước khi tạo bất cứ thư mục nào -> request bị từ chối không
+    # để lại folder skill rỗng trên đĩa. Router cắt ở SKILL_DESC_MAX nên vượt trần = mất chữ
+    # im lặng; chặn ở đây tốt hơn là ghi bừa rồi để runtime cắt.
+    desc_err = skill_router.validate_description(description)
+    if desc_err:
+        return JSONResponse({"error": desc_err}, status_code=400)
     root = _brain_root(brain)
     try:
         system_sync.migrate_brain(root)   # brain cũ: chuẩn hoá về skills/ trước khi ghi
@@ -2687,6 +2816,7 @@ async def usage_stats():
     """Token/chi phí Javis TỰ ĐO theo nhà cung cấp (hôm nay + tổng). Kèm số dư THẬT của OpenRouter
     nếu có key (provider duy nhất lộ số dư qua API); các provider còn lại API không cho lấy hạn mức."""
     out = usage_store.summary()
+    out["daily"] = usage_store.daily(14)   # chuỗi 14 ngày cho đồ thị trang Mức dùng
     orb = None
     try:
         key = (cfgmod.read_settings().get("model", {}) or {}).get("openrouter_key")
@@ -2705,6 +2835,46 @@ async def usage_stats():
         orb = None
     out["openrouter"] = orb
     return out
+
+
+# ---- Dashboard Token (index log thô Claude + Codex + nhánh API) -----------------------
+@app.get("/usage/summary")
+async def usage_summary(period: str = "this_month", provider: str = "", project: str = "", refresh: int = 1):
+    """Báo cáo token theo kỳ: KPI + breakdown + timeseries, kèm so kỳ trước. refresh=1 (mặc
+    định) quét tăng dần trước khi trả (rẻ khi index đã ấm)."""
+    if refresh:
+        try:
+            await asyncio.to_thread(usage_index.refresh)
+        except Exception:
+            pass
+    try:
+        return usage_index.summary(period=period, provider=provider or None, project=project or None)
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+
+@app.get("/usage/insights")
+async def usage_insights(period: str = "this_month", refresh: int = 0):
+    """Danh sách đề xuất hành động cho kỳ. Mặc định KHÔNG refresh (UI đã refresh ở /usage/summary)."""
+    if refresh:
+        try:
+            await asyncio.to_thread(usage_index.refresh)
+        except Exception:
+            pass
+    try:
+        return {"items": usage_index.insights(period=period)}
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+
+@app.post("/usage/refresh")
+async def usage_refresh():
+    """Quét tăng dần 3 nguồn, trả số file/event xử lý lần này."""
+    try:
+        return await asyncio.to_thread(usage_index.refresh)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
 
 async def execute_workflow(brain, slug, input="", tools=None):
     """Chạy workflow nhiều agent tuần tự, YIELD event dict (KHÔNG bọc SSE). Dùng CHUNG cho:
@@ -2747,6 +2917,18 @@ async def execute_workflow(brain, slug, input="", tools=None):
                 c.mcp_config = _mcpf; c.mcp_strict = True
             c.disallowed_tools = ["Bash", "WebFetch", "WebSearch", "Task"]
             c.max_wall_s = 300
+        else:
+            # Ungated (allowed_tools=None, "chạy full quyền" - Studio bấm nút): plugin in-process
+            # CÓ nạp (claude_sdk_engine._mcp_servers gọi _plugins_server() khi allowed_tools rỗng)
+            # nên PHẢI gắn brain để ctx plugin (vd javis_generate_image) suy đúng vault - thiếu
+            # dòng này thì rơi về Brain Default y hệt bug 0.9.70 đã vá ở đường chat (Nợ 1,
+            # final-fix-gd2). KHÔNG gọi _apply_mcp() ở đây: nhánh này cố ý dựa vào setting_sources
+            # (claude_sdk_engine.py _options(): permission_mode=bypassPermissions +
+            # setting_sources=[user,project,local]) để kế thừa MCP/skill/auth có sẵn của máy như
+            # 1 phiên `claude` tương tác thật - đúng ý đầu file main.py "claude CLI đã cài trên
+            # máy → tự kế thừa MCP". Gọi apply_mcp sẽ ép gắn thêm cấu hình MCP hub, đổi hành vi
+            # ngoài phạm vi lỗi vault_root đang vá.
+            c.javis_vault = vault_root
         return c
 
     def _agent_sysprompt(aslug):
@@ -3008,7 +3190,7 @@ loop_feature = self_improve.register(app, self_improve.LoopDeps(
     mcp_allow_patterns=_loop_mcp_allow,
 ))
 
-_LOOP_LOCK = loop_feature.lock   # shim: giữ tên cũ cho code phía dưới (scheduler/automations)
+_LOOP_LOCK = loop_feature.lock   # shim: giữ tên cũ cho code phía dưới (scheduler)
 
 
 def _read_loop_config():
@@ -3089,6 +3271,119 @@ reminders_feature = reminders_mod.register(app, reminders_mod.RemindersDeps(
 ))
 
 
+# ============================================================
+# LISTENER ZALO LIÊN TỤC (zalo_listener.py) - sidecar `zalo-agent-cli listen`.
+# Connector `zalo` qua MCP là PULL-ONLY và bị mcp_client._IDLE_TTL=600 giết sau 10 phút
+# không dùng, nên nghe liên tục phải có tiến trình sống ĐỘC LẬP với pool MCP: nó POST
+# mỗi tin về /hook/zalo → lọc theo từ khoá → báo Telegram. KHÔNG tự trả lời khách.
+# ============================================================
+import zalo_listener as zalo_listener_mod
+
+zalo_listener_feature = zalo_listener_mod.register(app, zalo_listener_mod.ZaloListenerDeps(
+    read_settings=cfgmod.read_settings,
+    write_settings=cfgmod.write_settings,
+    # Luật từng cuộc chat nằm ở <brain>/Javis/zalo/*.md. Listener là dịch vụ NỀN, không có
+    # khái niệm "brain đang mở", nên luôn đọc brain mặc định.
+    brain_root=lambda: _brain_root(None),
+    # Mọi brain: luật đặt bằng lời qua chat nằm ở brain ĐANG MỞ, không phải brain mặc định.
+    brain_roots=lambda: [str(p) for p in Path(BRAINS_DIR).iterdir()
+                         if p.is_dir() and not p.name.startswith(".")],
+    # enabled_only=False: chủ TẮT được connector Zalo trong kho (tránh va chạm một-socket-mỗi-
+    # tài-khoản) mà listener vẫn chạy được, vì sidecar không đi qua tầng MCP.
+    resolved_conns=lambda: mcp_store.resolved(enabled_only=False),
+    # Listener tự tắt connector Zalo của chính tài khoản đó khi bật (một kết nối mỗi tài
+    # khoản), và bật lại khi dừng nghe.
+    set_conn_enabled=lambda cid, en: mcp_store.update_connection(cid, {"enabled": en}),
+    notify=_notify_owner,                 # báo cho CHỦ (owner_chat rỗng → ID Telegram đầu tiên)
+    port=lambda: _javis_port(),           # định nghĩa phía dưới - lambda nên resolve lúc gọi
+))
+
+
+@app.get("/viec/all")
+async def viec_all():
+    """Gộp MỌI brain cho trang Việc: mỗi brain kèm loop + nhắc hẹn đang chờ, mỗi item gắn
+    brain_name/brain_path để nút thao tác (bật/tắt/xoá/chuyển/huỷ) nhắm ĐÚNG brain của chính
+    item, không phải brain đang chọn ở sidebar. Quét list_brains() (KHÔNG chỉ brain đã đăng ký)
+    để thấy cả việc nằm ở brain chưa từng mở trên dashboard - đây là gốc của cái rối 'tạo qua
+    Telegram vào brain mặc định, tìm ở brain khác không thấy'."""
+    loop_feature.ensure_migrated()
+
+    def _brain_viec(name: str, path: str, is_default: bool) -> dict:
+        try:
+            st_all = loop_feature.read_state(path)
+            loops = []
+            for lp in loop_feature.list_loops(path):
+                v = loop_feature.loop_view(path, lp, st_all)
+                v["brain_name"], v["brain_path"] = name, path
+                loops.append(v)
+        except Exception:
+            loops = []
+        try:
+            rems = []
+            for v in reminders_feature.pending_views(path):
+                v["brain_name"], v["brain_path"] = name, path
+                rems.append(v)
+        except Exception:
+            rems = []
+        if loops or rems:
+            loop_feature.register_brain(path)   # brain có việc → scheduler nền quét
+        return {"name": name, "path": path, "is_default": is_default,
+                "loops": loops, "reminders": rems}
+
+    # Liệt kê thư mục brain RẺ - KHÔNG dùng list_brains() vì nó đếm note bằng rglob("*.md") quét
+    # CẢ cây mỗi brain (vault lớn = vài giây). Trang Việc không cần số note; đếm làm /viec/all chậm
+    # tới mức reverse proxy trên VPS cắt giữa chừng (504) → dashboard báo "không tải được". Đây là
+    # gốc lỗi VPS khách không hiện mà VPS nhẹ hơn vẫn hiện.
+    base = Path(BRAINS_DIR)
+    try:
+        base.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
+    try:
+        default_resolved = _default_brain_dir().resolve()
+    except Exception:
+        default_resolved = None
+    out = []
+    seen = set()
+    try:
+        brain_dirs = sorted((p for p in base.iterdir() if p.is_dir() and not p.name.startswith(".")),
+                            key=lambda x: x.name.lower())
+    except Exception:
+        brain_dirs = []
+    for p in brain_dirs:
+        path = str(p)
+        try:
+            rp = p.resolve()
+            seen.add(str(rp))
+            is_def = default_resolved is not None and rp == default_resolved
+        except Exception:
+            is_def = False
+        out.append(_brain_viec(p.name, path, is_def))
+
+    # Gộp thêm brain đã ĐĂNG KÝ với scheduler nhưng KHÔNG nằm trong BRAINS_DIR (folder ngoài, hoặc
+    # brain legacy trong loop_config). Trước đây chỉ quét list_brains() nên loop tạo qua chat vào
+    # brain ngoài VẪN CHẠY (scheduler quét) mà KHÔNG hiện ở tab Việc → đúng triệu chứng khách báo.
+    try:
+        extra = loop_feature.scheduler_brains()
+    except Exception:
+        extra = []
+    for bident in extra:
+        try:
+            ep = _brain_root(bident)
+            rp = str(Path(ep).resolve())
+        except Exception:
+            continue
+        if rp in seen or not os.path.isdir(ep):
+            continue
+        seen.add(rp)
+        v = _brain_viec(Path(ep).name, ep, False)
+        if v["loops"] or v["reminders"]:   # brain ngoài chỉ hiện khi thực sự có việc (tránh rác)
+            out.append(v)
+
+    return {"brains": out, "running": loop_feature.lock.locked(),
+            "running_slug": loop_feature._running[1] if loop_feature._running else ""}
+
+
 @app.get("/lint")
 async def lint(brain: str = Query("brain")):
     """LINT - health-check Wiki (chỉ đọc, không sửa). Trả danh sách 8 loại vấn đề."""
@@ -3116,190 +3411,22 @@ async def lint(brain: str = Query("brain")):
 
 
 # ============================================================
-# Automations registry (Hướng 1) - lịch tự động: cron / trigger / routine
-# Backend KHÔNG query được CronList/RemoteTrigger của Claude Code → ta lưu file registry
-# trong vault (Javis/automations.json) + chèn sẵn "Vòng lặp tự cải thiện" (loop nội bộ).
+# Trang Việc = loop (việc bền, chạy engine theo chu kỳ) + nhắc hẹn (việc phù du, 1 lần).
+# KHÔNG có registry tay và KHÔNG có endpoint gộp: dashboard đọc thẳng hai nguồn thật là
+# GET /loops và GET /reminders. Tab Lịch cũ (5 route /automations*) đã xoá vì nó chưa từng
+# có executor - _scheduler_loop không đọc nó. Xem spec 2026-07-17-hop-nhat-viec-dinh-ky.
 # ============================================================
-def _automations_path(brain):
-    return Path(_brain_root(brain)) / "Javis" / "automations.json"
-
-
-def _read_automations(brain):
-    p = _automations_path(brain)
-    try:
-        if p.exists():
-            data = json.loads(p.read_text(encoding="utf-8"))
-            if isinstance(data, list):
-                return data
-    except Exception:
-        pass
-    return []
-
-
-def _write_automations(brain, items):
-    p = _automations_path(brain)
-    try:
-        _atomic_write_text(p, json.dumps(items, ensure_ascii=False, indent=2))
-    except Exception as e:
-        print(f"[automations write] {e}", file=__import__('sys').stderr)
-
-
-def _loops_as_routines(brain):
-    """MỌI loop của brain hiện ra trong tab Lịch như routine builtin (id __loop__:<slug>).
-    Toggle được từ Lịch; xoá thì phải sang trang Tự cải thiện (tab Loop)."""
-    out = []
-    try:
-        loop_feature.ensure_migrated()
-        st_all = loop_feature.read_state(brain)
-        for lp in loop_feature.list_loops(brain):
-            v = loop_feature.loop_view(brain, lp, st_all)
-            paused = bool(v["auto_paused_reason"])
-            mode_lbl = "⚠ TOÀN QUYỀN" if v["mode"] == "full" else v["mode"]
-            note = f"{v['goal']} · {mode_lbl}"
-            if v["last_status"]:
-                note += f" · {v['last_status'][:80]}"
-            if paused:
-                note += " · ⚠ tự tạm dừng"
-            out.append({
-                "id": f"__loop__:{v['slug']}", "builtin": True, "name": f"{v['name']}",
-                "type": "routine", "schedule": f"mỗi {v['interval_min']} phút",
-                "status": "active" if (v["enabled"] and not paused) else "paused",
-                "note": note, "last_run": v["last_run"],
-            })
-    except Exception as e:
-        print(f"[automations loops] {type(e).__name__}: {e}", file=__import__('sys').stderr)
-    return out
-
-
-@app.get("/automations")
-async def automations_list(brain: str = Query("brain")):
-    items = _read_automations(brain)
-    builtin = _loops_as_routines(brain) + reminders_feature.pending_as_automations(brain)
-    allitems = builtin + items
-    running = sum(1 for a in allitems if a.get("status") == "active")
-    return {"automations": items, "builtin": builtin, "running": running, "total": len(allitems)}
-
-
-@app.post("/automations")
-async def automations_save(
-    name: str = Form(...), type: str = Form("cron"), schedule: str = Form(""),
-    status: str = Form("active"), note: str = Form(""), id: str = Form(""),
-    brain: str = Form("brain"),
-):
-    items = _read_automations(brain)
-    aid = id or (_slugify(name) + "-" + str(int(time.time()))[-5:])
-    entry = {"id": aid, "name": name, "type": type, "schedule": schedule, "status": status, "note": note}
-    found = False
-    for i, a in enumerate(items):
-        if a.get("id") == aid:
-            items[i] = {**a, **entry}; found = True; break
-    if not found:
-        items.append(entry)
-    _write_automations(brain, items)
-    return {"ok": True, "id": aid}
-
-
-@app.post("/automations/toggle")
-async def automations_toggle(id: str = Form(...), brain: str = Form("brain")):
-    if id.startswith("__reminder__:"):
-        # Tab Lịch chỉ có 1 nút gạt → coi như HUỶ nhắc hẹn (nhắc là 1-lần, không "tạm dừng").
-        async with reminders_feature._io:
-            hit = reminders_feature.cancel(brain, id.split(":", 1)[1])
-        return {"ok": hit, "status": "paused", "error": ("" if hit else "not found")}
-    if id == "__loop__" or id.startswith("__loop__:"):
-        # Toggle loop từ tab Lịch. "__loop__" trần (client cũ) = loop legacy vong-lap-goc.
-        slug = id.split(":", 1)[1] if ":" in id else self_improve.LEGACY_SLUG
-        lp = loop_feature.toggle(brain, slug)
-        if not lp and ":" not in id:
-            # client cũ có thể đang ở brain khác brain legacy → thử brain legacy
-            legacy_brain = _read_loop_config().get("brain") or "brain"
-            lp = loop_feature.toggle(legacy_brain, slug)
-        if not lp:
-            return {"ok": False, "error": "not found"}
-        return {"ok": True, "status": "active" if lp["enabled"] else "paused"}
-    items = _read_automations(brain)
-    for a in items:
-        if a.get("id") == id:
-            a["status"] = "paused" if a.get("status") == "active" else "active"
-            _write_automations(brain, items)
-            return {"ok": True, "status": a["status"]}
-    return {"ok": False, "error": "not found"}
-
-
-@app.post("/automations/delete")
-async def automations_delete(id: str = Form(...), brain: str = Form("brain")):
-    if id.startswith("__reminder__:"):
-        async with reminders_feature._io:
-            hit = reminders_feature.cancel(brain, id.split(":", 1)[1])
-        return {"ok": hit, "error": ("" if hit else "not found")}
-    if id == "__loop__" or id.startswith("__loop__:"):
-        return {"ok": False, "error": "Xóa loop trong tab Loop (trang Tự cải thiện), không xoá từ Lịch"}
-    items = [a for a in _read_automations(brain) if a.get("id") != id]
-    _write_automations(brain, items)
-    return {"ok": True}
-
-
-@app.post("/automations/sync")
-async def automations_sync(brain: str = Form("brain")):
-    """Đồng bộ THẬT (Hướng 2): gọi Claude CLI dùng CronList / list_scheduled_tasks để lấy
-    routine/cron đang chạy trên cloud, upsert vào registry (mục source=cloud)."""
-    try:
-        cli = claude_engine(system_prompt=None, cwd=CLAUDE_CWD, tag="routines")
-        if not cli.is_available():
-            return {"ok": False, "error": "Claude CLI chưa cài"}
-        prompt = (
-            "CHỈ LIỆT KÊ, KHÔNG tạo/sửa/xoá/chạy gì. Gọi tool RemoteTrigger với action='list' "
-            "để lấy danh sách triggers (routines cloud trên claude.ai, endpoint /v1/code/triggers). "
-            "Với mỗi phần tử trong data[], map: id=id, name=name, schedule=cron_expression, "
-            "status=(enabled ? 'active' : 'paused'), type='trigger', next=next_run_at. "
-            'Trả ĐÚNG JSON 1 dòng bọc trong <RESULT>...</RESULT>, không markdown: '
-            '<RESULT>{"routines":[{"id":"","name":"","schedule":"","status":"active|paused","type":"trigger","next":""}]}</RESULT>. '
-            'Không có cái nào → <RESULT>{"routines":[]}</RESULT>.'
-        )
-        final = ""
-        err = ""
-        async for ev in cli.query(prompt):
-            if ev["type"] == "final":
-                final = ev.get("content", "") or final
-            elif ev["type"] == "error":
-                err = ev.get("content", "") or err
-        if not final and err:
-            return {"ok": False, "error": "Claude CLI: " + err[:250]}
-        # Ưu tiên lấy trong <RESULT>...</RESULT>, fallback object JSON ngoài cùng
-        rm = re.search(r"<RESULT>\s*(\{.*?\})\s*</RESULT>", final, re.DOTALL) or re.search(r"\{.*\}", final, re.DOTALL)
-        if not rm:
-            return {"ok": False, "error": "Claude không trả JSON. Có thể CLI nền chưa thấy MCP lịch.",
-                    "raw": (final or err)[:400]}
-        try:
-            routines = json.loads(rm.group(1) if rm.lastindex else rm.group(0)).get("routines", []) or []
-        except (json.JSONDecodeError, AttributeError):
-            return {"ok": False, "error": "Không parse được JSON", "raw": final[:400]}
-        items = [a for a in _read_automations(brain) if a.get("source") != "cloud"]
-        for r in routines:
-            rid = (r.get("id") or _slugify(r.get("name", "routine")))
-            nxt = r.get("next", "")
-            items.append({
-                "id": rid, "name": r.get("name", "(routine)"), "type": r.get("type", "trigger"),
-                "schedule": r.get("schedule", ""), "status": r.get("status", "active"),
-                "note": ("☁ cloud" + (f" · kế tiếp {nxt}" if nxt else "")), "source": "cloud",
-            })
-        _write_automations(brain, items)
-        return {"ok": True, "found": len(routines)}
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
 
 
 # ============================================================
-# JAVIS INDEX - chỉ mục tầng vận hành (agents/skills/workflows/loops/automations).
+# JAVIS INDEX - chỉ mục tầng vận hành (agents/skills/workflows/loops/plugins).
 # Song song wiki/index.md: để MỌI engine (Claude/Codex/OpenRouter) đọc 1 chỗ là hiểu Javis
 # có năng lực gì. SINH TỪ FILE (không sửa tay) → không bao giờ lệch. Ghi Javis/index.md CHỈ KHI
 # nội dung đổi (change-gated → không churn git). Bản LIVE gọn được chèn vào system prompt.
 # ============================================================
 def _gather_capabilities(brain: str) -> dict:
     root = Path(_brain_root(brain))
-    caps = {"agents": [], "skills": [], "workflows": [], "loops": [], "automations": [], "plugins": []}
+    caps = {"agents": [], "skills": [], "workflows": [], "loops": [], "plugins": []}
     ad = _agents_dir(brain)
     if ad.is_dir():
         for f in sorted(ad.glob("*.md")):
@@ -3327,9 +3454,6 @@ def _gather_capabilities(brain: str) -> dict:
                 "paused": bool(st.get(lp["slug"], {}).get("auto_paused_reason"))})
     except Exception:
         pass
-    for a in _read_automations(brain):
-        caps["automations"].append({"id": a.get("id"), "name": a.get("name"), "type": a.get("type"),
-            "schedule": a.get("schedule", ""), "status": a.get("status", "active")})
     try:
         for p in plugins_host.describe(str(root)):
             caps["plugins"].append({"slug": p["slug"], "name": p["name"], "source": p["source"],
@@ -3351,7 +3475,7 @@ def _render_javis_index(caps: dict) -> str:
          "AI/engine đọc 1 chỗ là hiểu Javis làm được gì. Song song `wiki/index.md` (tri thức).", "",
          f"**Tổng quan:** {len(caps['agents'])} agents · {len(caps['skills'])} skills · "
          f"{len(caps['workflows'])} workflows ({n_on_wf} bật) · {len(caps['loops'])} loops ({n_on_loops} bật) · "
-         f"{len(caps['automations'])} lịch · {len(plugins)} plugins ({n_on_plugins} chạy)", ""]
+         f"{len(plugins)} plugins ({n_on_plugins} chạy)", ""]
     L.append("## Agents")
     if caps["agents"]:
         for a in caps["agents"]:
@@ -3386,10 +3510,6 @@ def _render_javis_index(caps: dict) -> str:
             L.append(f"- **{l['name']}** (`{l['slug']}`) - {stt} · {l['goal']}/{l['mode']} · mỗi {l['interval_min']} phút")
     else:
         L.append("_(chưa có)_")
-    if caps["automations"]:
-        L.append("\n## Lịch (automations)")
-        for a in caps["automations"]:
-            L.append(f"- **{a['name']}** - {a['type']} · {a['schedule']} · {a['status']}")
     if plugins:
         L.append("\n## Plugins (tool/hook native cho mọi engine)")
         for p in plugins:
@@ -3485,17 +3605,18 @@ def _skill_router_block(brain: str, root: str) -> str:
     mô tả (trigger) + chỉ rõ 2 cách nạp: tool javis_use_skill (engine API có tool) HOẶC mở thẳng
     file SKILL.md bằng công cụ đọc file (Claude/Codex - dùng ĐƯỜNG DẪN TUYỆT ĐỐI vì cwd có thể là
     /app). Đây là thứ giúp skill chạy trên cả ChatGPT/Codex, không phụ thuộc cơ chế native của Claude.
-    Cap 15 skill để không phình context (nhiều hơn → trỏ Javis/index.md)."""
+    Cap skill_router.SKILL_LIST_MAX để không phình context (nhiều hơn → trỏ Javis/index.md)."""
     metas = skill_router.list_enabled_meta(root)
     if not metas:
         return ""
     sk_dir = skill_router.skills_base(root, canonical=True)
     lines = ["\n\n# === SKILL KHẢ DỤNG (router - dùng được trên MỌI engine) ==="]
-    for s in metas[:15]:
-        desc = (s.get("description") or "").replace("\n", " ")[:100]
+    cap = skill_router.SKILL_LIST_MAX
+    for s in metas[:cap]:
+        desc = (s.get("description") or "").replace("\n", " ")[:skill_router.SKILL_DESC_MAX]
         lines.append(f"- {s['slug']} ({s['name']}): {desc}")
-    if len(metas) > 15:
-        lines.append(f"…(+{len(metas) - 15} skill nữa - xem `Javis/index.md`)")
+    if len(metas) > cap:
+        lines.append(f"…(+{len(metas) - cap} skill nữa - xem `Javis/index.md`)")
     lines.append(
         "CÁCH DÙNG: khi yêu cầu của user KHỚP mô tả 1 skill ở trên, hãy NẠP skill đó rồi LÀM THEO - "
         "gọi tool `javis_use_skill(name=<slug>)` nếu engine có tool này; nếu không, mở file "
@@ -3567,6 +3688,10 @@ async def _start_scheduler():
     _migrate_legacy_brain()   # dữ liệu brain cũ → <BRAINS_DIR>/Brain Default (không mất data)
     _ensure_default_brain()   # brain mặc định có sẵn cấu trúc chuẩn (ghi được trên mount /brains)
     _sync_system_all_brains() # năng lực hệ thống → mọi brain (update theo phiên bản app)
+    try:
+        _record_boot_version(_read_version())   # duy trì last_good/previous cho tính năng lùi bản
+    except Exception:
+        pass
     cfgmod.apply_tool_env()   # secret Cài đặt (key ElevenLabs...) → env cho tool ngoài (video-use)
     try:
         loop_feature.ensure_migrated()   # loop_config.json cũ → Javis/loops/vong-lap-goc.md (1 lần)
@@ -3586,6 +3711,12 @@ async def _start_scheduler():
                   "=" * 66 + "\n", file=_sys.stderr)
     except Exception as e:
         print(f"[auth bootstrap] {e}", file=_sys.stderr)
+    try:
+        # Listener Zalo: chủ đã bật trước đó thì dựng lại sidecar sau khi app khởi động lại
+        # (VPS reboot / cập nhật) - không bắt chủ vào bấm bật tay mỗi lần.
+        await zalo_listener_feature.autostart()
+    except Exception as e:
+        print(f"[zalo listener autostart] {e}", file=_sys.stderr)
 
     async def _scheduler_loop():
         while True:
@@ -3597,6 +3728,12 @@ async def _start_scheduler():
                     await loop_feature.tick()
                 except Exception as lpe:
                     print(f"[loop tick] {type(lpe).__name__}: {lpe}", file=__import__('sys').stderr)
+                # 1b) Listener Zalo: nhắc chủ khi có tin khách quá lâu chưa ai trả lời
+                #     (chế độ nhac-quen). Rẻ - chỉ so mốc thời gian, không gọi model.
+                try:
+                    await zalo_listener_feature.tick()
+                except Exception as zle:
+                    print(f"[zalo tick] {type(zle).__name__}: {zle}", file=__import__('sys').stderr)
                 # 2) Engine tự học: debounce tick (rewire sau lượt) + curator định kỳ
                 try:
                     await learn_feature.tick()
@@ -3679,6 +3816,22 @@ async def browse(path: str = Query("", description="Thư mục cần liệt kê;
         return {"error": str(e), "path": path, "parent": None, "dirs": []}
 
 
+@app.get("/path/exists")
+async def path_exists(path: str = Query("", description="Đường dẫn tuyệt đối cần kiểm tra")):
+    """Kiểm tra RẺ (chỉ os.path) 1 đường dẫn có còn là thư mục không. Dùng cho dropdown chọn
+    brain dọn folder ngoài (📁) đã bị xoá khỏi ổ đĩa khỏi localStorage. Read-only, không liệt kê
+    nội dung (khác /browse) nên nhẹ, gọi được cho nhiều entry lúc nạp trang."""
+    p = (path or "").strip()
+    if not p:
+        return {"path": p, "exists": False, "is_dir": False}
+    try:
+        return {"path": p, "exists": os.path.exists(p), "is_dir": os.path.isdir(p)}
+    except Exception:
+        # Lỗi truy cập (path lạ/ổ đĩa rút) → coi như KHÔNG xác định được, báo exists=None để
+        # frontend GIỮ entry (không tự xoá khi chưa chắc chắn là đã mất).
+        return {"path": p, "exists": None, "is_dir": None}
+
+
 @app.get("/config")
 async def config():
     s = cfgmod.read_settings()
@@ -3705,25 +3858,6 @@ def _read_version() -> str:
     except Exception:
         pass
     return "0.0.0"
-
-
-def _ver_tuple(s):
-    try:
-        parts = [int(x) for x in re.split(r"[.\-]", (s or "").strip().lstrip("vV"))[:3] if x.isdigit()]
-        while len(parts) < 3:
-            parts.append(0)
-        return tuple(parts[:3])
-    except Exception:
-        return None
-
-
-def _ver_newer(latest, cur) -> bool:
-    """So sánh KIỂU SEMVER (không phải string != ) → tránh báo 'có bản mới' nhầm khi local ahead
-    hoặc lệch định dạng, và để tín hiệu 'cập nhật xong' của poll chính xác."""
-    lt, ct = _ver_tuple(latest), _ver_tuple(cur)
-    if lt is None or ct is None:
-        return False
-    return lt > ct
 
 
 def _deploy_mode() -> str:
@@ -3789,22 +3923,99 @@ async def version_info():
     # docker: chỉ tự cập nhật tại chỗ được nếu Watchtower ĐANG chạy (ping thật). Không có →
     # frontend chuyển sang hướng dẫn REDEPLOY. native/windows: git pull tự lo.
     can = mode in ("native", "windows") or (mode == "docker" and await _watchtower_reachable())
+    st = _read_update_state()
     return {"current": cur, "latest": latest, "update_available": avail,
-            "mode": mode, "can_self_update": can, "error": err}
+            "mode": mode, "can_self_update": can, "error": err,
+            "previous_version": st.get("previous_version")}
+
+
+@app.get("/update/status")
+async def update_status():
+    """Trạng thái cập nhật (UI poll để vẽ tiến trình). Đọc update_state.json + ~50 dòng cuối
+    update.log. File sống qua restart nên sau khi server lên lại vẫn báo được kết quả."""
+    st = _read_update_state()
+    tail = ""
+    try:
+        logf = cfgmod.STATE_DIR / "update.log"
+        if logf.exists():
+            lines = logf.read_text(encoding="utf-8", errors="replace").splitlines()
+            tail = "\n".join(lines[-50:])
+    except Exception:
+        tail = ""
+    return {"state": st, "log_tail": tail}
+
+
+_UPDATE_ACTIVE = {"preparing", "pulling", "installing", "restarting", "health_check", "rolling_back"}
+
+
+def _update_recent(started_at, window_s=900) -> bool:
+    """True nếu lần cập nhật đang dở BẮT ĐẦU gần đây (trong window ~15 phút). Guard chỉ chặn khi
+    THỰC SỰ đang chạy; phase 'đang dở' còn sót từ lần cũ (docker để 'restarting' vĩnh viễn, updater
+    chết giữa chừng, máy reboot) thì coi là cũ và CHO chạy lại. Khớp spec: 'phase đang dở VÀ started_at gần đây'.
+    started_at thiếu/hỏng -> coi là cũ (fail-open, tránh brick nút update)."""
+    if not started_at:
+        return False
+    try:
+        import datetime as _dt
+        return (_dt.datetime.now() - _dt.datetime.fromisoformat(started_at)).total_seconds() < window_s
+    except Exception:
+        return False
+
+
+def _git_head(root: str) -> str:
+    try:
+        import subprocess
+        r = subprocess.run(["git", "-C", root, "rev-parse", "HEAD"],
+                           capture_output=True, text=True, timeout=10)
+        return (r.stdout or "").strip() if r.returncode == 0 else ""
+    except Exception:
+        return ""
 
 
 @app.post("/update")
 async def do_update():
-    """Cập nhật lên bản mới nhất. Docker → nhờ Watchtower (chỉ nó có quyền Docker, app KHÔNG).
-    Native/Windows → git pull + restart ở tiến trình TÁCH RỜI (sống độc lập nếu process này bị kill)."""
+    """Cập nhật lên bản mới nhất. Git checkout (windows/native) → spawn updater.py TÁCH RỜI
+    (stop/pull/pip/start/health/rollback). Docker → Watchtower nếu có, không thì hướng dẫn Redeploy."""
     import sys as _sys
+    import subprocess
+    import datetime as _dt
+    now = lambda: _dt.datetime.now().isoformat(timespec="seconds")
+
+    st = _read_update_state()
+    if st.get("phase") in _UPDATE_ACTIVE and _update_recent(st.get("started_at")):
+        return JSONResponse({"ok": False, "error": "Đang cập nhật rồi, chờ chút.",
+                             "phase": st.get("phase")}, status_code=409)
+
+    # Claim NGAY sau guard (KHÔNG có await ở giữa → nguyên tử với event loop) để chặn double-click:
+    # request thứ 2 đọc phase="preparing" (thuộc _UPDATE_ACTIVE) sẽ bị 409.
+    _write_update_state({"phase": "preparing", "result": None, "error": None,
+                         "old_version": None, "old_sha": None, "target_version": None,
+                         "started_at": now(), "finished_at": None})
+
     mode = _deploy_mode()
+    cur = _read_version()
+    latest = None
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=8) as client:
+            r = await client.get(f"https://raw.githubusercontent.com/{GITHUB_REPO}/main/VERSION")
+            if r.status_code == 200:
+                latest = (r.text or "").strip() or None
+    except Exception:
+        latest = None
+
     if mode == "docker":
         if not await _watchtower_reachable():
+            _write_update_state({"phase": "idle"})   # nhả claim, không kẹt "preparing"
             return JSONResponse({"ok": False,
-                "error": "Bản Docker cập nhật bằng cách REDEPLOY để kéo image mới nhất: trên Hostinger bấm nút Redeploy trong Docker Manager; trên VPS chạy lại lệnh dưới.",
-                "manual": "docker compose up -d --pull always"}, status_code=400)
+                "error": "Bản Docker cập nhật bằng REDEPLOY để kéo image mới: trên Hostinger bấm Redeploy trong Docker Manager; trên VPS chạy lệnh dưới. Nếu bản mới lỗi, pin tag phiên bản cũ rồi Redeploy để lùi.",
+                "manual": "docker compose up -d --pull always",
+                "current": cur, "latest": latest,
+                "previous_version": st.get("previous_version")}, status_code=400)
         token = os.getenv("WATCHTOWER_TOKEN", "")
+        _write_update_state({"phase": "restarting", "old_version": cur, "target_version": latest,
+                             "old_sha": None, "result": None, "error": None, "stashed": False,
+                             "started_at": now(), "finished_at": None})
         import asyncio
         import httpx
 
@@ -3815,36 +4026,36 @@ async def do_update():
                                       headers={"Authorization": f"Bearer {token}"})
             except Exception as e:
                 print(f"[update] watchtower trigger: {e}", file=_sys.stderr)
-        t = asyncio.create_task(_trigger())      # giữ ref → không bị GC
+        t = asyncio.create_task(_trigger())
         _UPDATE_TASKS.add(t)
         t.add_done_callback(_UPDATE_TASKS.discard)
         return {"ok": True, "mode": "docker", "message": "Đang kéo image mới + khởi động lại (~20-40s)."}
 
-    # native / windows - chỉ tự cập nhật được nếu là git checkout
+    # git checkout (windows / native)
     root = str(PROJECT_ROOT)
     if not _is_git_checkout(root):
+        _write_update_state({"phase": "idle"})   # nhả claim, không kẹt "preparing"
         return JSONResponse({"ok": False,
             "error": "Thư mục cài đặt không phải git checkout → không tự cập nhật được. Cài lại bằng 'git clone' hoặc cập nhật thủ công.",
             "manual": "./update.sh"}, status_code=400)
+    old_sha = _git_head(root)
+    _write_update_state({"phase": "preparing", "old_version": cur, "old_sha": old_sha,
+                         "target_version": latest, "result": None, "error": None, "stashed": False,
+                         "started_at": now(), "finished_at": None})
     try:
-        import subprocess
-        logf = str(cfgmod.STATE_DIR / "update.log")
+        py = _sys.executable
+        updater = str(PROJECT_ROOT / "server" / "updater.py")
+        port = os.getenv("JAVIS_PORT", "7777")
+        args = [py, updater, "--old-sha", old_sha, "--old-version", cur,
+                "--target", latest or "", "--port", str(port)]
         if mode == "windows":
-            # Updater TÁCH RỜI (DETACHED): git pull ghi log rồi relaunch - không chết theo process này.
-            bat = str(cfgmod.STATE_DIR / "_selfupdate.bat")
-            with open(bat, "w", encoding="utf-8") as f:
-                f.write("@echo off\r\n")
-                f.write(f'cd /d "{root}"\r\n')
-                f.write(f'git pull --ff-only > "{logf}" 2>&1\r\n')
-                f.write('wscript.exe "start-javis.vbs"\r\n')
-            subprocess.Popen(["cmd", "/c", bat], cwd=root,
-                             creationflags=0x00000008 | 0x00000200)  # DETACHED_PROCESS|NEW_PROCESS_GROUP
+            subprocess.Popen(args, cwd=root, creationflags=0x00000008 | 0x00000200)  # DETACHED|NEW_GROUP
         else:
-            with open(logf, "w", encoding="utf-8") as lf:
-                subprocess.Popen(["bash", "update.sh", "native"], cwd=root,
-                                 stdout=lf, stderr=lf, start_new_session=True)
-        return {"ok": True, "mode": mode, "message": "Đang cập nhật + khởi động lại (log: update.log)."}
+            subprocess.Popen(args, cwd=root, start_new_session=True)
+        return {"ok": True, "mode": mode,
+                "message": "Đang cập nhật + khởi động lại (theo dõi ở thanh tiến trình)."}
     except Exception as e:
+        _write_update_state({"phase": "error", "result": "error", "error": str(e), "finished_at": now()})
         return JSONResponse({"ok": False, "error": str(e), "manual": "./update.sh"}, status_code=500)
 
 
@@ -4455,7 +4666,7 @@ async def websocket_endpoint(ws: WebSocket):
                 # ===== PROVIDER anthropic-cli - qua Claude Code, đầy đủ MCP / skill / session =====
                 cli.system_prompt = sysprompt
                 cli.model = api_model or mcfg.get("claude_model") or None   # alias opus/sonnet/haiku/fable
-                _apply_mcp(cli)   # gắn MCP do Javis quản lý (nhiều shop POSCake...)
+                _apply_mcp(cli, brain=brain)   # gắn MCP do Javis quản lý (nhiều shop POSCake...)
                 async for event in cli.query(_cli_think(reasoning, user_message)):
                     etype = event["type"]
                     if etype == "tool_call":
@@ -4592,6 +4803,33 @@ _TG_BOT = None
 #    "brain": str|None}       # brain RIÊNG của phiên (path); None = brain mặc định (theo Settings)
 _TG_SESS = {}
 
+# Map BỀN chat_id -> TÊN brain, sống sót qua restart (khác _TG_SESS bị .clear() mỗi lần bot bật
+# lại). Lưu theo TÊN (không phải path tuyệt đối) để bền qua Docker/local + brain đổi chỗ; đọc mới
+# resolve tên -> path. Ghi STATE_DIR/tg_brain.json (server state, gitignored, xuyên brain).
+_TG_BRAIN_PATH = cfgmod.STATE_DIR / "tg_brain.json"
+
+
+def _tg_load_brain_map() -> dict:
+    try:
+        if _TG_BRAIN_PATH.exists():
+            d = json.loads(_TG_BRAIN_PATH.read_text(encoding="utf-8"))
+            if isinstance(d, dict):
+                return {str(k): str(v) for k, v in d.items()}
+    except Exception:
+        pass
+    return {}
+
+
+_TG_BRAIN_MAP = _tg_load_brain_map()
+
+
+def _tg_save_brain_map() -> None:
+    try:
+        _atomic_write_text(_TG_BRAIN_PATH, json.dumps(_TG_BRAIN_MAP, ensure_ascii=False, indent=2))
+    except Exception as e:
+        import sys
+        print(f"[tg brain map write] {type(e).__name__}: {e}", file=sys.stderr)
+
 
 def _tg_session(chat_id):
     """Lấy (tạo nếu chưa có) phiên riêng của 1 chat_id. chat_id rỗng → gộp vào 'default'."""
@@ -4604,20 +4842,34 @@ def _tg_session(chat_id):
 
 
 def _tg_brain(chat_id):
-    """Brain của phiên Telegram này: phiên đã /brain thì dùng brain đó (nếu folder còn),
-    chưa chọn thì rơi về brain mặc định (cấu hình loop/Settings) - hành vi cũ."""
-    sess = _TG_SESS.get(str(chat_id or "default")) or {}
+    """Brain của phiên Telegram này. Ưu tiên: phiên sống (RAM) -> map BỀN (chat đã /brain, kể cả
+    trước restart) -> brain mặc định (Settings/loop). Map bền lưu TÊN brain nên brain đã xoá/đổi
+    tên thì tự dọn entry cũ và rơi về mặc định, không kẹt vào brain không còn."""
+    key = str(chat_id or "default")
+    sess = _TG_SESS.get(key) or {}
     b = sess.get("brain")
     if b and os.path.isdir(b):
         return b
+    name = _TG_BRAIN_MAP.get(key)
+    if name:
+        p = str(Path(BRAINS_DIR) / name)
+        if os.path.isdir(p):
+            return p
+        _TG_BRAIN_MAP.pop(key, None)   # brain đã biến mất → dọn, khỏi kẹt
+        _tg_save_brain_map()
     return _read_loop_config().get("brain", "brain")
 
 
 def _tg_set_brain(chat_id, brain_path):
     """Đổi brain cho 1 phiên Telegram + reset ngữ cảnh (brain khác = bộ nhớ/skill khác,
-    giữ mạch cũ sẽ trộn tri thức 2 vault)."""
+    giữ mạch cũ sẽ trộn tri thức 2 vault). Ghi cả phiên sống lẫn map BỀN để sống qua restart."""
     sess = _tg_session(chat_id)
     sess["brain"] = str(brain_path)
+    try:
+        _TG_BRAIN_MAP[str(chat_id or "default")] = Path(str(brain_path)).name
+        _tg_save_brain_map()
+    except Exception:
+        pass
     if sess.get("cli"):
         sess["cli"].reset_session()
     sess["or"] = None
@@ -4692,7 +4944,9 @@ async def _tg_answer(text, meta=None, progress=None):
         # nên dùng compact_mem - bản in-memory của cơ chế nén dashboard: phần cũ vào tóm tắt
         # thay vì bị trim cứng bỏ mất, hết mất trí nhớ khi phiên dài / đổi từ Claude sang API.
         sess["or"] = await compaction.compact_mem(sess["or"], prov, api_key, api_model, _api_stream)
-        return out   # engine API không có tool ghi file → không có gì để đính kèm
+        # Telegram là kênh chữ thuần: hạ khối điều khiển xuống chữ, đừng để lọt cụm thô.
+        # Lọc lúc TRẢ, không lọc trước khi append vào sess["or"]: lịch sử của model giữ nguyên bản gốc.
+        return channel_context.strip_control_blocks(out)   # engine API không có tool ghi file → không có gì để đính kèm
     else:
         if sess["cli"] is None:
             # tag riêng theo chat → /stop chỉ giết đúng subprocess của chat này, không đụng người khác
@@ -4700,7 +4954,7 @@ async def _tg_answer(text, meta=None, progress=None):
         cli = sess["cli"]
         cli.system_prompt = sysprompt
         cli.model = api_model or mcfg.get("claude_model") or None
-        _apply_mcp(cli)
+        _apply_mcp(cli, brain=brain)
         t0 = time.time()
         written = []   # file agent ghi bằng tool Write trong lượt này (ứng viên auto-gửi)
         out = ""
@@ -4723,10 +4977,14 @@ async def _tg_answer(text, meta=None, progress=None):
                     _pinged = True; await _p("✍ Đang soạn câu trả lời…")
             elif et == "error":
                 return "⚠ " + ev["content"]
-        # File sinh ra trong lượt → bot gửi đính kèm SAU câu trả lời (xem telegram_bot._handle_turn)
+        # File sinh ra trong lượt → bot gửi đính kèm SAU câu trả lời (xem telegram_bot._handle_turn).
+        # vault_root = brain phiên này: ảnh Javis tạo nhúng dạng ![](attachments/x.png) (path tương
+        # đối) được resolve về gốc vault để tự đính kèm về ĐÚNG người đang chat, khỏi phải curl.
         files = channel_context.collect_turn_files(out, written, t0,
-                                                   cwd=CLAUDE_CWD, exclude=sess["sent"])
-        return {"text": out, "files": files}
+                                                   cwd=CLAUDE_CWD, exclude=sess["sent"],
+                                                   vault_root=_brain_root(brain))
+        # Lọc SAU collect_turn_files: hàm đó dò đường dẫn file trong text gốc, lọc trước là mất dấu.
+        return {"text": channel_context.strip_control_blocks(out), "files": files}
 
 
 async def _tg_help_text(brain):
@@ -5137,7 +5395,8 @@ async def telegram_send_file(payload: dict = Body(...)):
     (miễn đăng nhập qua _AUTH_LOCAL_EXACT - request từ ngoài vẫn bị chặn).
     Body: {"path": "<đường dẫn tuyệt đối>", "caption": "<mô tả ngắn>", "chat_id": "<id người hỏi>"}.
     ĐA PHIÊN: có chat_id (và trong whitelist) → gửi ĐÚNG người đang hỏi + dedupe theo phiên họ;
-    thiếu chat_id → gửi chủ bot (ID đầu whitelist) như cũ."""
+    thiếu chat_id → gửi chủ bot (ID đầu whitelist) như cũ. Ảnh/tệp Javis tạo trong lượt nay tự đính
+    kèm về đúng người qua auto-attach (collect_turn_files), nên đường curl này ít khi cần cho chat."""
     path = str((payload or {}).get("path", "")).strip().strip('"')
     caption = str((payload or {}).get("caption", "")).strip()
     chat_id = str((payload or {}).get("chat_id", "")).strip()
@@ -5176,6 +5435,13 @@ async def _warm_mcp_hub():
 @app.on_event("shutdown")
 async def _shutdown_mcp_pool():
     """Đóng các session MCP sống lâu (stdio subprocess, httpx client) khi server tắt."""
+    # Listener Zalo TRƯỚC: nó cần được đóng tử tế để phía Zalo thả phiên ra. Bị giết đột
+    # ngột thì phiên cũ còn treo và lần bật sau báo trùng phiên, chủ tưởng hỏng phải quét
+    # QR lại. Đây chính là triệu chứng "cập nhật xong là báo đỏ".
+    try:
+        zalo_listener_feature.shutdown()
+    except Exception as e:
+        print(f"[zalo listener shutdown] {e}", file=__import__('sys').stderr)
     try:
         await mcp_client.pool.close_all()
     except Exception:

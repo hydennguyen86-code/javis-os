@@ -34,9 +34,15 @@
 
   var side = null, listEl = null, searchEl = null, searchTimer = null, refreshTimer = null;
 
+  // Danh sách chỉ hiện PAGE mục đầu, bấm "Xem thêm" mở thêm PAGE nữa.
+  // shown = số mục đang hiện; giữ nguyên qua các lần refresh, chỉ reset khi đổi brain.
+  var PAGE = 20, shown = PAGE, lastBrain = null;
+
   function mount(container) {
     if (!container) return;
     side = container;
+    shown = PAGE;
+    lastBrain = brain();
     side.innerHTML =
       '<button class="cside-new" type="button">＋ Hội thoại mới</button>' +
       '<input class="cside-search" placeholder="Tìm trong mọi hội thoại…">' +
@@ -57,6 +63,8 @@
 
   function refresh() {
     if (!side) return;
+    var b = brain();
+    if (b !== lastBrain) { lastBrain = b; shown = PAGE; }
     // debounce nhẹ: response + notifySessions có thể bắn sát nhau
     clearTimeout(refreshTimer);
     refreshTimer = setTimeout(function () {
@@ -78,19 +86,24 @@
 
   async function loadList() {
     if (!listEl) return;
-    listEl.innerHTML = '<div class="cside-empty">Đang tải…</div>';
+    // Chỉ hiện "Đang tải…" lần đầu; các lần sau giữ danh sách cũ cho khỏi nháy.
+    if (!listEl.children.length) listEl.innerHTML = '<div class="cside-empty">Đang tải…</div>';
     try {
-      var r = await fetch("/sessions?brain=" + encodeURIComponent(brain()) + "&limit=100");
+      // Lấy dư 1 mục để biết còn hội thoại phía sau hay không.
+      var r = await fetch("/sessions?brain=" + encodeURIComponent(brain()) + "&limit=" + (shown + 1));
       var data = await r.json();
-      renderList(data.sessions || []);
+      var items = data.sessions || [];
+      renderList(items.slice(0, shown), items.length > shown);
     } catch (e) { listEl.innerHTML = '<div class="cside-empty">Lỗi tải danh sách.</div>'; }
   }
 
-  function renderList(items) {
+  function renderList(items, hasMore) {
     if (!items.length) {
       listEl.innerHTML = '<div class="cside-empty">Chưa có hội thoại nào.<br>Bấm ＋ để bắt đầu.</div>';
       return;
     }
+    // Bấm "Xem thêm" render lại từ đầu → giữ chỗ cuộn để không bị nhảy lên trên.
+    var keepScroll = listEl.scrollTop;
     listEl.innerHTML = "";
     var cur = currentId(), lastGroup = null;
     items.forEach(function (s) {
@@ -115,6 +128,12 @@
       };
       listEl.appendChild(item);
     });
+    if (hasMore) {
+      var more = el('<button class="cside-more" type="button">Xem thêm ' + PAGE + '</button>');
+      more.onclick = function () { shown += PAGE; loadList(); };
+      listEl.appendChild(more);
+    }
+    listEl.scrollTop = keepScroll;
   }
 
   async function doSearch(q) {

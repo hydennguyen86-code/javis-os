@@ -4,7 +4,8 @@
 
 Không cần pytest, không chạm mạng. Tự cô lập STATE_DIR sang thư mục tạm.
 Phủ: hash mật khẩu, require_login fail-closed, session TTL, setup token, mã hoá secret at rest,
-secrets_store roundtrip, ma trận quyền MCP, chống path traversal, quyết định CSRF/DNS-rebinding.
+secrets_store roundtrip, ma trận quyền MCP, chống path traversal, quyết định CSRF/DNS-rebinding,
+rào _AUTH_LOCAL_EXACT (endpoint chỉ-localhost miễn đăng nhập).
 """
 import os
 import sys
@@ -19,6 +20,7 @@ import secrets_store           # noqa: E402
 import mcp_catalog             # noqa: E402
 import mcp_hub                 # noqa: E402
 import web_security            # noqa: E402
+import main                    # noqa: E402
 
 _fails = []
 
@@ -139,6 +141,35 @@ check("no-auth + host IP → cho qua",
       web_security.csrf_decision("GET", "192.168.1.9:7777", None, False) is None)
 check("đã bật auth + host lạ → cho qua (không khoá nhầm deploy)",
       web_security.csrf_decision("GET", "some-domain.com", None, True) is None)
+
+# ---- 10. Rào _AUTH_LOCAL_EXACT: /reminders/cancel phải được miễn đăng nhập localhost ----
+# Lỗi Important vừa vá: _AUTH_LOCAL_EXACT trước đây chỉ có ("/telegram/send-file", "/reminders"),
+# thiếu "/reminders/cancel". main.py:94 khớp CHÍNH XÁC theo path (không phải prefix), nên khi đã
+# bật mật khẩu (gate_active()=True) thì javis_schedule op=cancel (httpx.post từ localhost, không
+# cookie) LUÔN 401 dù POST /reminders (TẠO nhắc) đã được miễn cùng nhóm. Huỷ là thao tác YẾU HƠN
+# tạo nên miễn cùng mức là nhất quán, không phải nới rào.
+check("rào: /reminders/cancel được miễn đăng nhập localhost",
+      "/reminders/cancel" in main._AUTH_LOCAL_EXACT)
+check("rào: /reminders (tạo nhắc) vẫn còn được miễn (không mất khi thêm /reminders/cancel)",
+      "/reminders" in main._AUTH_LOCAL_EXACT)
+# Nguyên tắc rào: một path KHÔNG có mặt trong tuple thì KHÔNG được miễn - vd /loops (route ghi
+# self_improve; chính plugin javis_schedule đã lý luận "KHÔNG dùng POST /loops vì cần đăng nhập").
+check("rào: /loops KHÔNG nằm trong _AUTH_LOCAL_EXACT (path lạ không tự nhiên được miễn)",
+      "/loops" not in main._AUTH_LOCAL_EXACT)
+# /hook/zalo: sidecar `zalo-agent-cli listen` là tiến trình CON cùng máy, POST sự kiện tin nhắn
+# vào đây mà không có cookie. Miễn loopback là BẮT BUỘC, nhưng loopback KHÔNG đủ làm rào (tiến
+# trình khác trên cùng VPS cũng là loopback) → tầng hai là secret trong header, xem test_zalo_listener.
+check("rào: /hook/zalo được miễn đăng nhập localhost (sidecar không có cookie)",
+      "/hook/zalo" in main._AUTH_LOCAL_EXACT)
+import zalo_listener as _zl  # noqa: E402
+check("rào: /hook/zalo còn tầng hai là secret header (loopback một mình không đủ)",
+      bool(_zl.SECRET_HEADER) and "secret" in _zl.DEFAULT_CFG)
+# Tin Zalo do NGƯỜI LẠ soạn và được chuyển thẳng vào Telegram của chủ. _notify_owner phải
+# gửi PLAIN TEXT: nếu ai đó thêm parse_mode như telegram_bot._send (MarkdownV2) thì chữ
+# trong tin khách sẽ dựng được markup, mở đường giả dạng lời của Javis.
+import inspect  # noqa: E402
+check("rào: _notify_owner gửi plain text, KHÔNG parse_mode (tin người lạ không dựng được markup)",
+      "parse_mode" not in inspect.getsource(main._notify_owner))
 
 print()
 if _fails:

@@ -1,10 +1,18 @@
 ---
 name: HTML sang Webcake
-description: Kích hoạt khi người dùng muốn CHUYỂN một file/đoạn HTML thành file Webcake (.pke) để upload lên Webcake chỉnh sửa (vd "chuyển file html này sang webcake", "đổi html thành pke", "tạo file webcake từ html", "làm landing này thành file sửa được trên webcake", "html to webcake", "convert html sang webcake"). Đọc HTML, tái dựng thành page_source đúng khuôn Webcake rồi xuất .pke.
+description: Chuyển HTML sang file Webcake .pke để tải lên Webcake chỉnh sửa tiếp.
 group: Marketing
 ---
 
 # HTML sang Webcake (.pke)
+
+## Khi nào dùng
+
+Kích hoạt khi người dùng nói những câu như: "chuyển file html này sang webcake",
+"đổi html thành pke", "tạo file webcake từ html", "làm landing này thành file sửa được
+trên webcake", "html to webcake", "convert html sang webcake".
+
+Việc skill làm: đọc HTML, tái dựng thành page_source đúng khuôn Webcake rồi xuất .pke.
 
 Biến một trang HTML thành **file `.pke`** mở và sửa được trong trình dựng trang Webcake.
 

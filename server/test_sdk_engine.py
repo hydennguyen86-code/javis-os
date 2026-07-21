@@ -123,7 +123,9 @@ async def _fake_call(args):
     return f"kq:{(args or {}).get('x', '')}"
 
 _orig_pt, _orig_hooks = plugins_host.plugin_tools, plugins_host.has_tool_hooks
-plugins_host.plugin_tools = lambda mode, vr: (
+# chữ ký thật giờ có thêm keyword-only scope_vault (xem plugins_host.plugin_tools) -
+# mock phải nhận được, không thì _plugins_server gọi kèm scope_vault=False sẽ vỡ TypeError.
+plugins_host.plugin_tools = lambda mode, vr, *, scope_vault=True: (
     [{"fn": "vd_tool", "server": "javis", "name": "vd_tool", "description": "tool ví dụ",
       "schema": {"type": "object", "properties": {"x": {"type": "string"}}}}],
     {"vd_tool": {"call": _fake_call}})

@@ -17,7 +17,7 @@ Bốn kiểu nhiệm vụ có sẵn:
 | Cải thiện Javis | `product` | Đọc log hội thoại gần đây rồi đề xuất hoặc tạo agent, workflow, hoặc ghi note cải tiến trải nghiệm. |
 | Tự định nghĩa | `custom` | Bạn tự mô tả nhiệm vụ cụ thể bằng lời của mình (xem phần bên dưới). |
 
-Trang này khác với trang [Lịch & tự động hoá](12-lich-tu-dong-hoa.md): trang đó quản lý các cron/trigger/routine chạy trên cloud của Claude. Trang "Tự cải thiện" là **vòng lặp nội bộ** chạy ngay trong server Javis của bạn. Thực tế, vòng lặp này cũng hiện ra ở trang Lịch dưới tên "Vòng lặp tự cải thiện" (một routine gắn cứng, chỉ bật/tắt được chứ không xoá).
+Trang "Tự cải thiện" là **vòng lặp nội bộ** chạy ngay trong server Javis của bạn. Loop này, cùng các loop khác và các nhắc hẹn đang chờ, đều hiện chung ở trang **Việc định kỳ** trên thanh điều hướng.
 
 ## Mở ở đâu trong Javis
 
@@ -171,11 +171,10 @@ Nói cách khác, tệ nhất thì nó tạo ra một note nháp không hay; nó
 
 **Kiểm chứng báo "✗ Chưa đạt".** Nghĩa là bước tự soi thấy việc Javis vừa làm chưa ổn (ví dụ bịa số, sai quy ước Wiki). Đọc lý do trong nhật ký, mở file liên quan qua [Quản lý tệp tin](05-quan-ly-tep-tin.md) để kiểm tra và sửa tay nếu cần.
 
-**Muốn bật/tắt nhanh mà không vào trang này.** Vòng lặp cũng hiện ở trang [Lịch & tự động hoá](12-lich-tu-dong-hoa.md) dưới tên "Vòng lặp tự cải thiện", nơi bạn bật/tắt nó như một routine (nhưng không xoá được).
+**Muốn bật/tắt nhanh mà không vào trang này.** Vòng lặp cũng hiện trong danh sách loop ở trang **Việc định kỳ**, mỗi thẻ loop có sẵn nút **Bật/Tắt** để gạt nhanh mà không cần mở lại cấu hình đầy đủ.
 
 ## Xem thêm
 
-- [Lịch & tự động hoá](12-lich-tu-dong-hoa.md) - cron, trigger, routine chạy trên cloud (khác với vòng lặp nội bộ ở trang này).
 - [Second Brain: bộ nhớ, Wiki, INGEST](13-second-brain-bo-nho-wiki.md) - hiểu về Wiki mà LINT kiểm tra.
 - [MCP & số liệu kinh doanh](09-mcp-va-so-lieu.md) - đấu nối số liệu cho nhiệm vụ Kinh doanh.
 - [Models & engine](10-models-va-engine.md) - chọn model phụ cho việc chạy nền.

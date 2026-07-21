@@ -7,51 +7,81 @@
   <!-- Favicon = logo hiện tại (/brand-logo): mặc định theo logo.png, và tự đổi theo ảnh user tải lên. -->
   <link rel="icon" href="/brand-logo?v=5">
   <link rel="apple-touch-icon" href="/brand-logo?v=5">
-  <link rel="stylesheet" href="/static/style.css?v=41">
-  <link rel="stylesheet" href="/static/console.css?v=15">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="/static/style.css?v=48">
+  <link rel="stylesheet" href="/static/console.css?v=27">
+  <!-- Áp tông đã lưu TRƯỚC khi vẽ để không nháy tối-đậm rồi mới đổi sang tối-nhạt -->
+  <script>(function(){try{if(localStorage.getItem('javis.theme')==='dim')document.documentElement.setAttribute('data-theme','dim');}catch(e){}})();</script>
 </head>
 <body>
   <div class="hud">
 
     <!-- ===== TOP BAR ===== -->
     <header class="hud-top">
-      <div class="brand"><span class="brand-icon"><img src="/brand-logo" alt="" style="width:22px;height:22px;border-radius:5px;vertical-align:middle;object-fit:cover"></span> <span class="brand-text">JAVIS OS</span></div>
-      <!-- Select Brain: dời từ góc graph lên navbar (trái) -->
-      <div class="orb-graph-ctl navbar-brain">
-        <select id="graphSource" class="graph-select">
-          <option value="brain">Brain Default</option>
-        </select>
-        <button class="graph-folder-btn" id="newBrainBtn" title="Tạo brain mới trong thư mục brains">➕</button>
-        <button class="graph-folder-btn" id="delBrainBtn" title="Xoá brain đang chọn (xác nhận gõ đúng tên)">🗑</button>
-        <button class="graph-folder-btn" id="pickFolderBtn" title="Chọn brain từ folder ngoài bất kỳ">📁</button>
-        <span class="graph-stats" id="graphStats">-</span>
+      <!-- Mobile-only: mở ngăn kéo điều hướng -->
+      <button class="hud-icon-btn nav-toggle-btn" id="navToggle" title="Menu" aria-label="Mở menu">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/>
+        </svg>
+      </button>
+      <!-- NHÓM TRÁI: thương hiệu + chọn brain + số liệu (bám trái) -->
+      <div class="hud-top-left">
+        <div class="brand"><span class="brand-icon"><img src="/brand-logo" alt="" style="width:22px;height:22px;border-radius:5px;vertical-align:middle;object-fit:cover"></span> <span class="brand-text">JAVIS OS</span></div>
+        <!-- Select Brain: dời từ góc graph lên navbar -->
+        <div class="orb-graph-ctl navbar-brain">
+          <select id="graphSource" class="graph-select">
+            <option value="brain">Brain Default</option>
+          </select>
+          <button class="graph-folder-btn" id="newBrainBtn" title="Tạo brain mới trong thư mục brains">➕</button>
+          <button class="graph-folder-btn" id="delBrainBtn" title="Xoá brain đang chọn (xác nhận gõ đúng tên)">🗑</button>
+          <button class="graph-folder-btn" id="pickFolderBtn" title="Chọn brain từ folder ngoài bất kỳ">📁</button>
+          <span class="graph-stats" id="graphStats">-</span>
+        </div>
       </div>
+      <!-- NHÓM GIỮA: tên workspace + ngày (căn giữa) -->
       <div class="hud-center-title">
         <span class="ws-name" id="workspaceName">Javis OS</span>
         <span class="ws-date" id="currentDate"></span>
       </div>
-      <div class="hud-actions">
-        <button class="studio-open-btn" id="studioOpenBtn" title="Studio - Agents, Skills, Workflows">▦ Studio</button>
-        <button class="hud-icon-btn" id="settingsBtn" title="Cài đặt">
+      <!-- NHÓM PHẢI: nút đổi tông (LUÔN hiện) + cụm nút cockpit (ẩn ở trang quản lý) -->
+      <div class="hud-top-right">
+        <button class="hud-icon-btn" id="themeToggle" title="Đổi tông tối đậm / tối nhạt">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/>
-            <line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/>
-            <line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/>
-            <line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>
+            <circle cx="12" cy="12" r="9"/>
+            <path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor" stroke="none"/>
           </svg>
         </button>
-        <!-- Voice/tốc độ đã dời xuống sidebar phải (mục CÀI ĐẶT NHANH). -->
-        <button class="hud-icon-btn" id="ttsToggle" title="Bật/tắt giọng Javis">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M11 5L6 9H2v6h4l5 4V5z"/>
-            <path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"/>
-          </svg>
-        </button>
-        <button class="hud-icon-btn" id="resetBtn" title="Reset hội thoại">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M3 12a9 9 0 1 0 9-9 9 9 0 0 0-6.7 3M3 4v5h5"/>
-          </svg>
-        </button>
+        <div class="hud-actions">
+          <button class="studio-open-btn" id="studioOpenBtn" title="Studio - Agents, Skills, Workflows">▦ Studio</button>
+          <button class="hud-icon-btn" id="settingsBtn" title="Cài đặt">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/>
+              <line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/>
+              <line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/>
+              <line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>
+            </svg>
+          </button>
+          <!-- Voice/tốc độ đã dời xuống sidebar phải (mục CÀI ĐẶT NHANH). -->
+          <button class="hud-icon-btn" id="ttsToggle" title="Bật/tắt giọng Javis">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M11 5L6 9H2v6h4l5 4V5z"/>
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"/>
+            </svg>
+          </button>
+          <button class="hud-icon-btn" id="resetBtn" title="Reset hội thoại">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 12a9 9 0 1 0 9-9 9 9 0 0 0-6.7 3M3 4v5h5"/>
+            </svg>
+          </button>
+          <!-- Mobile-only: hội thoại mới -->
+          <button class="hud-icon-btn new-chat-btn" id="newChatBtn" title="Hội thoại mới" aria-label="Hội thoại mới">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+          </button>
+        </div>
       </div>
     </header>
 
@@ -109,18 +139,9 @@
             <span class="bstat-num" id="statWorkflows">-</span>
             <span class="bstat-lbl">WORKFLOWS</span>
           </button>
-          <span class="bstat-sep"></span>
-          <button class="bstat" data-tab="automations" title="Mở Studio · Lịch tự động (routines đang chạy)">
-            <span class="bstat-num" id="statRoutines">-</span>
-            <span class="bstat-lbl">ROUTINES</span>
-          </button>
         </div>
 
-        <!-- MỨC DÙNG token: dời từ cột phải xuống góc dưới-phải khung giữa (giải phóng chỗ cho chat). -->
-        <div class="usage-float" id="usageFloat">
-          <div class="uf-label"><span>MỨC DÙNG <span class="dim" style="font-weight:400">· hôm nay</span></span><button class="uf-toggle" id="usageToggle" type="button" title="Thu nhỏ / mở rộng">▾</button></div>
-          <div id="usagePanel" class="usage-panel"><div class="mcp-item dim">Chưa có lượt nào hôm nay</div></div>
-        </div>
+        <!-- MỨC DÙNG token đã chuyển thành trang riêng "Mức dùng" trong rail (nhóm Hệ thống) - có đồ thị 14 ngày. -->
 
         <!-- Popup sửa note: neo absolute BÊN TRONG .hud-center → đè lên visual não, cây trái & chat phải vẫn sống.
              Nội dung (toolbar + thân) do console.js openNote() dựng theo loại file. -->
@@ -151,46 +172,6 @@
              rewire sau MỖI lượt (có debounce, read-only, undo được). Cấu hình + xem "đã học gì" +
              hoàn tác ở trang sidebar "Tự học" (console.js renderLearn). Widget cũ vốn là UI chết,
              không còn JS nào gắn vào (autoLearnToggle/learnBtn/memCount không có handler). -->
-
-        <!-- Vòng lặp tự cải thiện ĐÃ DỜI sang trang sidebar "Tự cải thiện" (console.js renderSelfImprove).
-             Giữ DOM ẩn để app.js cũ vẫn gắn handler không lỗi. -->
-        <div class="panel-label" style="margin-top:10px;display:none">
-          VÒNG LẶP TỰ CẢI THIỆN <span class="beta-tag">BETA</span>
-        </div>
-        <div class="loop-box" style="display:none">
-          <div class="loop-desc">Javis tự đánh thức theo lịch, tìm đòn bẩy cải thiện rồi tự kiểm chứng. An toàn: chỉ soạn nháp/ghi file trong vault - KHÔNG tự gọi MCP tạo đơn, đốt tiền, đăng bài.</div>
-          <label class="loop-row">
-            <span>Bật tự chạy nền</span>
-            <label class="toggle"><input type="checkbox" id="loopEnabled"><span></span></label>
-          </label>
-          <label class="loop-row">
-            <span>Mục tiêu</span>
-            <select id="loopGoal" class="loop-sel">
-              <option value="business">Cải thiện chỉ số kinh doanh</option>
-              <option value="brain">Làm dày bộ não (Wiki)</option>
-              <option value="product">Cải thiện Javis hữu dụng hơn</option>
-              <option value="custom">Tự định nghĩa…</option>
-            </select>
-          </label>
-          <textarea id="loopCustomGoal" class="loop-custom" placeholder="Mô tả mục tiêu tự cải thiện của riêng anh…" style="display:none"></textarea>
-          <label class="loop-row">
-            <span>Chế độ</span>
-            <select id="loopMode" class="loop-sel">
-              <option value="suggest">Chỉ đề xuất (an toàn)</option>
-              <option value="auto">Tự làm (ghi nháp vào vault)</option>
-            </select>
-          </label>
-          <label class="loop-row">
-            <span>Chu kỳ (phút)</span>
-            <input type="number" id="loopInterval" class="loop-num" min="5" value="60">
-          </label>
-          <div class="loop-actions">
-            <button class="loop-btn" id="loopRunNow">▶ Chạy ngay</button>
-            <button class="loop-btn ghost" id="lintBtn">🩺 LINT Wiki</button>
-          </div>
-          <div class="loop-status" id="loopStatus">Tắt</div>
-          <div class="loop-log" id="loopLog"></div>
-        </div>
 
         <!-- HỆ THỐNG + MCP ĐANG DÙNG đã DỜI xuống thanh model-bar (ngang hàng ô chọn model). -->
 
@@ -345,26 +326,45 @@
     </div>
   </div>
 
+  <!-- Mobile-only: nền mờ khi mở ngăn kéo -->
+  <div class="nav-backdrop" id="navBackdrop" hidden></div>
+
   <!-- ===== Console layer: rail điều hướng + trang quản lý (Alpine-driven) ===== -->
-  <nav class="rail" x-data x-cloak>
+  <nav class="rail" x-data x-cloak :class="{ collapsed: $store.nav.collapsed }"
+       x-effect="document.body.classList.toggle('rail-collapsed', $store.nav.collapsed)">
     <!-- ĐỈNH cố định -->
     <div class="rail-top">
       <div class="rail-brand"><img src="/brand-logo" alt="Javis" style="width:30px;height:30px;border-radius:8px;display:block;object-fit:cover"></div>
     </div>
-    <!-- GIỮA cuộn được - nhồi bao nhiêu tính năng cũng cuộn -->
+    <!-- GIỮA cuộn được - gom theo nhóm; nhóm foot (Hệ thống) tự ghim xuống đáy -->
     <div class="rail-nav">
-      <template x-for="it in $store.nav.items" :key="it.id">
-        <button class="rail-item" :class="{ active: $store.nav.active === it.id }"
-                @click="$store.nav.go(it.id)" :title="it.label">
-          <span class="rail-ico" x-html="it.icon"></span>
-          <span class="rail-lbl" x-text="it.label"></span>
-        </button>
+      <template x-for="g in $store.nav.groups" :key="g.label">
+        <div class="rail-group" :class="{ foot: g.foot, open: $store.nav.isOpen(g.label), 'has-active': g.items.some(it => it.id === $store.nav.active) }">
+          <button class="rail-grp-lbl" @click="$store.nav.toggleGroup(g.label)" :title="g.label">
+            <span class="rail-grp-ico" x-html="g.icon"></span>
+            <span class="grp-name" x-text="g.label"></span>
+          </button>
+          <div class="rail-grp-items">
+            <template x-for="it in g.items" :key="it.id">
+              <button class="rail-item" :class="{ active: $store.nav.active === it.id }"
+                      @click="$store.nav.go(it.id)" :title="it.label">
+                <span class="rail-ico" x-html="it.icon"></span>
+                <span class="rail-lbl" x-text="it.label"></span>
+              </button>
+            </template>
+          </div>
+        </div>
       </template>
     </div>
-    <!-- ĐÁY cố định: version + tác giả (luôn hiện) -->
+    <!-- ĐÁY cố định: nút thu/mở + version + tác giả -->
     <div class="rail-foot">
-      <div class="rf-ver" id="railVersion">v0.0.0</div>
-      <a class="rf-author" href="https://minhquy.vn" target="_blank" rel="noopener">by Minh Quý</a>
+      <button class="rail-collapse-btn" @click="$store.nav.toggleCollapsed()"
+              :title="$store.nav.collapsed ? 'Mở rộng thanh bên' : 'Thu gọn thanh bên'"
+              x-html="$store.nav.collapseIcon"></button>
+      <div class="rf-meta">
+        <div class="rf-ver" id="railVersion">v0.0.0</div>
+        <a class="rf-author" href="https://javisos.com" target="_blank" rel="noopener">by Minh Quý</a>
+      </div>
     </div>
   </nav>
 
@@ -583,7 +583,7 @@
   <!-- Bảng SỐ LIỆU KINH DOANH đã gỡ khỏi giao diện (thay bằng Vault explorer ở cột trái).
        Vẫn giữ 3 id ở stub ẩn này vì app.js đọc #metricCards/#metricStatus/#refreshMetrics ngay
        lúc nạp (getElementById + addEventListener vô điều kiện) - xoá trần sẽ ném null, hỏng dashboard.
-       Ẩn hoàn toàn: block <!-- JAVIS_METRICS --> nếu có vẫn parse vào đây nhưng không hiển thị. -->
+       Ẩn hoàn toàn: block JAVIS_METRICS nếu có vẫn parse vào đây nhưng không hiển thị. -->
   <div id="metricsStub" hidden aria-hidden="true">
     <button id="refreshMetrics" tabindex="-1"></button>
     <div id="metricCards"></div>
@@ -594,17 +594,25 @@
   <!-- three.js + 3d-force-graph KHÔNG nạp tĩnh nữa: app.js tự lazy-load qua CDN CHỈ khi chọn đồ thị 3D. -->
   <script src="/static/graph.js?v=14"></script>
   <script src="/static/graph3d.js?v=16"></script>
-  <script src="/static/chat-render.js?v=2"></script>
-  <script src="/static/app.js?v=66"></script>
-  <script src="/static/model-picker.js?v=1"></script>
+  <script src="/static/chat-render.js?v=4"></script>
+  <script src="/static/file-editor.js?v=3"></script>
+  <script src="/static/chat-ask.js?v=1"></script>
+  <script src="/static/chat-slash.js?v=1"></script>
+  <script src="/static/app.js?v=70"></script>
+  <script src="/static/model-picker.js?v=2"></script>
   <script src="/static/branding.js?v=7"></script>
   <script src="/static/quick-settings.js?v=4"></script>
   <script src="/static/chat-zoom.js?v=5"></script>
-  <script src="/static/brains-ui.js?v=4"></script>
+  <script src="/static/brains-ui.js?v=7"></script>
   <script src="/static/sessions-ui.js?v=6"></script>
-  <script src="/static/studio.js?v=19"></script>
+  <script src="/static/studio.js?v=24"></script>
+  <!-- Dashboard Token (trang Mức dùng nâng cấp): nạp TRƯỚC console.js để renderUsage ủy quyền được. -->
+  <script src="/static/usage.js?v=1"></script>
   <!-- Console layer: console.js đăng ký store TRƯỚC khi Alpine khởi động (defer) -->
-  <script src="/static/console.js?v=64"></script>
+  <script src="/static/console.js?v=72"></script>
+  <script src="/static/mobile-chat.js?v=4"></script>
+  <!-- Nút đổi tông tối đậm / tối nhạt: lật data-theme trên <html>, nhớ qua localStorage -->
+  <script>(function(){var b=document.getElementById('themeToggle');if(!b)return;b.addEventListener('click',function(){var dim=document.documentElement.getAttribute('data-theme')==='dim';if(dim)document.documentElement.removeAttribute('data-theme');else document.documentElement.setAttribute('data-theme','dim');try{localStorage.setItem('javis.theme',dim?'dark':'dim');}catch(e){}});})();</script>
   <script defer src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>
 </body>
 </html>

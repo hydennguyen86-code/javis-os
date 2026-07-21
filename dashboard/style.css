@@ -11,13 +11,27 @@
   --green: #34d36b;
   --red: #f4565a;
   --yellow: #f0c020;
-  --font: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  --font: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  --mono: 'SF Mono', 'Fira Code', 'Consolas', ui-monospace, monospace;
+}
+/* Tông TỐI NHẠT (dim): nút đổi tông đặt data-theme="dim" trên <html>. Chỉ override biến màu nền/chữ
+   + biến nền rail (console.css) cho liền tông. Graph 3D cockpit dùng màu hard-code nên giữ nền tối. */
+:root[data-theme="dim"] {
+  --bg: #282a37;
+  --bg2: #343646;
+  --bg3: #414353;
+  --border: #545872;
+  --text: #eef0f7;
+  --text2: #c2c5d6;
+  --text3: #9498ad;
+  --rail-bg: rgba(40, 42, 55, 0.86);
+  --glass: rgba(52, 54, 70, 0.6);
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 16px;
   line-height: 1.5;
   height: 100vh;
@@ -37,16 +51,20 @@ body {
 /* TOP */
 .hud-top {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr) auto;   /* trái + phải theo nội dung, giữa co giãn → cụm trái đủ chỗ, không ép xuống dòng */
   align-items: center;
   padding: 0 20px;
   border-bottom: 1px solid var(--border);
   background: var(--bg2);
 }
+/* 3 nhóm header bám 3 cột: trái (brand + chọn brain), giữa (tên + ngày), phải (nút theme + cụm nút).
+   Con bị ẩn (.brand, .hud-actions khi in-console) chỉ tự co, nhóm vẫn giữ cột → cân ở mọi chế độ. */
+.hud-top-left { display: flex; align-items: center; gap: 14px; justify-self: start; }
+.hud-top-right { display: flex; align-items: center; gap: 8px; justify-self: end; }
 .brand { display: flex; align-items: center; gap: 8px; }
 .brand-icon { color: var(--accent); font-size: 18px; }
 .brand-text { font-family: var(--font); font-size: 15px; font-weight: 700; letter-spacing: 3px; }
-.hud-center-title { text-align: center; }
+.hud-center-title { text-align: center; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ws-name { font-weight: 600; font-size: 16px; }
 .ws-date { margin-left: 10px; font-size: 13px; color: var(--text2); font-family: var(--font); }
 .hud-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
@@ -122,18 +140,7 @@ body {
 #graph3dContainer { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; cursor: grab; }
 #graph2d { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; cursor: grab; display: none; }
 .concept-label.cl-active .cl-name { color: var(--accent); text-shadow: 0 0 10px rgba(255,122,60,.5); }
-/* MỨC DÙNG token: hộp nổi ở góc dưới-phải khung giữa (dời khỏi cột chat cho rộng chỗ) */
-.usage-float { position: absolute; right: 12px; bottom: 12px; z-index: 5; width: 200px; max-width: 34vw;
-  background: rgba(16,14,28,0.6); border: 1px solid var(--border); border-radius: 10px; padding: 6px 9px;
-  backdrop-filter: blur(8px); box-shadow: 0 6px 20px rgba(0,0,0,0.4); opacity: .92; }
-.usage-float:hover { opacity: 1; }
-.usage-float .uf-label { display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  font-family: var(--font); font-size: 10px; letter-spacing: .5px; color: var(--text3); margin-bottom: 4px; }
-.uf-toggle { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 12px; padding: 0 2px; line-height: 1; flex: none; }
-.uf-toggle:hover { color: var(--accent); }
-.usage-float.collapsed { width: auto; }
-.usage-float.collapsed #usagePanel { display: none; }
-.usage-float.collapsed .uf-label { margin-bottom: 0; }
+/* (Widget MỨC DÙNG nổi đã gỡ - chuyển thành trang riêng "Mức dùng" trong rail, có đồ thị 14 ngày) */
 #graph3dContainer canvas { display: block; background: transparent !important; }
 /* Vignette tối góc - chiều sâu kiểu HUD */
 .hud-center::after {
@@ -181,7 +188,7 @@ body {
   background: rgba(20,20,30,0.8); border: 1px solid var(--border);
   color: var(--text); padding: 5px 8px; border-radius: 6px; font-size: 14px;
 }
-.graph-stats { font-size: 13px; color: var(--text2); font-family: var(--font); transition: color .25s, text-shadow .25s; }
+.graph-stats { font-size: 13px; color: var(--text2); font-family: var(--font); white-space: nowrap; transition: color .25s, text-shadow .25s; }
 .graph-stats.pulse { color: #d6c2ff; text-shadow: 0 0 10px rgba(160,120,255,.8); }
 .graph-folder-btn {
   background: rgba(20,20,30,0.8); border: 1px solid var(--border); color: var(--text2);
@@ -394,7 +401,7 @@ body {
 }
 .msg-javis .bubble strong { color: var(--accent); }
 .msg-javis .bubble ul { padding-left: 16px; margin: 5px 0; }
-.msg-javis .bubble code { font-family: var(--font); font-size: 13px; background: var(--bg); padding: 1px 4px; border-radius: 3px; color: #a78bfa; }
+.msg-javis .bubble code { font-family: var(--mono); font-size: 13px; background: var(--bg); padding: 1px 4px; border-radius: 3px; color: #a78bfa; }
 .msg-javis .bubble h3 { font-size: 15px; color: var(--text); margin: 8px 0 4px; }
 
 /* Copy tin nhắn Javis (nút cạnh bubble, hiện khi hover) */
@@ -517,6 +524,24 @@ body {
 }
 .send-btn:hover { opacity: 0.85; }
 .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ===== Mobile: ô nhập thành viên pill lớn (chat là chính) ===== */
+@media (max-width: 860px) {
+  .hud-voice {
+    margin: 6px 10px 8px; padding: 5px 6px 5px 8px; gap: 4px;
+    border: 1px solid var(--border); border-radius: 24px; background: var(--bg2);
+    align-items: flex-end;
+  }
+  #ttsToggleBar { display: none; }                 /* loa dời vào ngăn kéo */
+  .hud-voice .attach-btn { order: 1; width: 34px; height: 34px; border: none; background: transparent; }
+  .hud-voice .voice-input {
+    order: 2; border: none; background: transparent; border-radius: 0;
+    min-height: 36px; max-height: 40vh; padding: 8px 4px; font-size: 16px;
+  }
+  .hud-voice .voice-input:focus { border: none; }
+  .hud-voice .mic-big { order: 3; width: 34px; height: 34px; border: none; background: transparent; }
+  .hud-voice .stop-btn, .hud-voice .send-btn { order: 4; width: 36px; height: 36px; border-radius: 50%; }
+}
 
 .stop-btn {
   background: var(--red); border: none; color: white; width: 44px; height: 44px;
@@ -675,29 +700,43 @@ body {
 .empty { color: var(--text3); font-size: 15px; padding: 30px; text-align: center; grid-column: 1/-1; line-height: 1.7; }
 .dim { color: var(--text3); font-size: 13px; }
 
-/* Workflow card */
+/* Workflow row: mỗi workflow một hàng đầy chiều rộng (KHÔNG dùng lưới .cards như
+   Agents/Lịch - pipeline nằm ngang nên cần trọn bề ngang, cột hẹp sẽ bóp nát nó). */
+.wf-list { display: flex; flex-direction: column; gap: 14px; }
+.wf-row { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 14px; transition: border-color 0.3s; }
+.wf-row.archived { opacity: 0.5; }
+.wf-row.running { border-color: var(--accent); }
+
+/* Workflow card (tab Lịch vẫn dùng) */
 .wf-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 14px; transition: border-color 0.3s; }
 .wf-card.archived { opacity: 0.5; }
 .wf-card.running { border-color: var(--accent); }
-.wf-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.wf-header { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
+.wf-spacer { flex: 1; min-width: 8px; }
+.wf-count { font-size: 12px; color: var(--text3); font-family: var(--font); white-space: nowrap; }
 .wf-name { font-size: 16px; font-weight: 600; color: var(--text); }
 .wf-badge { font-size: 12px; padding: 3px 9px; border-radius: 20px; font-family: var(--font); white-space: nowrap; }
 .wf-badge.ready { background: rgba(34,197,94,0.12); color: var(--green); }
 .wf-badge.off { background: var(--bg3); color: var(--text3); }
 .wf-badge.running { background: rgba(168,139,250,0.15); color: var(--accent); }
 .wf-desc { font-size: 14px; color: var(--text2); margin-bottom: 10px; line-height: 1.5; }
-.wf-pipeline { display: flex; align-items: stretch; gap: 4px; margin: 10px 0 14px; }
-.wf-pstep { flex: 1; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 8px 6px; text-align: center; transition: all 0.3s; min-width: 0; }
+/* Bước dàn ngang, hết chỗ thì xuống dòng. 150px là mức tối thiểu để chữ còn đọc được;
+   trước đây flex:1 chia đều nên 11 bước bóp mỗi ô còn ~35px, chữ bị ellipsis mất sạch
+   và chỉ còn lại mấy cột rỗng. Dùng grid auto-fill chứ KHÔNG dùng flex-wrap: với flex,
+   ô lẻ ở hàng cuối bị flex-grow kéo giãn ra full-width (11 bước → ô cuối rộng 1650px). */
+.wf-pipeline { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; margin: 10px 0 0; }
+.wf-pstep { min-width: 0; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 8px; text-align: left; transition: border-color 0.3s, background 0.3s; }
 .wf-pstep.active { border-color: var(--accent); background: rgba(168,139,250,0.12); animation: wf-pulse 1.3s ease-in-out infinite; }
 .wf-pstep.done { border-color: var(--green); background: rgba(34,197,94,0.08); }
-.wf-parrow { color: var(--text3); font-size: 15px; display: flex; align-items: center; flex-shrink: 0; padding: 0 1px; transition: color 0.3s; }
-.wf-card.running .wf-parrow { color: var(--accent); }
 .wps-num { font-size: 11px; color: var(--text3); font-family: var(--font); margin-bottom: 3px; letter-spacing: 0.05em; }
 .wf-pstep.done .wps-num { color: var(--green); }
 .wf-pstep.done .wps-num::before { content: "✓ "; }
 .wf-pstep.active .wps-num { color: var(--accent); }
-.wps-name { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.wps-task { font-size: 12px; color: var(--text3); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.4; }
+/* Việc làm là chữ chính, tên agent hạ xuống chữ phụ: nhiều workflow gọi CÙNG một
+   agent ở mọi bước (vd viral-video-production), lấy agent làm chính thì các ô hiện
+   chữ giống hệt nhau và không phân biệt được bước nào với bước nào. */
+.wps-task { font-size: 13px; color: var(--text); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.wps-name { font-size: 11px; color: var(--text3); margin-top: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wf-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .s-btn.run { background: var(--accent); padding: 6px 12px; font-size: 14px; }
 @keyframes wf-pulse {
@@ -763,7 +802,20 @@ body {
 }
 .editor-box input:focus, .editor-box textarea:focus { border-color: var(--accent2); }
 .editor-box textarea { resize: vertical; }
-.step-row { background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 8px; }
+/* Bước gập lại để thấy toàn cảnh workflow dài; bấm header thì mở ra sửa.
+   Gập = ẩn bằng CSS chứ KHÔNG bỏ input khỏi DOM, vì captureSteps() đọc value của chúng. */
+.step-row { background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 8px; display: flex; flex-direction: column; gap: 8px; }
+.step-row:not(.open) { padding: 8px 10px; }
+.step-row.open { border-color: var(--accent2); background: rgba(139,92,246,0.06); }
+.step-row:not(.open) .step-header { cursor: pointer; }
+.step-row:not(.open) .step-header:hover .step-sum { color: var(--text); }
+.step-row:not(.open) .st-agent, .step-row:not(.open) .step-body { display: none; }
+.step-row.open .step-sum { display: none; }
+.step-body { display: flex; flex-direction: column; gap: 8px; }
+.step-sum { flex: 1; min-width: 0; font-size: 13px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-move { background: none; border: 1px solid var(--border); color: var(--text3); border-radius: 6px; cursor: pointer; height: 28px; width: 24px; flex-shrink: 0; font-size: 12px; line-height: 1; }
+.st-move:hover:not(:disabled) { border-color: var(--accent2); color: var(--accent2); }
+.st-move:disabled { opacity: 0.3; cursor: default; }
 .step-header { display: flex; align-items: center; gap: 8px; }
 .step-num { background: var(--accent2); color: #fff; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
 .st-agent { flex: 1; }
@@ -773,7 +825,10 @@ body {
 .st-verify { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.05); }
 .st-verify .stv-lbl { font-size: 13px; color: var(--text3); }
 .st-verify-agent { flex: 1; min-width: 120px; background: rgba(20,20,30,0.8); border: 1px solid var(--border); color: var(--text2); border-radius: 5px; padding: 3px 5px; font-size: 13px; }
-.st-retries { width: 48px; background: rgba(20,20,30,0.8); border: 1px solid var(--border); color: var(--text); border-radius: 5px; padding: 3px; font-size: 13px; text-align: center; }
+/* Phải là ".editor-box .st-retries" (0,2,0) chứ KHÔNG phải ".st-retries" (0,1,0): quy tắc
+   gộp ".editor-box input {width:100%}" ở trên có specificity (0,1,1) nên thắng, kéo ô số này
+   full-width làm nó rớt xuống dòng riêng và đẩy chữ "lần" xuống dòng thứ ba. */
+.editor-box .st-retries { width: 48px; flex: 0 0 48px; background: rgba(20,20,30,0.8); border: 1px solid var(--border); color: var(--text); border-radius: 5px; padding: 3px; font-size: 13px; text-align: center; }
 .st-del:hover { color: var(--red); border-color: var(--red); }
 .skill-pick { display: flex; flex-wrap: wrap; gap: 8px; background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 10px; }
 .skill-pick .sp { display: flex; align-items: center; gap: 5px; font-size: 14px; color: var(--text); width: auto; background: none; border: none; padding: 0; cursor: pointer; }
@@ -852,6 +907,11 @@ body.chat-zoomed .chat-stage { display: flex; }
 .ci-snip { font-size: 12.5px; color: var(--text2); margin-top: 2px; }
 .ci-snip b { color: #ffd47a; }
 .cside-empty { color: var(--text3); text-align: center; padding: 26px 8px; font-size: 13.5px; }
+.cside-more { display: block; width: 100%; margin: 8px 0 4px; padding: 8px 10px;
+  border: 1px solid var(--border); border-radius: 9px; background: transparent;
+  color: var(--text2); font-size: 13px; cursor: pointer; }
+.cside-more:hover { background: rgba(120,180,255,0.07); border-color: rgba(120,180,255,0.25);
+  color: var(--text); }
 
 /* Cột chat chính: nội dung căn giữa, rộng tối đa ~980px cho dễ đọc */
 .chat-stage-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
@@ -1118,3 +1178,56 @@ body.chat-zoomed #jv-sess-btn { display: none; }
 .ne-prev hr { border: none; border-top: 1px solid var(--border); margin: 1em 0; }
 .ne-prev table { border-collapse: collapse; margin: .5em 0; }
 .ne-prev th, .ne-prev td { border: 1px solid var(--border); padding: 5px 9px; }
+
+/* Khoi hoi-lai co lua chon (chat-ask.js) */
+.jv-ask { margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--border); }
+.jv-ask-q { font-size: 13px; color: var(--text2); margin-bottom: 7px; }
+.jv-ask-tag {
+  display: inline-block; margin-right: 6px; padding: 1px 6px; border-radius: 5px;
+  background: var(--bg3); border: 1px solid var(--border);
+  color: var(--text3); font-size: 11px; text-transform: uppercase; letter-spacing: .4px;
+}
+.jv-ask-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.jv-ask-chip {
+  background: var(--bg3); border: 1px solid var(--border); color: var(--text);
+  border-radius: 999px; padding: 5px 12px; font-family: var(--font); font-size: 13px;
+  cursor: pointer; transition: border-color .15s, color .15s, background .15s;
+}
+.jv-ask-chip:hover { border-color: var(--accent); color: var(--accent); }
+.jv-ask-other { color: var(--text3); border-style: dashed; }
+
+/* Da tra loi: cung lai, chi con doc duoc */
+.jv-ask-done .jv-ask-chip { cursor: default; opacity: .45; }
+.jv-ask-done .jv-ask-chip:hover { border-color: var(--border); color: var(--text); }
+.jv-ask-done .jv-ask-other { display: none; }
+.jv-ask-done .jv-ask-chip.jv-ask-picked {
+  opacity: 1; border-color: var(--accent); color: var(--accent); background: rgba(255,122,60,.12);
+}
+.jv-ask-done .jv-ask-chip.jv-ask-picked::before { content: "✓ "; }
+
+/* Menu lệnh / (chat-slash.js) */
+.slash-menu {
+  position: fixed;
+  z-index: 999;
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0,0,0,.35);
+  padding: 4px;
+}
+.slash-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: "cmd name" "cmd desc";
+  gap: 0 10px;
+  padding: 6px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+.slash-item.active, .slash-item:hover { background: var(--bg3); }
+.slash-cmd { grid-area: cmd; align-self: center; font-weight: 600; color: var(--accent); white-space: nowrap; }
+/* name + desc: mỗi cái CẮT 1 DÒNG, tràn thì "..." (min-width:0 để ellipsis chạy trong grid) */
+.slash-name { grid-area: name; font-size: 13px; color: var(--text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.slash-desc { grid-area: desc; font-size: 11px; color: var(--text3); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

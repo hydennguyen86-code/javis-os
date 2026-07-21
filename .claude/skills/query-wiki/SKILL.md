@@ -1,10 +1,18 @@
 ---
 name: Query Wiki
-description: Kích hoạt khi người dùng hỏi/khai thác tri thức trong Second Brain (tổng hợp, so sánh, giả thuyết, liệt kê, trực quan hoá) - vd "tổng hợp các framework về X", "so sánh A vs B vs C", "wiki có gì về Y". Trả lời có trích dẫn và lưu lại kết quả giá trị.
+description: "Khai thác tri thức trong Second Brain: tổng hợp, so sánh, giả thuyết. Trả lời có trích dẫn."
 group: AI
 ---
 
 # QUERY - trả lời từ wiki (có citation, compounding)
+
+## Khi nào dùng
+
+Kích hoạt khi người dùng hỏi/khai thác tri thức trong Second Brain, vd "tổng hợp các
+framework về X", "so sánh A vs B vs C", "wiki có gì về Y".
+
+Năm kiểu khai thác: tổng hợp, so sánh, giả thuyết, liệt kê, trực quan hoá. Luôn trả lời
+có trích dẫn và lưu lại kết quả giá trị.
 
 1. Đọc `wiki/index.md` TRƯỚC để biết có trang nào.
 2. Đọc các trang wiki liên quan (theo nhóm/tên); đọc trang được `[[link]]` tới nếu cần đủ context.

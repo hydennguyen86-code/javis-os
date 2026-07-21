@@ -366,11 +366,45 @@ def claude_engine(system_prompt=None, cwd=None, tag="chat", allowed_tools=None, 
 # subscription auth (~/.codex/auth.json) + MCP (~/.codex/config.toml) + tool NATIVE
 # → ChatGPT subscription DÙNG ĐƯỢC MCP (điều mà raw HTTP endpoint không làm được).
 # ============================================================
+def _home_dir() -> Path:
+    """Thư mục home đáng tin trên MỌI cách khởi động server.
+
+    Không dựa mỗi USERPROFILE: khi server được bật lại bởi tự-cập-nhật, dịch vụ Windows
+    hay tác vụ nền, biến này có thể trống - lúc đó home thành Path("") nên mọi đường dẫn
+    ~/.codex/... hoá ra tương đối và không tồn tại, khiến Javis báo nhầm "chưa cài Codex CLI"
+    dù binary vẫn nằm đó. Thử lần lượt các nguồn rồi mới chịu thua.
+    """
+    cands = [os.environ.get("USERPROFILE"), os.environ.get("HOME")]
+    drive, path = os.environ.get("HOMEDRIVE", ""), os.environ.get("HOMEPATH", "")
+    if drive and path:
+        cands.append(drive + path)
+    for c in cands:
+        try:
+            if c and Path(c).exists():
+                return Path(c)
+        except Exception:
+            pass
+    try:
+        h = Path.home()          # dự phòng cuối: pathlib tự suy ra (pwd trên POSIX)
+        if h.exists():
+            return h
+    except Exception:
+        pass
+    return Path("")
+
+
 def find_codex_cli() -> Optional[str]:
+    envp = os.environ.get("JAVIS_CODEX_BIN")     # cửa thoát: chỉ thẳng chỗ cài lạ
+    if envp:
+        try:
+            if Path(envp).exists():
+                return envp
+        except Exception:
+            pass
     cli = shutil.which("codex")
     if cli:
         return cli
-    home = Path(os.environ.get("USERPROFILE", "")) if os.name == "nt" else Path.home()
+    home = _home_dir()
     cands = [
         home / ".codex" / ".sandbox-bin" / "codex.exe",
         home / ".codex" / "plugins" / ".plugin-appserver" / "codex.exe",

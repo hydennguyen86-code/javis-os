@@ -1,10 +1,15 @@
 ---
 name: Lint Wiki
-description: Kích hoạt khi người dùng muốn kiểm tra sức khoẻ / dọn dẹp wiki của Second Brain (vd "health check wiki", "lint wiki", "wiki có lỗi gì không", "rà soát bộ não"). CHỈ trả về danh sách vấn đề, KHÔNG tự sửa hàng loạt.
+description: Rà soát sức khoẻ wiki của Second Brain, trả về danh sách vấn đề. Không tự sửa hàng loạt.
 group: AI
 ---
 
 # LINT - health-check wiki (chỉ CHECKLIST)
+
+## Khi nào dùng
+
+Kích hoạt khi người dùng nói những câu như: "health check wiki", "lint wiki", "wiki có
+lỗi gì không", "rà soát bộ não".
 
 Quét `wiki/` phát hiện 8 loại vấn đề:
 1. Mâu thuẫn giữa các trang (gồm section `## Mâu thuẫn` ghi nhận trước mà chưa giải).

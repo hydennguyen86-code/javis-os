@@ -23,6 +23,9 @@ jobs:
       - name: Byte-compile toàn bộ server + plugin
         run: python -m compileall -q server system/plugins
 
+      - name: Chay test JS dashboard
+        run: node dashboard/test_chat_ask.js
+
       - name: Chạy test (auth/secret/MCP-perm/traversal/CSRF + plugin)
         env:
           PYTHONIOENCODING: utf-8

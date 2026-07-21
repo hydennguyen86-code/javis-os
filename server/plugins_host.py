@@ -268,18 +268,18 @@ class LoadedPlugin:
 # ============================================================
 # Load (CHẠY code plugin) - có cache theo signature
 # ============================================================
-def _key(vault_root: Optional[str]) -> str:
-    return str(vault_root or "")
+def _key(vault_root: Optional[str], scope_vault: bool = True) -> str:
+    return f"{vault_root or ''}|{scope_vault}"
 
 
-def _signature(vault_root: Optional[str]) -> tuple:
+def _signature(vault_root: Optional[str], scope_vault: bool = True) -> tuple:
     """Chữ ký để biết khi nào phải nạp lại: mtime state + mtime entry/manifest mọi plugin + env flag."""
     sig: List[Any] = [_env_user_enabled()]
     try:
         sig.append(_STATE_PATH.stat().st_mtime)
     except OSError:
         sig.append(0)
-    for source, pdir in _iter_plugin_dirs(vault_root):
+    for source, pdir in _iter_plugin_dirs(vault_root if scope_vault else None):
         for fn in ("plugin.yaml", "plugin.yml", "plugin.py", "__init__.py"):
             p = pdir / fn
             try:
@@ -312,10 +312,14 @@ def _import_entry(slug: str, source: str, entry: Path):
     return module
 
 
-def _load_all(vault_root: Optional[str]) -> dict:
-    """Nạp (hoặc lấy cache) mọi plugin effective-enabled cho vault_root này."""
-    k = _key(vault_root)
-    sig = _signature(vault_root)
+def _load_all(vault_root: Optional[str], scope_vault: bool = True) -> dict:
+    """Nạp (hoặc lấy cache) mọi plugin effective-enabled cho vault_root này.
+
+    scope_vault=False: KHÔNG duyệt thư mục plugin riêng-của-vault (chỉ bundled + user/global),
+    nhưng PluginContext của mọi plugin nạp được vẫn nhận đúng vault_root thật - đây là chỗ
+    tách hai nghĩa của tham số vault_root cũ (xem plugin_tools)."""
+    k = _key(vault_root, scope_vault)
+    sig = _signature(vault_root, scope_vault)
     with _lock:
         ent = _cache.get(k)
         if ent and ent.get("sig") == sig:
@@ -324,7 +328,8 @@ def _load_all(vault_root: Optional[str]) -> dict:
         hooks: Dict[str, List[Callable]] = {}
         errors: Dict[str, str] = {}
         env_ok = _env_user_enabled()
-        for source, pdir in _iter_plugin_dirs(vault_root):
+        dirs_vault_root = vault_root if scope_vault else None
+        for source, pdir in _iter_plugin_dirs(dirs_vault_root):
             slug = pdir.name
             manifest, merr = _read_manifest(pdir)
             if merr:
@@ -412,10 +417,15 @@ def _make_call(tool: dict, ctx: PluginContext, mode: str):
     return _call
 
 
-def plugin_tools(mode: str = "full", vault_root: Optional[str] = None) -> Tuple[List[dict], Dict[str, dict]]:
+def plugin_tools(mode: str = "full", vault_root: Optional[str] = None, *,
+                 scope_vault: bool = True) -> Tuple[List[dict], Dict[str, dict]]:
     """(tools_spec, route) từ MỌI plugin đã nạp. mcp_hub merge vào discover_all.
-    tools_spec: [{fn, server:'javis', name, description, schema}]. route: {fn: {'call': async fn}}."""
-    ent = _load_all(vault_root)
+    tools_spec: [{fn, server:'javis', name, description, schema}]. route: {fn: {'call': async fn}}.
+
+    mode: mức quyền lượt chạy. vault_root: brain để ctx của plugin biết đang ở đâu.
+    scope_vault=False: KHÔNG nạp plugin riêng-của-vault (chỉ bundled + global) nhưng ctx VẪN
+    thấy vault_root. Tách hai nghĩa vì trước đây một chữ None gánh cả hai, làm ctx mù brain."""
+    ent = _load_all(vault_root, scope_vault)
     tools: List[dict] = []
     route: Dict[str, dict] = {}
     seen = set()

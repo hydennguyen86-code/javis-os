@@ -1,10 +1,17 @@
 ---
 name: Ingest Source
-description: Kích hoạt khi người dùng muốn TIÊU HOÁ / xử lý / "ingest" một source vào Second Brain (vd "tiêu hoá source này", "xử lý bài này vào wiki", "đọc file này rồi ghi lại kiến thức", thả file vào sources/). Biến nguồn thô thành tri thức wiki tích luỹ, theo đúng 3 kỷ luật.
+description: Tiêu hoá một source thô vào Second Brain, chưng cất thành tri thức wiki tích luỹ.
 group: AI
 ---
 
 # INGEST - tiêu hoá 1 source thành wiki (compounding)
+
+## Khi nào dùng
+
+Kích hoạt khi người dùng nói những câu như: "tiêu hoá source này", "xử lý bài này vào
+wiki", "đọc file này rồi ghi lại kiến thức", hoặc khi có file mới thả vào `sources/`.
+
+Skill làm theo đúng 3 kỷ luật của vault.
 
 Đọc schema vault (`CLAUDE.md`/`AGENTS.md` ở gốc brain) trước; đây là bản thao tác của phép INGEST.
 

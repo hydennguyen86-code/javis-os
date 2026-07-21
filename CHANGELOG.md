@@ -4,6 +4,716 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.145] - 2026-07-21
+Sửa lỗi tick chọn cuộc chat theo dõi trên Zalo cứ mất sau khi tải lại trang hoặc khởi động lại server.
+### Sửa lỗi
+- **Tick theo dõi biến mất khi tải lại**: danh sách cuộc chat trong panel chỉ vẽ từ sổ tạm trong bộ nhớ (dựng lại từ tin đến), mà sổ này rỗng mỗi khi khởi động lại server. Luật theo dõi vẫn còn nguyên trên đĩa nhưng không có dòng nào để hiện, nên tick biến mất dù thực ra vẫn đang theo dõi. Nay panel vẽ từ HỢP của sổ tạm và các luật đang bật, và server tự nạp lại sổ từ luật ngay khi khởi động, nên cuộc chat đang theo dõi luôn hiện và tick được ngay, không phải đợi có tin mới đi qua.
+- **Hai cuộc chat trùng tên ghi đè luật của nhau**: file luật trước đây đặt tên theo TÊN cuộc chat, mà hệ thống lại cố ý đặt tên trùng cho nhóm chưa biết tên. Hai nhóm khác nhau cùng tên ghi vào một file, lưu cái sau xoá mất luật cái trước, tick của nó biến mất khi tải lại. Nay tên file gắn thẳng mã cuộc chat nên không thể đụng nhau.
+- **Lưu danh sách rỗng làm mất sạch theo dõi**: bản web cũ gửi khuôn dữ liệu cũ bị hiểu nhầm là "bỏ hết", tắt sạch mọi luật đang theo dõi. Nay chỉ bỏ theo dõi khi chủ gửi rõ danh sách mới.
+- **Nhóm bị hiện thành cá nhân sau khởi động lại**: luật giờ ghi kèm loại nhóm hay khách, nên sau khởi động lại vẫn dựng đúng nhãn nhóm và gửi tin đúng kiểu nhóm, không còn nhầm.
+- Dọn khoá cấu hình rác cũ (threads, dm_only, keywords) còn sót trong settings, tránh nó rò ngược vào ô từ khoá của giao diện và lật cuộc chat theo dõi thành lọc từ khoá.
+### Lưu ý
+- Nếu server đang chạy bản cũ thì phải KHỞI ĐỘNG LẠI server rồi tải lại trang (Ctrl+F5) thì bản vá này mới có tác dụng. Bản cũ không ghi được tick xuống đĩa nên tải lại là mất.
+
+## [0.9.144] - 2026-07-21
+Sửa lỗi bảng nghe Zalo cứ hiện "Mất kết nối, đang thử lại" dù thực ra vẫn đang nghe bình thường.
+### Sửa lỗi
+- **Kẹt ở trạng thái "Mất kết nối" dù kết nối vẫn sống**: mỗi khi mạng chớp một cái, thư viện Zalo tự nối lại ngay ở bên dưới mà KHÔNG in ra dòng thông báo nào, nên bảng điều khiển không có gì để biết là đã nối lại và cứ đứng ở "đang thử lại" mãi. Thêm nữa, dòng báo nối lại thành công của nhánh đăng nhập lại có kèm chữ "events:" nên bị bộ lọc dòng khởi động nuốt mất. Kết quả là chỉ cần rớt mạng một lần là nhãn đỏ nằm lì, chỉ tạm hết khi có tin mới về trong vòng ba phút, dù tiến trình nghe vẫn sống và tin vẫn về.
+- Nay Javis nhận đúng các dòng hồi phục để kéo trạng thái về đang nghe. Với trường hợp nối lại im lặng (không in dòng nào), nếu tiến trình nghe vẫn còn sống và đã qua một khoảng lặng không thấy dòng rớt mới thì tự coi là đã nối lại. Rớt thật thì thư viện in dòng rớt đều đặn nên vẫn báo đúng là đang thử lại; còn tiến trình chết hẳn thì vẫn để cơ chế dựng lại lo, không nhận nhầm.
+- Thêm kiểm thử chốt cho cả hai đường hồi phục và cho trường hợp nối lại im lặng.
+
+## [0.9.143] - 2026-07-21
+Bỏ hẳn tính năng Javis tự trả lời khách trên Zalo. Nay Javis chỉ đọc và báo, mọi tin gửi đi đều do chủ yêu cầu trực tiếp.
+### Cải thiện
+- **Zalo chỉ đọc và báo, không còn tự phản hồi**: gỡ bỏ chế độ "Tự phản hồi" (chatbot) cùng toàn bộ phần engine hộp cát soạn tin tự động cho khách. Listener giờ chỉ nghe rồi báo về Telegram theo luật từng cuộc chat, gồm bốn chế độ giữ nguyên: im lặng, báo hết, báo theo từ khoá, và nhắc khi quá lâu chưa ai trả lời. Muốn gửi tin cho ai thì chủ bảo thẳng trong chat, Javis dùng công cụ gửi an toàn javis_zalo_send.
+- Panel "Nghe tin liên tục" gọn lại: mỗi cuộc chat chỉ còn tick theo dõi là đọc và báo, bỏ ô chọn chế độ hai lựa chọn và hộp thoại xác nhận cho tự nhắn.
+- Dọn sạch mã phần Zalo: bỏ hàm soạn tin của bot, các hằng hộp cát, giới hạn tin mỗi giờ, và phụ thuộc model phụ mà chỉ chế độ tự trả lời mới cần.
+### An toàn
+- Không còn đường nào để Javis tự gửi tin cho khách khi đọc được tin nhắn của họ. File luật cũ để chế độ chatbot tự hạ về im lặng khi đọc, nên sau khi cập nhật không nhóm nào còn tự trả lời.
+
+## [0.9.142] - 2026-07-21
+Sửa lỗi nghiêm trọng: bảo Javis gửi tin Zalo cho một người thì nó nhắn nhầm sang người khác không trong danh sách theo dõi.
+### Sửa lỗi
+- **Gửi tin Zalo qua chat có thể ra nhầm tài khoản và nhầm người**: khi bật nghe một tài khoản, listener tự tắt connector của tài khoản đó, nên khi chủ bảo gửi tin, engine lặng lẽ rơi sang một tài khoản Zalo khác đang bật, tra tên người nhận trong danh bạ của tài khoản sai rồi gửi từ tài khoản sai. Không có bước xác nhận nên tin bay đi luôn, không thu hồi được. Đây là hệ quả của cơ chế tự tắt connector thêm việc engine được tự do gửi mà không phải chắc đúng người.
+- Thêm công cụ gửi Zalo an toàn riêng, khoá cứng vào tài khoản đang nghe và chỉ gửi được cho cuộc chat trong danh sách đang theo dõi, nên về mặt cấu trúc không thể gửi nhầm tài khoản hay nhầm người. Tên khớp nhiều thì công cụ từ chối và bắt hỏi lại, không đoán. Không có trong danh sách theo dõi thì từ chối.
+- Dặn Javis trong hướng dẫn hệ thống dùng công cụ an toàn này khi được yêu cầu gửi tin, tuyệt đối không dùng công cụ thô.
+### An toàn
+- Công cụ gửi ở mức quyền an toàn, nên vòng lặp nền chạy chế độ chỉ đọc không thể tự gửi tin. Chỉ khi chủ yêu cầu trực tiếp trong chat mới gửi.
+
+## [0.9.141] - 2026-07-20
+Sửa lỗi ảnh Javis tạo trong lúc chat Telegram cứ gửi về tài khoản Telegram đầu tiên thay vì người đang hỏi.
+### Sửa lỗi
+- **Ảnh gửi nhầm về chủ bot khi hai người cùng chat**: khi Javis tạo ảnh, ảnh được lưu vào thư mục attachments của brain và nhúng vào câu trả lời bằng đường dẫn tương đối như `![](attachments/anh.png)`. Cơ chế tự đính kèm file về Telegram trước đây chỉ nhận đường dẫn TUYỆT ĐỐI hoặc file viết bằng công cụ Write, nên ảnh tạo ra không được tự đính kèm. Engine đành gửi ảnh bằng lệnh curl, mà lệnh này thiếu mã người nhận thì rơi về tài khoản Telegram đầu tiên trong danh sách. Kết quả là người thứ hai đang chat vẫn thấy ảnh của mình bay về máy người đầu.
+- Nay cơ chế tự đính kèm hiểu luôn đường dẫn tương đối trong vault (ví dụ `attachments/...`), giải về gốc brain của đúng phiên đang chat và gửi thẳng cho người đang hỏi, không cần curl nữa. Có chặn thoát vault (không cho `../` ra ngoài) và bỏ qua liên kết web. Gateway cũng nhắc engine rằng ảnh vừa tạo chỉ cần nhúng là đủ, khỏi curl (curl dễ gửi nhầm chủ bot).
+- Thêm kiểm thử chốt cho việc thu file: ảnh nhúng tương đối được bắt đúng, đường dẫn tuyệt đối vẫn chạy, URL không bị nhầm là file, chặn thoát vault, và file cũ không bị gửi lại.
+
+## [0.9.140] - 2026-07-20
+Sửa lỗi bấm Bật nghe hiện Đang bật rồi lập tức quay về Bật nghe mà không có gì diễn ra.
+### Sửa lỗi
+- **Nút Bật nghe văng lỗi ngầm rồi tự hồi**: bản 0.9.136 đổi tên một biến trong giao diện nhưng sót lại một chỗ dùng tên cũ, nên khi bấm Bật nghe thì đoạn dựng dữ liệu gửi đi tham chiếu một biến không còn tồn tại và văng lỗi. Nút được lập trình luôn tự bật lại nên nó quay về Bật nghe, còn lệnh thì chưa bao giờ được gửi tới máy chủ. Không có thông báo gì nên nhìn như không phản ứng.
+- Sửa chỗ sót đó, và cập nhật nốt phần mô tả cùng bố cục panel sang thiết kế hai trạng thái Chỉ đọc và Tự phản hồi mà bản 0.9.136 áp dụng thiếu.
+- Thêm kiểm thử chốt để kiểu lỗi đổi tên biến sót chỗ này không lọt qua lần nữa.
+
+## [0.9.139] - 2026-07-20
+Sửa lỗi gốc khiến mọi thay đổi giao diện của nhiều bản gần đây trở nên vô hình với trình duyệt.
+### Sửa lỗi
+- **Trình duyệt giữ mãi bản giao diện cũ trong cache**: mỗi file javascript và css được đánh số phiên bản bằng tay trong trang chủ, và con số của console.js đứng yên suốt hàng chục bản. Vì địa chỉ tải không đổi nên trình duyệt cứ dùng bản cũ trong bộ nhớ đệm, máy chủ cập nhật thật mà giao diện đóng băng. Đây là lý do các sửa đổi như thiết kế hai trạng thái, nút không còn chìm, hạn chờ, đều có trên máy chủ nhưng người dùng không hề thấy.
+- Nay trang chủ tự gắn phiên bản app vào mọi file javascript và css khi phục vụ, nên mỗi lần cập nhật là trình duyệt tải lại toàn bộ, không phải nhớ tăng số bằng tay nữa và không thể quên.
+
+## [0.9.138] - 2026-07-20
+Sửa lỗi nút Bật nghe bấm vào rồi chìm mãi, không bật được cũng không hồi lại.
+### Sửa lỗi
+- **Endpoint bật nghe chặn cả vòng lặp sự kiện**: nó ghi cấu hình, giải mã kết nối và chờ luồng cũ dừng, tất cả làm đồng bộ ngay trong hàm bất đồng bộ, nên trong lúc đó máy chủ không phục vụ được gì khác và nút treo. Nay phần nặng chạy trong luồng riêng, vòng lặp không bị nghẽn.
+- **Chờ luồng cũ quá lâu**: khi bật lại ngay sau khi tắt, trước đây chờ tới mười lăm giây. Nay giết tiến trình con trước rồi chỉ chờ bốn giây, vì dừng xong là nó thoát ngay.
+- **Nút không tự hồi khi request lỗi**: thiếu bước bật lại nút trong mọi trường hợp, nên chỉ cần request chậm hay lỗi là nút kẹt vĩnh viễn. Nay nút luôn được bật lại, và lệnh gọi có hạn chờ ba mươi giây, quá hạn thì báo máy chủ không phản hồi thay vì chìm mãi.
+
+## [0.9.137] - 2026-07-20
+Sửa lỗi báo chưa chọn tài khoản Zalo trong khi ô chọn rõ ràng đang hiện tên tài khoản.
+### Sửa lỗi
+- **Ô chọn tài khoản hiện tên nhưng chưa hề được lưu**: giá trị đó chỉ được ghi xuống khi bấm Bật nghe, còn bấm Lưu theo dõi thì không gửi, nên cấu hình vẫn trống và lời báo tuy khó hiểu nhưng đúng. Nay lưu theo dõi ghi luôn tài khoản đang chọn, và đổi tài khoản trong ô là lưu ngay.
+- **Thông báo lỗi cũ nằm lì trên màn hình**: từ bản 0.9.132 giao diện hiện lỗi kể cả khi đang tắt, nhưng lệnh dừng lại không xoá lỗi cũ, nên một lần bật hụt từ lúc nào đó cứ hiện mãi và làm tưởng đang hỏng. Nay dừng nghe là xoá luôn.
+
+## [0.9.136] - 2026-07-20
+Mỗi cuộc chat Zalo giờ chỉ có hai trạng thái dễ hiểu, và Javis tự quyết khi nào nên lên tiếng.
+### Thay đổi
+- **Hai trạng thái thay cho năm chế độ**: mỗi cuộc chat trong danh sách có một ô chọn với hai lựa chọn là Chỉ đọc và Tự phản hồi. Đơn giản hơn hẳn cách cũ, và mọi thứ tinh vi hơn thì dặn thẳng trong chat.
+### Thêm mới
+- **Javis được quyền im lặng**: ở chế độ tự phản hồi, nó tự quyết có nên lên tiếng hay không chứ không phải cứ có tin là trả lời. Người ta đang nói chuyện với nhau, tán gẫu, hay chuyện chẳng liên quan thì nó im. Trước đây bot luôn phải sinh ra một câu trả lời, mà một con bot xen vào mọi câu chuyện trong nhóm còn phiền hơn là không có bot.
+- **Được tự do diễn đạt theo ngữ cảnh** thay vì bám câu chữ có sẵn, và nói theo phong cách riêng của từng nhóm nếu chủ đã dặn trong luật.
+- **Bật tự phản hồi phải xác nhận một lần**, vì tin gửi đi không thu hồi được.
+### Bảo mật
+- Vẫn giữ nguyên hộp cát: bot không có công cụ nào, không thấy dữ liệu kinh doanh, chỉ sinh ra chữ còn gửi đi đâu là do mã Javis quyết.
+- Giữ một rào cứng dù chủ cho tự do sáng tạo: không được bịa giá, tồn kho, thời gian giao hàng hay cam kết với khách. Sai một câu ở đó là mất tiền thật, nên gặp là hỏi lại chủ.
+
+## [0.9.135] - 2026-07-20
+Javis tự dọn đống luật ồn do chính mặc định hỏng của nó sinh ra, thay vì bắt chủ đi sửa tay từng cái.
+### Sửa lỗi
+- **Đổi mặc định không cứu được luật đã tạo**: bản 0.9.131 chuyển mặc định sang im lặng nhưng chỉ áp cho luật mới, còn những cuộc chat đã tick từ bản 0.9.130 vẫn mang chế độ báo mọi tin nên vẫn dội về Telegram. Ba lần trước Javis chỉ bảo chủ bấm Lưu lại, tức là đẩy việc dọn hậu quả sang cho người dùng. Nay khi khởi động Javis tự chuyển chúng về im lặng đúng một lần, và nhắn cho chủ biết đã sửa cái gì.
+- Chỉ đụng vào luật báo mọi tin mà không có từ khoá, vì đó đúng là dấu vết của mặc định hỏng. Luật có từ khoá, luật nhắc khi quên trả lời, và luật để Javis tự trả lời đều là chủ cố ý đặt nên giữ nguyên.
+- Việc dọn chạy đúng một lần, những lần khởi động sau không đè lên luật chủ tự đặt lại.
+
+## [0.9.134] - 2026-07-20
+Hết cảnh cập nhật xong là báo đỏ trùng phiên và phải xoá kết nối quét lại mã QR.
+### Sửa lỗi
+- **Không đóng listener tử tế khi tắt app**: lúc cập nhật, tiến trình bị dừng đột ngột mà chưa kịp đóng kết nối, nên phía Zalo vẫn coi phiên cũ đang sống và chặn listener mới. Nay khi server tắt sẽ đóng listener trước, gửi tín hiệu dừng nhẹ để công cụ kịp ngắt kết nối sạch sẽ.
+- **Trùng phiên bị coi là lỗi cứng ngay từ lần đầu**: ngay sau khi khởi động lại thì trùng phiên là chuyện bình thường và tự hết sau vài chục giây, nhưng listener lại dừng hẳn và bắt chủ đi xoá kết nối quét lại mã QR một cách oan uổng. Nay kiên nhẫn thử lại năm lần với khoảng chờ tăng dần, báo rõ đang chờ phiên cũ rụng và đây là chuyện thường sau khi cập nhật. Hết kiên nhẫn mới kết luận, kèm số lần đã thử.
+- **Dọn tiến trình cũ cũng ngắt nhẹ trước**: chính chúng đang giữ phiên Zalo, giết thẳng thì phiên lại treo, đúng cái vòng luẩn quẩn vừa gỡ.
+
+## [0.9.133] - 2026-07-20
+Javis giờ biết đặt luật Zalo khi được dặn bằng lời, thay vì chỉ ghi vào bộ nhớ rồi thôi.
+### Sửa lỗi
+- **Dặn bằng lời chỉ được ghi nhớ chứ không thành hành động**: chủ nói với nick này cứ trả lời thoải mái, Javis đáp đã ghi nhớ và tạo một file sở thích trong bộ nhớ, nhưng không hề tạo luật nào nên hành vi không đổi. Nguyên nhân là hướng dẫn hệ thống không hề nhắc tới Zalo, nên Javis không biết có công cụ đặt luật mà dùng, và rơi về thói quen mặc định là ghi nhớ sở thích.
+- Bổ sung việc đặt luật Zalo vào danh sách các cách xử lý khi nhận yêu cầu qua chat, kèm luật chọn nói thẳng rằng ghi nhớ không làm đổi hành vi, phải có file luật thì listener mới thật sự im lặng, báo, hay tự trả lời.
+- Mô tả công cụ được viết lại bằng đúng những câu người dùng hay nói, ví dụ đừng báo nữa, im lặng thôi, báo hết tin nhóm này, ba mươi phút chưa ai trả lời thì nhắc, với nick này cứ trả lời thoải mái.
+
+## [0.9.132] - 2026-07-20
+Sửa lỗi đặt luật Zalo bằng lời trong chat nhưng listener không hề áp dụng.
+### Sửa lỗi
+- **Ghi một nơi, đọc một nẻo**: khi chủ dặn bằng lời, công cụ ghi file luật vào brain đang mở, ví dụ My Bullet Journal. Nhưng listener là dịch vụ chạy nền nên chỉ đọc brain mặc định là Brain Default. Luật đặt bằng lời rơi vào chỗ không ai đọc, nên dặn đừng báo nữa mà vẫn báo. Nay listener gom luật từ mọi brain, hết luôn lớp lỗi này.
+- Cùng một cuộc chat mà có luật ở hai brain khác nhau thì lấy bản sửa gần nhất, thay vì chọn bừa một cái.
+### Ghi chú
+- Luật cũ tạo ở bản 0.9.130 vẫn là báo mọi tin, vì đổi mặc định ở bản 0.9.131 chỉ áp cho luật tạo mới. Muốn im lặng thì bấm Lưu theo dõi lại một lần với ô từ khoá để trống, hoặc dặn Javis trong chat.
+
+## [0.9.131] - 2026-07-20
+Mặc định Javis im lặng khi theo dõi cuộc chat Zalo, không còn dội mọi tin về Telegram.
+### Thay đổi
+- **Tick theo dõi giờ mặc định là im lặng**: chỉ ghi nhận cuộc chat chứ không báo Telegram. Trước đây tick vào là báo mọi tin, mà theo dõi vài nhóm đông thì điện thoại nổ tung và cuối cùng chẳng ai đọc nữa. Nghe là để Javis biết chuyện, còn báo phải là thứ chủ chủ động yêu cầu cho từng nhóm.
+- **Muốn được báo thì nói rõ**: nhập từ khoá vào ô bên dưới để chỉ báo khi tin có chứa những chữ đó, hoặc dặn Javis trong chat cho từng nhóm, ví dụ báo hết tin của nhóm này, hay nhắc khi ba mươi phút chưa ai trả lời.
+- Dòng xác nhận sau khi lưu nói rõ đang im lặng hay đang báo theo từ khoá nào, để không hiểu nhầm là sẽ được báo.
+
+## [0.9.130] - 2026-07-20
+Sửa lỗi tick chọn cuộc chat theo dõi nhưng không lưu được gì, và thêm nút lưu có xác nhận nhìn thấy được.
+### Sửa lỗi
+- **Tick vào không lưu gì cả**: từ khi chuyển sang luật riêng cho từng cuộc chat, giao diện vẫn gửi danh sách theo khuôn cấu hình cũ, mà phần ghi cấu hình chỉ nhận những trường còn trong khuôn mặc định nên danh sách bị vứt âm thầm. Đây là lỗi dời kiến trúc mà quên nối lại giao diện. Nay tick chọn sẽ ghi thành file luật thật trong brain.
+- **Ô tick hiện sai trạng thái**: nó đọc từ trường cấu hình đã bị bỏ, nên luật đặt qua chat không hiện lên và ngược lại. Nay lấy thẳng từ luật đang bật, và tự vẽ lại khi luật đổi.
+### Thêm mới
+- **Nút Lưu theo dõi kèm dòng xác nhận**: bấm là thấy ngay đã lưu bao nhiêu cuộc chat và theo kiểu gì. Trước đây lưu ngầm nên không có cách nào biết là đã ăn hay chưa. Ô từ khoá và giờ im lặng cũng được lưu cùng, trước đây hai ô đó chỉ ghi khi bật tắt nên sửa xong mà không bật tắt là mất.
+### Bảo mật
+- **Không để một cái tick xoá mất công sức**: luật chế độ chatbot hoặc nhắc khi quên trả lời do chủ đặt kỹ qua chat thì tick chỉ bật hoặc tắt, tuyệt đối không ghi đè chế độ và kịch bản. Bỏ tick cũng chỉ tắt luật chứ không xoá file, nên kịch bản đã viết vẫn còn nguyên.
+
+## [0.9.129] - 2026-07-20
+Phân biệt được các nhóm Zalo trong danh sách cuộc chat, thay vì tất cả cùng hiện tên người nhắn.
+### Sửa lỗi
+- **Nhóm hiện tên người nhắn chứ không phải tên nhóm**: dữ liệu tin nhắn gửi về không hề kèm tên nhóm. Bản trước đoán tên trường mà không kiểm chứng được, nên thực tế vẫn rơi về tên người gửi, và hai nhóm khác nhau mà cùng một người nhắn thì hiện y hệt nhau.
+### Thêm mới
+- **Phân biệt được ngay**: nhóm chưa có tên thật sẽ hiện kèm bốn số cuối của mã nhóm, nên không còn hai dòng trùng nhau.
+- **Nút lấy tên nhóm**: hỏi Zalo tên thật của tất cả nhóm trong một lần gọi rồi gắn vào danh sách. Để là nút bấm tay chứ không tự chạy ngầm, vì mỗi lần gọi mở một kết nối ngắn khiến listener phải nối lại một nhịp.
+- Bộ đọc kết quả nhận được nhiều định dạng khác nhau và không bao giờ lỗi với dữ liệu lạ, vì định dạng đầu ra của công cụ chưa kiểm chứng được nếu không có tài khoản đăng nhập thật.
+
+## [0.9.128] - 2026-07-20
+Sửa lỗi báo mất kết nối trong khi thực tế vẫn đang nghe bình thường và tin vẫn về đều.
+### Sửa lỗi
+- **Đọc nhầm dòng khai báo thành sự cố**: công cụ in dòng thông báo có bật tính năng tự nối lại, ngay sau dòng báo đã bắt đầu nghe. Bộ đọc log khớp chuỗi quá thô nên hiểu dòng khai báo đó thành đang mất kết nối, ghi đè trạng thái đúng và kẹt luôn ở đó. Nay chỉ nhận đúng những dòng báo sự cố thật, và bỏ qua các dòng liệt kê năng lực, sự kiện hay địa chỉ webhook.
+- **Thêm một nguồn sự thật chắc chắn hơn log**: nếu vừa có tin nhắn về trong ba phút gần đây thì kết nối chắc chắn đang sống, nên trạng thái báo đang nghe bất kể log đoán gì. Đọc log để suy ra trạng thái vốn mong manh vì chuỗi chữ của công cụ có thể đổi bất cứ lúc nào. Riêng lỗi cứng như trùng phiên thì không bị che, vì cái đó phải do người sửa rồi bật lại.
+
+## [0.9.127] - 2026-07-20
+Sửa lỗi mù của bộ dò tiến trình Zalo trên máy chủ: nó luôn báo không tìm thấy gì, kể cả khi thực tế đang có tiến trình chiếm kết nối.
+### Sửa lỗi
+- **Bộ dò tiến trình không chạy được trong Docker**: nó gọi lệnh pgrep, mà ảnh Docker chỉ cài ca-certificates, curl, git, ripgrep, ffmpeg và tini, không có gói chứa pgrep. Lệnh ném lỗi, bị nuốt, nên trang trạng thái luôn báo không có tiến trình lạ nào trong khi listener vẫn bị đá ra liên tục. Một con số không giả còn tệ hơn không có số vì nó khiến loại nhầm nguyên nhân. Nay đọc thẳng thư mục tiến trình của hệ thống, luôn có sẵn không cần cài gói.
+- **Bỏ sót phiên đăng nhập quét QR**: bộ dọn trước đây chỉ tìm tiến trình nghe và tiến trình của connector, trong khi phiên quét QR chưa thoát cũng giữ một kết nối cho cùng tài khoản. Nay quét cả ba loại.
+- **Không tự giết tiến trình con của chính mình**: loại trừ theo nhóm tiến trình, tránh vừa bật đã tự tắt.
+### Cải thiện
+- Đường dẫn thư mục tiến trình được tách thành hằng số để kiểm thử chạy được trên cả Windows lẫn Linux. Trước đây nhánh Linux không hề được kiểm thử, đó chính là lý do lỗi mù lọt qua.
+
+## [0.9.126] - 2026-07-20
+Dứt điểm trùng phiên Zalo: listener tự tắt connector của chính tài khoản đó khi bật, và dọn cả tiến trình của connector chứ không riêng tiến trình nghe.
+### Sửa lỗi
+- **Connector Zalo chính là thứ đá listener**: nó giữ một kết nối lâu dài cho cùng tài khoản, mà Zalo chỉ cho một kết nối mỗi tài khoản. Bản trước mới chỉ đổi đường gửi tin, còn bản thân connector vẫn bật nên vẫn tranh chỗ. Nay bật nghe là Javis tự tắt connector của đúng tài khoản đó, dừng nghe thì bật lại như cũ, và nói rõ cho chủ biết chứ không im lặng làm mất công cụ.
+- **Bộ dọn tiến trình cũ bỏ sót**: bản trước chỉ tìm tiến trình nghe, không đụng tới tiến trình của connector, nên thứ đang giữ kết nối vẫn sống. Nay quét cả hai.
+### Ghi chú
+- Từ bản 0.9.124 listener không cần connector nữa, cả nghe lẫn gửi đều tự lo, nên việc tạm tắt connector không mất chức năng gì.
+
+## [0.9.125] - 2026-07-20
+Tự dọn tiến trình nghe cũ còn sót, và thêm đường xoá hẳn phiên đăng nhập Zalo khi bị trùng phiên mà đăng xuất không ăn thua.
+### Thêm mới
+- **Bật nghe tự dọn trước khi khởi động**: tiến trình nghe mồ côi từ các bản trước vẫn giữ kết nối sống và đá listener mới ra ngay. Đăng xuất ở nơi khác không giết được nó vì kết nối đã mở thì cứ sống. Nay mỗi lần bật là Javis tự tìm và dọn sạch trước, chủ không phải đi tìm tiến trình trên máy chủ.
+- **Nút xoá phiên đăng nhập**: chỉ hiện khi đang trùng phiên. Cần vì lệnh đăng xuất của công cụ cố ý giữ lại thông tin đăng nhập để tự vào lại lần sau, nên đăng xuất không hề gỡ được phiên đang kẹt. Xoá xong quét QR lại là sạch.
+- **Nói rõ tìm thấy bao nhiêu tiến trình cũ** thay vì để chủ đoán tại sao trùng phiên.
+### Bảo mật
+- **Chặn một lỗi phá hoại trước khi phát hành**: bản đầu của bộ dò tiến trình lọc theo dòng lệnh, mà chính câu truy vấn lại chứa những chữ đang tìm nên nó tự bắt chính mình, và lệnh dọn thì giết cả cây tiến trình. Nay chỉ soi đúng tiến trình node và loại trừ chính câu dò. Có kiểm thử chốt lại.
+- **Xoá phiên bị rào trong đúng thư mục phiên của connector**, nên một mã kết nối bị sửa bậy không thể khiến Javis xoá thư mục khác.
+
+## [0.9.124] - 2026-07-20
+Xử lý va chạm một kết nối mỗi tài khoản Zalo, thứ đã ghi là chưa kiểm chứng từ bản đầu và nay xảy ra thật trên máy chủ.
+### Sửa lỗi
+- **Listener bị đá ra liên tục**: log thật báo có kết nối khác được mở nên kết nối này bị đóng, cứ vài phút một lần. Nguyên nhân là đường gửi tin đi qua connector Zalo, mà connector giữ một kết nối lâu dài cho cùng tài khoản nên chính nó đá listener, rồi listener nối lại và đá ngược. Nay gửi tin bằng lệnh một lần, chỉ mở kết nối trong tích tắc rồi thoát.
+- **Không còn quay vòng vô ích**: chuỗi báo lỗi của thư viện Zalo trong trường hợp này không nằm trong bộ nhận diện lỗi cứng, nên listener tưởng là rớt mạng thường và cứ thử lại mãi. Nay nhận ra đúng, dừng lại và nói rõ phải kiểm tra những gì: connector Zalo đã tắt chưa, có đang mở Zalo Web không, có listener cũ nào còn chạy không.
+- **Log không còn rác ký tự**: bóc mã màu trước khi hiển thị, hết cảnh nhìn thấy những đoạn như ESC ngoặc 31m ERROR.
+- **Nhóm hiện đúng tên nhóm**: trước đây sổ cuộc chat lấy tên người gửi làm tên nhóm nên hai nhóm khác nhau cùng hiện một tên và không phân biệt được. Nay ưu tiên tên nhóm, và người nhắn sau không ghi đè mất tên đã biết.
+
+## [0.9.123] - 2026-07-20
+Zalo chuyển từ một bộ lọc thông báo dùng chung sang chính sách riêng cho từng cuộc chat, đặt bằng lời qua chat. Thêm chế độ Javis tự trả lời khách như một chatbot, chạy trong hộp cát.
+### Thêm mới
+- **Mỗi cuộc chat một luật riêng**, ghi ở `Javis/zalo/<slug>.md` trong brain nên có git, xem lại và sửa tay được. Năm chế độ: chỉ ghi nhận, báo mọi tin, báo theo từ khoá, nhắc khi quá N phút chưa ai trả lời, và tự trả lời khách theo kịch bản.
+- **Đặt luật bằng lời**: tool `javis_zalo_rule` để nói thẳng trong chat hoặc Telegram, ví dụ nhóm này nếu 30 phút chưa ai trả lời thì nhắc. Giao diện chỉ hiển thị luật, không có form nhập. Gọi tên nhóm mà khớp nhiều hơn một thì tool từ chối kèm danh sách chứ không đoán, vì gắn kịch bản nhầm nhóm là bot đi trả lời khách của nhóm khác.
+- **Nhắc khi quên trả lời**: khách nhắn mà quá N phút không ai đáp thì báo Telegram đúng một lần. Làm được là nhờ Javis có tài khoản Zalo riêng, nên chủ trả lời bằng tài khoản của mình sẽ là một thành viên khác trong nhóm và tin của chủ về đầy đủ.
+- **Chế độ chatbot**: Javis tự trả lời khách theo kịch bản riêng của từng nhóm, có trần số tin mỗi giờ, và tự đẩy về cho chủ khi gặp việc ngoài kịch bản.
+### Bảo mật
+- **Hộp cát cho chatbot**: engine chạy không có tool nào, không thấy MCP nào, không mang theo bộ nhớ hay brain. Model chỉ sinh ra chữ, còn gửi đi đâu là do mã Javis quyết và luôn gửi về đúng cuộc chat vừa phát sinh tin, nên dù bị dụ hoàn toàn cũng không nhắn được cho người khác.
+- **Vá một bẫy nguy hiểm của lớp engine**: điều kiện kiểm tra danh sách tool cho phép coi danh sách rỗng là chưa đặt gì, nên cách viết trực giác nhất để tạo hộp cát lại mở toàn quyền kèm nạp cả MCP sẵn của máy, đúng lúc nội dung do người lạ soạn đi vào engine. Nay truyền một tên tool không tồn tại để cổng kiểm quyền thực sự bật, và có kiểm thử chốt lại.
+- Bốn chế độ còn lại vẫn không đụng tới engine, giữ nguyên rào của bản trước.
+- Chế độ chatbot luôn được tạo ở trạng thái tắt, chủ phải bật riêng sau khi nghe lại kịch bản.
+
+## [0.9.122] - 2026-07-20
+Nhóm Zalo giờ hiện ra để chọn được, danh sách cuộc chat chịu được hàng trăm nhóm, và dọn nốt lỗi tiến trình con sống mồ côi.
+### Sửa lỗi
+- **Tin nhóm không bao giờ hiện ra**: công cụ nghe mặc định chỉ gửi hai loại sự kiện là tin nhắn và bạn bè, thiếu hẳn loại nhóm. Nay khai đủ cả bốn loại. Ngoài ra sổ cuộc chat trước đây chỉ ghi đúng sự kiện tin nhắn, nên lúc vừa thêm tài khoản vào một nhóm mà chưa ai nhắn gì thì nhóm không xuất hiện. Nay mọi sự kiện có cuộc chat đều được ghi, thêm vào nhóm là thấy ngay.
+- **Tiến trình con sống mồ côi**: npx chỉ là lớp vỏ, node bên trong mới là thứ giữ kết nối. Lệnh dừng cũ chỉ giết cái vỏ nên node vẫn chạy và vẫn đẩy tin về, gây ra cảnh giao diện báo tiến trình chưa chạy trong khi tin vẫn chảy đều. Nay dọn cả cây tiến trình, bằng taskkill trên Windows và killpg trên Linux.
+- **Bật lại lúc luồng cũ đang dừng dở**: trước đây trả về "đã chạy rồi" mà không dựng luồng mới, cờ dừng vẫn còn bật nên luồng cũ thoát và để lại trạng thái tắt trong khi cấu hình nói đang bật. Nay chờ luồng cũ thoát hẳn rồi mới dựng luồng mới.
+- **Không dội tin cũ khi nối lại**: loại trừ các sự kiện phát lại lịch sử và báo đã xem, tránh dồn hàng loạt tin cũ vào Telegram mỗi lần kết nối lại.
+### Cải thiện
+- **Danh sách cuộc chat dùng được khi có hàng trăm nhóm**: thêm ô tìm kiếm, chỉ hiện sẵn 8 cuộc chat gần nhất và có nút xem thêm. Cuộc chat đang theo dõi luôn ghim lên đầu và không bao giờ bị cắt, để lúc nào cũng bỏ tick được. Trần ghi nhớ nâng từ 60 lên 300.
+- **Nhận diện tin nhắn rộng hơn**: chấp nhận cả biến thể tên sự kiện như tin nhắn nhóm, vì tên sự kiện của công cụ chưa có tài liệu chốt.
+- **Thêm bộ đếm loại sự kiện** trong trang trạng thái, để lần sau có thứ đáng lẽ phải hiện mà không hiện thì nhìn ra sự thật thay vì đoán.
+
+## [0.9.121] - 2026-07-20
+Sửa lỗi listener Zalo bấm Bật rồi mà vẫn hiện "Đang tắt" và không nhận được tin nào. Đây là lỗi chặn hoàn toàn: ở các bản trước listener CHƯA BAO GIỜ khởi động nổi, không phải chạy rồi hỏng.
+### Sửa lỗi
+- **Lấy sai nguồn thư mục phiên đăng nhập**: chỗ tìm thư mục phiên đọc qua mcp_store.get_connection, mà hàm đó trả bản đã che secret và lược mất trường config, nên đường dẫn luôn rỗng và mọi lần bật đều thất bại ngay từ bước kiểm tra. Chuyển sang đọc từ mcp_store.resolved, cũng chính là nơi tính thư mục home cho connector chạy cô lập, nên listener và connector không còn lệch nhau.
+- **Bật hụt vẫn ghi là đã bật**: endpoint bật ghi cờ enabled trước rồi mới kiểm tra, kiểm tra hỏng thì không hoàn tác, để lại đúng cảnh nhãn "Đang tắt" nằm cạnh nút "Tắt" còn danh sách thì bảo đang nghe. Nay kiểm tra xong mới bật.
+- **Lý do lỗi bị xoá mất sau 5 giây**: nhịp hỏi lại trạng thái ghi đè dòng lỗi vừa hiện, chủ không kịp đọc. Nay lý do được giữ ở tiến trình nền và hiện cả khi đang tắt.
+- **Thông báo lỗi giờ kèm đường dẫn cụ thể** thay vì chỉ nói chung chung là chưa đăng nhập.
+### Cải thiện
+- **Luồng nền không còn chết câm**: mọi lỗi bất ngờ được biến thành trạng thái đọc được thay vì để trạng thái đứng nguyên giá trị cũ và giao diện báo sai.
+- **Phân biệt hỏng cứng với rớt mạng**: sidecar bật lên là tắt ngay 3 lần thì dừng hẳn và phơi log của công cụ ra, thay vì lặp vô tận trong khi vẫn hiện "đang thử lại".
+- **Hiện log thô của sidecar trên giao diện** khi đang trục trặc, để không phải đoán mò nữa.
+- **Nhãn trạng thái nói đúng tên vấn đề**: đã bật mà tiến trình chưa chạy thì nói đúng như vậy, không hiện "Đang tắt".
+### Đã kiểm chứng
+- Chạy thật `zalo-agent-cli --help` và `listen --help`: lệnh listen có thật, các cờ webhook, filter, no-self đều đúng. Ghi nhận thêm là filter chỉ nhận user, group hoặc all; giá trị "dm" dùng ở 0.9.118 là sai, đã thay bằng "all" từ 0.9.119.
+- Chạy listen với thư mục trống: công cụ in "Not logged in" rồi thoát mã 1, khớp với bộ nhận diện lỗi sẵn có.
+- Kiểm trên dữ liệu thật: kết nối Zalo trả về đường dẫn home tồn tại.
+
+## [0.9.120] - 2026-07-20
+Sửa lỗi ô "Cuộc chat theo dõi" trống trơn không có một chữ hướng dẫn nào, khiến người dùng mở panel ra không biết phải làm gì để có nhóm mà chọn.
+### Sửa lỗi
+- **Ô cuộc chat trống giờ có chỉ dẫn**: biến chống vẽ lại được khởi tạo bằng chuỗi rỗng, mà danh sách rỗng cũng sinh ra khoá rỗng, nên lần vẽ đầu tiên bị chặn ngay và dòng hướng dẫn không bao giờ hiện. Đổi sang khởi tạo bằng null.
+- **Chỉ dẫn nói đúng việc cần làm theo từng trạng thái**: đang tắt thì bảo bấm Bật nghe trước, đang nghe mà chưa ai nhắn thì bảo nhờ người nhắn thử một tin vào nhóm cần theo dõi. Trước đây chỉ có một câu chung cho cả hai.
+- Thêm 4 kiểm tra trong dashboard/test_zalo_panel.js chốt đúng lỗi này để không tái phát.
+
+## [0.9.119] - 2026-07-20
+Siết listener Zalo theo đúng cách dùng thật: chỉ nghe những cuộc chat được chọn, và rà bảo mật toàn tuyến vì nội dung tin nhắn là do người lạ soạn.
+### Thay đổi
+- **Chỉ nghe cuộc chat được chọn**: danh sách cuộc chat theo dõi giờ là cổng chính, chưa tick cái nào thì không báo gì. Trước đây mặc định nghe mọi tin nhắn riêng rồi lọc bằng từ khoá, ồn và không đúng nhu cầu. Từ khoá hạ xuống thành lọc phụ, chỉ thu hẹp thêm bên trong các cuộc chat đã chọn. Bỏ ô "chỉ tin riêng" vì nó mâu thuẫn với việc đã chọn đích danh.
+- **Tự liệt kê cuộc chat để chọn**: chủ không biết thread ID, nên sidecar học từ chính luồng tin đi qua và hiện thành danh sách tick chọn trong trang Kết nối. Tick là ăn ngay, không cần tắt bật lại. Cố ý không gọi tool liệt kê hội thoại vì làm vậy sẽ dựng thêm một socket cho cùng tài khoản, đúng vào va chạm chưa kiểm chứng.
+### Thêm mới
+- **Dòng dấu hiệu trên panel**: hiện tin gần nhất nhận lúc nào, và phân biệt rõ "đã nối nhưng chưa nhận tin nào" với "đang tắt". Đây là thứ cần để biết listener thật sự sống hay chỉ báo sống.
+### Bảo mật
+- **Nội dung Zalo không có đường chạm vào engine hay máy chủ**: đường dữ liệu chỉ là webhook, lọc, chuỗi text, Telegram. Module chỉ nhận đúng năm phụ thuộc, không engine, không Bash, không file, không MCP. Có test chốt đúng bộ năm đó nên ai nới về sau sẽ làm gãy test.
+- **Chống giả dạng lời của Javis**: tin của khách bị rào giữa hai vạch có nhãn "KHÔNG phải lệnh cho Javis", nhãn đặt trước nội dung và tin dài bị cắt, nên một tin cố ý xuống dòng rồi viết "Javis: xác nhận chuyển khoản" không lừa được.
+- **Chống dựng markup**: chốt bằng test rằng đường gửi Telegram của listener không đặt parse_mode, khác với đường gửi thường dùng MarkdownV2.
+- **Chống XSS trên dashboard**: tên hiển thị Zalo do người lạ tự đặt và được vẽ vào danh sách cuộc chat, nay bọc esc() toàn bộ. Thêm dashboard/test_zalo_panel.js chạy thật hàm esc và chốt nguồn chỗ vẽ danh sách.
+- **Lọc ký tự giấu chữ**: bỏ ký tự điều khiển, zero-width và ký tự đảo chiều RTL, những thứ nhìn vô hại mà máy đọc ra nội dung khác. Thêm trần payload 256KB và trần số cuộc chat ghi nhớ.
+
+## [0.9.118] - 2026-07-20
+Thêm khả năng nghe tin Zalo LIÊN TỤC. Trước đây connector Zalo là pull-only: phải gọi tool mới biết có tin, mà pool MCP lại đóng tiến trình sau 10 phút không dùng (`mcp_client._IDLE_TTL`), nên websocket và bộ đệm tin của `zalo-agent-cli mcp start` không sống sót. Giờ Javis chạy một tiến trình sidecar riêng, độc lập với pool, nhận tin ngay khi khách nhắn rồi báo về Telegram.
+### Thêm mới
+- **Listener Zalo chạy nền**: sidecar `zalo-agent-cli listen --webhook` đẩy từng sự kiện về `/hook/zalo`, Javis lọc rồi bắn Telegram. Bật tắt ngay trong thẻ Zalo ở trang Kết nối, có hiện trạng thái thật (đang nghe, mất kết nối đang thử lại, trùng phiên). Tự dựng lại khi đứt với backoff 5s rồi 30s rồi 120s rồi 300s, và tự bật lại sau khi khởi động lại app.
+- **Lọc mặc định chặt**: chỉ báo tin nhắn riêng có chứa từ khoá, không báo nhóm. Khớp từ khoá bỏ dấu và không phân biệt hoa thường nên khách gõ "gia" vẫn khớp "giá". Có danh sách cuộc chat theo dõi riêng, giờ im lặng, khử trùng msgId, và trần 20 thông báo mỗi 10 phút để nhóm đông không làm nổ Telegram.
+### Bảo mật
+- **`/hook/zalo` hai tầng rào**: chỉ nhận từ loopback (`_AUTH_LOCAL_EXACT`), cộng shared secret sinh tự động. Secret đi trong query chứ không phải header, vì `--webhook` của CLI chỉ POST JSON trần và không đặt được header tuỳ ý; gác bằng header sẽ chặn sạch tin. Loopback một mình không đủ vì tiến trình khác trên cùng VPS cũng là loopback. Secret không bao giờ trả ra frontend.
+- **Javis vẫn không tự trả lời khách**: listener chỉ đọc và báo. Gửi tin Zalo vẫn phải do chủ yêu cầu trực tiếp trong chat.
+### Đã biết
+- Zalo chỉ cho MỘT socket mỗi tài khoản, nên connector `zalo` và sidecar có thể đá nhau nếu dùng chung tài khoản. Chưa kiểm chứng được nên thiết kế chọn làm va chạm hiện rõ: bắt chuỗi trùng phiên trong log, đẩy lên giao diện và dừng hẳn thay vì quay vòng vô ích.
+
+## [0.9.117] - 2026-07-20
+Sửa lỗi báo nhầm "Chưa cài Codex CLI" khiến không chat được bằng gói ChatGPT dù đã đăng nhập thành công. Nguyên nhân: binary codex không nằm trong PATH nên Javis phải dò nó trong thư mục home, mà home lại lấy mỗi từ biến môi trường USERPROFILE; khi server được bật lại bởi tự-cập-nhật hay tác vụ nền thì biến này có thể trống, home thành rỗng nên mọi đường dẫn ~/.codex/... hoá ra tương đối và không khớp, dù binary vẫn nằm nguyên chỗ cũ.
+### Sửa lỗi
+- **Dò Codex CLI không còn phụ thuộc mỗi USERPROFILE**: thêm các đường lùi lần lượt là HOME, HOMEDRIVE cộng HOMEPATH, rồi Path.home(). Đã kiểm bằng cách bỏ lần lượt cả ba biến môi trường, vẫn dò ra đúng binary.
+- **Thêm biến JAVIS_CODEX_BIN**: trỏ thẳng tới file codex nếu máy cài ở chỗ lạ; trỏ sai đường dẫn thì bỏ qua và dò tiếp như thường.
+
+## [0.9.111] - 2026-07-20
+Viết lại hướng dẫn đăng nhập của TẤT CẢ 23 connector cho dễ đọc, và sửa lỗi hộp hướng dẫn bị tràn ngang. Trước đây cả 23 guide đều là MỘT đoạn văn chạy dài không ngắt dòng, các bước (1)(2)(3) chen ngang giữa câu; gặp chuỗi dài không khoảng trắng (lệnh shell, URL callback) thì hộp bị đẩy tràn ra ngoài modal, phải kéo ngang mới đọc hết.
+### Sửa lỗi
+- **Hộp hướng dẫn không tràn ngang nữa**: thêm `overflow-wrap: anywhere` cho `.conn-guide` và `.conn-risk`, nên lệnh shell dài hay URL callback tự bẻ dòng thay vì đẩy tràn. Đã đo trên modal thật rộng 520px: `scrollWidth == clientWidth`, không còn thanh cuộn ngang.
+- **Xuống dòng trong catalog giờ hiện đúng**: thêm `white-space: pre-line`, nên ký tự xuống dòng viết trong `mcp-catalog.json` hiện thành xuống dòng thật trên giao diện (guide là chuỗi thuần đi qua `esc()`, trước đây HTML nuốt hết).
+### Cải thiện
+- **23/23 guide viết lại theo một khuôn**: dòng "Cần trước:" cho thứ phải cài sẵn, rồi "Làm 1 lần:" với mỗi bước một dòng đánh số, cuối cùng là ghi chú và cảnh báo tách đoạn riêng. Nội dung sự thật giữ nguyên, chỉ đổi cách trình bày.
+- **Tách các đoạn quá dài**: `meta-ads` (226 ký tự), `facebook-personal` (235), `google-keep` (204) được cắt thành đoạn ngắn hơn. Bước 2 của `facebook-personal` vốn nhồi cả quy trình DevTools vào một câu, nay tách thành 3 bước riêng.
+- **Entry `google-keep` khớp style file**: mảng gọn trên một dòng như 22 connector còn lại, thay vì mỗi phần tử một dòng.
+### Thêm mới
+- Test `server/test_catalog_guides.py` (10 kiểm tra, không mạng): guide dài phải có xuống dòng, không dòng nào quá 200 ký tự, bước đánh số phải mở đầu dòng, CSS phải thật sự khai `pre-line` + `overflow-wrap`, và cấm em dash / en dash trong cả file. Có canary chứng minh luật bắt được chuỗi kiểu cũ.
+
+## [0.9.116] - 2026-07-20
+Rà soát toàn bộ cảnh báo rủi ro của 23 connector. Từ khi viết ra tới nay chưa ai kiểm lại, mà chúng lại không hiện trên giao diện (sửa ở 0.9.115) nên lỗi tích lại không ai thấy. Tìm được ba connector có tool nguy hiểm mà không một chữ cảnh báo, một chỗ xếp loại mâu thuẫn, và một chỗ mô tả nhẹ hơn thực tế.
+### Bảo mật
+- **Ba connector có tool nguy hiểm mà KHÔNG có cảnh báo, nay đã có**: `pancake-pos` (tạo đơn hàng, ghi giao dịch thu chi, sửa công nợ, xuất hoá đơn điện tử, chạy quảng cáo, tạo voucher), `botcake` (gửi tin thật tới khách qua chatbot), `webcake-landing` (đăng trang công khai, lại đang mặc định ở mức Ghi nháp).
+- **Siết `*share*` của `google-sheets` từ mức Ghi lên mức NGUY HIỂM**: connector này mặc định ở mức Ghi nháp, nghĩa là trước đây Javis chia sẻ được bảng tính chứa số liệu kinh doanh ra người ngoài ngay từ mặc định. Nay thống nhất một chuẩn với `google-keep` (đã xếp `add_note_collaborator` là nguy hiểm): đẩy dữ liệu ra người ngoài luôn là mức Toàn quyền.
+### Sửa lỗi
+- **`google-workspace` mô tả nhẹ hơn thực tế**: cảnh báo viết mức Ghi nháp "chỉ soạn nháp, tạo lịch, tạo tài liệu", trong khi danh sách ghi có cả `*modify*` và `*move*`, tức sửa tài liệu có sẵn và di chuyển file Drive cũng được. Đã viết đúng lại.
+- **`zalo` là connector DUY NHẤT mặc định Toàn quyền** (17 cái Chỉ đọc, 5 cái Ghi nháp, 1 cái Toàn quyền) mà cảnh báo cũ không nói rõ điều đó. Giữ nguyên mức mặc định vì đấu Zalo vào chủ yếu để nhắn tin, nhưng cảnh báo nay nói thẳng là quyền gửi tin đang bật sẵn và chỉ cách hạ xuống.
+### Cải thiện
+- **Viết lại cả 20 cảnh báo theo một khuôn, có ngắt đoạn**: trước đây tất cả đều là một đoạn chạy dài không xuống dòng, y hệt vấn đề của phần hướng dẫn đã sửa ở 0.9.111. Nay mỗi mức quyền một đoạn, cảnh báo nặng nhất đứng đầu.
+### Thêm mới
+- Bổ sung 5 luật vào `server/test_canh_bao_rui_ro.py`: có tool nguy hiểm thì bắt buộc có cảnh báo; tool chia sẻ dữ liệu không được xếp mức Ghi; cảnh báo dài phải ngắt dòng và không dòng nào quá 200 ký tự; cảnh báo không được dùng chữ hạ thấp mức quyền so với thực tế; connector mặc định Toàn quyền phải nói rõ và chỉ cách hạ.
+### Ghi chú
+- Ba connector còn lại không có cảnh báo (`google-search-console`, `google-ads`, `tiktok-ads`) đều không khai tool nguy hiểm nào và mặc định Chỉ đọc, nên đúng là chưa cần.
+
+## [0.9.115] - 2026-07-20
+Sửa một lỗ hổng trình bày nghiêm trọng: **15 trong 16 connector có cảnh báo rủi ro thì không bao giờ hiện cảnh báo lúc bấm Kết nối**. Trường `risk` chỉ được vẽ ở luồng QR (Zalo) và ở hộp thoại đổi quyền, nên cảnh báo mạnh nhất lại vắng mặt đúng lúc người dùng ra quyết định.
+### Sửa lỗi
+- **Cảnh báo rủi ro hiện ở CẢ ba luồng đấu nối**: `openApikeyFlow` và `openOauthFlow` giờ vẽ khối `conn-risk` như `openQrFlow` vẫn làm, đặt NGAY TRÊN phần hướng dẫn để đọc trước. Ảnh hưởng 15 connector, trong đó có `facebook-personal` (dán cookie tài khoản thật), `google-workspace`, `slack`, `gmail`, `google-keep`.
+### Cải thiện
+- **Mô tả thẻ `google-keep` nói thẳng về bán kính thiệt hại**: Keep không có API chính chủ nên phải dùng master token có TOÀN QUYỀN tài khoản Google, khác hẳn `gmail` / `google-calendar` / `google-ads` vốn xin đúng một scope. Javis chỉ thao tác được ghi chú, nhưng token thì mở cả tài khoản nếu bị lộ. Nói ngay trên thẻ để thấy trước khi bấm vào.
+### Thêm mới
+- Test `server/test_canh_bao_rui_ro.py` (12 kiểm tra, không mạng): cắt thân từng hàm JS để xác nhận cả ba luồng đều vẽ `conn-risk` và chỉ vẽ khi thật sự có cảnh báo; kiểm mô tả thẻ Keep có nêu rủi ro; kiểm `google-keep` vẫn chỉ khai tool Keep chứ không lan sang Gmail/Drive. Có canary chứng minh phép cắt thân hàm đang soi đúng một hàm.
+### Ghi chú
+- Giữ nguyên tên "Google Keep" vì đó đúng với NĂNG LỰC (server chỉ phơi 23 tool Keep, đã bắt tay MCP đếm thật). Vấn đề nằm ở CREDENTIAL chứ không ở năng lực, nên xử bằng cảnh báo thay vì đổi tên.
+- KHÔNG mở rộng `google-keep` thành connector kiểu Workspace. Javis đã có `gmail`, `google-calendar`, `google-workspace` dùng OAuth có scope, an toàn hơn hẳn. Master token nên bị nhốt vào đúng chỗ duy nhất không có đường thay thế.
+
+## [0.9.114] - 2026-07-20
+Đấu **Google Ads** cũng không còn phải chạy lệnh. Trước đây phải cài Google Cloud CLI, chạy `gcloud auth application-default login` với một chuỗi scope rất dài, rồi đi tìm file JSON trong `%APPDATA%` mà dán vào. Giờ điền Client ID/Secret rồi bấm đăng nhập như Gmail và Lịch, Javis tự dựng file đăng nhập.
+### Thêm mới
+- **`oauth_mcp.credentials_file(conn_id, fmt)`**: dựng nội dung file credential cho connector STDIO đăng nhập bằng OAuth. Ghép refresh_token trong kho oauth với client_id/secret trong `mcp_store` thành đúng khuôn ADC mà gcloud vẫn sinh ra (`{type: authorized_user, client_id, client_secret, refresh_token}`). Đồng bộ, không gọi mạng.
+- **`oauth_file` trong catalog**: connector khai `{format, env, ext}` thì `mcp_store.resolved()` ghi file 0600 vào `connector-files/` rồi trỏ biến môi trường vào. Tái dùng đúng khuôn sẵn có của field `file`.
+- Test `server/test_google_ads_oauth.py` (26 kiểm tra, không mạng): khai báo catalog, dựng nội dung ADC, và kiểm ĐẦU-CUỐI rằng `resolved()` ghi được file thật lên đĩa với đúng nội dung. Có canary chứng minh hàm thật sự đọc kho token chứ không bịa file.
+### Sửa lỗi
+- **`openOauthFlow` không render được ô nhiều dòng**: nó ép mọi field thành input một dòng, nên ô dán file ADC (đường lui) sẽ không dùng nổi. Giờ khai `multiline` thì ra textarea, y như luồng apikey.
+### Cải thiện
+- **Bỏ yêu cầu Google Cloud CLI** khỏi `google-ads`. Chỉ còn cần Git (đã có sẵn trong Docker image) vì uvx tải server từ GitHub.
+- **Giữ ô dán tay file ADC làm đường lui** cho ai đã lỡ chạy gcloud, và đường lui THẮNG: dán tay rồi thì OAuth không ghi đè.
+### Ghi chú
+- Import `oauth_mcp` trong `mcp_store` phải TRỄ (gọi bên trong hàm) vì `oauth_mcp` đã import `mcp_store` ở cấp module. Import thẳng là vòng lặp.
+- KHÔNG đụng `args` của google-ads: vẫn tải từ `git+https://...` vì bản trên PyPI mới ở 0.0.1 (10/2025), đổi sang là rước rủi ro không cần thiết.
+- Chưa nghiệm thu với tài khoản Google Ads thật (cần developer token + tài khoản quảng cáo), nên bước đăng nhập phải thử tại chỗ.
+
+## [0.9.113] - 2026-07-20
+Bỏ hẳn bước bắt người dùng mở terminal để đấu **Google Keep**. Trước đây phải chạy một lệnh dài đổi App Password lấy master token rồi dán vào; giờ dán thẳng App Password vào Javis, server tự đổi. Hai bước còn lại (bật xác minh 2 bước, tạo App Password) là giao diện của chính Google nên không tự động hoá được, nhưng đã có nút mở thẳng tới đó.
+### Thêm mới
+- **Bước đổi credential khai báo từ catalog** (`server/cred_exchange.py`): connector khai `auth.exchange` gồm `handler` / `inputs` / `output` / `drop`; khi đấu, Javis tự đổi rồi XOÁ các field trong `drop` trước khi lưu. Làm tổng quát thay vì nhét cứng cho Keep, vì `google-ads` sẽ cần đúng cơ chế này.
+- **Handler `google_master_token`**: gọi `gpsoauth.perform_master_login`, tự bỏ dấu cách trong App Password (Google hiển thị thành 4 nhóm 4 ký tự), kiểm đủ 16 ký tự, và dịch mã lỗi Google sang tiếng Việt (sai mật khẩu, chưa bật 2 bước, đòi xác minh trình duyệt, bị chặn vì chạy trên VPS).
+- **Nút mở trang ngoài cho connector dạng apikey**: `openApikeyFlow` giờ gọi `oauthWizard(con)` nên mọi connector khai `auth.setup.links` đều hiện được nút, không riêng luồng OAuth. Google Keep có nút "Tạo App Password".
+- Test `server/test_cred_exchange.py` (25 kiểm tra, không mạng): phủ đổi thành công/thất bại, bỏ qua khi đã dán sẵn token, thiếu đầu vào, handler lạ, và kiểm ĐẦU-CUỐI rằng App Password không lọt xuống đĩa lẫn env. Có canary chứng minh check xoá là thật.
+### Bảo mật
+- **App Password KHÔNG BAO GIỜ được lưu**: bị xoá dù đổi thành công hay thất bại, không map ra biến môi trường, không xuất hiện trong thông báo lỗi. Đã kiểm bằng cách đọc thẳng file `mcp_servers.json` trên đĩa tìm chuỗi bí mật.
+- **Giữ nguyên đường lui dán master token thủ công**: quan trọng vì Google hay chặn đăng nhập từ IP trung tâm dữ liệu, nên bản chạy VPS vẫn có lối đi.
+### Ghi chú
+- Thêm `gpsoauth` vào `requirements.txt` (kéo theo pycryptodomex, requests, urllib3). Đã kiểm bằng `pip install --dry-run`: không đụng tới pin `fastapi`/`starlette`.
+- Chưa chạy thử với App Password thật (cần tài khoản Google thật), nên bước đổi token vẫn phải nghiệm thu tại chỗ.
+- Khảo sát `google-ads`: đưa lên UI ĐƯỢC, chi tiết trong `docs/superpowers/specs/2026-07-20-doi-credential-tren-ui-design.md`.
+
+## [0.9.112] - 2026-07-20
+Đính chính một khẳng định SAI ở bản 0.9.110 và gỡ dòng Dockerfile thừa đi kèm.
+### Sửa lỗi
+- **Gỡ `pip install uv` thừa khỏi `Dockerfile`**: bản 0.9.110 thêm dòng này kèm khẳng định "image thiếu uv nên 4 connector uvx khác (google-sheets, google-search-console, google-ads, tiktok-ads) đang hỏng trên VPS". Khẳng định đó SAI. `uv>=0.5` đã nằm trong `requirements.txt` từ v0.9.0 (commit 856cb19) và `Dockerfile` vẫn chạy `pip install -r requirements.txt`, nên image LUÔN có `uv`. Bốn connector kia chưa từng hỏng vì lý do này.
+- Nguyên nhân sai: chỉ grep `Dockerfile` tìm chữ `uv`, không thấy thì kết luận là thiếu, dù dòng `pip install -r requirements.txt` nằm ngay đó mà chưa mở `requirements.txt` ra xem.
+### Cải thiện
+- **Ghi chú lý do vào `requirements.txt`**: dòng `uv>=0.5` giờ có comment nói rõ nó không phải thư viện app import mà là runner cho các connector khai `command: uvx`, kèm cảnh báo đừng gỡ.
+- Sửa lại `CHANGELOG` bản 0.9.110 và file thiết kế `docs/superpowers/specs/2026-07-20-google-keep-connector-design.md` cho khớp sự thật, giữ lại phần phân tích cái sai để lần sau không lặp lại.
+
+## [0.9.110] - 2026-07-20
+Thêm connector **Google Keep** để Javis đọc và thao tác ghi chú Keep. Google Keep không có API chính chủ cho tài khoản gmail thường nên connector này đi qua thư viện không chính thức và đòi Google master token, loại token có TOÀN QUYỀN tài khoản Google chứ không giới hạn phạm vi như OAuth. Rủi ro này được ghi thẳng vào phần cảnh báo của connector.
+
+> **Đính chính (0.9.112):** bản 0.9.110 ban đầu có thêm `pip install uv` vào `Dockerfile` kèm khẳng định "image thiếu uv nên 4 connector uvx khác đang hỏng trên VPS". Khẳng định đó SAI: `uv>=0.5` đã nằm trong `requirements.txt` từ v0.9.0 và Dockerfile vẫn chạy `pip install -r requirements.txt`, nên image luôn có `uv`. Dòng thừa đã được gỡ ở 0.9.112.
+### Thêm mới
+- **Connector `google-keep`** (apikey, 3 ô: `google_email`, `master_token`, `unsafe_mode`): chạy local qua `uvx` với server cộng đồng `keep-mcp`. Phủ 23 tool: tìm/đọc note, tạo note và danh sách việc, sửa, gắn nhãn, ghim, lưu trữ, vứt, xoá, chia sẻ. Khai trong `system/mcp-catalog.json`, mặc định `readonly`.
+- **`UNSAFE_MODE` là opt-in, mặc định TẮT**: để trống thì Javis chỉ sửa được note do chính nó tạo (gắn nhãn `keep-mcp`); gõ `true` mới cho đụng note người dùng viết tay. Giữ bản fork sạch đúng nguyên tắc năng lực chạm dữ liệu cá nhân phải tự bật.
+- **Phân loại quyền có chủ ý**: `restore_note` ở mức Ghi nháp nhưng `trash_note` ở mức Toàn quyền, nên mức Ghi nháp luôn gỡ lại được note bị vứt nhầm mà không tự vứt được. Hai tool collaborator xếp mức nguy hiểm vì chúng chia sẻ note ra người khác, khác chất với sửa nội dung trong nhà.
+- Test `server/test_google_keep.py` (40 kiểm tra, không mạng, không cần token): map env, luật opt-in của `UNSAFE_MODE`, lớp chặn theo 3 mức quyền và trần của mode, kèm canary chứng minh lớp chặn có quyền lực thật.
+### Ghi chú
+- **Bẫy entry point của keep-mcp**: package này khai console script tên `mcp`, TRÙNG tên với CLI của MCP SDK vốn là dependency của nó. Nên `uvx keep-mcp` báo lỗi, còn `uvx --from keep-mcp mcp` thì chạy nhầm sang CLI của SDK mà KHÔNG báo lỗi gì. Cách đúng là `uvx --from keep-mcp python -m server`, đã xác minh bằng bắt tay MCP thật (trả đúng 23 tool). Có ghi chú `_args_doc` trong catalog để người sau đừng "dọn gọn" nó lại.
+- Chưa kiểm chứng được trên Docker thật (máy phát triển không có Docker) và chưa gọi tool nào chạm Keep thật (cần master token). Xem `docs/superpowers/specs/2026-07-20-google-keep-connector-design.md` mục "CHƯA kiểm chứng được".
+
+## [0.9.109] - 2026-07-20
+Thêm connector **Theo dõi Facebook (Apify)** và plugin `fb-monitor-apify`: theo dõi Trang và Nhóm CÔNG KHAI để tìm bài viral (nhiều share) qua dịch vụ quét Apify, thay vì tự cào bằng cookie cá nhân. Không đụng tài khoản Facebook của user nên không lo khoá, chạy tốt trên VPS 24/7, trả về số share/react/bình luận để lọc bài hot. Đây là hướng đúng cho nhu cầu "theo dõi nhóm/trang tìm bài nhiều share" mà cookie cá nhân không kham nổi 24/7.
+### Thêm mới
+- **Connector `facebook-monitor`** (apikey, field `apify_token`): dán Personal API token của Apify (đăng ký free tại apify.com). Chỉ đọc, tốn phí Apify theo lượt (~2.6 USD/1000 bài). Khai trong `system/mcp-catalog.json`.
+- **Plugin `fb-monitor-apify`** (bundled) - tool `fb_monitor(urls, limit, min_shares)`: nhận danh sách link Trang/Nhóm công khai, tự chọn actor Apify theo URL (`/groups/` → `apify/facebook-groups-scraper`, còn lại → `apify/facebook-posts-scraper`), chạy đồng bộ qua `run-sync-get-dataset-items`, chuẩn hoá bài (share/react/bình luận/link/tác giả), lọc theo `min_shares` và sắp theo share giảm dần. readonly, không dùng tài khoản cá nhân.
+- Test `server/test_fb_monitor.py` (17 kiểm tra, không mạng): catalog hợp lệ, routing actor, bóc số share nhiều tên trường, lọc + sắp xếp, gộp lỗi.
+
+### Ghi chú
+- V1 chỉ Trang + Nhóm CÔNG KHAI (actor chính chủ Apify không vào nhóm kín). Nhóm KÍN là bước sau: cần actor nhận cookie + cookie tài khoản là thành viên, vẫn có chút rủi ro khoá.
+### Cải thiện
+- **Đăng nhập ChatGPT qua trình duyệt báo lỗi rõ khi backend chưa sẵn**: nếu server đang chạy bản cũ (chưa có route browser OAuth), nút "Qua trình duyệt" trước đây mở một tab trắng (about:blank) không rõ vì sao. Giờ nó báo thẳng "Máy chủ chưa có chức năng này - khởi động lại Javis rồi tải lại trang" thay vì mở tab trắng.
+
+## [0.9.107] - 2026-07-19
+Thêm cách đăng nhập ChatGPT thứ hai qua trình duyệt (OAuth Authorization Code + PKCE), dành cho tài khoản Workspace bị chặn xác thực device-code. Trước đây Javis chỉ có một cách là device-code (nhập mã tại auth.openai.com/codex/device); Workspace nào tắt device-code thì không đăng nhập được. Cách mới dùng đúng luồng `codex login` mặc định.
+### Thêm mới
+- **Đăng nhập ChatGPT qua trình duyệt**: nút "Qua trình duyệt" ở card ChatGPT (trang Model) mở trang đăng nhập OpenAI; đăng nhập xong dán lại đường dẫn callback trên thanh địa chỉ để Javis tách mã và đổi lấy token. Chạy được cả bản trên máy cá nhân lẫn VPS headless vì không cần server tự bắt cổng localhost. Dùng chung client_id và endpoint đổi token với device-code nên token tương thích, vẫn bắc cầu sang ~/.codex/auth.json như cũ.
+- Kèm test offline `server/test_openai_oauth.py` phủ PKCE, dựng URL /oauth/authorize, tách mã từ URL callback dán lại, kiểm state, và redirect_uri đúng cho từng luồng. (Bước bấm nút đăng nhập thật với OpenAI cần kiểm tại chỗ vì đụng mạng.)
+
+## [0.9.106] - 2026-07-19
+Sửa lỗi trang Mức dùng (token & chi phí) hiện toàn số 0 trên một số bản cài (điển hình VPS Docker). Nguyên nhân: chỉ số Claude/ChatGPT được dựng TỪ log thô (~/.claude/projects, ~/.codex/sessions); bản cài nào không có/không đọc được log thô đó thì mất trắng, dù mỗi lượt đã ghi số token thật vào usage-events.jsonl (nguồn này trước đây bị bỏ qua cho cli/codex).
+### Sửa lỗi
+- **Trang Mức dùng dùng usage-events làm nguồn dự phòng**: indexer giờ nạp cả lượt cli (Claude SDK) và codex/ChatGPT từ usage-events.jsonl khi log thô thiếu, nên báo cáo có số thay vì 0. Chống đếm trùng: ngày nào đã có log thô phủ thì bỏ dòng-từ-event ngày đó, log thô luôn thắng.
+- **Backfill lịch sử một lần**: sau khi lên bản này, indexer đọc lại usage-events.jsonl từ đầu đúng một lần để dựng lại lịch sử token cli/codex đã ghi trước đó (xoá dòng cũ trước nên nhánh API không bị đếm trùng).
+
+## [0.9.105] - 2026-07-19
+Sửa lỗi trang Việc định kỳ báo "không tải được danh sách việc" trên VPS nặng. Nguyên nhân: /viec/all đếm số note của mọi brain (quét cả cây file) mỗi lần mở, vault lớn thì mất vài giây và reverse proxy cắt giữa chừng. VPS nhẹ thì kịp nên vẫn hiện, VPS nặng thì lỗi.
+### Sửa lỗi
+- **/viec/all bỏ đếm note**: trang Việc không cần số note nên bỏ hẳn phần quét cả cây file (rglob) - nhanh hơn 4-6 lần (đo tại chỗ 2.06s xuống 0.3s). Đây là gốc lỗi VPS khách không tải được danh sách.
+- **Tự thử lại 1 lần**: /viec/all lỗi/nghẽn thoáng qua thì dashboard tự thử lại sau 1.5s trước khi báo lỗi + nút Thử lại, đỡ phải bấm tay khi mạng chậm chốc lát.
+
+## [0.9.104] - 2026-07-19
+Trang Việc định kỳ hết cảnh tạo tay mà ô Brain trống, và giờ thêm được cả nhắc hẹn ngay trong form chứ không chỉ loop. Loop tạo qua chat rơi vào brain nào cũng hiện được.
+### Thêm mới
+- **Thêm nhắc hẹn ngay trong form Việc định kỳ**: nút "+ Thêm việc" cho chọn "Việc lặp" hay "Nhắc hẹn". Nhắc hẹn nhận thời điểm linh hoạt ("30 phút nữa", "8h30", cron "0 7 * * *", hoặc ngày giờ đầy đủ) và kiểu "Chỉ nhắc" hoặc "Tự làm rồi báo", lưu thẳng vào kho nhắc hẹn của brain đã chọn.
+### Sửa lỗi
+- **Ô chọn Brain trống khi tạo việc tay**: ô Brain trước đây chỉ đổ sau khi /viec/all (quét note mọi brain, chậm trên VPS) tải xong, bấm sớm là trống và không tự đổ lại. Giờ đổ độc lập từ /brains nên luôn có lựa chọn dù danh sách việc còn đang tải.
+- **Loop tạo qua chat chạy nhưng không hiện ở tab Việc**: /viec/all giờ gộp cả brain đã đăng ký với scheduler nằm ngoài thư mục brains, nên loop chạy nền ở brain ngoài cũng hiện. Khi /viec/all lỗi hoặc quá chậm thì báo rõ kèm nút Thử lại thay vì im lặng hiện "chưa có việc".
+
+## [0.9.103] - 2026-07-19
+Phần Skills trong Studio trên điện thoại giờ dễ đọc, dễ bấm. Trước đây dưới 860px khung Skills vẫn giữ 2 cột như máy tính (cột nhóm 210px + cột skill), khiến cột skill chỉ còn khoảng 150px và mô tả bị xuống dòng mỗi chữ một dòng; các nút Sửa/Xuất/Xoá lại chỉ hiện khi rê chuột nên trên điện thoại không bao giờ bấm được. Chỉ đổi bản điện thoại.
+### Cải thiện
+- **Skills trên điện thoại xếp dọc**: dưới 860px, khung Skills chuyển từ 2 cột sang xếp dọc. Danh sách nhóm thành dải chip cuộn ngang gọn ở trên (bấm để lọc), danh sách skill chiếm trọn bề ngang nên mô tả đọc bình thường thay vì vỡ từng từ.
+- **Nút thao tác skill luôn hiện trên điện thoại**: Sửa/Xuất/Xoá tách xuống một hàng riêng dưới mỗi thẻ và luôn hiển thị (bỏ kiểu chỉ hiện khi hover), vùng chạm to hơn, ô chọn bật/tắt cũng lớn hơn. Ô tìm skill dùng cỡ chữ 16px để iOS không tự phóng to khi focus.
+
+## [0.9.102] - 2026-07-19
+Màn Javis (cockpit) trên điện thoại giờ là một khung cố định không trôi: quả cầu thu nhỏ ở trên, khung chat cuộn được ngay dưới để đọc kết quả. Chỉ đổi bản điện thoại.
+### Cải thiện
+- **Cockpit điện thoại thành 1 khung cố định**: khoá cuộn cả trang trên điện thoại (không còn cảnh trôi lên trôi xuống lộ quả cầu), quả cầu não thu về khoảng 34% màn hình ở trên, phần chat chiếm khoảng còn lại và tự cuộn bên trong để đọc hội thoại. Header cố định + ô nhập bám đáy như cũ.
+
+## [0.9.101] - 2026-07-19
+Facebook cá nhân: nhận diện đúng trang ĐĂNG NHẬP mbasic trả về khi cookie bị từ chối, thay vì đọc nhầm trang login thành feed. Trước đó fix User-Agent (0.9.99) đã hết lỗi "không hỗ trợ", nhưng nếu cookie hết hạn/bị Facebook chặn thì mbasic trả trang đăng nhập (URL vẫn là mbasic, không redirect) nên không bị bắt.
+### Sửa lỗi
+- **fb-personal đọc nhầm trang đăng nhập thành feed**: thêm `_is_login()` (trang có cả ô email lẫn ô mật khẩu) vào lớp `_fetch`; gặp trang đăng nhập (theo NỘI DUNG, không chỉ theo URL redirect) thì trả lỗi rõ nêu 3 nguyên nhân thường gặp (cookie hết hạn/đã logout; Javis chạy ở IP/máy khác nơi đăng nhập nên Facebook chặn phiên lạ; tài khoản bị checkpoint) kèm cách sửa, thay vì trả nội dung trang login. Test lên 31 kiểm tra.
+Trang Việc định kỳ giờ gộp MỌI brain, mỗi việc gắn nhãn brain và chuyển được sang brain khác; tạo việc qua chat báo rõ brain; lựa chọn /brain trên Telegram được nhớ bền qua khởi động lại. Gỡ cái rối "tạo việc qua Telegram vào brain mặc định, tìm ở brain đang làm không thấy" - hai khái niệm brain (phiên Telegram vs brain đang xem trên dashboard) vốn tách rời, việc vẫn chạy nhưng người dùng không nhìn thấy.
+### Thêm mới
+- **Trang Việc gộp mọi brain**: endpoint `GET /viec/all` trả loop + nhắc hẹn của TẤT CẢ brain, nhóm theo brain (brain đang xem lên đầu, gắn "đang xem"), mỗi thẻ có nhãn brain. Nút bật/tắt/xoá/chạy/huỷ nhắm ĐÚNG brain của chính việc đó thay vì brain ở sidebar.
+- **Chuyển việc sang brain khác**: nút "Chuyển brain" trên mỗi loop/nhắc (`POST /loops/move`, `POST /reminders/move`). Loop dời nguyên file .md + trạng thái chạy; trùng tên ở brain đích thì từ chối, KHÔNG ghi đè (định danh loop theo tên file). Form tạo loop mới có ô chọn brain đích.
+- **Nhớ bền /brain Telegram**: lựa chọn brain của mỗi cuộc chat lưu bền ở `tg_brain.json` (theo tên brain), sống sót qua khởi động lại bot thay vì mất về mặc định như trước; brain bị xoá thì tự về mặc định + dọn mục cũ.
+### Cải thiện
+- **javis_schedule báo rõ brain**: câu xác nhận khi tạo việc/nhắc qua chat nêu tên brain ("Đã tạo việc ... trong brain Kim Khí Hà Lộc") để biết ngay việc rơi vào brain nào, không phải đi tìm mới ngã ngửa.
+- Test mới `test_viec_xuyen_brain.py` (30 kiểm tra): di chuyển loop/nhắc hẹn (thành công, va chạm slug, brain trùng, không tồn tại), nhớ bền tg brain qua restart + brain xoá, `/viec/all` gắn đúng brain cho từng item.
+
+## [0.9.99] - 2026-07-19
+Vá lỗi Facebook cá nhân (0.9.95) trả trang "Trình duyệt không hỗ trợ, hãy tải Facebook Lite" thay vì feed. Nguyên nhân: mbasic.facebook.com chê User-Agent - đã dò thật, mbasic chỉ nhả HTML cho trình duyệt DI ĐỘNG (UA iPhone Safari nhận được trang thật, UA desktop/Firefox mobile bị đẩy sang trang Lite).
+### Sửa lỗi
+- **fb-personal đọc feed ra trang "không hỗ trợ / Facebook Lite"**: đổi User-Agent mặc định sang iPhone Safari + danh sách UA dự phòng. Thêm lớp `_fetch` tự đổi UA khi gặp trang bị chê; nếu MỌI UA đều bị chê thì trả lỗi kèm cách sửa (dán UA riêng, lấy cookie từ trình duyệt di động) thay vì trả rác. Phát hiện đúng trang "không hỗ trợ" và trang login/checkpoint để báo lỗi rõ. Thêm field tuỳ chọn `user_agent` vào connector `facebook-personal` (khớp UA với trình duyệt nơi lấy cookie là chắc nhất) + cập nhật hướng dẫn. Test `test_fb_personal.py` lên 28 kiểm tra (thêm phát hiện UA + tự đổi UA + override).
+
+## [0.9.98] - 2026-07-19
+Vá triệt để lỗi header điện thoại ở trang quản lý (0.9.97 chưa dứt): header giờ CỐ ĐỊNH trên cùng nên luôn thấy nút ☰ để vào menu, và quả cầu cockpit ẩn hẳn sau trang quản lý. Chỉ đổi bản điện thoại.
+### Sửa lỗi
+- **Mất header (không vào được menu ☰) + lộ quả cầu ở trang quản lý**: header trước nằm trong lưới nên bị cuộn trôi mất, để lộ quả cầu 3D/2D phía sau. Nay header `position: fixed` trên cùng (nền đặc, luôn hiện ☰ · chip model · ＋ ở mọi trang), và ẩn hẳn `hud-body` (quả cầu) khi đang ở trang quản lý nên không còn lộ hay kéo trượt được. Màn cockpit vẫn hiển thị quả cầu bình thường.
+
+## [0.9.97] - 2026-07-19
+Vá lỗi trên điện thoại: ở trang quản lý (Tổng quan, Kết nối...) quả cầu 2D phía sau bị lộ ra và trượt nhẹ ở mép trên header. Chỉ đổi bản điện thoại.
+### Sửa lỗi
+- **Quả cầu cockpit lộ sau lưng trang quản lý khi cuộn**: mobile bật cuộn body cho màn cockpit dài, nhưng trang quản lý (cview đè lên) khi cuộn nhẹ làm header trượt lên để lộ quả cầu 3D/2D phía sau. Nay khoá cuộn body khi đang ở trang quản lý (`body.in-console`), nội dung trang tự cuộn bên trong khung - header cố định, không còn lộ cockpit. Màn cockpit vẫn cuộn bình thường.
+
+## [0.9.96] - 2026-07-19
+Vá nút + (hội thoại mới) trên header điện thoại: hết lệch khỏi header và bấm được. Chỉ đổi bản điện thoại.
+### Sửa lỗi
+- **Nút + bị rớt khỏi header, bấm không ăn**: header mobile trước là lưới 3 cột, thêm ☰ và chip model làm dư ô nên nút + rớt xuống dòng, đè lên quả cầu 3D và bị canvas chặn tap. Nay header thành một hàng flex (☰ · chip model căn giữa · +), nút + là con trực tiếp header (không còn nằm trong cụm bị ẩn ở trang quản lý). Bấm + giờ mở hội thoại mới và focus ô nhập luôn.
+
+## [0.9.95] - 2026-07-19
+Thêm connector **Facebook cá nhân (cookie - thử nghiệm)** và plugin `fb-personal`: tự động hoá tài khoản Facebook CÁ NHÂN bằng cookie phiên (Facebook đã đóng API cá nhân) - lướt/đọc feed, đăng bài lên tường, bình luận. Đi đường cookie + mbasic bằng httpx nên chạy được trên VPS headless, không cần Chromium. CẢNH BÁO: vi phạm điều khoản Facebook, rủi ro khoá tài khoản; mặc định TẮT, cookie mã hoá at rest. Đây là bước 2 nối tiếp connector Trang (0.9.90) cho nhu cầu lướt feed cá nhân.
+### Thêm mới
+- **Connector `facebook-personal`** (apikey, field `cookie` mã hoá): dán cookie phiên Facebook (kèm hướng dẫn lấy an toàn từ DevTools). Mặc định Chỉ đọc; đăng/bình luận chỉ chạy khi nâng Toàn quyền. Khai trong `system/mcp-catalog.json`.
+- **Plugin `fb-personal`** (bundled) - 3 tool: `fb_feed_read` (readonly, trả văn bản feed đã làm sạch + link bài để Javis tóm tắt) và `fb_personal_post`, `fb_personal_comment` (min_mode full). Engine gọi `mbasic.facebook.com` bằng httpx + cookie, tự bóc `fb_dtsg` và tìm form soạn bài/bình luận (best-effort, chỉnh selector khi Facebook đổi). Chặn rõ khi cookie bị đẩy về login/checkpoint.
+- **`validate_connection` nhận connector ẢO**: connector plugin-backed không có URL/command (Meta/Facebook gọi qua plugin) nay qua cửa thêm-kết-nối mà không dial MCP (đếm tool theo `tool_meta`). Trước đây connector apikey không URL sẽ bị xoá khi thêm. Sửa trong `mcp_hub.py` + bơm không đổi.
+- Test `server/test_fb_personal.py` (24 kiểm tra, không mạng): catalog hợp lệ, min_mode đúng, gate chưa-có-cookie, bóc fb_dtsg/tìm form, đọc feed + chặn login, đăng/bình luận build đúng POST, và nhánh validate connector ẢO.
+
+### Ghi chú
+- Phần tự động hoá Facebook cá nhân là THỬ NGHIỆM và chỉ kiểm chứng được khi chạy thật với cookie thật trên máy đích; mbasic có thể bị Facebook đổi/đóng nên bộ tìm form là best-effort, cần tinh chỉnh khi kết nối thực tế.
+Đổi font chữ toàn app sang **Montserrat** cho sạch, dễ đọc (thay font monospace cũ trông "lỗi lỗi" ở các nhãn). Code vẫn giữ font monospace. Và vá header màn cockpit trên điện thoại.
+### Cải thiện
+- **Font Montserrat**: nạp Montserrat (Google Fonts) và dùng làm font chính cho toàn giao diện (nhãn, tiêu đề, chữ thân, thanh bên). Khối mã và mã inline giữ font monospace riêng (`--mono`) cho dễ đọc code. Tải lại trang là thấy (đã bump ?v).
+- **Header cockpit điện thoại hết lệch**: ẩn nút "Lịch sử" trên điện thoại để header màn "Javis" (buồng lái) khỏi bị chồng dòng, gọn còn ☰ + chip model + nút hội thoại mới. (Lịch sử vẫn xem được ở khung chat phóng to trên máy tính.)
+
+## [0.9.93] - 2026-07-19
+Chỉnh tiếp giao diện chat điện thoại theo phản hồi: header hết chồng lên nhau, bấm chip model là sổ ra danh sách được, và mục Hệ thống trong ngăn kéo gọn lại. Chỉ đổi bản điện thoại.
+### Sửa lỗi
+- **Header điện thoại bị chồng lên nhau**: ẩn tên workspace + ngày trên mobile để chip model làm phần giữa header, không còn đè lên tiêu đề hội thoại.
+- **Bấm chip model không sổ ra danh sách**: popover chọn model giờ dùng vị trí cố định (không bị khung cha cắt), và sửa model-picker để bấm trong popover (chọn model, đổi effort) không tự đóng - trước đó do popover đã dời khỏi khung model-bar nên bị hiểu là bấm ra ngoài.
+- **Rò dòng comment ra màn hình** ("...parse vào đây nhưng không hiển thị"): comment HTML lồng nhau ở stub số liệu làm rò chữ; đã gỡ dấu comment lồng.
+- **Mục Hệ thống trong ngăn kéo**: bỏ nút Studio (không dùng nữa) và vá lỗi cụm chọn brain bị định vị đè lên đầu ngăn kéo.
+
+## [0.9.92] - 2026-07-19
+Wizard cài đặt cho các connector tự-tạo-app (Facebook Trang, Meta Ads): thêm nút mở thẳng trang tạo Facebook App và ô Redirect URI kèm nút Sao chép, để bớt thao tác dán tay hay dán sai. Chỉ đổi trang Kết nối, tải lại trang là thấy.
+### Cải thiện
+- **Nút mở trang + copy Redirect URI khi kết nối**: modal đăng nhập OAuth giờ đọc thêm `auth.setup` từ catalog để vẽ dãy nút "Bước 1: Tạo App mới / App của tôi" (mở tab mới) và một ô Redirect URI chỉ-đọc kèm nút Sao chép (tự lấy đúng cổng đang chạy). Hướng dẫn bằng chữ được rút gọn theo, trỏ vào các nút này. Áp cho connector `facebook-pages` và `meta-ads-graph`; connector không khai `setup` thì không đổi. Thêm trường `setup` vào `public_catalog()`, hàm `oauthWizard()` trong `console.js`, style `.conn-wizard/.wiz-*` trong `console.css`. Bump `console.js?v=72`, `console.css?v=21`.
+Vá tiếp giao diện chat điện thoại (0.9.89): rút gọn dòng gợi ý trong ô nhập cho khỏi xuống dòng, và đưa "phần Hệ thống" trở lại. Chỉ đổi bản điện thoại.
+### Sửa lỗi
+- **Dòng gợi ý ô nhập bị xuống dòng trên điện thoại**: đổi placeholder mobile thành câu ngắn "Nói hoặc gõ cho Javis…" cho vừa một dòng (bản máy tính giữ câu đầy đủ).
+- **Mất phần Hệ thống trên điện thoại**: chọn brain, Cài đặt, Đổi tông, Studio, bật/tắt loa và dải trạng thái HỆ THỐNG/MCP nay gom vào mục "Hệ thống" ở đáy ngăn kéo ☰ (trước đó bị ẩn mất). Dùng lại đúng nút cũ nên bấm là chạy như thường.
+
+## [0.9.90] - 2026-07-19
+Thêm connector **Facebook Trang (tự tạo app - Graph API)** và plugin `meta-pages-graph`: quản lý Fanpage của bạn qua Graph API chính chủ. Vẫn theo kiểu tự tạo app (BYO) nên KHÔNG cần Facebook duyệt app khi thao tác trên Trang bạn là admin, và mỗi bản fork tự đứng được một mình. Xem danh sách Trang, đọc bài và bình luận (chỉ đọc); đăng bài và trả lời bình luận (toàn quyền, không tự chạy lén). Dùng lại nguyên hạ tầng OAuth Meta sẵn có, không đụng `oauth_mcp`. Lưu ý: "lướt feed" trên trang cá nhân KHÔNG làm được qua Page API (Facebook đã đóng), để dành bài toán browser-automation đợt sau.
+### Thêm mới
+- **Connector `facebook-pages`**: OAuth BYO app kiểu Meta (dùng chung app với Meta Ads được), scope `pages_show_list, pages_read_engagement, pages_manage_posts, pages_manage_engagement`. Mặc định thêm ở mức Chỉ đọc; đăng/trả lời chỉ chạy khi user nâng lên Toàn quyền. Khai trong `system/mcp-catalog.json`, kèm hướng dẫn tạo app (~5 phút, redirect localhost).
+- **Plugin `meta-pages-graph`** (bundled) - 5 tool cho mọi engine: `fb_pages_list`, `fb_page_posts`, `fb_page_comments` (readonly) và `fb_page_post`, `fb_page_reply` (min_mode full). Mỗi thao tác trên một Trang dùng Page Access Token RIÊNG lấy từ `/me/accounts`, không dùng token cá nhân; `fb_pages_list` không lộ token Trang ra output. Tự chọn Trang khi chỉ có 1, bắt chỉ rõ khi có nhiều.
+- Test `server/test_meta_pages.py` (27 kiểm tra, không mạng): catalog hợp lệ, min_mode đúng (đọc readonly / ghi full), gate chưa-kết-nối, chọn Trang, đăng/trả lời dùng đúng token Trang, không lộ token.
+
+## [0.9.89] - 2026-07-19
+Giao diện chat trên điện thoại gọn hẳn: ô nhập thành viên bo tròn lớn, header chỉ còn menu ☰ + chip model + nút hội thoại mới, dãy công cụ chuyển thành ngăn kéo trượt từ trái. Chỉ đổi bản điện thoại (màn hẹp dưới 860px), bản máy tính giữ nguyên. Có spec + plan ở `docs/superpowers/specs/2026-07-19-mobile-chat-declutter-design.md`.
+### Cải thiện
+- **Khung chat điện thoại gọn tối đa**: ô nhập nở to thành một viên (đính kèm bên trái, ô gõ chiếm gần hết bề ngang và tự cao lên, mic và nút gửi bên phải); bỏ hai hàng điều khiển chật (dải HỆ THỐNG/MCP và thanh công cụ ở đáy). Header rút còn ☰ (mở ngăn kéo công cụ) + chip model (bấm đổi model/engine như cũ) + nút hội thoại mới. Nút đọc tiếng dời khỏi thanh nhập. Bản máy tính không đổi.
+
+## [0.9.88] - 2026-07-18
+Mỗi lần tải lại Javis giờ vào thẳng hội thoại mới thay vì mở lại phiên cũ. Chỉ đổi frontend, tải lại trang là có.
+### Cải thiện
+- **Tải trang = hội thoại mới**: trước đây F5 khôi phục phiên gần nhất vào khung chat; nay mặc định mở khung trống cho hội thoại mới. Hội thoại cũ KHÔNG mất - vẫn nằm trong panel Lịch sử (lưu ở server), bấm để mở lại. Bỏ gọi `restoreSession()` lúc load + xoá phiên tạm trong localStorage. Bump `app.js?v=70`.
+
+## [0.9.87] - 2026-07-18
+Chỉnh menu lệnh `/` sau lần chạy thật: mô tả skill dài giờ cắt gọn 1 dòng, tràn thì hiện "...". Chỉ đổi frontend, tải lại trang là thấy.
+### Sửa lỗi
+- **Mô tả trong menu `/` tràn nhiều dòng**: các skill mô tả dài (vd jay-abraham-sales) đẩy menu cao ngoằng, che cả các lệnh khác. Nay tên + mô tả mỗi cái cắt đúng 1 dòng, quá dài thì "..." (grid `minmax(0,1fr)` + `text-overflow: ellipsis`). Bump `style.css?v=46`.
+- **`/notes` chưa hiện trong menu ở brain đang mở**: skill hệ thống chỉ rải vào brain lần đầu truy cập trong đời process, mà server đã chạy từ trước khi thêm `notes` nên brain đang mở bị bỏ sót. Đã rải `notes` vào cả 3 brain trên đĩa (`system_sync.sync_brain`); endpoint `/skills` đọc đĩa nên menu thấy ngay, không cần khởi động lại. Brain mới hoặc sau khi restart thì tự có.
+
+## [0.9.86] - 2026-07-18
+Khung lệnh `/` cho khung chat web (giống Telegram/Claude) và lệnh đầu tiên `/notes`: gõ `/notes` thì lưu tin nhắn hiện tại nguyên văn vào `sources/` (kèm ảnh), rồi tự chưng cất lên wiki nếu note đáng. Chỉ đổi frontend + thêm 1 skill hệ thống, không cần khởi động lại server; chỉ cần tải lại trang.
+### Thêm mới
+- **Menu lệnh `/` trên web**: gõ `/` ở ô chat hiện menu gợi ý các skill của brain + vài lệnh phiên (`/new`, `/reset`, `/stop`), lọc dần khi gõ, chọn bằng chuột hoặc phím mũi tên + Enter. Chọn skill thì điền `/slug ` để gõ tiếp nội dung; lệnh phiên chạy ngay. Nhất quán với Telegram (mọi `/<slug>` = gọi skill cùng tên).
+- **Skill hệ thống `notes`**: lưu nhanh một note vào Second Brain. Giữ nguyên văn phần chữ người dùng gõ (không biên tập), ảnh đính kèm chuyển vào `attachments/` và nhúng `![[...]]`. Sau khi lưu vào `sources/`, tự đánh giá đáng-wiki: đáng thì chưng cất lên `wiki/` đủ 3 kỷ luật của vault; không đáng thì vẫn giữ source, chỉ báo nhẹ. Chạy được cả trên web lẫn Telegram, mọi engine. Là skill hệ thống nên tự có ở mọi brain qua `system_sync`.
+- Frontend: thêm `dashboard/chat-slash.js` (logic parse/route/menu + menu DOM) và `dashboard/test_chat_slash.js` (test node headless); chặn `/` trong `sendMessage` của `app.js`. Bump `app.js?v=69`, thêm `chat-slash.js?v=1`.
+
+## [0.9.85] - 2026-07-18
+Bản đánh dấu để kiểm tra luồng tự cập nhật 1-click (nút "Cập nhật ngay") chạy end-to-end trên bản Docker có Watchtower. Không đổi tính năng, không cần thao tác gì thêm.
+### Cải thiện
+- **Thử nút "Cập nhật ngay"**: bump phiên bản để xác nhận app phát hiện bản mới, gọi Watchtower kéo image + dựng lại container, rồi tự tải lại trang. Không ảnh hưởng dữ liệu hay cấu hình.
+
+## [0.9.84] - 2026-07-18
+### Sửa lỗi
+- **Đề xuất trong Dashboard Token thiếu dấu tiếng Việt**: các câu insight (cache thấp, hoạt động ngầm ngốn nhiều, opus chiếm nhiều, phiên phình, spike) viết trong `usage_index.py` bị gõ không dấu nên hiện ra "Hoat dong ngam chiem...", lệch với phần còn lại của app. Nay sửa thành tiếng Việt có dấu đầy đủ. CẦN KHỞI ĐỘNG LẠI SERVER (đổi ở backend) để đề xuất hiện đúng.
+
+## [0.9.83] - 2026-07-18
+Dashboard Token: nâng trang **Mức dùng** thành bảng theo dõi tiêu thụ token thật, đọc từ log của Claude Code và Codex trên máy (không cần API riêng). CẦN KHỞI ĐỘNG LẠI SERVER (thêm module `usage_index` + route `/usage/*`); sau đó tải lại trang.
+### Thêm mới
+- **Lọc theo kỳ**: hôm nay, hôm qua, tuần này, tuần trước, tháng này, tháng trước, 3 tháng gần nhất, năm nay - mỗi kỳ tự so với kỳ tương đương liền trước (delta %).
+- **Bóc tách nguồn tiêu**: theo provider (Claude Code / ChatGPT-Codex / API), theo nguồn (bạn gõ tay vs Javis tự chạy qua SDK), theo hoạt động (chat / nền loop-lịch / subagent), theo model, theo dự án. Phát hiện nhanh chỗ ngốn token nhất.
+- **Chỉ số hiệu quả**: tổng token, token/ngày, cache hit (tái dùng ngữ cảnh), số phiên + token trung bình mỗi phiên, và chi phí QUY ĐỔI theo giá API (với gói thuê bao là "tiết kiệm được bao nhiêu", chỉ OpenRouter là tiền thật).
+- **Đề xuất tự động**: cache thấp gợi ý /compact, hoạt động nền ngốn nhiều gợi ý giảm loop, opus dùng nhiều gợi ý hạ model, phiên phình gợi ý tách, spike bất thường cảnh báo sớm.
+- Backend: `usage_index.py` quét tăng dần `~/.claude/projects` + `~/.codex/sessions` (bỏ file chưa đổi), phân loại chat/nền qua `conversations.db`, gộp vào SQLite. Nhánh API ghi log tiến tới qua `usage_store`. Route `/usage/summary|insights|refresh`. Bump `console.js?v=71`, thêm `usage.js?v=1`.
+
+## [0.9.82] - 2026-07-18
+### Sửa lỗi
+- **Nhãn nút trong khung sửa file thiếu dấu tiếng Việt**: các nút của `file-editor.js` viết không dấu ("Sua / Nguon / Luu / Da luu / Loi / Tai ve / Dong / Mo tab moi"), lệch với phần còn lại của app. Nay sửa thành "Sửa / Nguồn / Lưu / Đã lưu / Lỗi / Tải về / Đóng / Mở tab mới". Nội dung tiếng Việt gõ vào vẫn hiển thị đúng như trước, chỉ nhãn nút thiếu dấu. Bump `file-editor.js?v=3`, chỉ cần tải lại trang.
+
+## [0.9.81] - 2026-07-18
+Nâng khung sửa file .md trong chat lên WYSIWYG (soạn như Word), dùng lại đúng bộ máy của editor cây. Thuần giao diện, KHÔNG cần khởi động lại server (chỉ tải lại trang, đã bump `?v`).
+### Cải thiện
+- **Khung sửa .md trong chat giờ là WYSIWYG 2 khung**: gõ trực tiếp trên bản render (đậm, nghiêng, tiêu đề, danh sách, trích dẫn, link, kẻ ngang qua thanh công cụ), gạt "Sửa / Nguồn" để xem markdown thô. Dùng lại Turndown + thanh công cụ + đổi HTML sang markdown của editor cây (`window.JavisNoteEditor` mới expose từ `console.js`), giữ nguyên `[[wikilink]]` và `![[ảnh]]`. File text không phải `.md` vẫn là textarea nguồn như cũ. Turndown nạp lazy từ CDN; offline thì tự ở lại chế độ Nguồn (vẫn sửa tốt). Đã kiểm chứng trên trình duyệt thật với Turndown thật: mở ra vào chế độ Sửa, gõ thêm nội dung, lưu ra markdown đúng (giữ tiêu đề, in đậm, danh sách), gạt Sửa/Nguồn đổi qua lại đúng.
+- **Bấm link/ảnh khi đang soạn không bung editor lồng nhau**: handler click trong chat nay bỏ qua khi click rơi vào vùng đang soạn (`[contenteditable]` / `.jvfe-modal` / `.note-editor`).
+
+## [0.9.80] - 2026-07-18
+Nút "Cập nhật ngay" làm chắc lại toàn diện: kiểm tra sức khoẻ sau khi cập nhật, bản git (Windows/native) lỗi thì TỰ QUAY VỀ bản cũ, có thanh tiến trình theo bước và xem trước "bản mới có gì" trước khi bấm; bản Docker có hướng dẫn lùi rõ ràng. **Cần khởi động lại server** (đổi luồng cập nhật + thêm endpoint). Có spec + plan ở `docs/superpowers/specs/2026-07-18-update-triet-de-design.md` và `docs/superpowers/plans/2026-07-18-update-triet-de.md`.
+### Thêm mới
+- **Updater đa nền tự rollback (bản git)**: thêm `server/updater.py` chạy tách rời, chỉ dùng thư viện chuẩn (vẫn chạy được cả khi bản mới làm hỏng dependency). Chuỗi: dừng server -> (git stash nếu cây bẩn) -> `git pull` -> `pip install` -> khởi động lại -> chờ `/health` khoảng 90 giây. Bản mới không lên được thì `git reset --hard` về commit cũ + cài lại lib + khởi động lại (tự rollback). Mọi bước ghi trạng thái vào `update_state.json` (sống qua restart).
+- **Thanh tiến trình + xem trước bản mới trong panel Phiên bản**: dashboard hiện changelog của bản mới trước khi bấm, và khi cập nhật hiện các bước Chuẩn bị -> Tải code -> Cài thư viện -> Khởi động lại -> Kiểm tra sức khoẻ -> Xong; lỗi thì báo đã tự quay về bản cũ (git) hoặc hiện cách lùi (Docker), kèm thông báo khi có sửa đổi cục bộ được cất vào git stash.
+- **Endpoint `GET /update/status` + `previous_version` trong `/version`**: UI theo dõi tiến trình qua trạng thái có cấu trúc + đuôi `update.log`, và biết bản cũ để lùi.
+- **CI xuất tag phiên bản GHCR**: image thêm tag `:x.y.z` (đọc từ VERSION) cạnh `:latest` và `:<sha>`, để luôn có bản cũ cố định mà pin khi cần lùi trên Docker.
+### Sửa lỗi
+- **Bản Windows thiếu bước cài thư viện khi cập nhật**: updater cũ chỉ `git pull` rồi bật lại, không `pip install`, nên bản mới thêm thư viện là app crash. Nay mọi bản git đều cài lib khi cập nhật.
+- **`git pull` chết khi cây làm việc bẩn**: có sửa đổi cục bộ ở file tracked là pull abort im lặng, cập nhật thất bại mà không rõ lý do. Nay tự `git stash` (giữ lại, không mất, không tự pop để tránh xung đột) trước khi pull và báo cho người dùng.
+### Bảo mật
+- **Chống double-click spawn 2 updater**: `POST /update` claim trạng thái ngay sau guard (không có await ở giữa) và chỉ chặn khi lần cập nhật đang dở BẮT ĐẦU gần đây, nên bấm hai lần không tạo hai tiến trình cập nhật chồng nhau, đồng thời không kẹt "đang cập nhật" vĩnh viễn nếu một lần cập nhật bị gián đoạn.
+
+## [0.9.79] - 2026-07-18
+Trong khung chat giờ bấm được link, và file .md/text bấm là bung ngay khung sửa giữa màn hình để xem và chỉnh sửa. Thuần giao diện, KHÔNG cần khởi động lại server (chỉ tải lại trang - đã bump `?v` để nạp bản mới). Có brainstorm + spec ở `docs/superpowers/specs/2026-07-18-chat-link-va-sua-md-design.md`.
+### Thêm mới
+- **Bấm file .md/text trong chat bung khung sửa giữa màn hình**: thêm `dashboard/file-editor.js` dựng một modal độc lập gắn thẳng vào `<body>` nên chạy được từ mọi trang. Với `.md` và file text hiện `<textarea>` sửa được (riêng `.md` có nút gạt "Nguồn / Xem", bản Xem render bằng `mdToHtml` sẵn có); ảnh/PDF xem trước; file khác cho tải. Lưu qua `/files/write` có ghép sẵn tiền tố "nhà" của brain nên ghi ĐÚNG chỗ kể cả trên localhost (trần duyệt = cả ổ đĩa). Đóng bằng Esc / ✕ / bấm nền mờ, lưu nhanh Ctrl+S. Bấm link thư mục vẫn nhảy trang Tệp tin như cũ; ảnh inline giữ nguyên.
+- **URL trần trong chat tự thành link mở tab mới**: URL `http(s)://...` Javis gõ thẳng (không bọc markdown) nay tự nhận thành link bấm được. Chạy sau khi code block / inline code / ảnh / link markdown đã cất vào placeholder nên không đụng vào chúng; dấu câu ở đuôi URL nằm ngoài link.
+### Sửa lỗi
+- **Link file có khoảng trắng hoặc dấu ngoặc bị cắt cụt đường dẫn**: regex link/ảnh markdown cũ (`[chữ](đường-dẫn)`) chỉ bắt tới khoảng trắng đầu tiên rồi dừng ở dấu `)` đầu tiên, nên đường dẫn kiểu `06 - Sources/Tên (Tư Duy Ngược).md` bị cắt còn `06` và phần đuôi rớt ra thành chữ. Nay bắt cả cặp ngoặc cân bằng 1 tầng và cho phép khoảng trắng, đồng thời cắt title markdown tùy chọn (`( "tiêu đề" )`). Nhờ vậy bấm đúng file cần mở.
+
+## [0.9.78] - 2026-07-18
+### Sửa lỗi
+- **Số liệu trên header ("N note · N kết nối") không còn ngắt xuống 2 dòng**: `.graph-stats` thiếu `white-space: nowrap` nên chữ tự xuống dòng khi cụm trái thiếu chỗ; và grid `.hud-top` là `1fr auto 1fr` ép cột trái bằng cột phải, trong khi cụm trái (chọn brain + nút + số liệu) rộng hơn hẳn. Nay: (1) `nowrap` cho `.graph-stats`; (2) grid đổi thành `auto minmax(0,1fr) auto` để cụm trái/phải bám theo nội dung, cụm giữa (tên + ngày) co giãn phần còn lại và cắt gọn bằng `…` khi màn hình quá hẹp thay vì đè lên nhau. Đã đo ở 1000px (một dòng, không đè, giữa tự cắt) và 1280px (đủ chỗ, hiện đầy đủ).
+
+## [0.9.77] - 2026-07-18
+Xoá não giờ LAN sang mọi máy đồng bộ (không còn bị "hồi sinh"), và giữ bản sao trong thùng rác cục bộ 30 ngày. **Cần khởi động lại server** (đổi luồng sync + endpoint xoá); giao diện tự nạp lại nhờ bump `?v=7`. Có brainstorm + spec + plan ở `docs/superpowers/specs/2026-07-18-brain-delete-sync-propagation-design.md` và `docs/superpowers/plans/2026-07-18-brain-delete-sync-propagation.md`.
+### Thêm mới
+- **Giấy báo tử (tombstone) đồng bộ để lan việc xoá não**: khi xoá 1 não (đã gõ đúng tên xác nhận), Javis ghi một file nhỏ `<BRAINS_DIR>/.javis-tombstones/<tên>.json` đồng bộ theo repo. Bước `_apply_tombstones` mới trong sync đọc tombstone và xoá dứt khoát não đó ở mọi máy, ghi đè đúng chính sách "xoá không thắng bản còn sống" - NHƯNG chỉ cho lần xoá cố ý. Có chốt thời gian: não được tạo/sửa lại sau khi xoá thì không bị giết oan (tombstone tự gỡ, và tạo lại não cùng tên qua `/brains/new` cũng gỡ tombstone). Não mặc định miễn nhiễm.
+- **Thùng rác cục bộ 30 ngày**: xoá não giờ CHUYỂN dữ liệu vào `<STATE_DIR>/brain-trash/<tên>__<thời-gian>/` (ngoài vùng đồng bộ, mỗi máy một thùng riêng) thay vì xoá cứng; tự dọn mục quá 30 ngày ở đầu mỗi lần sync. Lời xác nhận khi xoá báo rõ điều này. Khôi phục bằng tay (chuyển folder từ thùng rác về `brains/`). Endpoint xoá là nguyên tử: ghi tombstone lỗi thì hoàn tác việc chuyển thùng rác.
+### Sửa lỗi
+- **Não đã xoá bị "hồi sinh" khi sync/update**: chính sách sync cũ cố tình không cho việc xoá thắng bản còn sống (chống mất dữ liệu), nên một não xoá ở máy này bị máy/remote khác đẩy ngược lại. Nay lần xoá cố ý lan đi qua tombstone; lá chắn chống mất dữ liệu chung vẫn nguyên vẹn cho mọi trường hợp KHÔNG có tombstone (folder biến mất do volume chưa mount, engine ghi dở... được `_restore_missing_brains` khôi phục, không bị lan xoá).
+
+## [0.9.76] - 2026-07-18
+Giãn thanh header cho hết dồn cục, và thêm nút đổi tông tối-đậm / tối-nhạt. Có brainstorm + spec ở `docs/superpowers/specs/2026-07-18-header-theme-toggle-design.md`.
+### Thêm mới
+- **Nút đổi tông giao diện ở góc phải header**: lật giữa tối-đậm (mặc định, nền `#0e0e16`) và tối-nhạt (nền xám `#282a37`, chữ dịu cho đỡ chói). KHÔNG có light mode nền trắng - giữ cả app tông tối nên cockpit 3D không bị phá. Đặt `data-theme="dim"` trên `<html>` override ~9 biến CSS (màu nền/chữ + nền rail); graph 3D dùng màu hard-code nên giữ nền tối, nhưng hai tông đều tối nên nhìn liền. Nhớ lựa chọn qua `localStorage["javis.theme"]`, có inline script đầu `<head>` áp trước khi vẽ để không nháy.
+### Cải thiện
+- **Header hết "díu dít", giãn đều 3 cột**: `.hud-top` (grid `1fr auto 1fr`) trước đây có 4 con phẳng; ở trang quản lý `.brand` + `.hud-actions` bị ẩn khiến 2 con còn lại dồn vào cột 1-2, cột 3 (~414px) trống hoác. Nay gói thành 3 nhóm cố định cột: trái (brand + chọn brain + số liệu), giữa (tên + ngày), phải (nút theme + cụm nút cockpit). Con ẩn chỉ tự co, nhóm vẫn giữ cột nên cân ở CẢ home lẫn trang quản lý; nút theme là con trực tiếp nhóm phải nên luôn hiện, lấp đúng cột phải từng bỏ trống.
+
+## [0.9.75] - 2026-07-18
+Sửa lỗi dropdown chọn não giữ lại "folder ngoài" (📁) đã xoá khỏi ổ đĩa hoặc trùng với một não thật - chúng sống dai qua cả xoá folder, xoá não, lẫn update lên bản mới. **Cần khởi động lại server** để có endpoint `/path/exists`; phần giao diện tự nạp lại nhờ bump `?v=6`.
+### Sửa lỗi
+- **Menu chọn não hiện lại não cũ đã xoá**: dropdown gộp option từ 2 nguồn ĐỘC LẬP. Loại 🧠 (`data-brain`) do `brains-ui.js` nạp tươi từ `GET /brains` (đọc đĩa thật) nên xoá folder/xoá não là tự biến mất khi tải lại. Nhưng loại 📁 (`data-custom`) do `app.js` nạp từ `localStorage["javis.brains"]` (folder ngoài tự chọn qua nút duyệt) thì KHÔNG BAO GIỜ được kiểm tra tồn tại, không dọn, không có nút gỡ. `localStorage` sống theo origin trình duyệt nên trụ qua cả xoá folder, xoá não lẫn update app - đúng triệu chứng. Nút thùng rác khi chọn 📁 còn báo "folder ngoài thì bỏ khỏi danh sách" nhưng không cung cấp cách bỏ nào → entry kẹt vĩnh viễn.
+- **`brains-ui.js` giờ tự dọn danh sách 📁 mỗi lần nạp**: sau khi có danh sách não thật, hàm `pruneCustomBrains` bỏ khỏi `localStorage` những entry TRÙNG path một não thật (tránh hiện 2 lần) và entry mà path KHÔNG còn là thư mục (đã xoá khỏi đĩa), GIỮ lại folder ngoài hợp lệ khác path. Dọn ngay nguồn `localStorage` nên lần `app.js` render sau vẫn đúng, không "sống lại" qua update. Chạy TRƯỚC bước khôi phục lựa chọn để không khôi phục về một path đã chết.
+- **Nút thùng rác gỡ được folder ngoài 📁**: chọn một 📁 rồi bấm xoá giờ hỏi xác nhận và gỡ khỏi menu + `localStorage` (KHÔNG đụng dữ liệu trên ổ đĩa), thay vì chỉ báo lỗi rồi bó tay như trước.
+### Thêm mới
+- **Endpoint `GET /path/exists?path=`** (đọc-only, chỉ `os.path`, nhẹ): trả `{exists, is_dir}` cho một đường dẫn tuyệt đối. Dùng để dropdown kiểm tra folder ngoài còn tồn tại không. FAIL-SAFE: lỗi truy cập trả `exists=null` → frontend hiểu là "chưa xác định" và GIỮ entry, chỉ dọn khi server xác nhận rõ path đã mất (endpoint thiếu/404 vì server chưa restart, hay lỗi mạng, đều không làm mất entry hợp lệ). Kèm test `server/test_path_exists.py` + `dashboard/test_brains_ui.mjs` (mock DOM, chạy thẳng logic dọn đúng kịch bản bug thật).
+
+## [0.9.74] - 2026-07-18
+Gom phần "mức dùng" thành một trang riêng có đồ thị, bỏ widget nổi vướng víu, và tinh chỉnh nốt nút thu/mở rail. **Cần khởi động lại server** để đồ thị mức dùng có dữ liệu (thêm field ở endpoint `/usage`); phần còn lại chỉ cần tải lại trang.
+### Thêm mới
+- **Trang "Mức dùng" trong rail (nhóm Hệ thống) có đồ thị 14 ngày**: thay cho hộp mức dùng nhỏ trước đây, giờ là một trang đầy đủ gồm 3 thẻ tổng (hôm nay, tổng tích luỹ, số dư OpenRouter), đồ thị cột token/ngày 14 ngày gần nhất, và bảng chi tiết theo nhà cung cấp/model (token vào/ra, số lượt, chi phí). Endpoint `/usage` thêm field `daily` (hàm `usage_store.daily(14)` gộp per-day, lấp cả ngày trống cho trục liền mạch). Số liệu vẫn do Javis tự đo, giữ 30 ngày.
+### Cải thiện
+- **Bỏ widget "MỨC DÙNG" nổi ở góc dưới khung giữa**: user thấy vướng. Gỡ khối HTML + CSS; hàm `refreshUsage`/`initUsageToggle` trong app.js tự thành no-op (đã có guard khi không thấy element) nên không cần đụng tới, không còn fetch `/usage` mỗi lượt chat.
+- **Nút thu/mở rail dời sang PHẢI, version/tác giả sang trái**: `.rail-foot` xếp `space-between` (dùng `order`), icon nút to lên chút (18px) cho cân với icon nav; khi thu gọn chỉ còn nút, căn giữa.
+- **Tooltip nhãn khi rê chuột lúc thu gọn hiện nhanh hơn**: native `title` trễ ~500ms, thay bằng tooltip tự vẽ (1 node body-level, thoát mọi overflow của rail) hiện sau 90ms, đặt cạnh phải icon; tạm gỡ `title` lúc hover để không lòi thêm tooltip native chậm, trả lại khi rời chuột (giữ cho screen-reader).
+
+## [0.9.73] - 2026-07-18
+Tinh chỉnh nút thu/mở rail (bản 0.9.72) theo góp ý: đổi icon, dời vị trí, và sửa link tác giả.
+### Cải thiện
+- **Icon nút thu/mở đổi sang kiểu "panel sidebar"**: thay mũi tên kép `«` bằng khung vuông chia hai với cột trái có các dòng nội dung (giống icon toggle sidebar quen thuộc). Icon tĩnh, bỏ hiệu ứng xoay 180° khi thu (kiểu panel không cần chỉ hướng, trạng thái đã có tooltip).
+- **Dời nút thu/mở nằm CẠNH dòng version thay vì phía trên**: `.rail-foot` đổi từ xếp dọc sang hàng ngang, nút ở trái kề số phiên bản + "by Minh Quý". Khi thu gọn vẫn ẩn version/tác giả, chỉ còn mỗi nút căn giữa.
+- **Link "by Minh Quý" trỏ về javisos.com** thay cho minhquy.vn.
+
+## [0.9.72] - 2026-07-18
+Làm gọn thanh điều hướng bên trái (rail) theo góp ý trực tiếp: chữ khó đọc vì dùng font monospace, header nhóm trơ không icon, và rail chiếm quá nhiều bề ngang màn hình.
+### Thêm mới
+- **Nút thu/mở sidebar ở góc dưới**: bấm để thu rail còn 60px chỉ hiện cột icon dọc (tên mục hiện qua tooltip khi rê chuột), bấm lần nữa bung lại đầy chữ 160px. Phần nội dung bên phải tự giãn chiếm lại chỗ khi thu (mọi offset chạy qua biến `--rail-w`, thu chỉ đổi 1 biến trên `body.rail-collapsed`). Trạng thái nhớ qua `localStorage` nên lần sau vào giữ nguyên. Mũi tên nút xoay 180° báo trạng thái (xoay cả nút chứ không xoay riêng `<svg>` để né quirk transform-box của SVG root). Luật thu gọn bọc trong `@media (min-width: 861px)` nên KHÔNG chạm thanh dưới ngang trên mobile.
+### Cải thiện
+- **Rail thành 2 tầng gập/mở thay cho danh sách phẳng dài phải cuộn**: tầng 1 là tên nhóm bấm để xổ, tầng 2 là các mục con trượt ra dưới (max-height transition). Mỗi lúc chỉ 1 nhóm mở; nhóm chứa trang đang xem tự mở, nếu đang gập thì tên nhóm hé màu cam để biết mình ở đâu. Store `nav` thêm `openGroup`/`toggleGroup`/`collapsed`/`toggleCollapsed`.
+- **Sửa font sai + chữ to hơn**: nhãn rail trước dùng biến `--font` (monospace `SF Mono`/`Consolas`) làm chữ tiếng Việt có dấu cứng và lệch. Thêm biến `--font-ui` (Segoe UI sans-serif) cho riêng rail; cỡ chữ tên nhóm 12.5px, tên mục 13.5px (trước 11 và 12.5px).
+- **Thêm icon cho tên nhóm (tầng 1)**: 6 icon line-style đồng bộ với icon mục (`GICON`) cho Trợ lý/Bộ não/Năng lực/Việc/Kết nối/Hệ thống, hết trơ.
+- **Thu bề ngang rail 172→160px** ở chế độ mở rộng cho đỡ dư diện tích; đã đo không mục nào bị cắt chữ (kể cả "Việc định kỳ").
+
+## [0.9.71] - 2026-07-17
+Bản 0.9.70 ship tool `javis_schedule` ra ngoài trong tình trạng KHÔNG dùng được thật - review độc lập (chạy code, không đoán) tìm ra 2 lỗi Critical, 3 lỗi Important và 1 khoản nợ kỹ thuật. Bản này vá toàn bộ. Cảm ơn review đã chỉ đúng: "cả hai nửa của tool đều không làm được việc nó hứa".
+### Sửa lỗi
+- **[Critical] `httpx` ĐỒNG BỘ gọi ngược vào chính server đang chạy nó → treo CẢ SERVER**: handler `javis_schedule` (`plugin.py`) là `def` thuần, và 3 hàm `_post_reminder`/`_get_reminders`/`_cancel_reminder` gọi `httpx.post`/`httpx.get` ĐỒNG BỘ tới `http://127.0.0.1:<port>/reminders`. `plugins_host._make_call` gọi handler plugin bằng `res = handler(args, ctx)` rồi mới `await` - KHÔNG bọc `asyncio.to_thread` - nên lệnh `httpx.post` chặn NGUYÊN event loop của uvicorn (1 worker duy nhất, `main.py:5037`) trong lúc nó tự chờ CHÍNH request đó được trả lời → deadlock, `ReadTimeout` sau ~5-10s, và trong lúc đó server không trả lời được BẤT KỲ ai (mọi user, mọi tool). Tệ hơn: nhắc hẹn vẫn được tạo thật (đã vào hàng đợi trước khi treo), tool trả lỗi nên model retry → tạo THÊM 1 nhắc trùng + treo thêm 1 lần. Vá: cả 4 hàm chuyển `async def` + `httpx.AsyncClient`, đúng khuôn `system/plugins/meta-ads-graph/plugin.py` (`_get()`) và `system/plugins/image-chatgpt/plugin.py` (`_gen()`) - 2 plugin bundled còn lại vốn đã làm đúng từ đầu, `javis-schedule` là ngoại lệ duy nhất phá quy ước.
+- **[Critical] Loop tạo qua tool KHÔNG BAO GIỜ làm việc user yêu cầu**: `_create_loop_file` ghi frontmatter thiếu hẳn field `goal`. `self_improve.py:250` `goal = fm.get("goal", "business")` mặc định `"business"` khi thiếu, và nhánh `goal == "business"` (`self_improve.py:546`) không đọc `loop["body"]` một chữ nào (thân file - đúng chỗ chứa prompt user vừa gõ qua chat). Hai kiểu hỏng: chưa đấu MCP số liệu kinh doanh → `skip_reason` khiến loop bỏ qua VÔ HẠN mọi vòng; có POS/ads → loop âm thầm chạy "phân tích chỉ số kinh doanh" (nhiệm vụ mặc định) thay vì việc user thật sự yêu cầu, rồi vẫn báo Telegram như đã làm đúng việc. Form web tạo loop vốn làm đúng (`self_improve.py:914` `goal = goal or (old["goal"] if old else "custom")`) - tool là nơi DUY NHẤT sai. Vá: `_create_loop_file` ghi cứng `goal: custom` vào frontmatter, kèm comment giải thích tại sao dòng này bắt buộc để không ai vô tình xoá.
+- **`notify_only` không có tác dụng gì - mọi nhắc đều dựng nguyên engine Claude + MCP để "làm hộ"**: `_do_create` hard-code `"mode": "task"` trong payload gửi `POST /reminders`, bất kể `notify_only`. Hậu quả: "30 phút nữa nhắc anh gọi khách" (chỉ muốn 1 câu nhắc) tới giờ lại chạy `reminders.py:418 _run_task` (dựng CLI, đọc MCP, `max_wall_s=300`) rồi gửi "⏰ Nhắc hẹn (Javis đã làm): ..." thay vì đúng "⏰ Nhắc anh: ..." (`reminders.py:342`) - ngược hẳn mô tả tool tự khai và ngược CLAUDE.md ("notify_only=true nếu chỉ nhắc"). Vá: `"mode": "notify" if notify_only else "task"`.
+- **Lịch "mỗi tuần"/"mỗi ngày"/"mỗi tháng"/"mỗi sáng" đều bị hiểu thành chạy MỖI 5 PHÚT**: `_UNIT_ALT` trước đó chỉ biết phút/giờ (VN + tắt tiếng Anh), không có ngày/tuần/tháng; các chuỗi này không match được số+đơn vị nên `_interval_min` rơi về sàn cứng 5 phút - "việc mỗi tuần tổng kết doanh thu" thành ra chạy 5 phút/lần (cộng lỗi goal ở trên = spam Telegram + đốt phí LLM thật). Ca nặng hơn: "mỗi sáng 7h" bị hiểu thành "mỗi 7 TIẾNG" (`interval_min=420`) vì regex chỉ thấy số "7" + đơn vị "h", không phân biệt được đó là MỐC GIỜ TRONG NGÀY chứ không phải khoảng cách lặp. Vá 3 lớp: (1) thêm `ngay=1440`/`tuan=10080`/`thang=43200` vào bảng quy đổi, và cho phép đơn vị đứng một mình ngầm định số lượng 1 ("mỗi ngày" = "mỗi 1 ngày"); (2) hàm `_daily_cron` mới dò tín hiệu LẶP HẰNG NGÀY (`mỗi` + buổi sáng/trưa/chiều/tối, hoặc từ "ngày", hoặc cụm "hằng ngày") CỘNG một mốc giờ đồng hồ (`7h`, `07:00`) → route sang kho reminders dạng cron 5 trường thay vì loop interval; (3) **luật an toàn**: lịch mơ hồ không rút được đơn vị/mốc giờ nào (vd "mỗi sáng" trơ, "mỗi khi rảnh") → `_interval_min` trả `None`, `_create_loop_file` trả `"ERROR: ..."` yêu cầu nói rõ hơn - KHÔNG còn âm thầm rơi về 5 phút trong bất kỳ trường hợp nào.
+- **Skill `javis-builder` dạy gõ YAML tay, thắng cả chỉ dẫn "ưu tiên gọi tool" của CLAUDE.md**: `CLAUDE.md` (mục "Tự tạo năng lực") nói dùng skill `javis-builder`; skill này nạp SAU nên cụ thể hơn thắng - mà mục Loop của nó (trước bản này) chỉ có mẫu YAML để tự ghi file, không nhắc một chữ `javis_schedule`, nên model vẫn gõ tay dù tool đã có sẵn (và thiếu cả `owner_chat` trong mẫu → loop viết tay báo nhầm người). Vá: mục Loop giờ dạy ưu tiên gọi tool `javis_schedule` (op=create) trước, chỉ ghi file tay khi SỬA loop đã có hoặc cần trường nâng cao tool chưa nhận (`quiet_hours`/`max_runs_per_day`/`workspace`/`ambient_mcp`/`goal` khác `custom`); mẫu YAML còn lại thêm `goal: custom` + `owner_chat` cho đúng chuẩn tool đang tạo ra. Kèm hash bản cũ vào `system_sync.py:LEGACY_HASHES["skills/javis-builder"]` để brain user tự nhận bản vá này qua sync (không bị coi là "đã sửa tay").
+- **`apply_mcp` không truyền `brain` ở vài đường UNGATED, plugin in-process vẫn có thể mù brain**: những nơi tạo CLI với `allowed_tools=None` (ungated) đều nạp plugin in-process (`claude_sdk_engine._plugins_server`, đọc `cli.javis_vault`) - thiếu `brain` là tái diễn đúng bug 0.9.70 vừa vá ở đường chat (`image-chatgpt` lưu nhầm `brains/Brain Default`). Vá `self_improve._make_cli` nhận thêm tham số `brain`, truyền xuống cả 3 lần gọi `apply_mcp` bên trong (nhánh `mode=full`, nhánh `ambient_mcp`, và nhánh mặc định - nhánh này thật ra GATED nên plugin không nạp, nhưng vẫn truyền cho nhất quán/phòng hờ); 2 điểm gọi `_make_cli` trong `run_cycle`/kiểm chứng nay truyền `brain=brain` có sẵn trong scope. Thêm `else` nhánh ungated của `execute_workflow` (`main.py`, Studio "chạy full quyền") gắn thẳng `c.javis_vault = vault_root` - KHÔNG gọi `_apply_mcp()` ở đây vì nhánh này cố ý dựa `setting_sources` để kế thừa MCP máy như phiên `claude` tương tác thật, gọi `_apply_mcp` sẽ đổi hành vi ngoài phạm vi bug đang vá. **2 đường còn lại KHÔNG sửa được** vì không có biến brain/vault nào trong scope để truyền (không bịa biến): `/metrics` (`main.py:1451`) không nhận tham số brain (endpoint dùng chung mọi brain); `/ingest-upload` (`main.py:1733`) chỉ nhận `staged`/`sources`/`attachments` đã resolve sẵn, không có brain gốc.
+### Kiểm thử
+- `test_javis_schedule.py` thêm 5 nhóm test chặn đúng các lỗi trên: (1) `inspect.iscoroutinefunction` trên handler + 3 hàm HTTP - lưới hồi quy chặn quay lại lối sync; (2) LƯỚI THẬT cho lỗi goal - đưa loop vừa tạo qua ĐÚNG API `self_improve.LoopFeature.get_loop` (không chỉ kiểm tra chữ đã ghi ra file) và khẳng định `goal == "custom"` + thân file tới được nơi sẽ chạy; (3) monkeypatch `_post_reminder` bắt payload, khẳng định `mode` đổi đúng theo `notify_only`; (4) `_interval_min` cho ngày/tuần/tháng + cron mốc giờ cố định + lịch mơ hồ phải `None`/`ERROR`; (5) dispatcher với `op` sai và `vault_root` rỗng. `test_loop_ambient.py` cập nhật stub `_apply_mcp` nhận thêm `brain=None` để khớp chữ ký mới.
+
+## [0.9.70] - 2026-07-17
+### Thêm mới
+- **Tool `javis_schedule` - chat đặt được việc định kỳ, thôi gõ YAML tay**: trước đây muốn "tạo việc mỗi 2 tiếng quét đơn" phải tự gõ YAML frontmatter vào `Javis/loops/<slug>.md`, hoặc shell ra `curl POST /reminders` (`reminders.py:17` vốn ghi thẳng cách đó). Đường thứ hai còn tự mâu thuẫn: loop mode suggest/auto bị chặn Bash (`self_improve.py:112`) nên loop không tự đặt nhắc được cho chính nó. Nay một câu chat gọi thẳng tool, `op=create` tự route vào 1 trong 2 kho theo tính chất việc: lặp + bền → file `.md` (sửa được trong Obsidian); nhắc/cron/một lần → kho reminders (đã có cron 5 trường sẵn: `cron_util.py`, tự tính lần kế ở `reminders.py:364`). `op=list` nhìn CẢ HAI kho, `op=cancel` huỷ nhắc đang chờ. An toàn giữ nguyên luật CLAUDE.md: loop tạo qua chat luôn `enabled: false` + `mode: suggest`, không nhận tham số để đổi; trùng slug báo lỗi chứ không đẻ bản sao song song (định danh theo TÊN FILE, `self_improve.py:321-327`).
+- **Vì sao là plugin bundled chứ không phải tool trong hub**: hub không với tới được mọi engine cho việc này, vướng hai rào. Rào 1: `_builtin_tools` (`mcp_hub.py:211-212`) early-return ngay khi `vault_root` rỗng - không đăng ký thêm tool nào cần biết brain - mà đường HTTP hub (`tools/list`/`tools/call`, `mcp_hub.py:392,398`) luôn gọi `discover_all` không kèm brain nên `vault_root` luôn `None` ở đường đó. Rào 2: `claude_config_path` (`mcp_hub.py:448-453`) trả `None` khi chưa có connector MCP nào bật, tức Claude Code còn chưa từng thấy hub tồn tại. Plugin đi qua MCP server IN-PROCESS của engine SDK (`claude_sdk_engine.py:162-186`, phần `_plugins_server`), không dính rào nào trong hai rào đó.
+### Sửa lỗi
+- **Plugin gọi từ chat luôn mù brain, `javis_generate_image` âm thầm lưu ảnh vào Brain Default**: `_plugins_server` (`claude_sdk_engine.py`) trước đây tự suy brain từ `self.cwd`, nhưng chat luôn chạy với `cwd=CLAUDE_CWD` (`main.py:318`, gốc project - không có thư mục `Javis/`) nên phép suy này luôn trượt về `None` ở đúng đường chat, mọi plugin gọi từ Claude Code đều nhận `ctx.vault_root=None`. Hệ quả cụ thể: `image_gen._resolve_vault` rơi về fallback `brains/Brain Default`, không có lỗi nào báo. Việc build `javis_schedule` (cần ghi đúng `Javis/loops/` của brain đang mở) mới lộ ra brain chưa từng được truyền tường minh qua engine SDK. Vá: `_apply_mcp` (`main.py`) nhận thêm tham số brain, đặt `cli.javis_vault` tường minh ở cả hai đường chat (dashboard websocket + Telegram, brain có sẵn trong scope) - không còn suy từ cwd.
+- **Tên việc chứa ký tự chỉ-thị YAML làm loop chết âm thầm**: `_yaml_scalar` trước đó chỉ escape `[:#'"\n]`, bỏ sót các ký tự YAML coi là chỉ thị đầu dòng (`- @ * ! % ? | & >`). Tên việc dùng ký tự này ghi ra frontmatter vỡ, `yaml.safe_load` ném `ScannerError`/`ConstructorError`, và `self_improve.list_loops()` nuốt lỗi bằng try/except nên loop biến mất khỏi tab Việc định kỳ dù tool vừa báo "đã tạo thành công". Sửa bằng cách luôn trả về chuỗi nháy kép kiểu JSON (`json.dumps`) thay vì liệt kê ký tự cần escape - YAML 1.2 là superset của JSON nên scalar nháy kép JSON luôn hợp lệ. Áp dụng cả cho `owner_chat` (trước đó nối chuỗi tay, không qua hàm escape nào).
+- **`op=cancel` luôn 401 trên instance đã bật mật khẩu**: `POST /reminders/cancel` thiếu trong `_AUTH_LOCAL_EXACT` (`main.py`), nên khi `gate_active()=True`, `javis_schedule` gọi httpx từ localhost (không cookie) luôn bị chặn. `/reminders` (tạo nhắc) đã được miễn cùng nhóm từ trước; huỷ là thao tác yếu hơn tạo nên miễn cùng mức mới nhất quán.
+### Cải thiện
+- **CLAUDE.md dạy đúng thứ vừa xây**: mục "Điều phối" bậc 6 (Nhắc hẹn) đổi từ `POST /reminders` sang gọi tool `javis_schedule`; bậc 7 (Loop) thêm câu ưu tiên gọi tool thay vì tự ghi file. Lý do phải sửa ngay trong bản có tool: mô tả tool cạnh tranh trực tiếp với chỉ dẫn trong system prompt, và prompt thường thắng - có tool mà tài liệu vẫn dạy gõ YAML tay thì model vẫn gõ tay. Phần mô tả format file loop giữ nguyên bên dưới, vẫn cần để SỬA loop đã có.
+
+## [0.9.69] - 2026-07-17
+### Bảo mật
+- **`/automations/sync` là một lỗ bảo mật, xoá cùng toàn bộ tính năng giả nó thuộc về**: route gọi `claude_engine(...)` không truyền `allowed_tools`, nên theo `claude_sdk_engine.py:290-301` nó chạy `permission_mode="bypassPermissions"` VÀ nạp `setting_sources=["user","project","local"]` - engine call ít rào nhất trong codebase. Bảo đảm "CHỈ LIỆT KÊ" của route này chỉ là chữ trong prompt, không có gate thật nào đứng sau. Xoá route cùng lúc với toàn bộ registry `automations`.
+### Cải thiện
+- **Tab "Lịch" từng là tính năng giả, nay xoá sạch**: `Javis/automations.json` chưa từng có executor nào đọc - `_scheduler_loop` (`server/main.py`) tick 6 việc (loop, learn, kanban, reminders, backup, index) và không nhánh nào đọc file này. Kiểm tra thực tế trước khi xoá: 0 file `automations.json` tồn tại trên cả 4 brain đang chạy, 0 test phủ. Cái làm nó trông giống thật: badge xanh "N đang chạy" cho những dòng không bao giờ nổ, và ô lịch là free text không dòng code nào parse - vì tab phần lớn đang chiếu chính Loop qua hai lớp `_loops_as_routines` (main.py) và `pending_as_automations` (reminders.py), với chuỗi "mỗi N phút" bị bịa ra ngay lúc GET chứ không đọc từ đâu cả. Cả hai lớp chiếu, 3 helper registry và 5 route `/automations*` nay đã xoá.
+- **Một trang "Việc" thay cho hai trang Loop + Lịch**: rail `selfimprove` đổi nhãn "Loop" thành "Việc định kỳ", gộp thêm khối "Nhắc hẹn đang chờ" (đọc `GET /reminders`, huỷ qua `POST /reminders/cancel`) - bắt buộc phải gộp vì nhắc hẹn trước đây CHỈ hiện ở tab Lịch vừa xoá. Không thêm endpoint mới: trang đọc thẳng `GET /loops` và `GET /reminders` vốn đã có sẵn.
+- **Ô thống kê ROUTINES xoá hẳn, không thay bằng ô khác**: ô này ở `index.html` đếm "routines đang chạy" bằng cách fetch `/automations` trong `loadBrainStats()` (`app.js`) - chính route vừa xoá ở trên, nên sau khi route biến mất, số hiển thị mãi mãi là 0 vì lỗi 404 bị `.catch(() => ({}))` nuốt âm thầm. Ô này đúng là badge nói dối mà việc dọn tab Lịch sinh ra để diệt, chỉ là kế hoạch ban đầu bỏ sót nó vì chưa từng grep `app.js`.
+- **Dọn 138 dòng cụm chết của panel loop cũ**: panel `<div class="loop-box" style="display:none">` trong `index.html` cùng cụm phục vụ nó trong `app.js` (`loadLoopConfig`, `saveLoopConfig`, `renderLoopStatus`, `loadLoopLog`, listener `loopRunNow` kèm vòng poll, listener `lintBtn`, các fetch `/loop/config`, `/loop/log`, `/loop/run-now`) - panel đã bị ẩn cứng bằng `display:none` và không dòng code nào từng gỡ nó ra, nên toàn bộ cụm phía sau không thể chạm tới được nữa. Backend `/loop/config` và `/lint` giữ nguyên, chỉ dọn phía UI đã chết.
+
+## [0.9.68] - 2026-07-17
+### Cải thiện
+- **Lịch sử hội thoại chỉ hiện 20 mục, có nút "Xem thêm 20"**: sidebar trước đây đổ thẳng 100 hội thoại ra một mạch, chat nhiều thì danh sách dài lê thê phải cuộn mãi mới hết. Nay mặc định 20 mục, mỗi lần bấm mở thêm 20 nữa, hết hội thoại thì nút tự ẩn. Không cần sửa server: endpoint `/sessions` vốn nhận `limit` tự do nên client chỉ việc xin dư đúng 1 mục (`limit = shown + 1`) để biết còn dữ liệu phía sau hay không.
+- Số mục đang mở được giữ nguyên khi danh sách tự làm mới lúc có tin nhắn mới (nếu không thì đang xem 60 mục lại bị thu về 20), và chỉ reset về 20 khi đổi brain. Lần render lại cũng giữ chỗ cuộn để bấm "Xem thêm" không bị nhảy vọt lên đầu.
+- **Tìm kiếm vẫn quét toàn bộ hội thoại** như cũ, không bị giới hạn 20 mục này chạm vào.
+
+## [0.9.67] - 2026-07-17
+### Sửa lỗi
+- **Xoá một bước làm MẤT TRẮNG chữ đang gõ dở ở các bước khác**: nút ✕ gọi thẳng `steps.splice(i, 1)` rồi `render()` mà quên gọi `captureSteps()` trước (nút "+ Bước" thì có gọi), nên `render()` vẽ đè mọi ô nhập bằng giá trị cũ trong mảng. Sửa vài bước, chưa Lưu, bấm xoá một bước bất kỳ là bay sạch, rất dễ tưởng mình gõ nhầm. Đã dựng lại đúng kịch bản trên cả bản cũ lẫn bản mới để đối chứng: bản cũ trả về chữ cũ, bản mới giữ nguyên chữ vừa gõ.
+- **Dòng "Kiểm chứng" vỡ thành ba dòng**: quy tắc gộp `.editor-box input { width: 100% }` có specificity (0,1,1), thắng `.st-retries { width: 48px }` chỉ (0,1,0), nên ô số lần bị kéo full-width và đẩy chữ "lần" xuống dòng riêng. Ý đồ ban đầu là ba thứ nằm gọn một dòng nhưng CSS chưa bao giờ chạy đúng ý đó. Nay đổi thành `.editor-box .st-retries` (0,2,0). Ô chọn agent kiểm chứng không dính lỗi này vì nó có `flex: 1`.
+### Cải thiện
+- **Form Sửa workflow gập bước lại để thấy toàn cảnh**: workflow 11 bước trước đây trải hết cỡ trong hộp cao 86vh nên chỉ thấy được một bước rưỡi mỗi lần, muốn nắm tổng thể phải cuộn liên tục. Nay mỗi bước là một dòng gọn gồm số, tên agent và trích nội dung việc; bấm vào thì mở ra sửa, mở bước khác thì bước cũ tự gập. Các ô nhập vẫn nằm trong DOM khi gập (chỉ ẩn bằng CSS) nên `captureSteps()` đọc đủ, bước đang gập vẫn giữ nguyên cấu hình kiểm chứng lúc Lưu.
+- **Thêm nút lên/xuống đổi thứ tự bước**: trước đây muốn chuyển bước 9 lên trước bước 4 phải chép tay qua lại. Nút ↑ ở bước đầu và ↓ ở bước cuối tự mờ đi.
+
+## [0.9.66] - 2026-07-17
+### Cải thiện
+- **Biến workflow trong ô bước đọc thành lời thay vì dấu ba chấm**: mã cũ thay mọi `{{...}}` bằng `…`, nên bước đầu của viral-video-production hiện ra "Nhận …, tạo project folder" đọc lên cụt nghĩa. Nay `{{input}}` thành "đầu vào", `{{prev}}` thành "kết quả bước trước", và biến lạ thì hiện thẳng tên biến chứ không nuốt mất. Xử đúng cả trường hợp có khoảng trắng trong ngoặc như `{{ input }}`.
+
+## [0.9.65] - 2026-07-17
+### Sửa lỗi
+- **Trang Workflows hiện các bước thành mấy cột cao lêu nghêu, rỗng ruột**: dải bước dùng `flex: 1` chia đều bề ngang, nên workflow 11 bước (viral-video-production) bị bóp mỗi ô còn khoảng 35px, trong khi tên agent `viral-video-director` có `white-space: nowrap` nên bị cắt sạch không còn chữ nào, chỉ trơ lại số thứ tự. Nay mỗi ô rộng tối thiểu 150px và tự xuống dòng khi hết chỗ, chữ luôn đọc được. Đo thật trên màn 1720px: 10 ô một hàng, ô thứ 11 xuống hàng dưới; 1280px được 7 ô; 900px được 5; 600px được 3; 380px được 2. Bề rộng ô luôn nằm trong 152 tới 173px ở mọi khổ và không khổ nào tràn ngang.
+- **Bước từ thứ 10 trở đi đánh số sai thành `010`, `011`**: mã nối chuỗi `0${i+1}` nên chỉ đúng với bước 1 tới 9. Thay bằng `padStart(2, "0")`.
+- **Thẻ workflow bị nhét vào lưới cột hẹp**: panel Workflows dùng chung lưới `.cards` (`auto-fill, minmax(280px, 1fr)`) với Agents và Lịch, mà pipeline lại nằm ngang nên hai thứ đánh nhau, và khi chỉ có một workflow thì phần còn lại của hàng bỏ trống. Nay Workflows có `.wf-list` và `.wf-row` riêng, mỗi workflow một hàng đầy chiều rộng; Agents, Lịch, plugin và loop giữ nguyên `.cards`/`.wf-card` cũ nên không bị ảnh hưởng.
+### Cải thiện
+- **Ô bước lấy việc làm làm chữ chính, tên agent hạ xuống chữ phụ**: nhiều workflow gọi cùng một agent ở mọi bước, lấy agent làm chữ chính thì 11 ô hiện chữ giống hệt nhau và không phân biệt được bước nào với bước nào. Nội dung task cắt gọn 2 dòng, di chuột vào xem đầy đủ.
+- **Cụm nút và số bước dồn lên cùng hàng với tên workflow**, thay vì nằm dưới cùng, nên quét nhanh hơn khi có nhiều workflow.
+
+## [0.9.64] - 2026-07-17
+### Sửa lỗi
+- **Javis tốn tới ~52ms mỗi lượt chat chỉ để đồng bộ skill, và nó chặn cả tiến trình**: hàm mirror skill đọc và băm lại `SKILL.md` của MỌI skill (cả bản nguồn lẫn bản đích) mỗi lần dựng system prompt, tức mỗi lượt chat, mỗi tin Telegram, mỗi task Kanban, mỗi vòng loop, mỗi nhắc hẹn. Đo thật trên 3 brain đang chạy, trước khi sửa: My Bullet Journal (27 skill/41 file) 52,48ms/lượt, Ngọc Thu Phạm (16 skill/30 file) 44,23ms/lượt, Brain Default (6 skill/9 file) 11,62ms/lượt - chạy đồng bộ trên event loop nên làm đứng luôn các kết nối khác. Nay thay bằng cổng chữ ký chỉ dùng `stat` (không đọc nội dung file nào), chỉ copy thật khi cây skill có thay đổi. Đo lại đúng 3 brain đó sau khi sửa: còn 8,30ms, 6,05ms, 2,28ms/lượt theo cùng thứ tự - nhanh hơn khoảng 5 tới 7 lần tuỳ brain (5,1x / 6,3x / 7,3x), không phải một con số cố định. Lỗi có sẵn, không ai biết cho tới khi đo.
+- **File phụ trong skill đổi nội dung mà bản mirror không bao giờ nhận**: cổng cũ chỉ băm `SKILL.md`, nên sửa một file ảnh hay tài liệu ngang hàng trong thư mục skill thì bản Claude Code nạp native vẫn giữ bản cũ mãi. Chữ ký mới phủ mọi file (đường dẫn tương đối, thời gian sửa, kích thước) nên hết lỗi này.
+### Thêm mới
+- **Skill mang theo được `references/` và `scripts/`**: bản mirror sang `.claude/skills` nay copy cả cây con, nên skill có tài liệu tách riêng hay script đi kèm chạy được cả trên đường Claude Code nạp native, không chỉ đường router. 10 skill trong các brain hiện có đã dùng `references/` từ trước và tới giờ vẫn chưa tới được đường native; đã xác nhận cả 10 tới nơi sau bản này.
+### Đã biết, chưa sửa
+- **Skill hệ thống vẫn chưa ship được cây con**: `html-to-webcake` ship kèm `tools/` và `examples/` nhưng cơ chế cài skill hệ thống chỉ chuyển mỗi `SKILL.md`, nên cây con chưa bao giờ tới brain nào. Bản này KHÔNG sửa lỗi đó: nó nằm ở tầng cài đặt, phía trên tầng mirror.
+- **Bản mirror bị phá từ bên ngoài sẽ không tự lành cho tới khi khởi động lại**: cổng chữ ký tính trên cây nguồn và nhớ trong bộ nhớ, nên nếu ai đó xoá tay file trong `.claude/skills` mà không đụng vào skill gốc thì Javis sẽ không nhận ra. Đánh đổi có chủ đích để lấy tốc độ; tắt/bật skill hay khởi động lại đều đưa nó về đúng.
+
+## [0.9.63] - 2026-07-17
+### Sửa lỗi
+- **Skill Javis TỰ HỌC mất sạch frontmatter khi mô tả có dấu hai chấm**: `learn.py` ghi `description: <giá trị>` không bọc nháy kép. Mô tả tiếng Việt rất hay có dấu hai chấm (chính bản 0.9.62 phải bọc nháy kép cho 2 trong 5 skill hệ thống, tức khoảng 40%), và khi đó PyYAML ném lỗi trên CẢ KHỐI frontmatter chứ không riêng một dòng: `name`, `group`, `origin`, `status` mất theo, `split_frontmatter` nuốt lỗi trả về rỗng, và skill đó im lặng không bao giờ route được. Nay mọi giá trị do model sinh (`name`, `description`, `group`) đều đi qua `_yaml_scalar` (bọc nháy kép + escape đúng), kèm test round-trip gọi thẳng mã thật.
+- **`learn.py` chưa hề ép trần 150 ký tự**: bản 0.9.62 chỉ chặn ở `POST /skills`. Đường tự học vẫn ghi thẳng mô tả quá dài xuống đĩa rồi để runtime cắt cụt. Nay `_promote_sync` gọi `validate_description` và đưa vi phạm vào danh sách bị chặn, cùng khuôn với quét secret và quét injection sẵn có.
+- **`javis-builder` vẫn dạy đúng cái lỗi mà 0.9.62 sinh ra để diệt**: mẫu file trong skill đó, nằm dưới tiêu đề "ghi CHÍNH XÁC theo đây", vẫn ghi `description: <mô tả NGẮN nêu rõ KHI NÀO kích hoạt - đây là trigger, viết kỹ>` trong khi bộ chuẩn ngay 14 dòng dưới nói ngược lại. **CHANGELOG 0.9.62 tuyên bố "cả hai" tài liệu đã sửa là SAI**: `CLAUDE.md` sửa rồi, `javis-builder` thì chưa. Vì skill viết qua chat ghi thẳng ra đĩa nên không lớp chặn nào bắt được, và người viết theo mẫu sẽ tạo ra skill không route được mà không có lỗi nào báo. Nay đã sửa mẫu và một chỗ thứ hai cùng loại.
+- **Sidecar đếm lượt dùng bị hỏng KIỂU dữ liệu làm sập cả trang Skill**: `GET /skills` và `is_stale` ép kiểu số mà không phòng thủ, nên một bản ghi bị sửa tay hỏng sẽ trả lỗi 500 cho toàn trang, trái đúng cam kết "sidecar hỏng không bao giờ được làm gãy". Nặng hơn: nó không tự lành, vì `bump` cũng vấp đúng chỗ đó rồi nuốt lỗi, nên bản ghi hỏng tồn tại vĩnh viễn và cả brain ngừng đếm. Nay cả ba chỗ đều phòng thủ, và `bump` ghi đè để tự lành ở lượt dùng kế tiếp.
+### Thêm mới
+- **Javis biết skill nào THẬT SỰ được dùng**: mỗi lần nạp skill qua `javis_use_skill` được ghi vào `Javis/skill-usage.json` của brain. Trang Skill hiện "đã dùng N lần, gần nhất ..." hoặc "chưa thấy dùng" cho skill đủ già mà chưa có tín hiệu. **Đây là tín hiệu MỘT CHIỀU và cần hiểu đúng**: Claude Code còn nạp skill NATIVE qua bản mirror `.claude/skills`, đường đó không đi qua bộ đếm. Nên "đã dùng" là chắc chắn, còn "chưa thấy dùng" chỉ có nghĩa **chưa có bằng chứng**, KHÔNG có nghĩa skill vô dụng. Không có gì tự tắt, tự archive hay tự dọn skill dựa trên con số này; mọi quyết định vẫn là của người dùng.
+- **Chuẩn viết skill trong prompt của vòng tự học**: 9 điểm bắt buộc (trần 150 nội suy từ hằng số chứ không viết cứng, cấm mở đầu sáo rỗng, bọc nháy kép khi có dấu hai chấm, thứ tự mục thân file, cấm bịa flag và đường dẫn, trần độ dài thân, cấm skill kiểu router), kèm `group` thành trường bắt buộc trong schema.
+- **Sidecar không lọt vào lịch sử học**: `Javis/skill-usage.json` là state runtime nên được thêm vào `.gitignore` của brain và loại khỏi bản backup. Brain cũ trước đây không bao giờ nhận được cập nhật `.gitignore` (hàm khởi tạo repo trả về sớm, và cả nhánh init cũng bỏ qua nếu file đã tồn tại); nay được hợp nhất thêm dòng còn thiếu ở lần bật tự học hoặc bấm học tiếp theo, giữ nguyên các dòng người dùng tự thêm. Việc này tạo một commit `chore:` một lần trong repo của brain, cố ý tách khỏi tiền tố `learn:` để không hiện ở trang Duyệt và không bị hoàn tác nhầm.
+### Đã biết, chưa sửa
+- **Skill hệ thống `html-to-webcake` đang hỏng ở mọi brain**: nó ship kèm `tools/` và `examples/`, thân skill bảo agent chạy chúng, nhưng cơ chế cài skill hệ thống chỉ chuyển mỗi `SKILL.md` nên cây con chưa bao giờ tới brain nào. Lỗi có sẵn, không do bản này gây ra.
+- **`references/` và `scripts/` trong skill chỉ tới được đường router, chưa tới bản mirror `.claude/skills`**: bản mirror hiện chỉ copy file top-level. Đã ghi rõ giới hạn này ngay trong `javis-builder` để người viết skill biết trước. Làm mirror đệ quy đã được cân nhắc và HOÃN có chủ đích sau khi rà soát thấy 6 rào chặn thật (đắt nhất: nó sẽ quét và băm toàn bộ cây skill mỗi lượt chat, và chặn cả event loop). Chi tiết trong `docs/superpowers/specs/2026-07-16-skill-telemetry-authoring-design.md`.
+- **Bản mirror không nhận file phụ đổi nội dung nếu `SKILL.md` không đổi**: cổng bỏ qua chỉ băm `SKILL.md`. Lỗi có sẵn, cùng hồ sơ với hai mục trên.
+
+## [0.9.62] - 2026-07-16
+### Sửa lỗi
+- **Mô tả skill bị cắt cụt âm thầm nên skill không route được**: Javis cắt `description` của skill ở BA nơi với BA hạn mức khác nhau mà không ai biết: 60 ký tự ở mô tả tool `javis_use_skill`, 100 ký tự ở khối router trong system prompt, 140 ký tự ở đường dự phòng khi frontmatter thiếu `description`. Người viết skill không có cách nào biết mình đang bị chấm theo thước nào. Đo bằng chính `skill_router` trên brain đang chạy: **6/6 skill đang bật đều bị cắt**, mất từ 79 tới 316 ký tự mỗi cái, và phần bị vứt đúng là các ví dụ trigger, tức là thứ khiến routing hoạt động. Nay gom cả ba về một hằng số duy nhất `skill_router.SKILL_DESC_MAX = 150`, và gộp luôn hai hạn mức số-skill-liệt-kê (15 ở system prompt, 20 ở hub) về `SKILL_LIST_MAX = 20`.
+- **Tài liệu đang dạy viết sai**: `CLAUDE.md` bảo `description` phải "viết rõ trigger" và `javis-builder` bảo "viết kỹ", trong khi runtime cắt cụt. Nay cả hai nêu rõ trần 150 KÈM LÝ DO (viết dài hơn là mất im lặng, skill không route được, viết xong phải tự đếm) và chỉ rõ ví dụ trigger đầy đủ thuộc về mục `## Khi nào dùng` trong thân file, nơi không bị cắt. Kiến trúc: index để TÌM, thân file để LÀM.
+- **`javis-builder` trỏ sai chỗ ghi skill**: skill builder dạy ghi vào `.claude/skills/<slug>/SKILL.md` ở ba chỗ khác nhau, nhưng đó là bản MIRROR phái sinh. Canonical là `skills/<slug>/SKILL.md`. Đã sửa cả ba.
+### Thêm mới
+- **Viết lại mô tả 5 skill hệ thống cho lọt trần**: `html-to-webcake` (376 ký tự), `javis-builder` (333), `ingest-source` (266), `query-wiki` (249), `lint-wiki` (213) rút còn 69 tới 110 ký tự. Không mất thông tin: mọi ví dụ trigger chuyển xuống mục `## Khi nào dùng` trong thân file. Bỏ luôn cụm mở đầu sáo rỗng "Kích hoạt khi người dùng muốn" (29 ký tự giống hệt nhau ở mọi skill, đốt gần nửa ngân sách mà không phân biệt được gì).
+- **Lint CI chặn lỗi tái phát**: `server/test_skill_caps.py` quét mọi skill hệ thống, fail nếu có mô tả vượt trần, dính boilerplate, rỗng, hoặc frontmatter vỡ. Liệt kê MỌI skill vi phạm trong một lần chạy chứ không dừng ở cái đầu.
+- **`POST /skills` từ chối mô tả sai ngay lúc ghi**: trước đây endpoint chỉ kiểm slug, mô tả 400 ký tự vẫn lưu được rồi bị cắt âm thầm. Nay trả 400 kèm lý do, và kiểm TRƯỚC khi tạo thư mục nên request bị từ chối không để lại folder rỗng trên đĩa.
+- **Chuẩn viết skill nhúng vào `javis-builder`**: 8 điểm bắt buộc (trần 150, cấm boilerplate, bọc nháy kép khi mô tả có dấu hai chấm, thứ tự mục thân file, cấm bịa flag/path, trần độ dài thân, cấm skill kiểu router). Nói thẳng rằng skill do chat ghi thẳng ra đĩa KHÔNG qua lớp chặn nào và lint CI chỉ soi skill hệ thống, nên tự đếm là phòng tuyến duy nhất.
+
+## [0.9.61] - 2026-07-16
+### Thêm mới
+- **Khối hỏi-lại có lựa chọn trong khung chat**: Javis hỏi lại được bằng nút bấm ngay trong chat, kiểu Claude Code: nhúng khối ẩn `JAVIS_ASK` ở cuối câu trả lời, dashboard vẽ thành hàng chip dưới bong bóng. Bấm một nút là gửi đi như gõ tay, cùng phiên. Chỉ tin nhắn cuối mới bấm được; cuộn lên lịch sử thì chip đã đông cứng.
+- **Chạy trên mọi engine**: Claude Agent SDK, Codex CLI, các engine API đều dùng được vì chỉ dựa vào system prompt, không đụng MCP hub.
+### Sửa lỗi
+- **Khối điều khiển không còn lọt sang Telegram**: khối `JAVIS_METRICS` trước đây lọt nguyên xi sang Telegram. Nay mọi khối điều khiển đều bị bóc trước khi ra kênh chữ ở cả 4 đường trả lời Telegram (chat, báo cáo Loop, báo cáo Việc Kanban, nhắc hẹn kiểu task); riêng `JAVIS_ASK` hạ xuống danh sách đánh số để nhắn lại "1" là chọn.
+- **Chip hỏi-lại: nhãn hiện và nhãn gửi lệch nhau khi dài quá 40 ký tự**: nút chip trước đây cắt gọn LÚC VẼ nhưng vẫn gửi nguyên nhãn gốc khi bấm, nên nhãn dài (ẩn cả trong nội dung do connector ngoài chèn vào) có thể gửi đi phần người dùng chưa từng đọc hết. Nay cắt ngay ở bước bóc dữ liệu (`extract()`), thứ hiện và thứ gửi luôn giống nhau.
+
+## [0.9.60] - 2026-07-16
+### Sửa lỗi
+- **Loop nền thấy lại connector claude.ai (Gmail/Drive/lịch) qua cờ opt-in `ambient_mcp`**: từ bản chuyển engine sang Agent SDK (quãng v0.9.35-0.9.37), loop tự chạy không còn "nhìn thấy" các connector claude.ai như Gmail, Google Drive, Google Calendar, nên loop kiểu "chiều đọc Gmail tóm tắt" ngưng chạy dù trước đó chạy được. Nguyên nhân: loop chạy ở nhánh fork nền có khoá quyền (duyệt từng tool, mặc định từ chối mọi tool ngoài whitelist), và ở nhánh này engine SDK cố tình KHÔNG nạp cấu hình máy (`setting_sources`) để allow-rule trong settings không che được lớp gate. Hệ quả phụ là connector claude.ai (vốn chỉ xuất hiện khi nạp cấu hình máy, như `claude -p` vẫn làm) biến mất khỏi loop. Nhánh Popen cũ trước đó chạy `--dangerously-skip-permissions` cộng `--mcp-config` không kèm `--strict` nên connector luôn được gộp vào, đó là lý do loop cũ đọc được Gmail. Chat (web và Telegram) KHÔNG dính vì chạy nhánh không-khoá-quyền đã được nạp lại `setting_sources`. Cách sửa: thêm cờ frontmatter `ambient_mcp: true` cho từng loop. Bật thì loop đó chạy nhánh không-gated (nạp cấu hình máy nên connector claude.ai xuất hiện lại), vẫn chặn cứng Bash/WebFetch/WebSearch/Task và tool tiền/đơn qua hub vẫn khoá theo mode. MẶC ĐỊNH TẮT để bản fork về sạch, không loop nào tự chạm Gmail/Drive của ai; chỉ bật khi user yêu cầu rõ. Bước kiểm chứng luôn giữ khoá chặt dù cờ bật. Kèm test hành vi trong `test_loop_ambient.py`.
+### Bảo mật
+- **Không lộ định danh thật trong ví dụ cấu hình + soát sạch git**: `system/mcp-catalog.json` dùng nhầm một mã định danh thật làm placeholder gợi ý, nay đổi thành số giả `1234567890` để bản fork không thấy thông tin thật của ai. Đã soát toàn bộ file đang được git theo dõi: mọi file dữ liệu kết nối (Kho kết nối, hub config, settings, khoá bí mật, token) đều đã nằm trong `.gitignore` và chưa từng bị commit, nên người fork về có bản trắng, không kết nối nào cài sẵn.
+
+## [0.9.59] - 2026-07-16
+### Cải thiện
+- **Navbar gom nhóm cho dễ tìm công cụ**: thanh điều hướng trái trước đây xếp phẳng 18 mục thành một cột dài, tìm mỏi mắt. Nay gom theo chức năng thành 5 nhóm có nhãn nhỏ (Trợ lý, Bộ não, Năng lực, Việc & lịch, Kết nối) và ghim cụm Hệ thống (Cài đặt, Cập nhật, Tài khoản) xuống đáy rail (có đường kẻ ngăn). Sắp lại thứ tự các mục cho hợp mạch dùng. Trên mobile các nhóm tự dàn phẳng thành một hàng ngang như cũ (ẩn nhãn nhóm). Cấu trúc nhóm khai trong `RAIL_GROUPS` (console.js) - đổi thành viên/thứ tự chỉ sửa một chỗ, mục nào quên xếp nhóm sẽ tự dồn vào cụm Hệ thống nên không bao giờ mất mục.
+- **Trang Cập nhật phân trang 20 bản mỗi trang**: nhật ký dài 98 bản trước đây đổ hết ra một trang vừa nặng DOM vừa khó đọc. Nay chỉ hiện 20 bản mới nhất mỗi trang, cuối trang có thanh "‹ Mới hơn · Trang x/y · N bản · Cũ hơn ›"; đổi trang dùng lại dữ liệu đã tải (không gọi lại mạng) và tự cuộn lên đầu cho dễ theo dõi.
+
 ## [0.9.58] - 2026-07-16
 ### Sửa lỗi
 - **Đồ thị 3D chói trắng + mất hiệu ứng nhấp nháy lúc "đang suy nghĩ"**: từ v0.9.55 bản 3D được tô đa màu theo danh mục (bảng màu cầu vồng) và kéo co tròn chặt, nhưng bản 3D render bằng `AdditiveBlending` (cộng dồn ánh sáng) nên nhiều màu cộng dồn trong khối chặt dồn về TRẮNG - lõi cháy trắng, nhìn chói. Nền đã sáng sẵn nên node loé lên lúc suy nghĩ không còn nổi bật, mất cảm giác nhấp nháy (code hiệu ứng vẫn còn nguyên, chỉ bị chìm). Sửa trong `graph3d.js`: hạ lõi glow từ trắng đặc `1.0` xuống `0.7` và cho màu danh mục ra sớm (giữ đúng hue thay vì cháy trắng); hạ độ sáng nền lúc nghỉ từ `0.85` xuống `0.5`; cho node "suy nghĩ" loé dày hơn (mỗi 14 khung thay vì 22, nhiều điểm khởi phát hơn). Kết quả: nền dịu, hết chói, node loé lên nổi bật rõ trên nền tối nên nhấp nháy quay lại. Vẫn giữ đa màu.

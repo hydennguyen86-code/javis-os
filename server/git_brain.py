@@ -18,6 +18,7 @@ Stdlib-only. Không thêm dependency.
 """
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -66,10 +67,41 @@ _GITIGNORE = (
     "Javis/learn-staging/\n"
     "Javis/learn-log/\n"
     "Javis/loop-log/\n"
+    "Javis/skill-usage.json\n"
     "memory/conversations/\n"
     "Memory/conversations/\n"
     "*.tmp\n"
 )
+
+
+def _ensure_gitignore_lines(root) -> bool:
+    """Merge các dòng của _GITIGNORE vào <root>/.gitignore, CHỈ THÊM dòng còn thiếu.
+    Trả True nếu có thay đổi. TUYỆT ĐỐI không ghi đè: brain cũ có thể đã có dòng user tự
+    thêm. Cần thiết vì ensure_git_repo return sớm ở nhánh brain-đã-là-repo → brain cũ sẽ
+    đông cứng mãi ở template lúc nó ra đời."""
+    try:
+        gi = Path(root) / ".gitignore"
+        cur = gi.read_text(encoding="utf-8") if gi.exists() else ""
+        have = {l.strip() for l in cur.splitlines() if l.strip()}
+        missing = [l for l in _GITIGNORE.splitlines()
+                   if l.strip() and not l.strip().startswith("#") and l.strip() not in have]
+        if not missing:
+            return False
+        if cur.strip():
+            text = cur.rstrip("\n") + "\n"
+        else:
+            # File chưa có/rỗng: dựng lại đúng phần header comment của template (không phụ
+            # thuộc vị trí 1 dòng cụ thể trong _GITIGNORE - tránh vỡ nếu template đổi thứ tự).
+            comment_lines = [l for l in _GITIGNORE.splitlines() if l.strip().startswith("#")]
+            text = ("\n".join(comment_lines) + "\n") if comment_lines else ""
+        # newline="\n": KHÔNG để Python dịch \n -> os.linesep (CRLF trên Windows). Hiện chỉ vô
+        # hại nhờ core.autocrlf=true của máy; nếu deploy chạy autocrlf=false thì merge lên một
+        # .gitignore đã commit dạng LF sẽ đẻ diff đổi line-ending TOÀN FILE thay vì thêm 1 dòng.
+        gi.write_text(text + "\n".join(missing) + "\n", encoding="utf-8", newline="\n")
+        return True
+    except Exception as e:
+        print(f"[gitignore] {root}: {type(e).__name__}: {e}", file=__import__('sys').stderr)
+        return False
 
 
 def ensure_git_repo(root: str) -> dict:
@@ -79,6 +111,40 @@ def ensure_git_repo(root: str) -> dict:
     if not has_git():
         return {"ok": False, "created": False, "error": "Máy chưa cài git"}
     if is_git_checkout(root):
+        # Brain ĐÃ là repo: trước đây return thẳng ở đây nên template .gitignore mới không
+        # bao giờ tới được brain cũ. Merge dòng còn thiếu rồi commit riêng bằng prefix
+        # 'chore:' - KHÔNG dùng 'learn:'/'curator:' (xem LEARN_COMMIT_PREFIXES dòng 31) để
+        # một lần vá .gitignore không bị hiện ở UI Review hay bị revert_last_learn undo.
+        #
+        # BrainLock CHỈ bọc lúc COMMIT, không bọc lúc merge file:
+        #  - commit_paths chạy `git commit` = commit CẢ INDEX, không riêng path nó add. Nếu một
+        #    learn/curator đang chạy vừa `git add` file của nó thì commit 'chore:' này sẽ cuốn
+        #    luôn tri thức đó vào một commit KHÔNG hiện ở Review và revert_last_learn KHÔNG
+        #    undo được - đúng thứ LEARN_COMMIT_PREFIXES sinh ra để chặn. Phải giữ khoá.
+        #  - Ngược lại việc GHI .gitignore là vô hại + idempotent, nên cố tình để NGOÀI khoá:
+        #    git đọc luật ignore từ WORKING TREE, nên chỉ cần file trên đĩa đúng là sidecar bị
+        #    ignore NGAY - mục tiêu task đạt được kể cả khi không giành nổi khoá.
+        # Không lấy được khoá -> bỏ qua COMMIT (đúng khuôn learn.py:864-867), KHÔNG bỏ merge.
+        # Điều kiện commit vì thế KHÔNG chỉ là "merge vừa đổi": còn commit khi .gitignore đang
+        # dirty. Nếu chỉ xét giá trị trả về của _ensure_gitignore_lines thì một lần kẹt khoá sẽ
+        # để .gitignore vá trên đĩa mà VĨNH VIỄN không được commit (lần sau merge trả False ->
+        # không ai commit nữa), vì ensure_git_repo chỉ chạy lúc bật học / bấm /reflect chứ
+        # không chạy mỗi tick. Xét thêm dirty -> lần bấm sau tự lành.
+        changed = _ensure_gitignore_lines(root)
+        dirty = bool((_git(root, "status", "--porcelain", "--", ".gitignore").stdout or "").strip())
+        if changed or dirty:
+            # timeout=1.0 (KHÔNG phải mặc định 30s): ensure_git_repo bị gọi THẲNG, không qua
+            # asyncio.to_thread, từ 2 handler async (learn.py /learn/enable + main.py /reflect),
+            # mà BrainLock.acquire() chờ bằng time.sleep(0.25) CHẶN. Chờ 30s ở đây = đóng băng
+            # CẢ event loop 30s (mọi chat, Telegram poller, scheduler, reminders, mọi brain) -
+            # đúng lúc đang tranh chấp, tức đúng lúc hệ đang bận nhất. Chờ lâu cũng vô nghĩa vì
+            # nhánh `dirty` ở trên đã tự lành: không giành được thì lần bấm /learn/enable hay
+            # /reflect kế tiếp commit nốt. Fail nhanh cho cùng một đảm bảo với giá rẻ hơn nhiều.
+            # (Cách khác là bọc asyncio.to_thread như learn.py:764 làm với _promote_sync, nhưng
+            # đó là thay đổi lớn hơn và không cần khi thời gian chờ đã bị chặn ~1s.)
+            with BrainLock(root, timeout=1.0) as lk:
+                if getattr(lk, "acquired", False):
+                    commit_paths(root, [".gitignore"], "chore: cập nhật .gitignore brain")
         return {"ok": True, "created": False}
     try:
         Path(root).mkdir(parents=True, exist_ok=True)
@@ -88,9 +154,7 @@ def ensure_git_repo(root: str) -> dict:
         # Cấu hình identity cục bộ (repo có thể chạy trong container không có global config)
         _git(root, "config", "user.email", "javis@localhost")
         _git(root, "config", "user.name", "Javis Learn")
-        gi = Path(root) / ".gitignore"
-        if not gi.exists():
-            gi.write_text(_GITIGNORE, encoding="utf-8")
+        _ensure_gitignore_lines(root)   # merge chứ không ghi đè (brain có thể đã có .gitignore)
         _git(root, "add", ".gitignore")
         _git(root, "add", "-A")   # commit NỀN duy nhất được phép add -A (baseline, chưa có state học)
         c = _git(root, "commit", "-m", "chore: baseline brain snapshot (bật tự học)")
@@ -265,7 +329,8 @@ def remote_reachable(repo_url: str, token: str, timeout: int = 30) -> dict:
 # hội thoại gốc/log/khoá (có thể chứa secret), file tạm.
 _BACKUP_SKIP_DIRS = {".git"}
 _BACKUP_SKIP_SUBSTR = ("/memory/conversations/", "/Memory/conversations/",
-                       "/Javis/loop-log/", "/Javis/learn-log/", "/Javis/learn-staging/")
+                       "/Javis/loop-log/", "/Javis/learn-log/", "/Javis/learn-staging/",
+                       "/Javis/skill-usage.json/")
 
 
 def _backup_skip(rel: str) -> bool:
@@ -534,7 +599,103 @@ def _brains_has_content(brains_dir: str) -> bool:
     return False
 
 
-def sync_brains(brains_dir: str, mirror_dir: str, repo_url: str, token: str, branch: str = "main") -> dict:
+def _restore_missing_brains(brains_dir: str, mirror_dir: str, protected_names) -> None:
+    """Bảo vệ mặc định 'xóa không thắng' (bổ sung cho _apply_tombstones ngay dưới đây): não là
+    con TRỰC TIẾP của mirror_dir (đã biết từ lần sync trước) mà giờ THIẾU khỏi brains_dir và
+    KHÔNG có tombstone hợp lệ trong brains_dir (xóa tay ngoài ý muốn, crash, volume lỗi...) thì
+    khôi phục NGAY từ mirror về brains_dir - PHẢI chạy TRƯỚC bước _sync_mirror() chụp snapshot ở
+    _sync_brains_locked, vì bước đó coi MỌI thứ thiếu trong brains là xóa có chủ đích rồi commit
+    + đẩy đi mất - lúc đó thông tin não từng tồn tại KHÔNG còn cách nào lấy lại. Chỉ tombstone
+    thật (đọc + xử lý ở _apply_tombstones, chạy SAU trong CÙNG lượt sync này) mới được làm não
+    biến mất vĩnh viễn; não mặc định (protected_names) luôn được khôi phục bất kể tombstone."""
+    if not is_git_checkout(mirror_dir):
+        return
+    protected = set(protected_names or ())
+    tomb_names = {t.get("name") for t in _read_tombstones(brains_dir)}
+    mp = Path(mirror_dir)
+    for child in mp.iterdir():
+        name = child.name
+        if not child.is_dir() or name in (".git", TOMBSTONE_DIR):
+            continue
+        if name in tomb_names and name not in protected:
+            continue   # có tombstone hợp lệ -> để _apply_tombstones xử lý xóa, không khôi phục oan
+        bp = Path(brains_dir) / name
+        if bp.exists():
+            continue
+        try:
+            shutil.copytree(str(child), str(bp))
+        except Exception as e:
+            print(f"[sync restore] {name}: {type(e).__name__}: {e}", file=__import__('sys').stderr)
+
+
+def _apply_tombstones(brains_dir: str, mirror_dir: str, trash_dir: str,
+                      protected_names) -> dict:
+    """Áp giấy báo tử: xóa DỨT KHOÁT các não có tombstone (ghi đè chính sách 'xóa không thắng'),
+    chỉ cho lần xóa cố ý. Đọc tombstone từ MIRROR sau hoà nhập (= union mọi máy).
+    - Chốt thời gian: não còn sống mà có file mtime > deleted_at -> dựng/sửa lại có chủ đích ->
+      BỎ QUA + gỡ tombstone (superseded, propagate việc gỡ).
+    - Xóa: brains_dir/<name> -> thùng rác; mirror/<name> -> git rm -r (stage) để đẩy đi.
+    - An toàn: bỏ qua não mặc định (protected_names) + tên phải là con TRỰC TIẾP của brains_dir.
+    Trả {deleted, superseded, failed}."""
+    rep = {"deleted": [], "superseded": [], "failed": []}
+    protected = set(protected_names or ())
+    tombs = _read_tombstones(mirror_dir)
+    if not tombs:
+        return rep
+    base = Path(brains_dir).resolve()
+    changed_mirror = False
+    for t in tombs:
+        name = t.get("name") or ""
+        deleted_at = int(t.get("deleted_at", 0))
+        if not name or name in protected:
+            continue
+        bp = Path(brains_dir) / name
+        mp = Path(mirror_dir) / name
+        try:
+            if bp.resolve().parent != base:   # chỉ con trực tiếp của brains_dir
+                continue
+        except Exception:
+            continue
+        # Chốt thời gian: dựng lại có chủ đích -> giữ + gỡ tombstone
+        if bp.is_dir() and _dir_newer_than(str(bp), deleted_at):
+            _git(mirror_dir, "rm", "-f", "--", f"{TOMBSTONE_DIR}/{t['_file']}")
+            try:
+                (Path(brains_dir) / TOMBSTONE_DIR / t["_file"]).unlink()
+            except Exception:
+                pass
+            changed_mirror = True
+            rep["superseded"].append(name)
+            continue
+        # Xóa dứt khoát
+        ok = True
+        if bp.is_dir():
+            try:
+                move_to_trash(str(bp), trash_dir, name)
+            except Exception as e:
+                ok = False
+                print(f"[tombstone] move trash {name}: {type(e).__name__}: {e}",
+                      file=__import__('sys').stderr)
+        if ok and mp.exists():
+            # --ignore-unmatch: máy CHỦ (vừa tự xóa não rồi mới sync) đã prune Foo khỏi git qua
+            # commit "backup:" đầu vòng sync (_sync_mirror), nên mirror/<name> có thể còn là thư
+            # mục RỖNG trên đĩa (mp.exists() = True) nhưng KHÔNG còn gì được git track bên dưới ->
+            # `git rm` không -ignore-unmatch sẽ báo "did not match any files" dù việc xóa đã xong.
+            r = _git(mirror_dir, "rm", "-r", "-f", "--ignore-unmatch", "--", name)
+            if r.returncode == 0:
+                changed_mirror = True
+            else:
+                ok = False
+        if ok:
+            rep["deleted"].append(name)
+        else:
+            rep["failed"].append(name)
+    if changed_mirror:
+        _git(mirror_dir, "commit", "-m", f"sync: áp giấy báo tử ({_host_tag()})")
+    return rep
+
+
+def sync_brains(brains_dir: str, mirror_dir: str, repo_url: str, token: str, branch: str = "main",
+                trash_dir: Optional[str] = None, protected_names=None) -> dict:
     """Đồng bộ 2 CHIỀU toàn bộ thư mục brains với repo GitHub. Trả
     {ok, pushed, committed, merged, restored, conflicts, applied, deleted, error?}."""
     if not has_git():
@@ -546,17 +707,23 @@ def sync_brains(brains_dir: str, mirror_dir: str, repo_url: str, token: str, bra
     if not _SYNC_LOCK.acquire(blocking=False):
         return {"ok": False, "error": "Đang có phiên đồng bộ khác chạy - thử lại sau"}
     try:
-        return _sync_brains_locked(str(brains_dir), str(mirror_dir), repo_url, token, branch)
+        return _sync_brains_locked(str(brains_dir), str(mirror_dir), repo_url, token, branch,
+                                   trash_dir, protected_names)
     except Exception as e:
         return {"ok": False, "error": _redact(f"{type(e).__name__}: {e}", token)}
     finally:
         _SYNC_LOCK.release()
 
 
-def _sync_brains_locked(brains_dir: str, mirror_dir: str, repo_url: str, token: str, branch: str) -> dict:
+def _sync_brains_locked(brains_dir: str, mirror_dir: str, repo_url: str, token: str, branch: str,
+                        trash_dir: Optional[str] = None, protected_names=None) -> dict:
     rep = {"ok": False, "pushed": False, "committed": False, "merged": False,
            "restored": False, "conflicts": [], "applied": 0, "deleted": 0,
-           "applied_sample": [], "deleted_sample": []}
+           "applied_sample": [], "deleted_sample": [], "brains_deleted": []}
+    if not trash_dir:
+        trash_dir = str(Path(mirror_dir).parent / "brain-trash")   # cạnh mirror (đều trong STATE_DIR)
+    gc_trash(trash_dir, 30)              # dọn thùng rác quá 30 ngày
+    gc_tombstones(brains_dir, _TOMBSTONE_TTL)   # dọn giấy báo tử quá 180 ngày
     Path(mirror_dir).mkdir(parents=True, exist_ok=True)
     if not is_git_checkout(mirror_dir):
         r = _git(mirror_dir, "init")
@@ -567,6 +734,10 @@ def _sync_brains_locked(brains_dir: str, mirror_dir: str, repo_url: str, token: 
     # Sync truyền BYTE NGUYÊN VĂN giữa các máy: tắt autocrlf để git Windows không tự đổi
     # LF↔CRLF lúc add/checkout (nếu không, cùng 1 file sẽ lệch byte giữa local và VPS mãi mãi).
     _git(mirror_dir, "config", "core.autocrlf", "false")
+
+    # Khôi phục não thiếu KHÔNG tombstone TRƯỚC khi chụp snapshot (xem docstring
+    # _restore_missing_brains) - phải chạy trước dòng _sync_mirror ngay dưới.
+    _restore_missing_brains(brains_dir, mirror_dir, protected_names)
 
     sync_start = time.time()
     if _brains_has_content(brains_dir):
@@ -596,6 +767,15 @@ def _sync_brains_locked(brains_dir: str, mirror_dir: str, repo_url: str, token: 
             rep["merged"] = rep["merged"] or bool(m.get("merged"))
             rep["conflicts"].extend(m.get("conflicts", []))
             changed = _changed_by_integration(mirror_dir, pre_head)
+        # Áp giấy báo tử: xóa dứt khoát não có tombstone (ghi đè 'xóa không thắng') TRƯỚC khi
+        # _apply_back kịp khôi phục chúng về brains. Đặt trước tự-vá + _apply_back là cố ý.
+        tomb = _apply_tombstones(brains_dir, mirror_dir, trash_dir, protected_names)
+        if tomb["failed"]:
+            _rollback_mirror(mirror_dir, pre_head)
+            return {**rep, "error": "Áp giấy báo tử lỗi (" + ", ".join(tomb["failed"][:2]) +
+                    ") - hoãn push, lần sau tự thử lại"}
+        if tomb["deleted"]:
+            rep["brains_deleted"] = (rep["brains_deleted"] + tomb["deleted"])[:50]
         # Tự vá: file có trong HEAD mirror nhưng THIẾU trong brains → luôn áp về. Bao trường hợp
         # khôi phục khi mirror đã up-to-date (diff rỗng) + brains bị wipe/volume mới. Chỉ THÊM
         # file thiếu, không bao giờ xoá (xoá chỉ đi qua diff của bước hoà nhập).
@@ -629,6 +809,133 @@ def _sync_brains_locked(brains_dir: str, mirror_dir: str, repo_url: str, token: 
             continue
         return {**rep, "error": _redact(("push: " + (err or "lỗi"))[:300], token)}
     return {**rep, "error": "push liên tục bị vượt - thử lại sau"}
+
+
+# ============================================================
+# GIẤY BÁO TỬ (tombstone) - đánh dấu não bị xóa CÓ CHỦ ĐÍCH để lan việc xóa sang mọi máy.
+# Một file cho mỗi não trong <brains_dir>/.javis-tombstones/<tên não>.json. Đồng bộ theo repo
+# (không nằm trong _backup_skip), KHÔNG hiện thành não (/brains bỏ tên bắt đầu bằng '.').
+# ============================================================
+TOMBSTONE_DIR = ".javis-tombstones"
+_TOMBSTONE_TTL = 180 * 86400   # giữ 180 ngày: lâu hơn thùng rác để máy offline lâu quay lại không hồi sinh
+
+
+def _tombstone_path(brains_dir: str, name: str) -> Path:
+    return Path(brains_dir) / TOMBSTONE_DIR / (name + ".json")
+
+
+def write_tombstone(brains_dir: str, name: str) -> None:
+    """Ghi giấy báo tử cho não <name> (đã bị xóa có chủ đích). Ghi nguyên tử (.tmp -> replace)."""
+    if not name:
+        return
+    p = _tombstone_path(brains_dir, name)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    data = {"name": name, "deleted_at": int(time.time()), "host": _host_tag(), "v": 1}
+    tmp = Path(str(p) + ".tmp")   # đuôi .tmp -> nằm trong _backup_skip, không lọt vào backup
+    tmp.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    os.replace(str(tmp), str(p))
+
+
+def clear_tombstone(brains_dir: str, name: str) -> None:
+    """Gỡ giấy báo tử của não <name> (khi tạo lại não cùng tên) để không bị xóa oan."""
+    try:
+        _tombstone_path(brains_dir, name).unlink()
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        print(f"[tombstone clear] {name}: {e}", file=__import__('sys').stderr)
+
+
+def _read_tombstones(root: str) -> List[dict]:
+    """Đọc mọi giấy báo tử trong <root>/.javis-tombstones/. Bỏ file hỏng. Gắn _file = tên file."""
+    d = Path(root) / TOMBSTONE_DIR
+    out: List[dict] = []
+    if not d.is_dir():
+        return out
+    for f in sorted(d.glob("*.json")):
+        try:
+            j = json.loads(f.read_text(encoding="utf-8"))
+            if isinstance(j, dict) and j.get("name"):
+                j["_file"] = f.name
+                out.append(j)
+        except Exception:
+            continue
+    return out
+
+
+def gc_tombstones(brains_dir: str, ttl: int = _TOMBSTONE_TTL) -> int:
+    """Xóa giấy báo tử quá hạn (mặc định 180 ngày). Trả số file đã xóa."""
+    now = int(time.time())
+    n = 0
+    for t in _read_tombstones(brains_dir):
+        if now - int(t.get("deleted_at", now)) > ttl:
+            try:
+                (Path(brains_dir) / TOMBSTONE_DIR / t["_file"]).unlink()
+                n += 1
+            except Exception:
+                pass
+    return n
+
+
+# ============================================================
+# THÙNG RÁC CỤC BỘ - giữ bản sao não đã xóa (30 ngày) để cứu hộ. NGOÀI vùng đồng bộ (không lên git).
+# ============================================================
+def move_to_trash(brain_dir: str, trash_dir: str, name: str) -> Optional[str]:
+    """Chuyển thư mục não vào thùng rác <trash_dir>/<name>__<ts>/. Trả path đích hoặc None nếu
+    nguồn không phải thư mục. shutil.move xử lý cả khác ổ đĩa. Retry 3 lần: Windows có thể kẹt
+    handle (engine đang mở file trong não) - chờ ngắn rồi thử lại."""
+    src = Path(brain_dir)
+    if not src.is_dir():
+        return None
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    dst = Path(trash_dir) / f"{name}__{stamp}"
+    i = 1
+    while dst.exists():
+        dst = Path(trash_dir) / f"{name}__{stamp}-{i}"
+        i += 1
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    last = None
+    for _ in range(3):
+        try:
+            shutil.move(str(src), str(dst))
+            return str(dst)
+        except Exception as e:
+            last = e
+            time.sleep(0.3)
+    raise last
+
+
+def gc_trash(trash_dir: str, days: int = 30) -> int:
+    """Xóa các mục trong thùng rác cũ hơn <days> ngày (theo mtime thư mục). Trả số mục đã xóa."""
+    d = Path(trash_dir)
+    if not d.is_dir():
+        return 0
+    cutoff = time.time() - days * 86400
+    n = 0
+    for sub in d.iterdir():
+        try:
+            if sub.is_dir() and sub.stat().st_mtime < cutoff:
+                shutil.rmtree(str(sub))
+                n += 1
+        except Exception:
+            pass
+    return n
+
+
+def _dir_newer_than(root: str, ts: int) -> bool:
+    """Có file nào trong root có mtime > ts (dung sai +1s) không? Bỏ .git nested. Dùng cho chốt
+    thời gian: não dựng/sửa lại SAU khi có tombstone thì không bị xóa oan."""
+    if ts <= 0:
+        return False
+    for dp, dn, fns in os.walk(root):
+        dn[:] = [x for x in dn if x not in _BACKUP_SKIP_DIRS]
+        for fn in fns:
+            try:
+                if os.path.getmtime(os.path.join(dp, fn)) > ts + 1:
+                    return True
+            except Exception:
+                continue
+    return False
 
 
 # ============================================================

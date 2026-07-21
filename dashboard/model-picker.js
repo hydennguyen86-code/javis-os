@@ -87,7 +87,7 @@
 
   document.addEventListener("click", async (e) => {
     if (e.target.closest("#mbOpen")) { isOpen() ? close() : open(); return; }
-    if (!e.target.closest("#modelBar")) { if (isOpen()) close(); return; }
+    if (!e.target.closest("#modelBar") && !e.target.closest("#mbPop") && !e.target.closest("#mbOpen")) { if (isOpen()) close(); return; }
 
     const goto = e.target.closest("[data-goto]");
     if (goto) {

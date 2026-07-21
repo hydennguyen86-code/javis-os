@@ -136,7 +136,6 @@ Dashboard có thanh điều hướng bên trái:
 | **Skills** | Gom nhóm + tìm kiếm + **bật/tắt** + thêm/sửa/xoá skill. | [Skills](docs/06-skills.md) |
 | **Tệp tin** | Duyệt brain, **sửa `.md`/`.txt` trực tiếp**, tải lên/về, tạo/đổi tên/xoá. | [Quản lý tệp tin](docs/05-quan-ly-tep-tin.md) |
 | **Tự cải thiện** | Bật Javis tự chạy nền làm 1 nhiệm vụ cụ thể theo lịch + nhật ký + LINT Wiki. | [Tự cải thiện](docs/08-tu-cai-thien.md) |
-| **Lịch** | Quản lý cron/trigger/routine tự động. | [Lịch & tự động hoá](docs/12-lich-tu-dong-hoa.md) |
 | **Models** | Main model + các provider (Claude/OpenAI/OpenRouter…) + reasoning + model phụ. | [Models & engine](docs/10-models-va-engine.md) |
 | **Kênh** | Bật Telegram bot (hỏi Javis qua điện thoại). | [Kênh Telegram](docs/11-telegram.md) |
 | **MCP** | Đấu/quản lý công cụ ngoài (đa-shop cùng link khác key). | [MCP & số liệu](docs/09-mcp-va-so-lieu.md) |

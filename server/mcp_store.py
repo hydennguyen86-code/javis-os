@@ -368,6 +368,31 @@ def resolved(enabled_only=True):
                 env[f["env"]] = str(fp)
             except Exception as e:
                 print(f"[mcp_store] field file {f['key']}: {e}", file=sys.stderr)
+        # Connector STDIO đăng nhập bằng OAuth (vd google-ads): token nằm ở oauth_mcp, nhưng tiến
+        # trình con chỉ nhận credential qua FILE + env. Dựng file theo format catalog khai rồi trỏ
+        # env vào. KHÔNG ghi đè nếu user đã tự dán file ở vòng trên (đường lui thủ công thắng).
+        of = (con or {}).get("oauth_file") or {}
+        if of.get("env") and of.get("format") and not env.get(of["env"]):
+            try:
+                import oauth_mcp   # import TRỄ: oauth_mcp import mcp_store ở cấp module
+                blob = oauth_mcp.credentials_file(c["id"], of["format"])
+                if blob:
+                    fdir = STATE_DIR / "connector-files"
+                    fdir.mkdir(parents=True, exist_ok=True)
+                    fp = fdir / f"{c['id']}-oauth{of.get('ext', '.json')}"
+                    try:
+                        cur = fp.read_text(encoding="utf-8")
+                    except OSError:
+                        cur = None
+                    if cur != blob:
+                        fp.write_text(blob, encoding="utf-8")
+                        try:
+                            os.chmod(fp, 0o600)
+                        except Exception:
+                            pass
+                    env[of["env"]] = str(fp)
+            except Exception as e:
+                print(f"[mcp_store] oauth file {c['id']}: {e}", file=sys.stderr)
         out.append({
             "id": c["id"], "connector_id": c["connector_id"], "label": c.get("label"),
             "slug": c.get("slug"), "namespace": ns,

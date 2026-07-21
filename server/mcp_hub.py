@@ -25,6 +25,7 @@ import mcp_catalog
 import mcp_client
 import mcp_store
 import skill_router
+import skill_usage
 from config import STATE_DIR
 
 _TOKEN_PATH = STATE_DIR / ".hub_token"
@@ -242,7 +243,15 @@ def _builtin_tools(mode, vault_root):
         if not f or not f.is_file():
             return ("ERROR: không có skill đó. Skill khả dụng: "
                     + (", ".join(_list_skills(vault_root)) or "(chưa có)"))
-        return f.read_text(encoding="utf-8", errors="replace")[:60_000]
+        text = f.read_text(encoding="utf-8", errors="replace")[:60_000]
+        # ĐIỂM ĐẾM DUY NHẤT: mọi engine nạp skill qua tool này đều đi ngang đây. Chỉ đếm ở
+        # đường THÀNH CÔNG - nhánh trên đã lọc slug sai/skill tắt nên không đếm gõ nhầm.
+        # Dùng f.parent.name (slug canonical trên đĩa) chứ không dùng `name` thô từ engine.
+        # bump có I/O đĩa + fsync trong lock (chặn) → đẩy qua thread để không chẹn event
+        # loop (WebSocket/telegram poller/loop scheduler đều chạy chung loop này).
+        # bump tự nuốt lỗi → sidecar hỏng không bao giờ làm gãy việc nạp skill.
+        await asyncio.to_thread(skill_usage.bump, vault_root, f.parent.name)
+        return text
 
     add("javis_read_file", "Đọc 1 file trong vault (Second Brain). path tương đối so với gốc vault.",
         {"path": {"type": "string"}}, ["path"], _read)
@@ -252,10 +261,14 @@ def _builtin_tools(mode, vault_root):
         "báo cáo, nháp. KHÔNG dùng cho hành động ra ngoài.",
         {"path": {"type": "string"}, "content": {"type": "string"}}, ["path", "content"], _write)
     # Mô tả tool = router thu nhỏ: liệt kê slug + mô tả ngắn để engine biết KHI NÀO gọi skill nào.
+    # Trần lấy từ skill_router (CHUNG với system prompt) - trước đây hub tự cắt 60, system prompt
+    # cắt 100 - người viết skill không biết mình bị chấm theo thước nào.
     metas = skill_router.list_enabled_meta(vault_root)
-    listing = "; ".join(f"{s['slug']}: {(s['description'] or '')[:60]}" for s in metas[:20])
-    if len(metas) > 20:
-        listing += f"; …(+{len(metas) - 20} skill nữa)"
+    _cap = skill_router.SKILL_LIST_MAX
+    listing = "; ".join(f"{s['slug']}: {(s['description'] or '')[:skill_router.SKILL_DESC_MAX]}"
+                        for s in metas[:_cap])
+    if len(metas) > _cap:
+        listing += f"; …(+{len(metas) - _cap} skill nữa)"
     add("javis_use_skill",
         "Nạp nội dung 1 skill (hướng dẫn chuyên sâu) rồi LÀM THEO. Truyền name=<slug>. "
         "Skill khả dụng (slug: mô tả): " + (listing or "(chưa có)"),
@@ -528,6 +541,12 @@ async def validate_connection(conn_id):
     conn = next((c for c in mcp_store.resolved(enabled_only=False) if c["id"] == conn_id), None)
     if not conn:
         return {"ok": False, "label": "", "tools": 0, "error": "Không tìm thấy kết nối"}
+    # Connector ẢO (không URL, không command): tool do PLUGIN phục vụ (vd Meta/Facebook gọi
+    # Graph API/cookie), không có MCP server để dial. Coi là hợp lệ; đếm tool theo tool_meta để hiển thị.
+    if not (conn.get("url") or "").strip() and not (conn.get("command") or "").strip():
+        tm = (conn.get("connector") or {}).get("tool_meta") or {}
+        n = len((tm.get("read") or []) + (tm.get("write") or []) + (tm.get("danger") or []))
+        return {"ok": True, "label": "", "tools": n, "error": ""}
     spec = mcp_client._conn_spec(conn)
     try:
         spec["headers"].update(await mcp_client._oauth_headers(conn))

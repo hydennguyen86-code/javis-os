@@ -20,7 +20,6 @@
     workflows:   _svg('<path d="M13 2L4.5 13.5H11l-1 8.5L19.5 10H13l0-8z"/>'),
     agents:      _svg('<rect x="5" y="7" width="14" height="13" rx="2"/><path d="M12 7V3M8 3h8"/><circle cx="9.2" cy="13" r="1.1"/><circle cx="14.8" cy="13" r="1.1"/>'),
     skills:      _svg('<path d="M12 3l2.4 5.6L20 11l-5.6 2.4L12 19l-2.4-5.6L4 11l5.6-2.4L12 3z"/>'),
-    automations: _svg('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
     models:      _svg('<path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/>'),
     channels:    _svg('<path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/>'),
     mcp:         _svg('<path d="M9 2v6M15 2v6"/><path d="M7 8h10v3a5 5 0 0 1-10 0V8z"/><path d="M12 16v6"/>'),
@@ -31,8 +30,21 @@
     plugins:     _svg('<path d="M14 4a2 2 0 1 0-4 0v2H6a1 1 0 0 0-1 1v3H4a2 2 0 1 0 0 4h1v3a1 1 0 0 0 1 1h3v-1a2 2 0 1 1 4 0v1h3a1 1 0 0 0 1-1v-4h1a2 2 0 1 0 0-4h-1V7a1 1 0 0 0-1-1h-3V4z"/>'),
     learn:       _svg('<path d="M12 3v18"/><path d="M5 7h14"/><path d="M4 12h16"/><circle cx="12" cy="12" r="9"/>'),
     kanban:      _svg('<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="10" rx="1"/><rect x="17" y="4" width="4" height="13" rx="1"/>'),
+    usage:       _svg('<path d="M3 3v18h18"/><rect x="7" y="11" width="3" height="6" rx="0.5"/><rect x="12" y="7" width="3" height="10" rx="0.5"/><rect x="17" y="13" width="3" height="4" rx="0.5"/>'),
     settings:    _svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>'),
   };
+
+  // Icon cho TẦNG 1 (nhãn nhóm) - cùng phong cách line-style; chỉ dùng ở header nhóm rail.
+  const GICON = {
+    "Trợ lý":   _svg('<path d="M12 3l1.8 4.7L18.5 9.5 13.8 11.3 12 16l-1.8-4.7L5.5 9.5l4.7-1.8L12 3z"/><path d="M19 15l.7 1.8 1.8.7-1.8.7L19 20l-.7-1.8L16.5 17.5l1.8-.7L19 15z"/>'),
+    "Bộ não":   _svg('<path d="M8.5 4A3.5 3.5 0 0 0 5 7.5 3 3 0 0 0 4 13a3 3 0 0 0 2 4.5A3 3 0 0 0 12 19V5.5A2.5 2.5 0 0 0 8.5 4z"/><path d="M15.5 4A3.5 3.5 0 0 1 19 7.5 3 3 0 0 1 20 13a3 3 0 0 1-2 4.5A3 3 0 0 1 12 19"/>'),
+    "Năng lực": _svg('<path d="M12 2c3 1.2 5 4.2 5 8 0 2.2-1 4-2 5l-3 2-3-2c-1-1-2-2.8-2-5 0-3.8 2-6.8 5-8z"/><circle cx="12" cy="9" r="1.6"/><path d="M9 16l-2 4M15 16l2 4"/>'),
+    "Việc":     _svg('<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M8.5 11l2 2 4-4"/>'),
+    "Kết nối":  _svg('<path d="M9 15l6-6"/><path d="M10.5 7.5l1-1a3.5 3.5 0 0 1 5 5l-1 1M13.5 16.5l-1 1a3.5 3.5 0 0 1-5-5l1-1"/>'),
+    "Hệ thống": _svg('<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/><circle cx="4" cy="12" r="1.8"/><circle cx="12" cy="6" r="1.8"/><circle cx="20" cy="14" r="1.8"/>'),
+  };
+  // Icon nút thu/mở sidebar: kiểu "panel sidebar" (khung chia 2, cột trái có dòng nội dung). Tĩnh, không xoay.
+  const COLLAPSE_ICON = _svg('<rect x="3" y="3" width="18" height="18" rx="2.5"/><path d="M10 3v18"/><path d="M5.6 8h2.6M5.6 11.2h2.6M5.6 14.4h2.6"/>');
 
   const RAIL_ITEMS = [
     { id: "home",        icon: ICON.home,        label: "Javis" },
@@ -43,17 +55,49 @@
     { id: "agents",      icon: ICON.agents,      label: "Agents" },
     { id: "skills",      icon: ICON.skills,      label: "Skills" },
     { id: "files",       icon: ICON.files,       label: "Tệp tin" },
-    { id: "selfimprove", icon: ICON.selfimprove, label: "Loop" },
+    { id: "selfimprove", icon: ICON.selfimprove, label: "Việc định kỳ" },
     { id: "learn",       icon: ICON.learn,       label: "Tự học" },
     { id: "kanban",      icon: ICON.kanban,      label: "Việc" },
-    { id: "automations", icon: ICON.automations, label: "Lịch" },
     { id: "models",      icon: ICON.models,      label: "Models" },
     { id: "channels",    icon: ICON.channels,    label: "Kênh" },
     { id: "mcp",         icon: ICON.mcp,         label: "Kết nối" },
     { id: "plugins",     icon: ICON.plugins,     label: "Plugins" },
     { id: "logs",        icon: ICON.logs,        label: "Cập nhật" },
     { id: "account",     icon: ICON.account,     label: "Tài khoản" },
+    { id: "usage",       icon: ICON.usage,       label: "Mức dùng" },
   ];
+
+  // ---- Gom rail thành nhóm theo chức năng (dễ tìm hơn danh sách phẳng 18 mục) ----
+  // Nhóm cuối (foot:true) được ghim xuống ĐÁY rail; các nhóm còn lại cuộn ở giữa.
+  // Thứ tự & thành viên đổi ở đây; RAIL_ITEMS vẫn là nguồn icon/label + tra cứu cho go().
+  const RAIL_GROUPS = [
+    { label: "Trợ lý",      icon: GICON["Trợ lý"],   ids: ["home", "chat", "overview"] },
+    { label: "Bộ não",      icon: GICON["Bộ não"],   ids: ["files", "learn"] },
+    { label: "Năng lực",    icon: GICON["Năng lực"], ids: ["agents", "skills", "workflows", "plugins"] },
+    { label: "Việc",        icon: GICON["Việc"],     ids: ["kanban", "selfimprove"] },
+    { label: "Kết nối",     icon: GICON["Kết nối"],  ids: ["mcp", "channels", "models"] },
+    { label: "Hệ thống",    icon: GICON["Hệ thống"], ids: ["usage", "settings", "logs", "account"], foot: true },
+  ];
+  const RAIL_BY_ID = Object.fromEntries(RAIL_ITEMS.map(i => [i.id, i]));
+  // Trả về [{label, foot, items:[...]}], bỏ id không tồn tại. Mục nào chưa xếp nhóm → dồn vào "Khác".
+  function railGroups() {
+    const seen = new Set();
+    const groups = RAIL_GROUPS.map(g => {
+      const items = (g.ids || []).map(id => { seen.add(id); return RAIL_BY_ID[id]; }).filter(Boolean);
+      return { label: g.label, icon: g.icon || "", foot: !!g.foot, items };
+    }).filter(g => g.items.length);
+    const rest = RAIL_ITEMS.filter(i => !seen.has(i.id));
+    if (rest.length) {
+      const foot = groups.find(g => g.foot);
+      if (foot) foot.items.push(...rest); else groups.push({ label: "Khác", foot: false, items: rest });
+    }
+    return groups;
+  }
+  // Nhãn nhóm chứa một mục id (cho accordion: mở đúng nhóm của trang đang xem).
+  function groupLabelOf(id) {
+    const g = RAIL_GROUPS.find(gr => (gr.ids || []).includes(id));
+    return g ? g.label : (RAIL_GROUPS[0] && RAIL_GROUPS[0].label) || "";
+  }
 
   const VIEW_META = {
     home:        { icon: "⬡", label: "Javis OS", sub: "" },
@@ -64,20 +108,20 @@
     agents:      { icon: "🤖", label: "Agents", sub: "Trợ lý chuyên biệt" },
     skills:      { icon: "🧩", label: "Skills", sub: "Kỹ năng khả dụng" },
     files:       { icon: "🗂", label: "Tệp tin", sub: "Duyệt · sửa · tải file trong brain" },
-    selfimprove: { icon: "♻", label: "Loop", sub: "Nhiệm vụ lặp tự động chạy nền" },
+    selfimprove: { icon: "♻", label: "Việc định kỳ", sub: "Việc định kỳ + nhắc hẹn đang chờ" },
     learn:       { icon: "🧠", label: "Tự học", sub: "Rewire Memory · Wiki · Skill (an toàn, undo được)" },
     kanban:      { icon: "🗂", label: "Việc (Kanban)", sub: "Backlog + dispatcher tự làm task nền" },
-    automations: { icon: "⏰", label: "Lịch tự động", sub: "Cron · trigger · routine" },
     models:      { icon: "◈", label: "Models", sub: "Main model & providers" },
     channels:    { icon: "✉", label: "Kênh kết nối", sub: "Telegram & hơn nữa" },
     mcp:         { icon: "🔌", label: "Kết nối", sub: "Nguồn dữ liệu & công cụ" },
     plugins:     { icon: "🧰", label: "Plugins", sub: "Tool/hook native cho mọi engine" },
     logs:        { icon: "🗒", label: "Nhật ký cập nhật", sub: "Phiên bản & tính năng mới" },
     account:     { icon: "⚙", label: "Tài khoản", sub: "Đăng nhập & workspace" },
+    usage:       { icon: "📊", label: "Mức dùng", sub: "Token & chi phí theo ngày, theo nhà cung cấp" },
   };
 
   // 4 trang tách từ Studio cũ - render container rồi gọi loader trong studio.js (window.JavisStudio).
-  const STUDIO_PAGES = ["workflows", "agents", "skills", "automations"];
+  const STUDIO_PAGES = ["workflows", "agents", "skills"];
 
   let _settings = null;
   let _renderGen = 0;         // token chống race: mỗi lần đổi trang tăng 1; render async cũ tự bỏ
@@ -187,6 +231,7 @@
     if (id === "learn")    return renderLearn(el);
     if (id === "kanban")   return renderKanban(el);
     if (id === "logs")     return renderLogs(el);
+    if (id === "usage")    return renderUsage(el);
     el.innerHTML = placeholder(id);
   }
 
@@ -204,6 +249,89 @@
       <div class="ph-ico">${m.icon || "✦"}</div>
       <div><b>${esc(m.label || id)}</b> - đang phát triển</div>
       <div style="max-width:380px;font-size:14px;opacity:.7">${esc(note || "Trang này là chỗ cắm chức năng mở rộng sau. Khung điều hướng đã sẵn sàng.")}</div>
+    </div>`;
+  }
+
+  // ============================================
+  // Trang Mức dùng (token & chi phí Javis tự đo, có đồ thị 14 ngày)
+  // ============================================
+  let _uzCss = false;
+  function _injectUsageCss() {
+    if (_uzCss) return; _uzCss = true;
+    const css = `
+    .uz-wrap{max-width:840px}
+    .uz-cards{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:24px}
+    .uz-card{flex:1 1 150px;background:var(--glass);border:1px solid var(--glass-brd);border-radius:12px;padding:14px 16px}
+    .uz-card .uz-k{font-size:12px;color:var(--text3);letter-spacing:.3px}
+    .uz-card .uz-v{font-size:23px;font-weight:700;color:var(--text);margin-top:4px;font-variant-numeric:tabular-nums}
+    .uz-card .uz-sub{font-size:12px;color:var(--text2);margin-top:4px}
+    .uz-card.accent .uz-v{color:var(--accent)}
+    .uz-sec-h{font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin:0 0 12px;font-weight:600}
+    .uz-chart{display:flex;align-items:flex-end;gap:5px;height:150px;padding:6px 2px 0}
+    .uz-bar-col{flex:1 1 0;display:flex;align-items:flex-end;justify-content:center;height:100%;min-width:0;cursor:default}
+    .uz-bar{width:64%;max-width:24px;background:linear-gradient(180deg,var(--accent),#a2360f);border-radius:4px 4px 0 0;transition:opacity .15s;min-height:3px}
+    .uz-bar.empty{background:rgba(255,255,255,.07)}
+    .uz-bar-col:hover .uz-bar{opacity:.75}
+    .uz-xlabels{display:flex;gap:5px;border-top:1px solid var(--glass-brd);padding-top:5px;margin-bottom:26px}
+    .uz-xl{flex:1 1 0;text-align:center;font-size:9.5px;color:var(--text3);white-space:nowrap;overflow:hidden}
+    .uz-tbl{width:100%;border-collapse:collapse;font-size:13.5px}
+    .uz-tbl th{text-align:left;color:var(--text3);font-weight:600;font-size:12px;padding:6px 10px;border-bottom:1px solid var(--glass-brd)}
+    .uz-tbl td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.05);font-variant-numeric:tabular-nums}
+    .uz-tbl td.num{text-align:right;color:#8fb4ff}
+    .uz-tbl .uz-prov{color:var(--text)}
+    .uz-tbl .uz-mdl{color:var(--text3);font-size:12px}
+    .uz-note{margin-top:20px;font-size:12px;color:var(--text3);line-height:1.55;max-width:640px}`;
+    const s = document.createElement("style"); s.textContent = css; document.head.appendChild(s);
+  }
+  const _uzTok = (n) => { n = +n || 0; if (n >= 1e6) return (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + "M"; if (n >= 1e3) return (n / 1e3).toFixed(n >= 1e4 ? 0 : 1) + "k"; return "" + n; };
+  const _uzCost = (c) => (+c > 0 ? "$" + (+c).toFixed(+c < 0.01 ? 4 : 2) : "-");
+  const _UZ_PROV = { cli: "Claude Code", codex: "ChatGPT", openrouter: "OpenRouter", openai: "OpenAI", "anthropic-api": "Anthropic" };
+  const _uzModel = (m) => (m || "").split("/").pop().replace(/^(claude-|gpt-)/, "").slice(0, 26);
+
+  async function renderUsage(el) {
+    // Trang Token nâng cấp (usage.js): index log thô Claude+Codex + lọc kỳ/provider + insight.
+    // Ủy quyền sang module mới nếu đã nạp; nếu chưa thì rơi về bảng cũ (usage_store 30 ngày).
+    if (window.JavisUsage && window.JavisUsage.render) { try { return window.JavisUsage.render(el); } catch (e) {} }
+    _injectUsageCss();
+    el.innerHTML = `<div class="uz-wrap"><div class="cview-placeholder" style="min-height:200px"><div class="ph-ico">📊</div><div class="dim">Đang tải mức dùng...</div></div></div>`;
+    let d;
+    try { d = await (await fetch("/usage")).json(); }
+    catch (e) { el.innerHTML = `<div class="uz-wrap"><div class="cview-placeholder"><div class="ph-ico">📊</div><div>Không tải được dữ liệu mức dùng.</div></div></div>`; return; }
+    const daily = d.daily || [];
+    const today = d.today || { items: [], total: { in: 0, out: 0, cost: 0, turns: 0 } };
+    const all = d.all_time || { items: [], total: { in: 0, out: 0, cost: 0, turns: 0 } };
+    const tt = today.total, at = all.total;
+
+    const orCard = (d.openrouter && d.openrouter.remaining != null)
+      ? `<div class="uz-card"><div class="uz-k">OpenRouter còn</div><div class="uz-v" style="color:#8fd0a0">$${(+d.openrouter.remaining).toFixed(2)}</div><div class="uz-sub">đã dùng $${(+(d.openrouter.used || 0)).toFixed(2)}</div></div>` : "";
+    const cards = `<div class="uz-cards">
+      <div class="uz-card accent"><div class="uz-k">Hôm nay</div><div class="uz-v">${_uzTok(tt.in + tt.out)}</div><div class="uz-sub">${_uzTok(tt.in)}↑ ${_uzTok(tt.out)}↓ · ${tt.turns || 0} lượt${tt.cost > 0 ? " · $" + tt.cost.toFixed(2) : ""}</div></div>
+      <div class="uz-card"><div class="uz-k">Tổng tích luỹ</div><div class="uz-v">${_uzTok(at.in + at.out)}</div><div class="uz-sub">${_uzTok(at.in)}↑ ${_uzTok(at.out)}↓${at.cost > 0 ? " · $" + at.cost.toFixed(2) : ""}</div></div>
+      ${orCard}
+    </div>`;
+
+    const maxv = Math.max(1, ...daily.map(x => x.in + x.out));
+    const bars = daily.map(x => {
+      const v = x.in + x.out, h = v > 0 ? Math.max(3, Math.round(v / maxv * 100)) : 0;
+      const tip = `${x.day}: ${_uzTok(v)} token${x.cost > 0 ? " · $" + x.cost.toFixed(2) : ""} · ${x.turns || 0} lượt`;
+      return `<div class="uz-bar-col" title="${esc(tip)}"><div class="uz-bar ${v > 0 ? "" : "empty"}" style="height:${h}%"></div></div>`;
+    }).join("");
+    const xlabels = daily.map(x => `<div class="uz-xl">${esc(x.day.slice(8))}</div>`).join("");
+    const chart = daily.length ? `<div class="uz-sec-h">${daily.length} ngày gần nhất · token/ngày</div>
+      <div class="uz-chart">${bars}</div><div class="uz-xlabels">${xlabels}</div>` : "";
+
+    const scope = today.items.length ? "hôm nay" : "tổng tích luỹ";
+    const items = today.items.length ? today.items : all.items;
+    const rows = items.length ? items.map(i => `<tr>
+        <td><span class="uz-prov">${esc(_UZ_PROV[i.provider] || i.provider)}</span> <span class="uz-mdl">${esc(_uzModel(i.model))}</span></td>
+        <td class="num">${_uzTok(i.in)}</td><td class="num">${_uzTok(i.out)}</td>
+        <td class="num">${i.turns || 0}</td><td class="num">${_uzCost(i.cost)}</td></tr>`).join("")
+      : `<tr><td colspan="5" style="padding:16px;color:var(--text3)">Chưa có lượt nào.</td></tr>`;
+    const table = `<div class="uz-sec-h">Theo nhà cung cấp · ${scope}</div>
+      <table class="uz-tbl"><thead><tr><th>Nhà cung cấp / model</th><th style="text-align:right">Token vào</th><th style="text-align:right">Token ra</th><th style="text-align:right">Lượt</th><th style="text-align:right">Chi phí</th></tr></thead><tbody>${rows}</tbody></table>`;
+
+    el.innerHTML = `<div class="uz-wrap">${cards}${chart}${table}
+      <div class="uz-note">Số liệu do Javis tự đo từ token vào/ra của mọi engine (Claude Code, ChatGPT/Codex, OpenRouter...), không phụ thuộc nhà cung cấp có lộ hạn mức hay không. Chi phí chỉ hiện khi nhà cung cấp trả về giá thật (vd Claude Code CLI); còn lại chỉ đếm token. Lưu 30 ngày gần nhất.</div>
     </div>`;
   }
 
@@ -241,7 +369,12 @@
     .cl-sec.feat li:before{content:"✨"} .cl-sec.fix li:before{content:"🔧"}
     .cl-sec.imp li:before{content:"⚡"} .cl-sec.sec li:before{content:"🔒"}
     .cl-sec.doc li:before{content:"📖"} .cl-sec.other li:before{content:"•"}
-    .cl-empty{color:#8a97b4;font-size:15px}`;
+    .cl-empty{color:#8a97b4;font-size:15px}
+    .cl-pager{display:flex;align-items:center;justify-content:center;gap:14px;margin:24px 0 6px;padding-top:16px;border-top:1px solid rgba(255,255,255,.07)}
+    .cl-pg{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:#cdd8ee;font-size:13.5px;font-weight:600;padding:7px 15px;border-radius:9px;cursor:pointer;transition:background .15s,border-color .15s,color .15s}
+    .cl-pg:hover:not(:disabled){background:rgba(120,180,255,.14);border-color:rgba(120,180,255,.45);color:#dce8ff}
+    .cl-pg:disabled{opacity:.32;cursor:default}
+    .cl-pg-info{font-size:13px;color:#8a97b4;min-width:130px;text-align:center}`;
     const s = document.createElement("style"); s.textContent = css; document.head.appendChild(s);
   }
   function _clSecClass(title) {
@@ -253,6 +386,63 @@
     if (t.includes("tài liệu") || t.includes("doc")) return "doc";
     return "other";
   }
+  // Phân trang nhật ký: giữ dữ liệu đã fetch, render 20 bản/trang - đỡ dài, đỡ nặng DOM.
+  let _clData = null;              // cache /changelog để đổi trang không phải gọi lại mạng
+  const CL_PAGE_SIZE = 20;         // số phiên bản hiển thị mỗi trang
+
+  function _clRelHtml(rel) {
+    const cls = rel.is_current ? "cur" : (rel.installed ? "" : "new");
+    const tag = rel.is_current ? `<span class="cl-tag cur">đang dùng</span>`
+      : (!rel.installed ? `<span class="cl-tag new">bản mới</span>` : "");
+    const secs = (rel.sections || []).map(s => {
+      const items = (s.items || []).map(it => `<li>${esc(it)}</li>`).join("");
+      return `<div class="cl-sec ${_clSecClass(s.title)}"><h4>${esc(s.title)}</h4><ul>${items}</ul></div>`;
+    }).join("");
+    return `<div class="cl-rel ${cls}">
+      <div class="cl-rtop"><span class="cl-ver">v${esc(rel.version)}</span>${rel.date ? `<span class="cl-date">${esc(rel.date)}</span>` : ""}${tag}</div>
+      ${secs || '<div class="cl-empty">(không có chi tiết)</div>'}
+    </div>`;
+  }
+
+  function _clRenderPage(el, page) {
+    const d = _clData; if (!d) return;
+    const cur = d.current || "?";
+    const upBadge = d.update_available
+      ? `<span class="cl-badge up">Có bản mới: v${esc(d.latest)}</span>`
+      : `<span class="cl-badge ok">Đang ở bản mới nhất</span>`;
+    const upNote = d.update_available
+      ? `<div class="cl-note">Cập nhật ở mục <b>Tổng quan</b>: bản có Watchtower bấm "Cập nhật ngay"; bản Docker khác thì <b>Redeploy</b> (Hostinger) hoặc <code>docker compose up -d --pull always</code>; bản VPS chạy <code>./update.sh</code>.</div>`
+      : "";
+    const rels = d.releases || [];
+    const total = rels.length;
+    const pages = Math.max(1, Math.ceil(total / CL_PAGE_SIZE));
+    page = Math.min(Math.max(0, page | 0), pages - 1);
+    const start = page * CL_PAGE_SIZE;
+    const slice = rels.slice(start, start + CL_PAGE_SIZE);
+    const timeline = slice.length
+      ? slice.map(_clRelHtml).join("")
+      : `<div class="cl-empty">Chưa có nhật ký. Thêm file <code>CHANGELOG.md</code> ở gốc dự án.</div>`;
+    const pager = pages > 1 ? `<div class="cl-pager">
+      <button class="cl-pg" data-clpage="${page - 1}"${page === 0 ? " disabled" : ""}>‹ Mới hơn</button>
+      <span class="cl-pg-info">Trang ${page + 1}/${pages} · ${total} bản</span>
+      <button class="cl-pg" data-clpage="${page + 1}"${page >= pages - 1 ? " disabled" : ""}>Cũ hơn ›</button>
+    </div>` : "";
+    el.innerHTML = `<div class="cl-wrap">
+      <div class="cl-head"><span class="cl-cur">Đang cài: <b>v${esc(cur)}</b></span>${upBadge}</div>
+      ${upNote}
+      ${timeline}
+      ${pager}
+    </div>`;
+    el.querySelectorAll(".cl-pg[data-clpage]").forEach(b => {
+      if (b.disabled) return;
+      b.onclick = () => {
+        _clRenderPage(el, parseInt(b.dataset.clpage, 10) || 0);
+        let n = el; while (n && n.scrollHeight <= n.clientHeight + 1) n = n.parentElement;
+        if (n) n.scrollTop = 0;   // đổi trang → cuộn lên đầu cho dễ đọc
+      };
+    });
+  }
+
   async function renderLogs(el) {
     _injectChangelogCss();
     const myGen = _renderGen;
@@ -267,32 +457,8 @@
       return;
     }
     if (myGen !== _renderGen) return;   // đã đổi trang trong lúc chờ
-    const cur = d.current || "?";
-    const upBadge = d.update_available
-      ? `<span class="cl-badge up">Có bản mới: v${esc(d.latest)}</span>`
-      : `<span class="cl-badge ok">Đang ở bản mới nhất</span>`;
-    const upNote = d.update_available
-      ? `<div class="cl-note">Cập nhật ở mục <b>Tổng quan</b>: bản có Watchtower bấm "Cập nhật ngay"; bản Docker khác thì <b>Redeploy</b> (Hostinger) hoặc <code>docker compose up -d --pull always</code>; bản VPS chạy <code>./update.sh</code>.</div>`
-      : "";
-    const rels = d.releases || [];
-    const timeline = rels.length ? rels.map(rel => {
-      const cls = rel.is_current ? "cur" : (rel.installed ? "" : "new");
-      const tag = rel.is_current ? `<span class="cl-tag cur">đang dùng</span>`
-        : (!rel.installed ? `<span class="cl-tag new">bản mới</span>` : "");
-      const secs = (rel.sections || []).map(s => {
-        const items = (s.items || []).map(it => `<li>${esc(it)}</li>`).join("");
-        return `<div class="cl-sec ${_clSecClass(s.title)}"><h4>${esc(s.title)}</h4><ul>${items}</ul></div>`;
-      }).join("");
-      return `<div class="cl-rel ${cls}">
-        <div class="cl-rtop"><span class="cl-ver">v${esc(rel.version)}</span>${rel.date ? `<span class="cl-date">${esc(rel.date)}</span>` : ""}${tag}</div>
-        ${secs || '<div class="cl-empty">(không có chi tiết)</div>'}
-      </div>`;
-    }).join("") : `<div class="cl-empty">Chưa có nhật ký. Thêm file <code>CHANGELOG.md</code> ở gốc dự án.</div>`;
-    el.innerHTML = `<div class="cl-wrap">
-      <div class="cl-head"><span class="cl-cur">Đang cài: <b>v${esc(cur)}</b></span>${upBadge}</div>
-      ${upNote}
-      ${timeline}
-    </div>`;
+    _clData = d;
+    _clRenderPage(el, 0);
   }
 
   const fbrain = () => (window.currentBrainPath ? currentBrainPath() : "brain");
@@ -615,49 +781,151 @@
     const fmtT = ts => ts ? new Date(ts * 1000).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : "-";
 
     el.innerHTML = `<div class="cview-section">
-      <p style="color:#9fb0cf;font-size:15px;max-width:680px;margin:0 0 14px">Nhiều <b>loop</b> chạy ngầm: mỗi loop tự thức theo chu kỳ, làm <b>một việc</b> anh mô tả, tự kiểm chứng rồi ghi log. Thực thi <b>tuần tự</b> (1 vòng/lúc). Loop <b>đọc được dữ liệu thật qua MCP</b> (POS, quảng cáo, lịch...) để làm việc, nhưng KHÔNG tự tạo đơn/tiêu tiền/đăng bài - chỉ ghi nháp để anh duyệt. Loop bật sẽ hiện ở tab <b>Lịch</b>.</p>
+      <p style="color:#9fb0cf;font-size:15px;max-width:680px;margin:0 0 14px">Nhiều <b>loop</b> chạy ngầm: mỗi loop tự thức theo chu kỳ, làm <b>một việc</b> anh mô tả, tự kiểm chứng rồi ghi log. Thực thi <b>tuần tự</b> (1 vòng/lúc). Loop <b>đọc được dữ liệu thật qua MCP</b> (POS, quảng cáo, lịch...) để làm việc, nhưng KHÔNG tự tạo đơn/tiêu tiền/đăng bài - chỉ ghi nháp để anh duyệt.</p>
       <div class="si-actions" style="margin-bottom:14px">
-        <button class="s-btn" id="lpNew">+ Loop mới</button>
+        <button class="s-btn" id="lpNew">+ Thêm việc</button>
         <button class="s-btn-ghost" id="lpStop">■ Dừng vòng đang chạy</button>
       </div>
       <div id="lpForm" style="display:none;margin-bottom:14px;padding:14px;border:1px solid rgba(255,255,255,.1);border-radius:10px;background:rgba(255,255,255,.03)">
         <input type="hidden" id="lpSlug">
         <div class="si-grid">
-          <div class="si-field"><label>Tên loop</label><input id="lpName" placeholder="VD: Đọc source mỗi 2 tiếng"></div>
-          <div class="si-field"><label>Mô tả nhiệm vụ (mỗi vòng Javis làm đúng việc này)</label>
+          <div class="si-field"><label>Loại việc</label><div class="si-row" id="lpKind">
+            <button class="si-chip sel" data-kind="loop">🔁 Việc lặp</button>
+            <button class="si-chip" data-kind="reminder">⏰ Nhắc hẹn</button></div></div>
+          <div class="si-field"><label>Tên</label><input id="lpName" placeholder="VD: Đọc email mỗi 2 tiếng"></div>
+          <div class="si-field"><label id="lpBodyLabel">Mô tả nhiệm vụ (mỗi vòng Javis làm đúng việc này)</label>
             <textarea id="lpBody" placeholder="VD: Mỗi vòng đọc 1 source chưa xử lý trong 06 - Sources rồi đề xuất Wiki page nên tạo. Hoặc: đọc số đơn hôm nay qua MCP POS, nếu thấp thì soạn nháp 1 caption đẩy hàng vào 05 - Projects."></textarea></div>
-          <div class="si-row" style="gap:14px;flex-wrap:wrap">
-            <div class="si-field"><label>Chế độ</label><div class="si-row" id="lpModes">
-              <button class="si-chip" data-mode="suggest">Đề xuất (chỉ đọc)</button>
-              <button class="si-chip" data-mode="auto">Tự làm (an toàn)</button>
-              <button class="si-chip" data-mode="full" style="border-color:rgba(224,102,74,.5)">⚠ Toàn quyền</button></div></div>
-            <div class="si-field"><label>Chu kỳ (phút, tối thiểu 5)</label><input type="number" id="lpInterval" min="5" value="120" style="max-width:120px"></div>
+          <div id="lpLoopFields">
+            <div class="si-row" style="gap:14px;flex-wrap:wrap">
+              <div class="si-field"><label>Chế độ</label><div class="si-row" id="lpModes">
+                <button class="si-chip" data-mode="suggest">Đề xuất (chỉ đọc)</button>
+                <button class="si-chip" data-mode="auto">Tự làm (an toàn)</button>
+                <button class="si-chip" data-mode="full" style="border-color:rgba(224,102,74,.5)">⚠ Toàn quyền</button></div></div>
+              <div class="si-field"><label>Chu kỳ (phút, tối thiểu 5)</label><input type="number" id="lpInterval" min="5" value="120" style="max-width:120px"></div>
+            </div>
           </div>
+          <div id="lpRemFields" style="display:none">
+            <div class="si-row" style="gap:14px;flex-wrap:wrap">
+              <div class="si-field"><label>Khi nào</label><input id="lpRemWhen" placeholder="30 phút nữa · 8h30 · 0 7 * * * · 2026-07-20 09:00" style="min-width:260px"></div>
+              <div class="si-field"><label>Kiểu</label><div class="si-row" id="lpRemModes">
+                <button class="si-chip sel" data-rmode="notify">⏰ Chỉ nhắc</button>
+                <button class="si-chip" data-rmode="task">🤖 Tự làm rồi báo</button></div></div>
+            </div>
+            <div class="dim" style="font-size:12px;color:#6b7894;margin-top:4px">Nhắc một lần: "30 phút nữa", "8h30", "2026-07-20 09:00". Lặp theo giờ cố định: cron 5 trường (vd "0 7 * * *" = 7h sáng mỗi ngày). "Chỉ nhắc" = bắn tin nhắc anh; "Tự làm rồi báo" = Javis chạy việc (đọc MCP, ghi nháp) rồi báo kết quả.</div>
+          </div>
+          <div class="si-field"><label>Brain (nơi lưu việc)</label><select id="lpBrain" class="loop-sel" style="min-width:180px"></select></div>
           <div id="lpFullWarn" style="display:none;margin-top:4px;padding:10px 12px;border:1px solid rgba(224,102,74,.5);border-radius:8px;background:rgba(224,102,74,.08);color:#ffb59e;font-size:13px;line-height:1.5">
             <b>⚠ CHẾ ĐỘ TOÀN QUYỀN - rủi ro cao.</b> Loop sẽ tự thao tác THẬT qua MCP không cần hỏi: có thể <b>tạo/sửa đơn hàng, chạy quảng cáo (tiêu tiền thật), gửi tin nhắn/email, đăng bài</b>. Nó chạy nền theo lịch, KHÔNG có người duyệt từng bước, và <b>hành động thật không hoàn tác được</b>. Chỉ bật khi anh đã tin tưởng loop này và mô tả nhiệm vụ thật rõ ràng, giới hạn phạm vi. Nên chạy thử ở "Đề xuất" hoặc "Tự làm (an toàn)" trước.
           </div>
-          <div class="dim" style="font-size:12px;color:#6b7894;margin-top:2px">Đề xuất = chỉ đọc + gợi ý. Tự làm (an toàn) = ghi nháp file + đọc MCP, KHÔNG tiền/đơn/đăng bài. Toàn quyền = tự thao tác mọi thứ. · Tinh chỉnh nâng cao (giờ im lặng, trần vòng/ngày, thư mục code): sửa file <code>Javis/loops/&lt;tên&gt;.md</code>.</div>
-          <div class="si-actions"><button class="s-btn" id="lpSave">💾 Lưu loop</button><button class="s-btn-ghost" id="lpCancel">Huỷ</button><span class="dim" id="lpFormMsg" style="font-size:13px;color:#e0a04a"></span></div>
+          <div class="dim" id="lpLoopNote" style="font-size:12px;color:#6b7894;margin-top:2px">Đề xuất = chỉ đọc + gợi ý. Tự làm (an toàn) = ghi nháp file + đọc MCP, KHÔNG tiền/đơn/đăng bài. Toàn quyền = tự thao tác mọi thứ. · Tinh chỉnh nâng cao (giờ im lặng, trần vòng/ngày, thư mục code): sửa file <code>Javis/loops/&lt;tên&gt;.md</code>.</div>
+          <div class="si-actions"><button class="s-btn" id="lpSave">💾 Lưu</button><button class="s-btn-ghost" id="lpCancel">Huỷ</button><span class="dim" id="lpFormMsg" style="font-size:13px;color:#e0a04a"></span></div>
         </div>
       </div>
-      <div id="lpCards">Đang tải...</div>
+      <div id="lpGroups">Đang tải...</div>
       <div class="si-log"><h3 style="font-size:15px;color:#cdd8ee">Nhật ký gần đây · <select id="lpLogFilter" class="loop-sel" style="font-size:13px"><option value="">Tất cả loop</option></select></h3><div id="lpLog">Đang tải...</div></div>
     </div>`;
 
     let fcur = { mode: "suggest" };
+    let fkind = "loop";      // loại việc đang tạo: loop (việc lặp) | reminder (nhắc hẹn)
+    let frmode = "notify";   // kiểu nhắc hẹn: notify (chỉ nhắc) | task (tự làm rồi báo)
     function syncFormChips() {
       el.querySelectorAll("#lpModes .si-chip").forEach(x => x.classList.toggle("sel", x.dataset.mode === fcur.mode));
-      const w = el.querySelector("#lpFullWarn"); if (w) w.style.display = (fcur.mode === "full") ? "block" : "none";
+      const w = el.querySelector("#lpFullWarn"); if (w) w.style.display = (fcur.mode === "full" && fkind === "loop") ? "block" : "none";
     }
     el.querySelectorAll("#lpModes .si-chip").forEach(c => c.onclick = () => { fcur.mode = c.dataset.mode; syncFormChips(); });
 
-    function openForm(lp) {
+    // Chuyển giao diện form theo loại việc: loop hiện chế độ + chu kỳ; nhắc hẹn hiện thời điểm + kiểu.
+    function syncKindUI() {
+      el.querySelectorAll("#lpKind .si-chip").forEach(x => x.classList.toggle("sel", x.dataset.kind === fkind));
+      const isRem = fkind === "reminder";
+      const q = id => el.querySelector(id);
+      if (q("#lpLoopFields")) q("#lpLoopFields").style.display = isRem ? "none" : "";
+      if (q("#lpRemFields")) q("#lpRemFields").style.display = isRem ? "" : "none";
+      if (q("#lpLoopNote")) q("#lpLoopNote").style.display = isRem ? "none" : "";
+      if (isRem && q("#lpFullWarn")) q("#lpFullWarn").style.display = "none";
+      q("#lpBodyLabel").textContent = isRem
+        ? "Nội dung nhắc (Javis sẽ nhắc hoặc làm đúng việc này)"
+        : "Mô tả nhiệm vụ (mỗi vòng Javis làm đúng việc này)";
+    }
+    el.querySelectorAll("#lpKind .si-chip").forEach(c => c.onclick = () => {
+      if (el.querySelector("#lpSlug").value) return;   // đang SỬA loop → khoá loại, không đổi sang nhắc
+      fkind = c.dataset.kind; syncKindUI();
+    });
+    el.querySelectorAll("#lpRemModes .si-chip").forEach(c => c.onclick = () => {
+      frmode = c.dataset.rmode;
+      el.querySelectorAll("#lpRemModes .si-chip").forEach(x => x.classList.toggle("sel", x.dataset.rmode === frmode));
+    });
+
+    // "Khi nào" (nhắc hẹn) → payload cho POST /reminders. Cron 5 trường/@macro → {cron};
+    // "N phút/tiếng/giờ/ngày [nữa]" → {delay_min}; còn lại (8h30, 07:00, ngày giờ) → {at} để
+    // reminders.resolve_due tự hiểu. Chỉ nhận đơn-vị-chữ cho delay để "8h" vẫn là mốc giờ 8h.
+    function parseReminderWhen(s) {
+      s = (s || "").trim();
+      if (!s) return null;
+      if (s[0] === "@") return { cron: s };
+      const toks = s.split(/\s+/);
+      if (toks.length === 5 && toks.every(t => /^[\d*/,\-]+$/.test(t))) return { cron: s };
+      // KHÔNG dùng \b sau đơn vị: \b của JS là ranh giới ASCII, mà "giờ" kết thúc bằng ký tự có
+      // dấu ("ờ") nên "1.5 giờ" ở cuối chuỗi sẽ trượt. Alternation đã đủ đặc trưng để không khớp bừa.
+      const m = s.toLowerCase().match(/^(\d+(?:[.,]\d+)?)\s*(phút|phut|tiếng|tieng|giờ|gio|ngày|ngay)/);
+      if (m) {
+        const num = parseFloat(m[1].replace(",", "."));
+        const u = m[2];
+        const mins = (u === "ngày" || u === "ngay") ? num * 1440
+          : (u === "tiếng" || u === "tieng" || u === "giờ" || u === "gio") ? num * 60 : num;
+        return { delay_min: Math.max(1, Math.round(mins)) };
+      }
+      return { at: s };
+    }
+
+    let allLoops = [];    // phẳng mọi brain - cho bộ lọc nhật ký (log per brain+slug)
+    let allBrains = [];   // [{name, path, is_default}] - cho ô chọn brain (tạo mới + chuyển)
+
+    // Nạp danh sách brain cho ô chọn ĐỘC LẬP với /viec/all (vốn nặng: quét note mọi brain).
+    // /brains là nguồn chuẩn của sidebar - nhanh + luôn sẵn, nên form không bao giờ trống ô brain
+    // dù /viec/all còn đang tải hoặc lỗi. Đây là gốc bug "phần brain không thấy để chọn".
+    async function ensureBrains() {
+      if (allBrains.length) return;
+      try {
+        const d = await (await fetch("/brains")).json();
+        allBrains = (d.brains || []).map(b => ({ name: b.name, path: b.path, is_default: b.is_default }));
+      } catch (e) {}
+    }
+
+    function isCurrentBrain(b) {
+      const cur = fbrain();   // path brain đang chọn ở sidebar, hoặc "brain" (mặc định)
+      return cur === "brain" ? !!b.is_default : b.path === cur;
+    }
+    // Options brain cho nút "Chuyển sang..." - bỏ chính brain của item (không chuyển sang chỗ cũ).
+    function moveOptions(exceptPath) {
+      return allBrains.filter(b => b.path !== exceptPath)
+        .map(b => `<option value="${esc(b.path)}">${esc(b.name)}</option>`).join("");
+    }
+
+    async function openForm(lp) {
+      await ensureBrains();   // đảm bảo ô brain luôn có lựa chọn dù /viec/all chưa tải xong
       fcur = { mode: lp ? lp.mode : "suggest" };
+      // Form này chỉ SỬA loop (nhắc hẹn không sửa ở đây, chỉ huỷ/chuyển trên thẻ). Tạo mới → về loop.
+      fkind = "loop"; frmode = "notify";
       el.querySelector("#lpSlug").value = lp ? lp.slug : "";
       el.querySelector("#lpName").value = lp ? lp.name : "";
       el.querySelector("#lpBody").value = lp ? (lp.body || "") : "";
       el.querySelector("#lpInterval").value = lp ? lp.interval_min : 120;
+      el.querySelector("#lpRemWhen").value = "";
+      el.querySelectorAll("#lpRemModes .si-chip").forEach(x => x.classList.toggle("sel", x.dataset.rmode === "notify"));
       el.querySelector("#lpFormMsg").textContent = "";
+      // Khoá bộ chọn loại khi SỬA (chỉ đổi được lúc tạo mới); mờ đi cho rõ.
+      el.querySelectorAll("#lpKind .si-chip").forEach(x => { x.disabled = !!lp; x.style.opacity = lp ? .45 : 1; });
+      // Ô chọn brain: TẠO MỚI cho chọn (mặc định brain đang xem); SỬA thì khoá về brain của loop
+      // (đổi brain lúc sửa sẽ đẻ file mới ở brain khác mà bản gốc vẫn còn - muốn dời thì dùng nút
+      // "Chuyển sang brain" trên thẻ, có kiểm tra trùng + dời state đàng hoàng).
+      const bsel = el.querySelector("#lpBrain");
+      const defPath = lp ? (lp.brain_path || "")
+        : ((allBrains.find(isCurrentBrain) || allBrains[0] || {}).path || "");
+      bsel.innerHTML = allBrains.map(b =>
+        `<option value="${esc(b.path)}" ${b.path === defPath ? "selected" : ""}>${esc(b.name)}</option>`).join("");
+      bsel.disabled = !!lp;
+      syncKindUI();
       syncFormChips();
       el.querySelector("#lpForm").style.display = "block";
       el.querySelector("#lpName").focus();
@@ -668,8 +936,30 @@
     el.querySelector("#lpSave").onclick = async () => {
       const name = el.querySelector("#lpName").value.trim();
       const body = el.querySelector("#lpBody").value.trim();
-      if (!name) { el.querySelector("#lpFormMsg").textContent = "Nhập tên loop"; return; }
-      if (!body) { el.querySelector("#lpFormMsg").textContent = "Nhập mô tả nhiệm vụ (Javis cần biết mỗi vòng làm gì)"; return; }
+      const msg = el.querySelector("#lpFormMsg");
+      const brainVal = el.querySelector("#lpBrain").value || fbrain();   // brain đích do user chọn
+      const b = el.querySelector("#lpSave");
+      if (!name) { msg.textContent = "Nhập tên"; return; }
+      if (!body) { msg.textContent = fkind === "reminder" ? "Nhập nội dung nhắc" : "Nhập mô tả nhiệm vụ (Javis cần biết mỗi vòng làm gì)"; return; }
+
+      // NHẮC HẸN → POST /reminders (kho reminders, JSON). Một lần hoặc lặp cron.
+      if (fkind === "reminder") {
+        const timePayload = parseReminderWhen(el.querySelector("#lpRemWhen").value);
+        if (!timePayload) { msg.textContent = 'Nhập thời điểm (vd "30 phút nữa", "8h30", "0 7 * * *")'; return; }
+        b.textContent = "Đang lưu...";
+        const payload = Object.assign(
+          { text: body, label: name, mode: frmode, brain: brainVal, created_by: "dashboard" }, timePayload);
+        let r = {};
+        try { r = await (await fetch("/reminders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })).json(); }
+        catch (e) { r = { error: e.message }; }
+        b.textContent = "💾 Lưu";
+        if (!r.ok) { msg.textContent = "⚠ " + (r.error || "Lưu lỗi"); return; }
+        el.querySelector("#lpForm").style.display = "none";
+        loadAll();
+        return;
+      }
+
+      // LOOP → POST /loops (file Javis/loops/<slug>.md).
       if (fcur.mode === "full" && !confirm(`Bật CHẾ ĐỘ TOÀN QUYỀN cho loop "${name}"?\n\nLoop sẽ tự thao tác THẬT qua MCP không cần hỏi: tạo/sửa đơn, chạy quảng cáo (tiêu tiền thật), gửi tin, đăng bài. Chạy nền theo lịch, KHÔNG duyệt từng bước, hành động KHÔNG hoàn tác được.\n\nAnh chắc chắn chứ?`)) return;
       const fd = new FormData();
       fd.append("slug", el.querySelector("#lpSlug").value);
@@ -677,18 +967,18 @@
       fd.append("mode", fcur.mode);
       fd.append("interval_min", el.querySelector("#lpInterval").value || "120");
       fd.append("body", body);
-      fd.append("brain", fbrain());
+      fd.append("brain", brainVal);
       // Không gửi goal/workspace/tools_profile/quiet/maxruns → server giữ giá trị cũ (khi sửa)
       // hoặc mặc định an toàn (tạo mới: goal=custom, vault + MCP đọc).
-      const b = el.querySelector("#lpSave"); b.textContent = "Đang lưu...";
+      b.textContent = "Đang lưu...";
       let r = {}; try { r = await (await fetch("/loops", { method: "POST", body: fd })).json(); } catch (e) { r = { error: e.message }; }
-      b.textContent = "💾 Lưu loop";
-      if (!r.ok) { el.querySelector("#lpFormMsg").textContent = "⚠ " + (r.error || "Lưu lỗi"); return; }
+      b.textContent = "💾 Lưu";
+      if (!r.ok) { msg.textContent = "⚠ " + (r.error || "Lưu lỗi"); return; }
       el.querySelector("#lpForm").style.display = "none";
-      loadLoops(); loadLog();
+      loadAll(); loadLog();
     };
 
-    el.querySelector("#lpStop").onclick = async () => { await fetch("/loops/stop", { method: "POST" }); loadLoops(); };
+    el.querySelector("#lpStop").onclick = async () => { await fetch("/loops/stop", { method: "POST" }); loadAll(); };
 
     function loopCard(lp) {
       const paused = !!lp.auto_paused_reason;
@@ -719,60 +1009,162 @@
           <button class="s-btn-ghost run">▶ Chạy ngay</button>
           <button class="s-btn-ghost edit">Sửa</button>
           <button class="s-btn-ghost del" style="color:#e0664a">Xoá</button>
+          <select class="mv loop-sel" style="font-size:12px"><option value="">Chuyển brain…</option>${moveOptions(lp.brain_path)}</select>
         </div>`;
+      // MỌI thao tác gửi brain của CHÍNH item (lp.brain_path), KHÔNG phải fbrain() - trang này gộp
+      // nhiều brain nên bám sidebar sẽ nhắm nhầm brain.
       div.querySelector(".tgl").onclick = async () => {
         // Bật loop TOÀN QUYỀN = xác nhận rủi ro (tắt thì khỏi hỏi)
         if (!lp.enabled && lp.mode === "full" &&
             !confirm(`Bật loop TOÀN QUYỀN "${lp.name}"?\n\nNó sẽ tự thao tác THẬT qua MCP (tạo đơn, tiêu tiền quảng cáo, gửi tin, đăng bài) theo lịch, không duyệt từng bước. Chắc chứ?`)) return;
-        await fetch("/loops/toggle", { method: "POST", body: (() => { const f = new FormData(); f.append("slug", lp.slug); f.append("brain", fbrain()); return f; })() });
-        loadLoops();
+        await fetch("/loops/toggle", { method: "POST", body: (() => { const f = new FormData(); f.append("slug", lp.slug); f.append("brain", lp.brain_path); return f; })() });
+        loadAll();
       };
       div.querySelector(".run").onclick = async (e) => {
         e.target.disabled = true; e.target.textContent = "Đang chạy...";
-        await fetch("/loops/run-now", { method: "POST", body: (() => { const f = new FormData(); f.append("slug", lp.slug); f.append("brain", fbrain()); return f; })() });
-        setTimeout(() => { loadLoops(); loadLog(); }, 2500);
+        await fetch("/loops/run-now", { method: "POST", body: (() => { const f = new FormData(); f.append("slug", lp.slug); f.append("brain", lp.brain_path); return f; })() });
+        setTimeout(() => { loadAll(); loadLog(); }, 2500);
       };
       div.querySelector(".edit").onclick = () => openForm(lp);
       div.querySelector(".del").onclick = async () => {
         if (!confirm(`Xoá loop "${lp.name}"? File Javis/loops/${lp.slug}.md sẽ bị xoá.`)) return;
-        await fetch("/loops/delete", { method: "POST", body: (() => { const f = new FormData(); f.append("slug", lp.slug); f.append("brain", fbrain()); return f; })() });
-        loadLoops(); loadLog();
+        await fetch("/loops/delete", { method: "POST", body: (() => { const f = new FormData(); f.append("slug", lp.slug); f.append("brain", lp.brain_path); return f; })() });
+        loadAll(); loadLog();
+      };
+      div.querySelector(".mv").onchange = async (e) => {
+        const to = e.target.value; if (!to) return;
+        const toName = (allBrains.find(b => b.path === to) || {}).name || to;
+        if (!confirm(`Chuyển việc "${lp.name}" sang brain ${toName}?`)) { e.target.value = ""; return; }
+        const f = new FormData();
+        f.append("slug", lp.slug); f.append("from_brain", lp.brain_path); f.append("to_brain", to);
+        let r = {}; try { r = await (await fetch("/loops/move", { method: "POST", body: f })).json(); } catch (er) { r = { error: er.message }; }
+        if (!r.ok) alert("Không chuyển được: " + (r.error || "lỗi"));
+        loadAll(); loadLog();
       };
       return div;
     }
 
-    async function loadLoops() {
-      if (myGen !== _renderGen) return;   // đã rời trang
-      let d = { loops: [] };
-      try { d = await (await fetch(`/loops?brain=${encodeURIComponent(fbrain())}`)).json(); } catch (e) {}
-      if (myGen !== _renderGen) return;   // đổi trang trong lúc chờ fetch
-      const box = el.querySelector("#lpCards");
+    // Nhắc hẹn đang chờ: gộp cùng loop trong mỗi nhóm brain. Loop = việc bền (.md, sửa trong
+    // Obsidian); nhắc = việc phù du. Cả hai đều gắn brain_path để thao tác đúng brain.
+    const MODE_LBL = { notify: "nhắc", task: "tự làm + báo", script: "script" };
+    function reminderCard(r) {
+      const title = r.label || r.text || "Nhắc hẹn";
+      const when = r.cron ? `cron ${r.cron}`
+        : (r.repeat_min ? `lặp mỗi ${r.repeat_min} phút · kế tiếp ${r.due_human || ""}` : (r.due_human || ""));
+      const kind = MODE_LBL[r.mode] || "nhắc";
+      const div = document.createElement("div");
+      div.className = "wf-card";
+      div.innerHTML = `<b>${esc(title)}</b>
+        <div class="dim" style="font-size:12px;color:#6b7894">${esc(when)} · ${esc(kind)}</div>
+        <div class="wf-actions" style="margin-top:8px">
+          <button class="s-btn-ghost rmCancel">Huỷ</button>
+          <select class="mv loop-sel" style="font-size:12px"><option value="">Chuyển brain…</option>${moveOptions(r.brain_path)}</select>
+        </div>`;
+      div.querySelector(".rmCancel").onclick = async () => {
+        if (!confirm(`Huỷ "${title}"?`)) return;
+        const f = new FormData();
+        f.append("id", r.id);        // id THÔ, /reminders/cancel nhận đúng dạng này
+        f.append("brain", r.brain_path);
+        await fetch("/reminders/cancel", { method: "POST", body: f });
+        loadAll();
+      };
+      div.querySelector(".mv").onchange = async (e) => {
+        const to = e.target.value; if (!to) return;
+        const toName = (allBrains.find(b => b.path === to) || {}).name || to;
+        if (!confirm(`Chuyển nhắc "${title}" sang brain ${toName}?`)) { e.target.value = ""; return; }
+        const f = new FormData();
+        f.append("id", r.id); f.append("from_brain", r.brain_path); f.append("to_brain", to);
+        let rr = {}; try { rr = await (await fetch("/reminders/move", { method: "POST", body: f })).json(); } catch (er) { rr = { error: er.message }; }
+        if (!rr.ok) alert("Không chuyển được: " + (rr.error || "lỗi"));
+        loadAll();
+      };
+      return div;
+    }
+
+    // Gộp MỌI brain: /viec/all trả từng brain kèm loop + nhắc hẹn. Nhóm theo brain, brain đang
+    // xem ở sidebar lên đầu; brain khác rỗng thì ẩn. Mỗi item mang brain_path riêng.
+    async function loadAll(retried) {
+      if (myGen !== _renderGen) return;
+      let d = null, loadErr = false;
+      try { d = await (await fetch("/viec/all")).json(); } catch (e) { loadErr = true; }
+      if (myGen !== _renderGen) return;
+      const box = el.querySelector("#lpGroups");
       if (!box) return;
-      box.innerHTML = "";
-      if (!(d.loops || []).length) {
-        box.innerHTML = `<div class="empty">Chưa có loop nào. Bấm <b>+ Loop mới</b>, hoặc nói với Javis trong chat (vd "tạo loop mỗi 2 tiếng đọc 1 source rồi đề xuất").</div>`;
-      } else {
-        d.loops.forEach(lp => box.appendChild(loopCard(lp)));
+      // /viec/all lỗi/hết-giờ (VPS chậm) → tự thử lại 1 lần sau 1.5s (vượt qua nhịp chậm/nghẽn
+      // thoáng qua), rồi mới BÁO RÕ + cho bấm thử lại. KHÔNG im lặng hiện "chưa có việc" (dễ tưởng
+      // việc biến mất). Giữ danh sách brain cũ + ensureBrains cho ô chọn của form.
+      if (loadErr || !d || !d.brains) {
+        ensureBrains();
+        if (!retried) {
+          box.innerHTML = `<div class="empty">Đang tải danh sách việc...</div>`;
+          setTimeout(() => { if (myGen === _renderGen) loadAll(true); }, 1500);
+          return;
+        }
+        box.innerHTML = `<div class="empty">Không tải được danh sách việc (mạng chậm hoặc hết giờ). <a href="#" id="lpRetry" style="color:#6ea8fe">Thử lại</a></div>`;
+        const rt = el.querySelector("#lpRetry");
+        if (rt) rt.onclick = (ev) => { ev.preventDefault(); loadAll(); loadLog(); };
+        return;
       }
+      allBrains = (d.brains || []).map(b => ({ name: b.name, path: b.path, is_default: b.is_default }));
+      allLoops = [];
+      const groups = (d.brains || []).slice().sort((a, b) => {
+        const ac = isCurrentBrain(a) ? 0 : 1, bc = isCurrentBrain(b) ? 0 : 1;
+        return ac - bc || String(a.name).localeCompare(String(b.name));
+      });
+      box.innerHTML = "";
+      let anyItem = false;
+      groups.forEach(g => {
+        const loops = g.loops || [], rems = g.reminders || [];
+        const cur = isCurrentBrain(g);
+        if (!loops.length && !rems.length && !cur) return;   // brain rỗng không phải brain đang xem → ẩn
+        if (loops.length || rems.length) anyItem = true;
+        const head = document.createElement("div");
+        head.style.cssText = "display:flex;align-items:center;gap:8px;margin:18px 0 8px;font-size:15px;color:#cdd8ee;font-weight:600;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:6px";
+        head.innerHTML = `<span>🧠 ${esc(g.name)}</span>`
+          + (cur ? `<span style="font-size:11px;color:#3fdc86;font-weight:500">đang xem</span>` : "")
+          + (g.is_default ? `<span style="font-size:11px;color:#6b7894;font-weight:400">mặc định</span>` : "");
+        box.appendChild(head);
+        if (!loops.length && !rems.length) {
+          const e2 = document.createElement("div");
+          e2.className = "empty"; e2.style.margin = "0 0 10px";
+          e2.innerHTML = `Chưa có việc nào ở brain này. Bấm <b>+ Thêm việc</b>, hoặc nói với Javis trong chat.`;
+          box.appendChild(e2);
+        }
+        loops.forEach(lp => { allLoops.push(lp); box.appendChild(loopCard(lp)); });
+        if (rems.length) {
+          const rh = document.createElement("div");
+          rh.style.cssText = "font-size:13px;color:#9fb0cf;margin:10px 0 6px";
+          rh.textContent = "Nhắc hẹn đang chờ";
+          box.appendChild(rh);
+          rems.forEach(r => box.appendChild(reminderCard(r)));
+        }
+      });
+      if (!anyItem) {
+        box.innerHTML = `<div class="empty">Chưa có việc định kỳ hay nhắc hẹn nào. Bấm <b>+ Thêm việc</b>, hoặc nói với Javis trong chat (vd "tạo loop mỗi 2 tiếng đọc 1 source rồi đề xuất").</div>`;
+      }
+      // Bộ lọc nhật ký: mọi loop mọi brain (value = index vào allLoops → biết cả brain lẫn slug).
       const sel = el.querySelector("#lpLogFilter");
       const cur = sel.value;
-      sel.innerHTML = `<option value="">Tất cả loop</option>` +
-        (d.loops || []).map(lp => `<option value="${esc(lp.slug)}" ${lp.slug === cur ? "selected" : ""}>${esc(lp.name)}</option>`).join("");
+      sel.innerHTML = `<option value="">Nhật ký brain đang xem</option>` +
+        allLoops.map((lp, i) => `<option value="${i}" ${String(i) === cur ? "selected" : ""}>${esc(lp.name)} · ${esc(lp.brain_name)}</option>`).join("");
       clearTimeout(pollTimer);
-      if (d.running) pollTimer = setTimeout(loadLoops, 5000);   // đang có vòng chạy → tự refresh (1 chuỗi)
+      if (d.running) pollTimer = setTimeout(loadAll, 5000);   // đang có vòng chạy → tự refresh
     }
     async function loadLog() {
       if (myGen !== _renderGen) return;
-      const slug = el.querySelector("#lpLogFilter").value;
+      const v = el.querySelector("#lpLogFilter").value;
+      let brainQ = fbrain(), slugQ = "";
+      if (v !== "") { const lp = allLoops[+v]; if (lp) { brainQ = lp.brain_path; slugQ = lp.slug; } }
       let d = { entries: [] };
-      try { d = await (await fetch(`/loops/log?brain=${encodeURIComponent(fbrain())}&slug=${encodeURIComponent(slug)}&limit=10`)).json(); } catch (e) { }
+      try { d = await (await fetch(`/loops/log?brain=${encodeURIComponent(brainQ)}&slug=${encodeURIComponent(slugQ)}&limit=10`)).json(); } catch (e) { }
       if (myGen !== _renderGen) return;
       const box = el.querySelector("#lpLog");
       if (!box) return;
       box.innerHTML = (d.entries || []).length ? d.entries.map(e => `<div class="le">${esc(e)}</div>`).join("") : `<div class="dim" style="color:#6b7894">Chưa có nhật ký.</div>`;
     }
     el.querySelector("#lpLogFilter").onchange = loadLog;
-    loadLoops(); loadLog();
+    ensureBrains();   // nạp sẵn danh sách brain cho ô chọn (không chờ /viec/all vốn nặng)
+    loadAll(); loadLog();
   }
 
   // ============================================
@@ -1118,14 +1510,17 @@
     el.innerHTML = `
       <div class="cview-section">
         <h3>Phiên bản</h3>
-        <div class="gcard" style="max-width:560px">
+        <div class="gcard" style="max-width:640px">
           <div class="gcard-top"><span class="gcard-name">Javis OS</span><span class="gcard-tag" id="ovVerTag">…</span></div>
           <div class="gcard-meta" id="ovVerMeta">Đang kiểm tra bản mới…</div>
+          <div id="ovVerChangelog" style="display:none;margin:8px 0;padding:8px 10px;border-left:3px solid var(--accent,#6aa);background:rgba(120,140,160,.08);border-radius:6px;font-size:13px;line-height:1.6"></div>
           <div class="js-actions">
             <button class="gcard-btn ghost" id="ovVerCheck">Kiểm tra lại</button>
             <button class="gcard-btn" id="ovVerUpdate" style="display:none">⬆ Cập nhật ngay</button>
           </div>
+          <div id="ovVerProgress" style="display:none;margin-top:10px"></div>
           <div class="gcard-meta" id="ovVerStatus"></div>
+          <div id="ovVerRollback" style="display:none;margin-top:10px;padding:10px;border:1px solid #c55;border-radius:8px;background:rgba(200,80,80,.08);font-size:13px;line-height:1.6"></div>
         </div>
       </div>
       <div class="cview-section">
@@ -1175,26 +1570,59 @@
       </div>`;
     // ---- Phiên bản + cập nhật trong UI ----
     const MODE_LBL = { docker: "Docker / VPS", native: "Linux (systemd)", windows: "Windows" };
+    const UPD_STEPS = [
+      { key: "preparing", label: "Chuẩn bị" },
+      { key: "pulling", label: "Tải code" },
+      { key: "installing", label: "Cài thư viện" },
+      { key: "restarting", label: "Khởi động lại" },
+      { key: "health_check", label: "Kiểm tra sức khoẻ" },
+      { key: "done", label: "Xong" },
+    ];
+    function updStepIndex(phase) {
+      if (phase === "rolling_back") return 4;        // vẫn ở giai đoạn kiểm tra/khôi phục
+      const i = UPD_STEPS.findIndex(s => s.key === phase);
+      return i < 0 ? 0 : i;
+    }
+    function renderProgress(phase, extra) {
+      const box = document.getElementById("ovVerProgress");
+      if (!box) return;
+      box.style.display = "";
+      const at = updStepIndex(phase);
+      const dots = UPD_STEPS.map((s, i) => {
+        const mark = i < at ? "✅" : (i === at ? "⏳" : "○");
+        const w = i === at ? "font-weight:600" : "opacity:.7";
+        return `<span style="${w}">${mark} ${esc(s.label)}</span>`;
+      }).join('<span style="opacity:.4"> → </span>');
+      box.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px">${dots}</div>`
+        + (phase === "rolling_back" ? `<div style="margin-top:6px;color:#c55">↩ Bản mới lỗi, đang tự quay về bản cũ…</div>` : "")
+        + (extra ? `<div style="margin-top:6px;opacity:.85">${esc(extra)}</div>` : "");
+    }
     async function ovLoadVersion() {
       const tag = document.getElementById("ovVerTag");
       const meta = document.getElementById("ovVerMeta");
       const upd = document.getElementById("ovVerUpdate");
+      const cl = document.getElementById("ovVerChangelog");
       if (!tag) return;
       meta.textContent = "Đang kiểm tra bản mới…";
       let j = {};
       try { j = await (await fetch("/version", { cache: "no-store" })).json(); }
       catch (e) { meta.textContent = "⚠ Không kiểm tra được (mạng)."; return; }
       tag.textContent = "v" + (j.current || "?");
+      window._ovVerCur = j.current || "";
+      window._ovVerPrev = j.previous_version || "";
+      window._ovVerMode = j.mode || "";
       const ml = MODE_LBL[j.mode] || j.mode || "";
+      if (cl) { cl.style.display = "none"; cl.innerHTML = ""; }
       if (j.update_available) {
         const base = "🆕 Có bản mới <b>v" + esc(j.latest) + "</b> (đang chạy v" + esc(j.current) + ") · " + esc(ml);
         if (j.can_self_update) {
           meta.innerHTML = base;
           upd.style.display = "";
+          ovLoadChangelogSnippet(j.current);
         } else {
-          // Docker không có Watchtower: cập nhật bằng REDEPLOY (kéo lại image mới nhất).
-          meta.innerHTML = base + '<div style="margin-top:8px;line-height:1.55">↻ Cập nhật bằng cách <b>Redeploy</b>: trên Hostinger bấm nút <b>Redeploy</b> trong Docker Manager; trên VPS chạy <code>docker compose up -d --pull always</code>.</div>';
+          meta.innerHTML = base + '<div style="margin-top:8px;line-height:1.55">↻ Cập nhật bằng cách <b>Redeploy</b>: trên Hostinger bấm nút <b>Redeploy</b> trong Docker Manager; trên VPS chạy <code>docker compose up -d --pull always</code>. Bản mới lỗi thì pin tag <code>:' + esc(j.previous_version || "bản-cũ") + '</code> rồi Redeploy để lùi.</div>';
           upd.style.display = "none";
+          ovLoadChangelogSnippet(j.current);
         }
       } else if (j.latest) {
         meta.innerHTML = "✅ Đang dùng bản mới nhất (v" + esc(j.current) + ") · " + esc(ml);
@@ -1204,42 +1632,86 @@
         upd.style.display = "none";
       }
     }
+    async function ovLoadChangelogSnippet(current) {
+      const cl = document.getElementById("ovVerChangelog");
+      if (!cl) return;
+      let d = {};
+      try { d = await (await fetch("/changelog", { cache: "no-store" })).json(); }
+      catch (e) { return; }
+      const fresh = (d.releases || []).filter(r => !r.installed).slice(0, 3);
+      if (!fresh.length) return;
+      cl.style.display = "";
+      cl.innerHTML = "<b>Bản mới có gì:</b><br>" + fresh.map(r => {
+        const items = (r.sections || []).flatMap(s => s.items || []).slice(0, 4);
+        return "<div style='margin-top:4px'>v" + esc(r.version) + (r.date ? " · " + esc(r.date) : "") + "</div>"
+          + "<ul style='margin:2px 0 0 16px;padding:0'>" + items.map(it => "<li>" + esc(it) + "</li>").join("") + "</ul>";
+      }).join("");
+    }
     const verCheck = document.getElementById("ovVerCheck");
     if (verCheck) verCheck.onclick = ovLoadVersion;
     const verUpd = document.getElementById("ovVerUpdate");
     if (verUpd) verUpd.onclick = async () => {
-      if (!confirm("Cập nhật Javis lên bản mới nhất?\nApp sẽ tự khởi động lại (~20-40 giây), trang sẽ tự tải lại.")) return;
+      if (!confirm("Cập nhật Javis lên bản mới nhất?\nApp sẽ tự khởi động lại. Nếu bản mới lỗi, hệ thống sẽ tự quay về bản cũ (bản git) hoặc hiện cách lùi (Docker).")) return;
       const st = document.getElementById("ovVerStatus");
+      const rb = document.getElementById("ovVerRollback");
+      const oldCur = window._ovVerCur || "";
       verUpd.disabled = true;
-      st.textContent = "⏳ Đang chuẩn bị cập nhật…";
+      if (rb) { rb.style.display = "none"; rb.innerHTML = ""; }
+      renderProgress("preparing", "Đang chuẩn bị cập nhật…");
+      st.textContent = "";
       let resp;
       try { resp = await (await fetch("/update", { method: "POST" })).json(); }
-      catch (e) { resp = { ok: true, _dropped: true }; }   // kết nối đứt = server đang restart, bình thường
+      catch (e) { resp = { ok: true, _dropped: true }; }   // đứt kết nối = server đang restart
       if (resp && resp.ok === false) {
         verUpd.disabled = false;
+        renderProgress("preparing", "");
+        document.getElementById("ovVerProgress").style.display = "none";
         st.innerHTML = "⚠ " + esc(resp.error || "Không cập nhật được.") + (resp.manual ? " Chạy: <code>" + esc(resp.manual) + "</code>" : "");
         return;
       }
-      st.textContent = "⏳ Đang tải bản mới + khởi động lại… (đừng tắt trang)";
-      let tries = 0, backButOld = 0;
+      st.textContent = "⏳ Đang cập nhật… đừng tắt trang.";
+      let tries = 0;
       const poll = setInterval(async () => {
         tries++;
+        // 1) ưu tiên trạng thái chi tiết từ updater (bản git)
+        let s = null;
+        try { s = await (await fetch("/update/status", { cache: "no-store" })).json(); } catch (e) { s = null; }
+        if (s && s.state && s.state.phase) {
+          const ph = s.state.phase, res = s.state.result;
+          const stashNote = s.state.stashed ? "📦 Sửa đổi cục bộ đã được cất vào git stash (dùng 'git stash list' để xem lại)." : "";
+          renderProgress(ph, stashNote);
+          if (res === "success") { clearInterval(poll); st.textContent = "✅ Đã cập nhật xong. Đang tải lại trang…"; setTimeout(() => location.reload(), 1500); return; }
+          if (res === "rolled_back") { clearInterval(poll); renderProgress("done", stashNote); st.innerHTML = "↩ Bản mới lỗi, đã <b>tự quay về bản cũ</b>. Xem <code>update.log</code>."; verUpd.disabled = false; return; }
+          if (res === "pull_failed" || res === "rollback_failed" || res === "error") {
+            clearInterval(poll);
+            const pb = document.getElementById("ovVerProgress"); if (pb) pb.style.display = "none";
+            st.innerHTML = "⚠ " + esc(s.state.error || "Cập nhật lỗi.") + " Xem <code>update.log</code>.";
+            verUpd.disabled = false; return;
+          }
+        }
+        // 2) fallback: dò /version (docker qua Watchtower - updater.py không chạy)
         try {
-          const j = await (await fetch("/version", { cache: "no-store" })).json();
-          if (j && j.update_available === false) {          // đã lên bản mới → xong
-            clearInterval(poll);
-            st.textContent = "✅ Đã cập nhật xong. Đang tải lại trang…";
-            setTimeout(() => location.reload(), 1500);
-            return;
+          const v = await (await fetch("/version", { cache: "no-store" })).json();
+          const flipOk = (window._ovVerMode === "docker") || !(s && s.state && s.state.phase);
+          if (flipOk && v && v.update_available === false && v.current && v.current !== oldCur) {
+            clearInterval(poll); st.textContent = "✅ Đã cập nhật xong. Đang tải lại trang…"; setTimeout(() => location.reload(), 1500); return;
           }
-          backButOld++;                                     // server sống lại nhưng vẫn bản cũ
-          if (backButOld >= 3) {
+          // docker bản mới có thể lỗi: server vẫn còn bản cũ sau khá lâu → hiện cách lùi
+          if ((window._ovVerMode === "docker") && tries >= 12 && v && v.current === oldCur) {
             clearInterval(poll);
-            st.innerHTML = "⚠ Server đã lên lại nhưng phiên bản chưa đổi - cập nhật có thể thất bại. Xem <code>update.log</code> / <code>docker compose logs</code>.";
+            const prev = window._ovVerPrev || (v.previous_version || "");
+            st.innerHTML = "⚠ Bản mới chưa lên sau một lúc - có thể lỗi.";
+            if (rb) {
+              rb.style.display = "";
+              rb.innerHTML = "<b>Cách lùi về bản cũ (Docker):</b><br>Pin tag phiên bản cũ rồi kéo lại:"
+                + "<br><code>docker compose pull && docker compose up -d</code>"
+                + (prev ? "<br>Hoặc sửa image thành <code>ghcr.io/blogminhquy/javis-os:" + esc(prev) + "</code> rồi Redeploy." : "");
+            }
+            verUpd.disabled = false; return;
           }
-        } catch (e) { backButOld = 0; /* server đang restart - tiếp tục chờ */ }
-        if (tries > 45) { clearInterval(poll); st.innerHTML = "Server chưa lên lại sau ~3 phút - thử tải lại trang."; }
-      }, 4000);
+        } catch (e) { /* server đang restart - chờ tiếp */ }
+        if (tries > 60) { clearInterval(poll); st.innerHTML = "Server chưa lên lại sau ~3 phút - thử tải lại trang."; verUpd.disabled = false; }
+      }, 3000);
     };
     ovLoadVersion();
 
@@ -1348,11 +1820,12 @@
           : "○ Chưa kết nối · " + p.models.length + " model";
         return `<div class="prov-card ${p.is_main ? "main" : ""}">
           ${provHead(p, on, "Device code", st)}
-          <div class="prov-action">
+          <div class="prov-action" style="flex-wrap:wrap">
             ${on
               ? `<button class="gcard-btn" data-oauth-disc="1" style="background:transparent;opacity:.75">Ngắt</button>`
-              : `<button class="gcard-btn" data-oauth-login="1">Đăng nhập ChatGPT</button>`}
-            <span id="oauthMsg" class="gcard-meta" style="margin-left:10px;flex:1"></span>
+              : `<button class="gcard-btn" data-oauth-login="1">Đăng nhập ChatGPT</button>
+                 <button class="gcard-btn" data-oauth-browser="1" style="background:transparent;opacity:.85">Qua trình duyệt</button>`}
+            <span id="oauthMsg" class="gcard-meta" style="margin-left:10px;flex:1;min-width:220px"></span>
           </div>
         </div>`;
       }
@@ -1436,6 +1909,8 @@
     });
     const ol = el.querySelector("[data-oauth-login]");
     if (ol) ol.onclick = () => startOauthLogin(el);
+    const ob = el.querySelector("[data-oauth-browser]");
+    if (ob) ob.onclick = () => startOauthBrowser(el);
     const od = el.querySelector("[data-oauth-disc]");
     if (od) od.onclick = async () => {
       od.disabled = true; od.textContent = "Đang ngắt...";
@@ -1544,6 +2019,43 @@
     setTimeout(poll, iv);
   }
 
+  // ---- ChatGPT OAuth qua trình duyệt: mở link → user dán lại URL callback → đổi token ----
+  async function startOauthBrowser(el) {
+    const msg = el.querySelector("#oauthMsg");
+    if (msg) msg.textContent = "Đang khởi tạo…";
+    let d;
+    try { d = await (await fetch("/oauth/openai/browser/start", { method: "POST" })).json(); }
+    catch (e) { if (msg) msg.textContent = "Lỗi kết nối server."; return; }
+    if (d.error) { if (msg) msg.textContent = "Lỗi: " + d.error; return; }
+    if (!d.authorize_url) { if (msg) msg.textContent = "Máy chủ chưa có chức năng này - khởi động lại Javis rồi tải lại trang (Ctrl+Shift+R)."; return; }
+    try { window.open(d.authorize_url, "_blank"); } catch (e) {}
+    if (msg) msg.innerHTML =
+      `Đã mở trang <a href="${esc(safeHref(d.authorize_url))}" target="_blank">đăng nhập ChatGPT</a>. `
+      + `Đăng nhập xong, trình duyệt sẽ nhảy sang <b>localhost</b> (có thể báo không tải được trang - không sao). `
+      + `Copy toàn bộ đường dẫn trên thanh địa chỉ rồi dán vào đây:`
+      + `<div style="display:flex;gap:6px;margin-top:6px">`
+      + `<input id="oauthCb" class="js-input" placeholder="http://localhost:1455/auth/callback?code=…" style="flex:1;min-width:180px">`
+      + `<button class="gcard-btn" id="oauthCbBtn">Xác nhận</button></div>`
+      + `<div id="oauthCbMsg" class="gcard-meta" style="margin-top:4px;opacity:.75"></div>`;
+    const btn = el.querySelector("#oauthCbBtn");
+    if (btn) btn.onclick = async () => {
+      const cb = (el.querySelector("#oauthCb").value || "").trim();
+      const m2 = el.querySelector("#oauthCbMsg");
+      if (!cb) { if (m2) m2.textContent = "Dán đường dẫn callback vào đã."; return; }
+      btn.disabled = true; if (m2) m2.textContent = "Đang xác nhận…";
+      let p;
+      try {
+        p = await (await fetch("/oauth/openai/browser/finish", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ callback: cb }),
+        })).json();
+      } catch (e) { if (m2) m2.textContent = "Lỗi mạng."; btn.disabled = false; return; }
+      if (p.status === "connected") { if (msg) msg.textContent = "✓ Đã kết nối!"; renderModels(el); return; }
+      if (m2) m2.textContent = "⚠ " + (p.error || "Chưa được, thử lại.");
+      btn.disabled = false;
+    };
+  }
+
   // ---- Picker model (kiểu Hermes SET MAIN MODEL) ----
   function openModelPicker(providers, main, onDone) {
     let modal = document.getElementById("modelPicker");
@@ -1627,9 +2139,20 @@
   }
 
   // ---- Trang MCP - quản lý server công cụ ngoài cho engine Claude Code ----
-  async function postJson(url, obj) {
-    try { return await (await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(obj || {}) })).json(); }
-    catch (e) { return { ok: false, error: String(e) }; }
+  async function postJson(url, obj, timeoutMs) {
+    // Hạn chờ: request treo (vd server bận vòng lặp sự kiện) phải nổi lên thành lỗi đọc
+    // được, chứ không để nút bấm chìm mãi. 0 = không giới hạn (giữ hành vi cũ cho chỗ khác).
+    const ctl = timeoutMs ? new AbortController() : null;
+    const timer = ctl ? setTimeout(() => ctl.abort(), timeoutMs) : null;
+    try {
+      const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" },
+                                   body: JSON.stringify(obj || {}), signal: ctl ? ctl.signal : undefined });
+      return await r.json();
+    } catch (e) {
+      return { ok: false, error: (ctl && e && e.name === "AbortError")
+        ? "Máy chủ không phản hồi sau " + Math.round(timeoutMs / 1000) + "s. Thử lại giúp em."
+        : String(e) };
+    } finally { if (timer) clearTimeout(timer); }
   }
   function parseKV(text, sep) {
     const o = {};
@@ -1688,7 +2211,268 @@
       + '<div class="prov-head"><span class="conn-ico">' + iconInner(con) + '</span>'
       + '<div class="prov-info"><div class="prov-name">' + esc(con.name || con.id) + '</div>'
       + '<div class="prov-status">' + esc(con.description || "") + '</div></div></div>'
-      + '<div class="conn-accounts">' + chips + '</div></div>';
+      + '<div class="conn-accounts">' + chips + '</div>'
+      + (con.id === "zalo" ? zaloListenerPanel(conns) : "")
+      + '</div>';
+  }
+
+  // Panel "Nghe tin liên tục" trong thẻ Zalo. Sidecar `zalo-agent-cli listen` chạy nền,
+  // đẩy tin về /hook/zalo → lọc từ khoá → báo Telegram. Javis KHÔNG tự trả lời khách.
+  const ZL_STATE = {
+    off: ["Đang tắt", ""],
+    starting: ["Đang khởi động…", "#d9a521"],
+    listening: ["● Đang nghe", "#2c7a4b"],
+    reconnecting: ["Mất kết nối, đang thử lại…", "#d9a521"],
+    duplicate: ["Trùng phiên - tài khoản này đang bị dùng ở nơi khác", "#c0392b"],
+    error: ["Lỗi", "#c0392b"],
+  };
+  function zaloListenerPanel(conns) {
+    const opts = conns.map(c => '<option value="' + esc(c.id) + '">' + esc(c.label || c.id) + '</option>').join("");
+    return '<div class="zl-panel" style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.08)">'
+      + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+      + '<b style="font-size:13px">Nghe tin liên tục</b>'
+      + '<span id="zlState" class="mp-note">đang tải…</span>'
+      + '<button class="mp-btn" id="zlToggle" style="margin-left:auto">…</button></div>'
+      + '<div class="gcard-meta" style="margin-top:6px">Tick chọn cuộc chat để Javis <b>theo dõi</b> - chỉ đọc và báo về Telegram, KHÔNG tự trả lời khách. Điền từ khoá bên dưới nếu chỉ muốn được báo khi tin có chứa từ đó. Muốn Javis nhắn tin cho ai thì bảo thẳng trong chat.</div>'
+      + '<div class="mp-note" id="zlSignal" style="margin-top:6px">đang tải…</div>'
+      + '<div id="zlForm" style="margin-top:10px;display:flex;flex-direction:column;gap:8px">'
+      + '<label class="mcp-lb">Tài khoản Zalo dùng để nghe<select class="js-input" id="zlConn">' + opts + '</select></label>'
+      + '<div class="mcp-lb">Cuộc chat theo dõi <span style="opacity:.6">(chưa chọn cái nào thì không báo gì)</span>'
+      + '<div style="display:flex;gap:6px;margin-top:4px">'
+      + '<input class="js-input" id="zlSearch" placeholder="Tìm tên nhóm hoặc người…" style="flex:1">'
+      + '<button class="mp-btn" id="zlNames" style="font-size:12px;white-space:nowrap">Lấy tên nhóm</button></div>'
+      + '<div id="zlThreads" style="max-height:200px;overflow:auto;border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:6px;margin-top:4px"></div></div>'
+      + '<label class="mcp-lb">Báo Telegram khi tin có chứa <span style="opacity:.6">(để trống = không báo gì)</span>'
+      + '<input class="js-input" id="zlKw" placeholder="giá, còn hàng, đặt, ship"></label>'
+      + '<label class="mcp-lb">Giờ im lặng (tuỳ chọn, vd 23-07)<input class="js-input" id="zlQuiet" placeholder="23-07" style="max-width:140px"></label>'
+      + '<div style="display:flex;align-items:center;gap:8px">'
+      + '<button class="mp-btn primary" id="zlSave" style="font-size:12px">Lưu theo dõi</button>'
+      + '<span class="mp-note" id="zlSaved"></span></div>'
+      + '<div class="mp-note" id="zlErr" style="color:#c0392b"></div>'
+      // Chỉ hiện khi đang trùng phiên: `zalo-agent logout` cố ý giữ lại thông tin đăng
+      // nhập nên đăng xuất KHÔNG gỡ được phiên đang kẹt, phải xoá thẳng rồi quét QR lại.
+      + '<button class="mp-btn" id="zlClear" style="display:none;font-size:12px">Xoá phiên đăng nhập rồi quét QR lại</button>'
+      + '<pre id="zlLog" style="display:none;white-space:pre-wrap;word-break:break-all;font-size:11px;opacity:.65;margin:0;max-height:110px;overflow:auto"></pre>'
+      + '</div></div>';
+  }
+  function zlAgo(ts) {
+    if (!ts) return "";
+    const d = new Date(ts * 1000), s = (Date.now() / 1000) - ts;
+    if (s < 60) return "vừa xong";
+    if (s < 3600) return Math.floor(s / 60) + " phút trước";
+    const p = n => String(n).padStart(2, "0");
+    return p(d.getHours()) + ":" + p(d.getMinutes()) + " " + p(d.getDate()) + "/" + p(d.getMonth() + 1);
+  }
+  async function wireZaloListener(el) {
+    const panel = el.querySelector(".zl-panel");
+    if (!panel) return;
+    const $ = id => panel.querySelector("#" + id);
+    // rosterKey = null chứ KHÔNG phải "": danh sách rỗng cũng cho key "", để "" thì lần vẽ đầu
+    // bị chặn ngay và dòng hướng dẫn "chưa thấy cuộc chat nào" không bao giờ hiện ra.
+    let on = false, modes = {}, rosterKey = null, showAll = false, lastSt = null;
+    // Lệnh Bật nghe chỉ cần tài khoản và giờ im lặng. KHÔNG tham chiếu biến cũ "selected"
+    // (đã đổi thành "modes" ở 0.9.136 nhưng dòng này sót lại) - nó ném ReferenceError khiến
+    // bấm Bật nghe là văng lỗi, finally hồi nút về "Bật nghe", không có gì diễn ra. Đúng
+    // triệu chứng đã gặp. Cuộc chat theo dõi lưu riêng qua /watch bằng "modes".
+    const cfgBody = () => ({
+      conn_id: $("zlConn").value,
+      quiet_hours: $("zlQuiet").value.trim(),
+    });
+    // Dấu hiệu MỘT DÒNG: đủ để phân biệt "không ai nhắn" với "đang hỏng mà vẫn báo đang nghe".
+    const signal = (st) => {
+      if (!st.enabled) return "Đang tắt.";
+      if (st.last_event) return "Tin gần nhất nhận lúc " + zlAgo(st.last_event) + ".";
+      if (st.state === "listening") return "Đã nối, chưa nhận tin nào. Nhắn thử một tin để kiểm tra.";
+      return "Chưa nhận tin nào.";
+    };
+    const ZL_SHOW = 8;           // hiện sẵn ngần này, còn lại phải tìm hoặc bấm xem thêm
+    // Tick = theo dõi (chỉ đọc + báo). KHÔNG còn lựa chọn "tự phản hồi": Javis không tự
+    // nhắn cho khách, mọi tin gửi đi đều do chủ yêu cầu trực tiếp trong chat.
+    const row = (t) => {
+      const on = !!modes[t.id];
+      return '<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:13px">'
+        + '<input type="checkbox" class="zl-th" value="' + esc(t.id) + '"' + (on ? " checked" : "") + '>'
+        // esc() BẮT BUỘC: tên do người lạ trên Zalo tự đặt, chèn thẳng vào HTML là hở XSS.
+        + '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
+        + esc(t.name || t.id)
+        + (t.type === "group"
+            ? ' <span style="opacity:.55">' + (t.named ? "(nhóm)" : "(nhóm #" + esc(String(t.id).slice(-4)) + ")") + '</span>'
+            : "")
+        + ' <span style="opacity:.45">' + zlAgo(t.last) + '</span></span></div>';
+    };
+    // Lưu thành FILE LUẬT qua /watch. Gửi vào settings như trước là mất trắng: write_cfg
+    // chỉ nhận khoá có trong DEFAULT_CFG, mà threads/keywords đã bị bỏ khỏi đó.
+    const saveWatch = async () => {
+      $("zlSaved").textContent = "đang lưu…";
+      $("zlSaved").style.color = "";
+      const r = await postJson("/zalo-listener/watch", {
+        conn_id: $("zlConn").value,   // lưu luôn tài khoản đang chọn, không đợi bấm Bật nghe
+        modes: modes,
+        keywords: $("zlKw").value.split(",").map(s => s.trim()).filter(Boolean),
+        quiet_hours: $("zlQuiet").value.trim(),
+      });
+      if (r.ok === false) {
+        $("zlSaved").textContent = "";
+        $("zlErr").textContent = r.error || "Lưu không được";
+        return false;
+      }
+      $("zlErr").textContent = "";
+      $("zlSaved").textContent = "✓ " + (r.msg || "Đã lưu.");
+      $("zlSaved").style.color = "#2c7a4b";
+      setTimeout(() => { if ($("zlSaved")) $("zlSaved").textContent = ""; }, 6000);
+      return true;
+    };
+    const paintRoster = (st) => {
+      const enabledRules = (st.rules || []).filter(x => x.enabled);
+      // Luật đang bật = đang theo dõi -> đảm bảo có tick. Chỉ THÊM chứ không xoá tick đang
+      // có (chủ có thể vừa tick tại chỗ, chưa lưu xong), để nhịp hỏi lại không đè mất.
+      enabledRules.forEach(x => { if (!modes[x.thread_id]) modes[x.thread_id] = "chi-doc"; });
+      // Nguồn vẽ = sổ cuộc chat (roster) HỢP với cuộc chat đang có LUẬT bật. Sổ là bộ nhớ
+      // tạm, RỖNG sau khi khởi động lại server, nên nếu chỉ dựa vào nó thì cuộc chat đang
+      // theo dõi biến mất khỏi giao diện dù luật vẫn còn trên đĩa - đúng lỗi "tải lại là
+      // mất tick". Ghép luật vào để tick luôn hiện và bỏ được, kể cả khi chưa có tin mới.
+      const byId = {};
+      (st.roster || []).forEach(t => { byId[t.id] = t; });
+      enabledRules.forEach(x => {
+        if (!byId[x.thread_id]) byId[x.thread_id] = {
+          id: x.thread_id, name: x.thread_name || x.thread_id,
+          type: x.thread_type || "user", named: true, last: 0 };
+      });
+      const list = Object.values(byId);
+      const q = ($("zlSearch").value || "").trim().toLowerCase();
+      // Khoá vẽ lại gồm cả trạng thái bật/tắt, từ khoá tìm và cờ xem-thêm: thiếu cái nào
+      // thì thao tác đó không có tác dụng vì bị guard chặn.
+      const key = (st.enabled ? "on" : "off") + "|" + (showAll ? "all" : "top") + "|" + q
+        + "|" + list.map(x => x.id).join("|")
+        // Luật đổi (vd chủ đặt qua chat) thì ô tick phải vẽ lại theo, không thì hiện sai.
+        + "|" + (st.rules || []).filter(x => x.enabled)
+            .map(x => x.thread_id + ":" + x.mode).sort().join(",");
+      if (key === rosterKey) return;         // không vẽ lại khi chưa đổi, tránh nhảy ô đang tick
+      rosterKey = key;
+      const box = $("zlThreads");
+      if (!list.length) {
+        box.innerHTML = '<div class="mp-note">' + (st.enabled
+          ? 'Đang nghe nhưng chưa ai nhắn. Nhờ ai đó nhắn một tin vào nhóm hoặc cuộc chat anh cần theo dõi, nó sẽ tự hiện ra đây trong vài giây.'
+          : 'Danh sách này chỉ có khi đang nghe. Bấm <b>Bật nghe</b> ở trên, rồi đợi có người nhắn vào cuộc chat anh cần theo dõi, nó sẽ tự hiện ra đây để tick chọn.')
+          + '</div>';
+        return;
+      }
+      // Cái ĐÃ CHỌN luôn ghim lên đầu và không bao giờ bị cắt: đang theo dõi mà trôi mất
+      // khỏi danh sách thì không bỏ tick được nữa.
+      const picked = list.filter(t => modes[t.id]);
+      let rest = list.filter(t => !modes[t.id]);
+      if (q) rest = rest.filter(t => (t.name || t.id).toLowerCase().includes(q));
+      const hidden = showAll ? 0 : Math.max(0, rest.length - ZL_SHOW);
+      const shown = showAll ? rest : rest.slice(0, ZL_SHOW);
+      box.innerHTML = picked.map(row).join("")
+        + (picked.length && shown.length ? '<div style="border-top:1px solid rgba(255,255,255,.08);margin:4px 0"></div>' : "")
+        + shown.map(row).join("")
+        + (!shown.length && q ? '<div class="mp-note">Không có cuộc chat nào khớp "' + esc(q) + '".</div>' : "")
+        + (hidden ? '<button class="mp-btn" id="zlMore" style="margin-top:6px;font-size:12px">Xem thêm ' + hidden + ' cuộc chat</button>' : "");
+      box.querySelectorAll(".zl-th").forEach(cb => cb.onchange = async () => {
+        if (cb.checked) modes[cb.value] = "chi-doc"; else delete modes[cb.value];
+        rosterKey = null;                       // ghim lại lên đầu ngay
+        await saveWatch();
+      });
+      const more = box.querySelector("#zlMore");
+      if (more) more.onclick = () => { showAll = true; rosterKey = null; paintRoster(st); };
+    };
+    const paint = (st) => {
+      const [txt, color] = ZL_STATE[st.state] || ZL_STATE.off;
+      on = !!st.enabled;
+      // Đã bật mà tiến trình nền báo "off" là MÂU THUẪN (luồng chết hoặc chưa kịp chạy).
+      // Hiện "Đang tắt" lúc này là nói dối người dùng - phải gọi đúng tên vấn đề.
+      const stuck = st.enabled && st.state === "off";
+      $("zlState").textContent = !st.enabled ? "Đang tắt"
+        : (stuck ? "Đã bật nhưng tiến trình chưa chạy" : txt);
+      $("zlState").style.color = !st.enabled ? "" : (stuck ? "#c0392b" : color);
+      $("zlToggle").textContent = on ? "Tắt" : "Bật nghe";
+      $("zlToggle").classList.toggle("primary", !on);
+      // Hiện lỗi KỂ CẢ khi đang tắt: bật thất bại thì cờ enabled không được đặt, mà lý do
+      // thất bại lại chính là thứ cần đọc. Lọc theo enabled là tự xoá mất lời giải thích.
+      $("zlErr").textContent = st.error || "";
+      // Log thô của sidecar: chỉ hiện khi đang trục trặc. Không có nó thì lúc hỏng chỉ
+      // nhìn được mỗi nhãn trạng thái, không đủ để biết vì sao.
+      const bad = st.enabled && (st.error || ["error", "duplicate", "reconnecting"].includes(st.state));
+      const log = (st.log || []).join("\n");
+      $("zlLog").style.display = (bad && log) ? "" : "none";
+      $("zlLog").textContent = log;
+      $("zlSignal").textContent = signal(st);
+      const dup = st.state === "duplicate";
+      $("zlClear").style.display = dup ? "" : "none";
+      if (dup && st.strays) {
+        $("zlErr").textContent = "Tìm thấy " + st.strays + " tiến trình nghe cũ còn sót. "
+          + "Bấm Bật nghe lại là Javis tự dọn trước khi khởi động.";
+      }
+      lastSt = st;
+      paintRoster(st);
+    };
+    let st;
+    try { st = await (await fetch("/zalo-listener/status")).json(); } catch (e) { return; }
+    const c = st.cfg || {};
+    if (c.conn_id) $("zlConn").value = c.conn_id;
+    // Lấy từ LUẬT đang bật, không lấy từ cfg.threads (trường đó đã bỏ, đọc vào là sai).
+    // Luật nào đang bật = cuộc chat đang theo dõi -> tick sẵn.
+    modes = {};
+    (st.rules || []).filter(x => x.enabled).forEach(x => {
+      modes[x.thread_id] = "chi-doc";
+    });
+    $("zlKw").value = (c.keywords || []).join(", ");
+    $("zlQuiet").value = c.quiet_hours || "";
+    $("zlSearch").oninput = () => { rosterKey = null; if (lastSt) paintRoster(lastSt); };
+    // Đổi tài khoản là lưu ngay: để ô hiện một đằng mà cấu hình một nẻo là gốc của lỗi
+    // "chưa chọn tài khoản Zalo" dù trong ô rõ ràng đang có tên.
+    $("zlConn").onchange = () => saveWatch();
+    // Tên nhóm KHÔNG có trong dữ liệu tin nhắn nên phải hỏi Zalo riêng. Là nút bấm tay vì
+    // nó mở một kết nối ngắn, làm listener phải nối lại một nhịp.
+    $("zlSave").onclick = async () => {
+      $("zlSave").disabled = true;
+      await saveWatch();
+      $("zlSave").disabled = false;
+      rosterKey = null;
+      try { paint(await (await fetch("/zalo-listener/status")).json()); } catch (e) {}
+    };
+    $("zlNames").onclick = async () => {
+      $("zlNames").disabled = true;
+      $("zlNames").textContent = "Đang lấy…";
+      const r = await postJson("/zalo-listener/group-names", {});
+      $("zlNames").disabled = false;
+      $("zlNames").textContent = "Lấy tên nhóm";
+      $("zlErr").textContent = r.ok ? (r.msg || "") : (r.error || "Lỗi");
+      rosterKey = null;
+      try { paint(await (await fetch("/zalo-listener/status")).json()); } catch (e) {}
+    };
+    paint(st);
+    $("zlToggle").onclick = async () => {
+      $("zlErr").textContent = "";
+      $("zlToggle").disabled = true;
+      $("zlToggle").textContent = on ? "Đang tắt…" : "Đang bật…";
+      try {
+        const r = await postJson(on ? "/zalo-listener/stop" : "/zalo-listener/start",
+                                 on ? {} : cfgBody(), 30000);
+        if (r.ok === false) { $("zlErr").textContent = r.error || "Lỗi"; }
+        try { paint(await (await fetch("/zalo-listener/status")).json()); } catch (e) {}
+      } finally {
+        // LUÔN bật lại nút dù có lỗi gì - trước đây thiếu finally nên request treo là
+        // nút chìm mãi, không bấm lại được.
+        $("zlToggle").disabled = false;
+      }
+    };
+    $("zlClear").onclick = async () => {
+      if (!confirm("Xoá phiên đăng nhập Zalo của tài khoản này? Sau đó anh phải quét QR lại "
+                   + "trong kho Kết nối. Dùng khi bị trùng phiên mà đăng xuất không ăn thua.")) return;
+      $("zlClear").disabled = true;
+      const r = await postJson("/zalo-listener/clear-session", {});
+      $("zlClear").disabled = false;
+      $("zlErr").textContent = r.ok ? (r.msg || "Đã xoá phiên.") : (r.error || "Lỗi");
+      try { paint(await (await fetch("/zalo-listener/status")).json()); } catch (e) {}
+    };
+    // Trạng thái thật đến từ tiến trình nền (đang nghe / đứt / trùng phiên) nên phải hỏi lại.
+    clearInterval(window._zlPoll);
+    window._zlPoll = setInterval(async () => {
+      if (!document.body.contains(panel)) { clearInterval(window._zlPoll); return; }
+      try { paint(await (await fetch("/zalo-listener/status")).json()); } catch (e) {}
+    }, 5000);
   }
   function catalogCard(con) {
     const soon = con.status === "soon";
@@ -1723,11 +2507,15 @@
       + '</label>').join("");
     const m = connModal(mHead("KẾT NỐI " + esc((con.name || "").toUpperCase()))
       + '<div class="conn-form">'
+      // Cảnh báo rủi ro phải hiện NGAY LÚC QUYẾT ĐỊNH, không đợi tới hộp thoại đổi quyền.
+      + (con.risk ? '<div class="conn-risk">⚠ ' + esc(con.risk) + '</div>' : "")
       + (con.guide ? '<div class="conn-guide">' + esc(con.guide) + (con.guide_url ? ' <a href="' + esc(con.guide_url) + '" target="_blank">Hướng dẫn ↗</a>' : "") + '</div>' : "")
+      + oauthWizard(con)   // nút mở trang ngoài (vd "Tạo App Password") khi catalog khai auth.setup.links
       + fields
       + '<label class="mcp-lb">Tên gợi nhớ (tuỳ chọn - bỏ trống sẽ tự lấy tên tài khoản/shop)<input class="js-input" id="cLabel"></label>'
       + '</div>'
       + '<div class="mp-foot"><span class="mp-note" id="cErr"></span><div><button class="mp-btn" data-act="close">Huỷ</button><button class="mp-btn primary" id="cGo">Kết nối</button></div></div>');
+    m.querySelectorAll(".wiz-open").forEach(b => { b.onclick = () => window.open(b.dataset.url, "_blank", "noopener"); });
     m.querySelector("#cGo").onclick = async () => {
       const fieldsVal = {};
       let missing = "";
@@ -1785,17 +2573,56 @@
     };
   }
 
+  // Wizard cài đặt cho connector tự-tạo-app (Facebook/Meta): nút mở thẳng trang Developer
+  // + ô Redirect URI kèm nút sao chép. Chỉ hiện khi connector khai auth.setup trong catalog.
+  function oauthWizard(con) {
+    const s = con.setup || {};
+    const hasLinks = Array.isArray(s.links) && s.links.length;
+    if (!hasLinks && !s.redirect) return "";
+    let h = '<div class="conn-wizard">';
+    if (hasLinks) {
+      h += '<div class="wiz-links">' + s.links.map(l =>
+        '<button type="button" class="mp-btn wiz-open" data-url="' + esc(l.url) + '">' + esc(l.label) + ' ↗</button>'
+      ).join("") + '</div>';
+    }
+    if (s.redirect) {
+      const uri = 'http://localhost:' + (location.port || '7777') + '/connect/oauth/callback';
+      h += '<label class="mcp-lb">Redirect URI - dán vào ô "Valid OAuth Redirect URIs" (Facebook Login &gt; Settings)'
+        + '<div class="wiz-copy"><input class="js-input" id="wizRedirect" readonly value="' + esc(uri) + '">'
+        + '<button type="button" class="mp-btn wiz-copy-btn" id="wizCopy">Sao chép</button></div></label>';
+    }
+    return h + '</div>';
+  }
+
   function openOauthFlow(el, con) {
     // Provider không tự đăng ký client (vd Google) khai sẵn fields client_id/secret user tự tạo.
+    // Có ô multiline (vd google-ads cho dán sẵn file ADC làm đường lui) nên render y như luồng
+    // apikey, đừng ép hết thành input 1 dòng.
     const fields = (con.fields || []).map(f =>
       '<label class="mcp-lb">' + esc(f.label || f.key)
-      + '<input class="js-input" data-f="' + esc(f.key) + '" placeholder="' + esc(f.placeholder || "") + '"></label>').join("");
+      + (f.multiline
+        ? '<textarea class="js-input" data-f="' + esc(f.key) + '" rows="4" placeholder="' + esc(f.placeholder || "") + '"></textarea>'
+        : '<input class="js-input" data-f="' + esc(f.key) + '" placeholder="' + esc(f.placeholder || "") + '">')
+      + '</label>').join("");
     const m = connModal(mHead("KẾT NỐI " + esc((con.name || "").toUpperCase()))
-      + '<div class="conn-form"><div class="conn-guide">' + esc(con.guide || "Đăng nhập bằng tài khoản của nhà cung cấp.")
+      + '<div class="conn-form">'
+      // Cảnh báo rủi ro phải hiện NGAY LÚC QUYẾT ĐỊNH, không đợi tới hộp thoại đổi quyền.
+      + (con.risk ? '<div class="conn-risk">⚠ ' + esc(con.risk) + '</div>' : "")
+      + '<div class="conn-guide">' + esc(con.guide || "Đăng nhập bằng tài khoản của nhà cung cấp.")
       + (con.guide_url ? ' <a href="' + esc(con.guide_url) + '" target="_blank">Hướng dẫn ↗</a>' : "") + '</div>'
+      + oauthWizard(con)
       + fields
       + '<button class="mp-btn primary" id="oGo">' + (fields ? "Lưu & mở trang đăng nhập" : "Mở trang đăng nhập") + '</button></div>'
       + '<div class="mp-foot"><span class="mp-note" id="oErr"></span><button class="mp-btn" data-act="close">Đóng</button></div>');
+    m.querySelectorAll(".wiz-open").forEach(b => { b.onclick = () => window.open(b.dataset.url, "_blank", "noopener"); });
+    const wizCopy = m.querySelector("#wizCopy");
+    if (wizCopy) wizCopy.onclick = async () => {
+      const inp = m.querySelector("#wizRedirect");
+      try { await navigator.clipboard.writeText(inp.value); }
+      catch (e) { inp.select(); try { document.execCommand("copy"); } catch (_) {} }
+      wizCopy.textContent = "Đã chép ✓";
+      setTimeout(() => { wizCopy.textContent = "Sao chép"; }, 1400);
+    };
     m.querySelector("#oGo").onclick = async () => {
       const err = m.querySelector("#oErr"), go = m.querySelector("#oGo");
       const fieldsVal = {};
@@ -1949,6 +2776,7 @@
       + '<div class="gcard-meta" style="max-width:740px">Các MCP anh đã kết nối sẵn trong Claude Code (đồng bộ từ claude.ai). Engine Claude Code tự dùng các cái "Connected". Đăng nhập/quản lý trong app Claude, không sửa ở đây.</div>'
       + '<div class="prov-list" id="mcpAmbient" style="margin-top:12px"><div class="mp-empty">Đang tải… (kiểm tra sức khoẻ MCP, hơi lâu)</div></div></div>';
     document.getElementById("mcpStrict").onchange = (e) => postJson("/mcp/strict", { strict: e.target.checked });
+    wireZaloListener(el);   // panel "Nghe tin liên tục" trong thẻ Zalo (chỉ có khi đã nối Zalo)
     const isFirst = conns.length === 0;
     el.querySelectorAll("[data-connect]").forEach(b => b.onclick = () => openAddFlow(el, byId[b.dataset.connect], isFirst));
     el.querySelectorAll("[data-addacc]").forEach(b => b.onclick = () => openAddFlow(el, byId[b.dataset.addacc], false));
@@ -2364,10 +3192,21 @@
     Alpine.store("nav", {
       active: "home",
       items: RAIL_ITEMS,
+      openGroup: groupLabelOf("home"),   // accordion 2 tầng: nhóm đang mở (mặc định nhóm chứa trang đầu)
+      collapsed: (() => { try { return localStorage.getItem("javis_rail_collapsed") === "1"; } catch (e) { return false; } })(),
+      collapseIcon: COLLAPSE_ICON,
+      get groups() { return railGroups(); },
       get meta() { return VIEW_META[this.active] || VIEW_META.home; },
+      isOpen(label) { return this.openGroup === label; },
+      toggleGroup(label) { this.openGroup = (this.openGroup === label) ? null : label; },   // 1 nhóm mở 1 lúc; bấm lại để đóng
+      toggleCollapsed() {   // thu/mở sidebar: thu → chỉ còn icon; mở → đầy chữ. Nhớ lựa chọn qua localStorage.
+        this.collapsed = !this.collapsed;
+        try { localStorage.setItem("javis_rail_collapsed", this.collapsed ? "1" : "0"); } catch (e) {}
+      },
       go(id) {
         const item = RAIL_ITEMS.find(i => i.id === id);
         if (item && item.launch) { item.launch(); recomputeGraph(); return; }  // launcher: không đổi view
+        const gl = groupLabelOf(id); if (gl) this.openGroup = gl;   // giữ nhóm chứa mục vừa mở luôn bung ra
         navigateTo(id);
       },
     });
@@ -2762,6 +3601,16 @@
     });
   }
 
+  // Cho khung sua file trong chat (file-editor.js) dung LAI dung bo may WYSIWYG cua editor cay:
+  // nap Turndown, doi HTML<->markdown (giu [[wikilink]]/![[anh]]), va thanh cong cu markdown.
+  if (typeof window !== "undefined") {
+    window.JavisNoteEditor = {
+      ensureTurndown: _ensureTurndown,
+      mdFromHtml: _mdFromHtml,
+      buildToolbar: _neBuildToolbar,
+    };
+  }
+
   async function openNote(rel, it) {
     const ed = document.getElementById("noteEditor"); if (!ed) return;
     it = it || {}; const ext = (it.ext || "").toLowerCase();
@@ -2835,6 +3684,36 @@
     _neRenderDownload(body, actions, rel, it); _vtMarkActive(null);
   }
 
+  // Tooltip NHANH cho rail khi thu gọn (native title trễ ~500ms). 1 node body-level, thoát mọi overflow clip.
+  function initRailTooltip() {
+    const nav = document.querySelector(".rail-nav"); if (!nav) return;
+    let tip = document.getElementById("railTip");
+    if (!tip) { tip = document.createElement("div"); tip.id = "railTip"; tip.className = "rail-tip"; document.body.appendChild(tip); }
+    let timer = null, cur = null;
+    const collapsed = () => document.body.classList.contains("rail-collapsed");
+    nav.addEventListener("mouseover", (e) => {
+      const btn = e.target.closest(".rail-item"); if (!btn || !collapsed() || btn === cur) return;
+      cur = btn;
+      if (btn.hasAttribute("title")) { btn.dataset.tip = btn.getAttribute("title"); btn.removeAttribute("title"); }  // chặn tooltip native chậm
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const label = btn.dataset.tip || ""; if (!label) return;
+        const r = btn.getBoundingClientRect();
+        tip.textContent = label;
+        tip.style.top = (r.top + r.height / 2) + "px";
+        tip.style.left = (r.right + 8) + "px";
+        tip.classList.add("show");
+      }, 90);
+    });
+    nav.addEventListener("mouseout", (e) => {
+      const btn = e.target.closest(".rail-item"); if (!btn) return;
+      if (e.relatedTarget && btn.contains(e.relatedTarget)) return;
+      clearTimeout(timer); tip.classList.remove("show");
+      if (btn.dataset.tip && !btn.hasAttribute("title")) btn.setAttribute("title", btn.dataset.tip);   // trả title cho accessibility
+      if (btn === cur) cur = null;
+    });
+  }
+
   function boot() {
     document.body.classList.add("has-rail");
     const ver = document.getElementById("railVersion");
@@ -2861,6 +3740,7 @@
 
     // Cột trái = Vault explorer (luôn có trong DOM ở màn home) → nạp cây ngay khi khởi động
     renderVaultTree();
+    initRailTooltip();   // tooltip nhanh cho rail thu gọn
 
     freshSettings().then(s => {
       graphEnabled = !(s.dashboard && s.dashboard.graph_enabled === false);
