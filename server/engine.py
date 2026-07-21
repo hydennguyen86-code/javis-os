@@ -242,6 +242,10 @@ OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 # LM Studio local server (OpenAI-compatible). Docker: đặt LMSTUDIO_BASE_URL=http://host.docker.internal:1234
 LMSTUDIO_BASE = os.environ.get("LMSTUDIO_BASE_URL", "http://127.0.0.1:1234").rstrip("/")
 LMSTUDIO_URL = LMSTUDIO_BASE + "/v1/chat/completions"
+# Ollama dùng API native, mặc định chạy local trên port 11434. Docker có thể đặt
+# OLLAMA_BASE_URL=http://host.docker.internal:11434.
+OLLAMA_BASE = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+OLLAMA_CHAT_URL = OLLAMA_BASE + "/api/chat"
 ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
 # Google Gemini qua endpoint TƯƠNG THÍCH OpenAI → dùng lại nguyên logic Chat Completions
 # (stream, usage, tool-calling) như OpenAI, chỉ khác base URL + auth Bearer bằng Gemini API key.
@@ -380,6 +384,45 @@ async def lmstudio_stream(model, messages, reasoning="off"):
         yield {"type": "error", "content": f"Không kết nối được LM Studio tại {LMSTUDIO_BASE}. Mở LM Studio → Developer → Start Server (port 1234). Chạy Docker thì đặt env LMSTUDIO_BASE_URL=http://host.docker.internal:1234"}
     except Exception as e:
         yield {"type": "error", "content": f"LM Studio lỗi: {_describe_exc(e)}"}
+
+
+async def ollama_stream(model, messages, reasoning="off"):
+    """Ollama local qua /api/chat, không cần API key.
+    Ollama stream từng JSON line thay vì SSE. Timeout dài vì model local có thể load chậm."""
+    payload = {"model": model or "", "messages": messages, "stream": True}
+    try:
+        timeout = httpx.Timeout(300.0, connect=10.0)
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            async with client.stream("POST", OLLAMA_CHAT_URL, json=payload) as r:
+                if r.status_code != 200:
+                    body = await r.aread()
+                    yield {"type": "error", "content": f"Ollama {r.status_code}: {body.decode('utf-8', 'replace')[:300]}"}
+                    return
+                got = False
+                strip = _ThinkScrubber()
+                async for line in r.aiter_lines():
+                    if not (line or "").strip():
+                        continue
+                    try:
+                        obj = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    c = (obj.get("message") or {}).get("content")
+                    if c:
+                        c = strip.feed(_sanitize_surrogates(c))
+                        if c:
+                            got = True
+                            yield {"type": "text", "content": c}
+                tail = strip.flush()
+                if tail:
+                    got = True
+                    yield {"type": "text", "content": tail}
+                if not got:
+                    yield {"type": "error", "content": "Ollama trả về rỗng. Kiểm tra model đã được tải bằng 'ollama pull <tên-model>' và đang chạy bằng 'ollama serve'."}
+    except httpx.ConnectError:
+        yield {"type": "error", "content": f"Không kết nối được Ollama tại {OLLAMA_BASE}. Chạy 'ollama serve' rồi thử lại. Chạy Docker thì đặt OLLAMA_BASE_URL=http://host.docker.internal:11434"}
+    except Exception as e:
+        yield {"type": "error", "content": f"Ollama lỗi: {_describe_exc(e)}"}
 
 
 async def anthropic_stream(api_key, model, messages, reasoning="off"):

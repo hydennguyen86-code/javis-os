@@ -531,6 +531,8 @@ PROVIDER_DEFS = [   # thứ tự = thứ tự hiển thị card ở trang Models
 
     {"id": "lmstudio",      "label": "LM Studio (Local)",       "kind": "api", "key_field": None,               "catalog_key": "lmstudio",
      "default_models": []},   # model load ĐỘNG từ /v1/models của LM Studio (model nào đang load thì hiện)
+    {"id": "ollama",        "label": "Ollama (Local)",          "kind": "api", "key_field": None,               "catalog_key": "ollama",
+     "default_models": []},   # model load ĐỘNG từ /api/tags của Ollama
 
     {"id": "gemini",        "label": "Google Gemini (API)",     "kind": "api", "key_field": "gemini_api_key",    "catalog_key": "gemini",
      "default_models": ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"]},
@@ -554,6 +556,8 @@ def _effective_main(cfg):
         return {"provider": "anthropic-api", "model": m.get("claude_model") or ""}
     if eng == "lmstudio":
         return {"provider": "lmstudio", "model": ""}
+    if eng == "ollama":
+        return {"provider": "ollama", "model": ""}
     return {"provider": "anthropic-cli", "model": m.get("claude_model") or "opus"}
 
 def _providers_view(cfg):
@@ -598,6 +602,9 @@ def _set_main_model(cfg, provider, model):
 
     elif provider == "lmstudio":
         m["engine"] = "lmstudio"
+
+    elif provider == "ollama":
+        m["engine"] = "ollama"
 
     elif provider == "gemini":
         m["engine"] = "gemini"
@@ -648,6 +655,9 @@ def _api_stream(prov, key, model, messages, reasoning="off"):
 
     if prov == "lmstudio":
         return engine.lmstudio_stream(model, messages, reasoning)
+
+    if prov == "ollama":
+        return engine.ollama_stream(model, messages, reasoning)
 
     if prov == "gemini":
         return engine.gemini_stream(key, model, messages, reasoning)
@@ -1463,6 +1473,12 @@ async def _fetch_provider_models(provider, m):
             r.raise_for_status()
             data = r.json().get("data", [])
         return [x.get("id") for x in data if x.get("id")] or None
+    if provider == "ollama":
+        async with httpx.AsyncClient(timeout=10) as c:
+            r = await c.get(engine.OLLAMA_BASE + "/api/tags")
+            r.raise_for_status()
+            data = r.json().get("models", [])
+        return [x.get("name") for x in data if x.get("name")] or None
     return None   # anthropic-cli: alias CLI, không list được → fallback catalog
 
 
@@ -4600,7 +4616,7 @@ async def websocket_endpoint(ws: WebSocket):
             prov, kind, api_key, api_model = _chat_provider(mcfg)
             reasoning = _reasoning_level(mcfg)
             api_ready = (
-                (kind == "api" and (bool(api_key) or prov == "lmstudio"))
+                (kind == "api" and (bool(api_key) or prov in ("lmstudio", "ollama")))
                 or kind == "oauth"
             )
             _row0 = store.get_session(conv_sid) or {}
@@ -4616,7 +4632,7 @@ async def websocket_endpoint(ws: WebSocket):
 
             # Model local chỉ chat thuần và context nhỏ hơn, nên dùng prompt gọn.
             # Claude/Codex/API cloud vẫn nhận prompt đầy đủ + ngữ cảnh dashboard như cũ.
-            if prov == "lmstudio":
+            if prov in ("lmstudio", "ollama"):
                 sysprompt = build_local_system_prompt(brain)
             else:
                 sysprompt = build_system_prompt(brain) + channel_context.build_channel_block(
@@ -4934,7 +4950,7 @@ async def _tg_answer(text, meta=None, progress=None):
     reasoning = _reasoning_level(mcfg)
 
     api_ready = (
-        (kind == "api" and (bool(api_key) or prov == "lmstudio"))
+        (kind == "api" and (bool(api_key) or prov in ("lmstudio", "ollama")))
         or kind == "oauth"
     )
 

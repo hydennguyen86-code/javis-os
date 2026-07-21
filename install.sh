@@ -28,8 +28,8 @@ fi
 
 log "Checking Python..."
 ok "$($PYTHON_BIN --version)"
-python3.12 -m venv --help >/dev/null 2>&1 || { command -v apt-get >/dev/null 2>&1 && $SUDO apt-get install -y python3-venv; }
-ok "$(python3.12 --version)"
+"$PYTHON_BIN" -m venv --help >/dev/null 2>&1 || { command -v apt-get >/dev/null 2>&1 && $SUDO apt-get install -y python3-venv; }
+ok "$($PYTHON_BIN --version)"
 
 # --- 2. system deps: git, ripgrep, ffmpeg (best-effort) ---
 log "Installing system deps (git, ripgrep, ffmpeg)..."
@@ -75,7 +75,7 @@ ok "Claude CLI $(claude --version 2>/dev/null || echo installed)"
 
 # --- 5. venv + python deps ---
 log "Creating virtualenv (.venv)..."
-[ -d .venv ] || python3.12 -m venv .venv
+[ -d .venv ] || "$PYTHON_BIN" -m venv .venv
 ./.venv/bin/pip install --upgrade pip -q
 ./.venv/bin/pip install -r requirements.txt -q
 ok "Python deps installed"

@@ -28,9 +28,9 @@ Nói ngắn gọn: Javis xây trên **CLI dạng agent của nhà cung cấp** -
 2. Ở thanh bên trái, bấm mục **Models**.
 3. Trang Models hiện 4 khối theo thứ tự: **Main Model**, **Providers**, **Auxiliary**, **Suy nghĩ**.
 
-## Năm provider có sẵn
+## Các provider có sẵn
 
-Trang **Providers** liệt kê 5 nhà cung cấp theo đúng thứ tự này:
+Trang **Providers** liệt kê các nhà cung cấp theo đúng thứ tự này:
 
 | Provider (nhãn trên màn hình) | Kiểu kết nối | Ghi chú |
 |---|---|---|
@@ -39,6 +39,8 @@ Trang **Providers** liệt kê 5 nhà cung cấp theo đúng thứ tự này:
 | **OpenRouter** | Dán API key | Nhiều model 1 chỗ, MCP + tool file + skill qua hub |
 | **Anthropic (API)** | Dán API key | MCP + tool file + skill qua hub (từ 0.9) |
 | **OpenAI (ChatGPT API)** | Dán API key | MCP + tool file + skill qua hub |
+| **LM Studio (Local)** | Server local tại cổng 1234 | Chat thuần, không cần API key |
+| **Ollama (Local)** | Ollama tại cổng 11434 | Chat thuần, không cần API key. Chạy `ollama serve` và tải model trước bằng `ollama pull <tên-model>` |
 
 Mỗi card provider hiển thị trạng thái: **● Đã kết nối** hoặc **○ Chưa kết nối**, kèm số model khả dụng. Card nào đang là Main Model sẽ có nhãn **MAIN**.
 
