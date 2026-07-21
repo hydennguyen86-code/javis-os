@@ -4,6 +4,17 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.145] - 2026-07-21
+Sửa lỗi tick chọn cuộc chat theo dõi trên Zalo cứ mất sau khi tải lại trang hoặc khởi động lại server.
+### Sửa lỗi
+- **Tick theo dõi biến mất khi tải lại**: danh sách cuộc chat trong panel chỉ vẽ từ sổ tạm trong bộ nhớ (dựng lại từ tin đến), mà sổ này rỗng mỗi khi khởi động lại server. Luật theo dõi vẫn còn nguyên trên đĩa nhưng không có dòng nào để hiện, nên tick biến mất dù thực ra vẫn đang theo dõi. Nay panel vẽ từ HỢP của sổ tạm và các luật đang bật, và server tự nạp lại sổ từ luật ngay khi khởi động, nên cuộc chat đang theo dõi luôn hiện và tick được ngay, không phải đợi có tin mới đi qua.
+- **Hai cuộc chat trùng tên ghi đè luật của nhau**: file luật trước đây đặt tên theo TÊN cuộc chat, mà hệ thống lại cố ý đặt tên trùng cho nhóm chưa biết tên. Hai nhóm khác nhau cùng tên ghi vào một file, lưu cái sau xoá mất luật cái trước, tick của nó biến mất khi tải lại. Nay tên file gắn thẳng mã cuộc chat nên không thể đụng nhau.
+- **Lưu danh sách rỗng làm mất sạch theo dõi**: bản web cũ gửi khuôn dữ liệu cũ bị hiểu nhầm là "bỏ hết", tắt sạch mọi luật đang theo dõi. Nay chỉ bỏ theo dõi khi chủ gửi rõ danh sách mới.
+- **Nhóm bị hiện thành cá nhân sau khởi động lại**: luật giờ ghi kèm loại nhóm hay khách, nên sau khởi động lại vẫn dựng đúng nhãn nhóm và gửi tin đúng kiểu nhóm, không còn nhầm.
+- Dọn khoá cấu hình rác cũ (threads, dm_only, keywords) còn sót trong settings, tránh nó rò ngược vào ô từ khoá của giao diện và lật cuộc chat theo dõi thành lọc từ khoá.
+### Lưu ý
+- Nếu server đang chạy bản cũ thì phải KHỞI ĐỘNG LẠI server rồi tải lại trang (Ctrl+F5) thì bản vá này mới có tác dụng. Bản cũ không ghi được tick xuống đĩa nên tải lại là mất.
+
 ## [0.9.144] - 2026-07-21
 Sửa lỗi bảng nghe Zalo cứ hiện "Mất kết nối, đang thử lại" dù thực ra vẫn đang nghe bình thường.
 ### Sửa lỗi

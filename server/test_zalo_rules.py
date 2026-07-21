@@ -34,16 +34,18 @@ def ev(**kw):
 
 # ---- 1. Ghi rồi đọc lại phải ra đúng cái đã ghi ----
 r = {"thread_id": "t1", "thread_name": "Nhóm Kim Khí Hà Lộc", "mode": "nhac-quen",
-     "enabled": True, "owner_uid": "uOwner", "escalate_after_min": 45,
+     "enabled": True, "owner_uid": "uOwner", "escalate_after_min": 45, "thread_type": "group",
      "script": "Ghi chú của chủ về nhóm.\nDòng thứ hai."}
 p = zr.save_rule(BRAIN, r)
-check("file: ghi ra đúng <brain>/Javis/zalo/<slug>.md",
-      Path(p).parent == zr.rules_dir(BRAIN) and Path(p).name == "nhom-kim-khi-ha-loc.md")
+check("file: ghi ra đúng <brain>/Javis/zalo/<slug>.md, tên file GẮN thread_id (chống trùng)",
+      Path(p).parent == zr.rules_dir(BRAIN) and Path(p).name == "nhom-kim-khi-ha-loc-t1.md")
 
 back = zr.parse_rule(Path(p).read_text(encoding="utf-8"), p)
 check("vòng tròn: thread_id giữ nguyên", back["thread_id"] == "t1")
 check("vòng tròn: mode giữ nguyên", back["mode"] == "nhac-quen")
 check("vòng tròn: enabled giữ nguyên", back["enabled"] is True)
+check("vòng tròn: thread_type giữ nguyên (để dựng đúng nhãn nhóm sau khi khởi động lại)",
+      back["thread_type"] == "group")
 check("vòng tròn: phần thân nhiều dòng không vỡ", "thứ hai" in back["script"]
       and back["script"].count("\n") == 1)
 check("vòng tròn: escalate_after_min giữ nguyên", back["escalate_after_min"] == 45)
@@ -53,6 +55,17 @@ check("phần thân nằm ở THÂN file, không nhồi vào YAML",
 check("liệt kê: thấy luật vừa ghi", len(zr.list_rules(BRAIN)) == 1)
 check("brain chưa có thư mục luật thì trả rỗng, không nổ",
       zr.list_rules(tempfile.mkdtemp(prefix="javis-trong-")) == [])
+
+# CHỐNG TRÙNG FILE: hai cuộc chat KHÁC id nhưng CÙNG tên (sổ cố ý đặt tên trùng cho nhóm
+# chưa biết tên) phải ra HAI file khác nhau. Trước đây slug theo tên -> cùng file -> lưu
+# cái sau xoá luật cái trước -> tick của nó biến mất khi tải lại.
+BC = tempfile.mkdtemp(prefix="javis-collide-")
+pa = zr.save_rule(BC, {"thread_id": "g111", "thread_name": "Minh Quý", "mode": "im-lang", "enabled": True})
+pb = zr.save_rule(BC, {"thread_id": "g222", "thread_name": "Minh Quý", "mode": "im-lang", "enabled": True})
+check("chống trùng: hai chat cùng TÊN khác ID ra HAI file riêng", pa != pb)
+check("chống trùng: cả hai luật cùng tồn tại, không cái nào bị ghi đè",
+      len(zr.list_rules(BC)) == 2
+      and {x["thread_id"] for x in zr.list_rules(BC)} == {"g111", "g222"})
 
 # Mode lạ (gõ sai tay) phải rơi về im lặng, KHÔNG được đoán thành chế độ nào khác
 odd = zr.parse_rule("---\nmode: tu-tra-loi-het\nenabled: true\n---\nx")

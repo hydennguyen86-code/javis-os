@@ -69,6 +69,9 @@ def _norm(meta: dict, body: str, path=None) -> dict:
     return {
         "thread_id": str(meta.get("thread_id") or "").strip(),
         "thread_name": str(meta.get("thread_name") or "").strip(),
+        # Loại nhóm/khách, để dựng đúng nhãn "(nhóm)" và gửi đúng thread_type kể cả sau khi
+        # khởi động lại (lúc sổ cuộc chat còn rỗng, chưa học lại được từ webhook).
+        "thread_type": str(meta.get("thread_type") or "").strip(),
         "mode": mode,
         "enabled": bool(meta.get("enabled")),
         "keywords": [str(k).strip() for k in kws if str(k).strip()],
@@ -93,9 +96,11 @@ def dump_rule(rule: dict) -> str:
         return '"' + str(v).replace('"', "'") + '"'
     lines = ["---", "type: zalo-rule",
              f"thread_id: {q(rule.get('thread_id', ''))}",
-             f"thread_name: {q(rule.get('thread_name', ''))}",
-             f"mode: {rule.get('mode') or DEFAULT_MODE}",
-             f"enabled: {'true' if rule.get('enabled') else 'false'}"]
+             f"thread_name: {q(rule.get('thread_name', ''))}"]
+    if rule.get("thread_type"):
+        lines.append(f"thread_type: {rule.get('thread_type')}")
+    lines += [f"mode: {rule.get('mode') or DEFAULT_MODE}",
+              f"enabled: {'true' if rule.get('enabled') else 'false'}"]
     if rule.get("keywords"):
         lines.append("keywords: [" + ", ".join(q(k) for k in rule["keywords"]) + "]")
     if rule.get("mode") == "nhac-quen":
@@ -122,12 +127,27 @@ def list_rules(brain_root) -> list:
     return out
 
 
+def slug_for(rule: dict) -> str:
+    """Tên file DUY NHẤT theo thread_id, để hai cuộc chat TRÙNG TÊN không ghi đè lên nhau.
+
+    Sổ cuộc chat CỐ Ý đặt tên trùng cho nhóm chưa biết tên (lấy tên người gửi gần nhất), nên
+    nếu chỉ slug theo tên thì hai nhóm khác nhau cùng ghi vào MỘT file - lưu cái sau xoá mất
+    luật cái trước, và tick của nó biến mất khi tải lại. Gắn thẳng thread_id vào tên file để
+    ánh xạ 1-1 với thread_id. Cắt phần tên ngắn lại rồi mới nối id, để id không bị cắt cụt."""
+    tid = re.sub(r"[^a-z0-9]+", "-", str(rule.get("thread_id") or "").lower()).strip("-")
+    nm = slugify(rule.get("thread_name") or "")[:32]
+    if tid:
+        return (nm + "-" + tid).strip("-") if nm else tid
+    return nm or "cuoc-chat"
+
+
 def save_rule(brain_root, rule: dict) -> str:
     d = rules_dir(brain_root)
     d.mkdir(parents=True, exist_ok=True)
-    slug = rule.get("slug") or slugify(rule.get("thread_name") or rule.get("thread_id"))
+    slug = rule.get("slug") or slug_for(rule)
     p = d / f"{slug}.md"
-    tmp = d / f".{slug}.md.tmp"
+    # Tên tạm kèm pid để hai lần lưu đồng thời (chủ tick nhanh) không giẫm lên tmp của nhau.
+    tmp = d / f".{slug}.{os.getpid()}.md.tmp"
     tmp.write_text(dump_rule(rule), encoding="utf-8")
     os.replace(tmp, p)     # ghi nguyên tử: đọc giữa chừng không bao giờ thấy file cụt
     return str(p)

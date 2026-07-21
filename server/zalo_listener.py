@@ -249,6 +249,26 @@ class Roster:
         return [x["id"] for x in self._items.values()
                 if x.get("type") == "group" and not x.get("named")]
 
+    def seed_from_rules(self, rules: list) -> int:
+        """Nạp trước sổ từ các luật ĐANG BẬT, để cuộc chat đang theo dõi HIỆN NGAY sau khi
+        khởi động lại - không phải đợi có tin mới đi qua.
+
+        Sổ vốn dựng từ webhook nên rỗng lúc tiến trình mới chạy: cuộc chat đang theo dõi
+        biến mất khỏi giao diện dù luật vẫn còn trên đĩa (đúng lỗi 'tải lại là mất tick').
+        Nạp từ luật vá đúng chỗ đó, và cũng cho send_from_chat gửi đúng thread_type. KHÔNG
+        đè mục đã học từ webhook (mục đó mới và chính xác hơn)."""
+        n = 0
+        for r in rules or []:
+            tid = str(r.get("thread_id") or "")
+            if not tid or tid in self._items or not r.get("enabled"):
+                continue
+            self._items[tid] = {
+                "id": tid, "name": r.get("thread_name") or tid,
+                "type": r.get("thread_type") or "user",
+                "named": True, "count": 0, "last": 0.0, "from_rule": True}
+            n += 1
+        return n
+
 
 class SeenSet:
     """Khử trùng msgId: CLI gửi lại sau khi nối lại là chuyện thường, không được
@@ -877,7 +897,10 @@ class _Runner:
 def read_cfg(deps: ZaloListenerDeps) -> dict:
     cfg = dict(DEFAULT_CFG)
     try:
-        cfg.update(deps.read_settings().get("zalo_listener") or {})
+        raw = deps.read_settings().get("zalo_listener") or {}
+        for k in DEFAULT_CFG:          # CHỈ nhận khoá thuộc schema hiện tại, bỏ rác cũ
+            if k in raw:               # (threads/dm_only/keywords do bản trước để lại, nếu
+                cfg[k] = raw[k]        # lọt ra /status thì rò ngược vào ô từ khoá của giao diện)
     except Exception:
         pass
     return cfg
@@ -885,8 +908,11 @@ def read_cfg(deps: ZaloListenerDeps) -> dict:
 
 def write_cfg(deps: ZaloListenerDeps, patch: dict) -> dict:
     s = deps.read_settings()
+    existing = s.get("zalo_listener") or {}
     cur = dict(DEFAULT_CFG)
-    cur.update(s.get("zalo_listener") or {})
+    for k in DEFAULT_CFG:              # giữ khoá cũ thuộc schema, VỨT khoá rác ngoài schema
+        if k in existing:
+            cur[k] = existing[k]
     for k in DEFAULT_CFG:
         if k in patch and patch[k] is not None:
             cur[k] = patch[k]
@@ -1131,24 +1157,29 @@ def register(app, deps: ZaloListenerDeps):
         # Giao diện giờ chỉ còn MỘT hành vi: theo dõi = chỉ đọc + báo. `modes` là {tid: *} -
         # có mặt tid nghĩa là đang theo dõi (giá trị không còn phân biệt gì). Vẫn nhận khuôn
         # cũ (mảng threads) để bản web chưa nạp lại không gãy.
-        modes = payload.get("modes")
-        if not isinstance(modes, dict):
-            modes = {str(t): True for t in (payload.get("threads") or [])}
+        # `explicit_modes` phân biệt "chủ GỬI RÕ danh sách (kể cả rỗng = bỏ hết)" với "client
+        # CŨ không gửi modes". Không phân biệt thì payload cũ {threads:[]} bị hiểu là "bỏ hết"
+        # và xoá sạch cuộc chat đang theo dõi - đúng một đường làm mất tick.
+        explicit_modes = isinstance(payload.get("modes"), dict)
+        modes = payload.get("modes") if explicit_modes else \
+            {str(t): True for t in (payload.get("threads") or [])}
         kws = [str(k).strip() for k in (payload.get("keywords") or []) if str(k).strip()]
         # Lưu LUÔN tài khoản đang chọn. Trước đây ô này chỉ được ghi khi bấm "Bật nghe",
         # nên chủ thấy tên hiện trong ô mà cấu hình vẫn trống, rồi bị báo "chưa chọn tài
         # khoản" một cách vô lý.
         write_cfg(deps, {"quiet_hours": payload.get("quiet_hours") or "",
                          "conn_id": payload.get("conn_id") or None})
-        names = {x["id"]: x.get("name") for x in roster.list()}
+        # Giữ nguyên CẢ mục sổ (tên + type), không chỉ tên: type để ghi vào luật cho đúng nhãn.
+        meta = {x["id"]: x for x in roster.list()}
         rules = zalo_rules.list_rules(brain)
         n_doc = off = 0
         for tid in modes:
             tid = str(tid)
+            info = meta.get(tid) or {}
             # Theo dõi = báo theo từ khoá nếu chủ có nhập, không thì chỉ ghi nhận im lặng.
             mode = "tu-khoa" if kws else "im-lang"
             r = zalo_rules.rule_for(rules, tid) or {
-                "thread_id": tid, "thread_name": names.get(tid) or tid,
+                "thread_id": tid, "thread_name": info.get("name") or tid,
                 "escalate_after_min": 30, "owner_uid": "", "script": ""}
             # Giữ nguyên nhac-quen chủ cố ý đặt qua chat; các cuộc chat còn lại theo panel.
             if r.get("mode") != "nhac-quen":
@@ -1156,15 +1187,28 @@ def register(app, deps: ZaloListenerDeps):
             r["keywords"] = kws if r["mode"] == "tu-khoa" else r.get("keywords") or []
             r["enabled"] = True
             if not r.get("thread_name"):
-                r["thread_name"] = names.get(tid) or tid
+                r["thread_name"] = info.get("name") or tid
+            # Ghi loại nhóm/khách vào luật để sau khi khởi động lại (sổ rỗng) vẫn dựng đúng
+            # dòng "(nhóm)" và gửi đúng thread_type. Chỉ cập nhật khi sổ đang biết.
+            if info.get("type"):
+                r["thread_type"] = info["type"]
             r["updated"] = time.strftime("%Y-%m-%d")
-            zalo_rules.save_rule(brain, r)
-            n_doc += 1
-        for r in rules:
-            if str(r.get("thread_id")) not in modes and r.get("enabled"):
-                r["enabled"] = False
+            try:
                 zalo_rules.save_rule(brain, r)
-                off += 1
+                n_doc += 1
+            except OSError as e:      # một file kẹt không được làm hỏng cả mẻ lưu
+                print(f"[zalo watch] lưu luật {tid} lỗi: {e}", file=sys.stderr)
+        # CHỈ bỏ theo dõi khi chủ GỬI RÕ danh sách (modes dict, kể cả rỗng) hoặc threads có
+        # phần tử. Client cũ gửi {threads:[]} rỗng thì KHÔNG động vào (đừng xoá sạch).
+        if explicit_modes or payload.get("threads"):
+            for r in rules:
+                if str(r.get("thread_id")) not in modes and r.get("enabled"):
+                    r["enabled"] = False
+                    try:
+                        zalo_rules.save_rule(brain, r)
+                        off += 1
+                    except OSError as e:
+                        print(f"[zalo watch] tắt luật lỗi: {e}", file=sys.stderr)
         bits = []
         if n_doc:
             bits.append(f"{n_doc} cuộc chat theo dõi"
@@ -1279,6 +1323,16 @@ def register(app, deps: ZaloListenerDeps):
                               f"báo lại thì nhập từ khoá trong panel, hoặc dặn thẳng trong chat.")
         except Exception as e:
             print(f"[zalo listener] migrate lỗi: {e}", file=sys.stderr)
+        # Nạp sổ cuộc chat từ luật ĐANG BẬT: sau khi khởi động lại sổ rỗng, nếu không nạp
+        # trước thì cuộc chat đang theo dõi biến mất khỏi giao diện tới khi có tin mới. Làm
+        # bất kể listener bật hay tắt, để trang Kết nối luôn hiện đúng những gì đang theo dõi.
+        try:
+            n_seed = roster.seed_from_rules(_rules())
+            if n_seed:
+                print(f"[zalo listener] nạp sổ {n_seed} cuộc chat từ luật đang theo dõi",
+                      file=sys.stderr)
+        except Exception as e:
+            print(f"[zalo listener] nạp sổ từ luật lỗi: {e}", file=sys.stderr)
         cfg = read_cfg(deps)
         if not cfg.get("enabled"):
             return

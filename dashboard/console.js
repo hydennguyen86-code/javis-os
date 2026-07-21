@@ -2323,7 +2323,22 @@
       return true;
     };
     const paintRoster = (st) => {
-      const list = st.roster || [];
+      const enabledRules = (st.rules || []).filter(x => x.enabled);
+      // Luật đang bật = đang theo dõi -> đảm bảo có tick. Chỉ THÊM chứ không xoá tick đang
+      // có (chủ có thể vừa tick tại chỗ, chưa lưu xong), để nhịp hỏi lại không đè mất.
+      enabledRules.forEach(x => { if (!modes[x.thread_id]) modes[x.thread_id] = "chi-doc"; });
+      // Nguồn vẽ = sổ cuộc chat (roster) HỢP với cuộc chat đang có LUẬT bật. Sổ là bộ nhớ
+      // tạm, RỖNG sau khi khởi động lại server, nên nếu chỉ dựa vào nó thì cuộc chat đang
+      // theo dõi biến mất khỏi giao diện dù luật vẫn còn trên đĩa - đúng lỗi "tải lại là
+      // mất tick". Ghép luật vào để tick luôn hiện và bỏ được, kể cả khi chưa có tin mới.
+      const byId = {};
+      (st.roster || []).forEach(t => { byId[t.id] = t; });
+      enabledRules.forEach(x => {
+        if (!byId[x.thread_id]) byId[x.thread_id] = {
+          id: x.thread_id, name: x.thread_name || x.thread_id,
+          type: x.thread_type || "user", named: true, last: 0 };
+      });
+      const list = Object.values(byId);
       const q = ($("zlSearch").value || "").trim().toLowerCase();
       // Khoá vẽ lại gồm cả trạng thái bật/tắt, từ khoá tìm và cờ xem-thêm: thiếu cái nào
       // thì thao tác đó không có tác dụng vì bị guard chặn.

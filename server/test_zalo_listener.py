@@ -949,5 +949,73 @@ check("tin moi ve: bang chung cung, bao dang nghe ngay du vua co dong dut",
       rnE.status()["state"] == "listening")
 
 
+# ---- 27. Tick theo dõi phải SỐNG SÓT khởi động lại + ghi đúng thread_type ----
+# Lỗi thật (chủ mệt mỏi, thử nhiều bản vẫn lỗi): tick chọn cuộc chat + Lưu theo dõi, RELOAD
+# lại thì tick MẤT. Gốc: sổ cuộc chat là bộ nhớ tạm, RỖNG sau khi khởi động lại server, mà
+# giao diện chỉ vẽ từ sổ. Luật vẫn còn trên đĩa nhưng không có dòng nào để hiện. Vá: nạp sổ
+# từ luật đang bật + ghi thread_type vào luật để dựng lại đúng.
+B7 = _tf.mkdtemp(prefix="javis-persist-")
+_st7 = {"zalo_listener": {**zl.DEFAULT_CFG, "enabled": True, "conn_id": "cP", "secret": "s"}}
+def deps7():
+    return mkdeps(read_settings=lambda: _st7, write_settings=lambda s: _st7.update(s),
+                  brain_root=lambda: B7, brain_roots=lambda: [B7],
+                  resolved_conns=lambda: [{"id": "cP", "env": {"HOME": "/khong-co"}}])
+app7 = FastAPI(); feat7 = zl.register(app7, deps7()); cl7 = TestClient(app7)
+
+for evd in (
+    {"event": "message", "data": {"msgId": "p1", "threadId": "u1", "content": "hi", "dName": "Minh Quý"}},
+    {"event": "message", "data": {"msgId": "p2", "threadId": "g1", "threadType": "group",
+                                  "groupName": "Nhóm Kim Khí", "dName": "Ai đó", "content": "hi"}},
+):
+    asyncio.run(feat7.handle_event(zl.normalize_event(evd), zl.read_cfg(deps7())))
+
+r = cl7.post("/zalo-listener/watch",
+             json={"conn_id": "cP", "modes": {"u1": "chi-doc", "g1": "chi-doc"}, "keywords": []}).json()
+check("persist: lưu 2 cuộc chat ra 2 file luật THẬT", r.get("doc") == 2)
+rules7 = {x["thread_id"]: x for x in zr.list_rules(B7)}
+check("persist: NHÓM ghi thread_type=group vào luật (để sau restart dựng đúng nhãn + gửi đúng)",
+      rules7["g1"].get("thread_type") == "group")
+check("persist: khách ghi thread_type=user", rules7["u1"].get("thread_type") == "user")
+
+# GIẢ LẬP KHỞI ĐỘNG LẠI: đăng ký feature MỚI (sổ RỖNG), gọi autostart để nạp sổ từ luật.
+app7b = FastAPI(); feat7b = zl.register(app7b, deps7()); cl7b = TestClient(app7b)
+check("restart: sổ RỖNG ngay sau khi khởi động lại (chưa nạp)",
+      len(cl7b.get("/zalo-listener/status").json().get("roster", [])) == 0)
+asyncio.run(feat7b.autostart())      # home không có nên listener không chạy, nhưng SEED vẫn chạy
+st7b = cl7b.get("/zalo-listener/status").json()
+seeded = {x["id"]: x for x in st7b.get("roster", [])}
+check("restart: sổ được NẠP từ luật đang bật -> cuộc chat theo dõi hiện lại NGAY, không đợi tin mới",
+      "u1" in seeded and "g1" in seeded)
+check("restart: nhóm nạp lại giữ đúng type=group (nhãn '(nhóm)' + send_from_chat gửi đúng)",
+      seeded.get("g1", {}).get("type") == "group")
+check("restart: luật vẫn còn và vẫn BẬT sau khi khởi động lại",
+      {x["thread_id"] for x in st7b.get("rules", []) if x.get("enabled")} >= {"u1", "g1"})
+
+# CHỐNG XOÁ SẠCH: client CŨ gửi {threads:[]} (không có 'modes') KHÔNG được bỏ hết theo dõi.
+cl7b.post("/zalo-listener/watch", json={"threads": []})
+check("chống xoá sạch: payload cũ {threads:[]} KHÔNG tắt hết luật đang theo dõi",
+      {x["thread_id"] for x in zr.list_rules(B7) if x.get("enabled")} >= {"u1", "g1"})
+# Nhưng gửi RÕ modes rỗng thì đúng là bỏ hết có chủ đích.
+cl7b.post("/zalo-listener/watch", json={"modes": {}})
+check("bỏ hết có chủ đích: gửi RÕ modes:{} thì mới tắt hết theo dõi",
+      {x["thread_id"] for x in zr.list_rules(B7) if x.get("enabled")} == set())
+
+
+# ---- 28. write_cfg / read_cfg VỨT khoá rác cũ (threads/dm_only/keywords) ----
+# Settings live của chủ còn dính threads:[]/dm_only:true - dấu vết bản cũ. Chúng rò qua
+# /status vào ô từ khoá của giao diện, và có thể lật cuộc chat theo dõi thành tu-khoa.
+_st8 = {"zalo_listener": {**zl.DEFAULT_CFG, "conn_id": "cH", "secret": "s",
+                          "threads": ["x"], "dm_only": True, "keywords": ["giá"]}}
+d8 = mkdeps(read_settings=lambda: _st8, write_settings=lambda s: _st8.update(s))
+zl.write_cfg(d8, {"quiet_hours": "23-07"})
+saved8 = _st8["zalo_listener"]
+check("hygiene: write_cfg VỨT khoá rác ngoài schema (threads/dm_only/keywords)",
+      "threads" not in saved8 and "dm_only" not in saved8 and "keywords" not in saved8)
+check("hygiene: vẫn giữ khoá hợp lệ", saved8.get("conn_id") == "cH" and saved8.get("quiet_hours") == "23-07")
+cfg8 = zl.read_cfg(mkdeps(read_settings=lambda: {"zalo_listener": {**zl.DEFAULT_CFG,
+        "conn_id": "cH", "threads": ["x"], "keywords": ["giá"]}}))
+check("hygiene: read_cfg cũng không lộ khoá rác ra /status", "keywords" not in cfg8 and "threads" not in cfg8)
+
+
 print("\n" + ("TAT CA OK" if not _fails else f"{len(_fails)} FAIL: {_fails}"))
 sys.exit(1 if _fails else 0)

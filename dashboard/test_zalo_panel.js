@@ -108,6 +108,23 @@ check("theo doi: tick chon thi ghi vao modes roi gui len server",
 check("theo doi: khoa ve lai van gom MODE de luat doi (vd nhac-quen) thi ve lai dung",
   src.indexOf('x.thread_id + ":" + x.mode') !== -1);
 
+// ---- TICK PHAI SONG SOT RELOAD/RESTART: ve tu LUAT, khong chi tu roster ----
+// Bug that (chu met moi): tick chon cuoc chat, luu, reload lai thi mat. Roster la bo nho
+// tam, rong sau khi khoi dong lai; neu chi ve tu roster thi cuoc chat theo doi bien mat du
+// luat con tren dia. paintRoster phai ghep cuoc chat co LUAT bat vao danh sach ve.
+const prStart = src.indexOf("const paintRoster = (st) =>");
+const prBlock = src.slice(prStart, src.indexOf("const paint =", prStart));
+check("render: paintRoster ghep sổ voi cuoc chat co luat bat (union), khong chi roster",
+  prBlock.indexOf("Object.values(byId)") !== -1
+  && /st\.rules\s*\|\|\s*\[\]\)\.filter\(x\s*=>\s*x\.enabled\)/.test(prBlock));
+check("render: cuoc chat co luat bat ma vang khoi roster van duoc dung dong tu thread_id/thread_name",
+  prBlock.indexOf("id: x.thread_id") !== -1 && prBlock.indexOf("name: x.thread_name") !== -1);
+check("render: KHONG con lay danh sach ve THANG tu roster ('const list = st.roster')",
+  src.indexOf("const list = st.roster") === -1);
+check("render: nguon ve la union byId roi moi tinh picked/rest tu do",
+  prBlock.indexOf("const list = Object.values(byId)") !== -1
+  && prBlock.indexOf("list.filter(t => modes[t.id])") !== -1);
+
 // ---- Chong "va nham nho": doi bien ma sot cho dung cu ----
 // Bug that (0.9.136): doi `selected` -> `modes` o phan khai bao nhung cfgBody() con dung
 // `selected` -> ReferenceError khi bam Bat nghe -> nut van ve "Bat nghe", khong gi dien ra.
