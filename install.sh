@@ -15,21 +15,21 @@ err()  { echo -e "${RED}xx${NC} $*" >&2; }
 
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$APP_DIR"
-
+export PATH="/opt/homebrew/opt/python@3.12/libexec/bin:$PATH"
+hash -r
 SUDO=""; [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1 && SUDO="sudo"
 
 # --- 1. python3 + venv + pip ---
-log "Checking Python 3..."
-if ! command -v python3 >/dev/null 2>&1; then
-  log "Installing python3..."
-  if command -v apt-get >/dev/null 2>&1; then
-    $SUDO apt-get update -qq && $SUDO apt-get install -y python3 python3-venv python3-pip
-  elif command -v dnf >/dev/null 2>&1; then $SUDO dnf install -y python3 python3-pip
-  elif command -v brew >/dev/null 2>&1; then brew install python
-  else err "Install python3 manually then re-run."; exit 1; fi
+PYTHON_BIN="python3"
+
+if command -v python3.12 >/dev/null 2>&1; then
+  PYTHON_BIN="python3.12"
 fi
-python3 -m venv --help >/dev/null 2>&1 || { command -v apt-get >/dev/null 2>&1 && $SUDO apt-get install -y python3-venv; }
-ok "$(python3 --version)"
+
+log "Checking Python..."
+ok "$($PYTHON_BIN --version)"
+python3.12 -m venv --help >/dev/null 2>&1 || { command -v apt-get >/dev/null 2>&1 && $SUDO apt-get install -y python3-venv; }
+ok "$(python3.12 --version)"
 
 # --- 2. system deps: git, ripgrep, ffmpeg (best-effort) ---
 log "Installing system deps (git, ripgrep, ffmpeg)..."
@@ -75,7 +75,7 @@ ok "Claude CLI $(claude --version 2>/dev/null || echo installed)"
 
 # --- 5. venv + python deps ---
 log "Creating virtualenv (.venv)..."
-[ -d .venv ] || python3 -m venv .venv
+[ -d .venv ] || python3.12 -m venv .venv
 ./.venv/bin/pip install --upgrade pip -q
 ./.venv/bin/pip install -r requirements.txt -q
 ok "Python deps installed"
